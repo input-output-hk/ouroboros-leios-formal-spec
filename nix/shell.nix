@@ -6,16 +6,11 @@
 # Each flake variant defined in your project.nix project will yield a separate
 # shell. If no flake variants are defined, then cabalProject is the original 
 # project.
-cabalProject:
-
 let
-
   agda = import ./agda.nix {inherit pkgs lib inputs;};
   emacsWithPackages = pkgs.emacs.pkgs.withPackages (epkgs: [ epkgs.agda2-mode pkgs.mononoki ]);
-
 in 
-
-{
+lib.iogx.mkShell {
   name = "nix-shell";
 
   packages = [
