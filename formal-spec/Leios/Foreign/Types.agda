@@ -10,7 +10,7 @@ open import Tactic.Derive.HsType
 
 open import Leios.Prelude
 open import Leios.Foreign.Defaults
-  renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda) --  LeiosState to LeiosStateAgda)
+  renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda)
 open import Leios.Foreign.BaseTypes
 open import Leios.Foreign.HsTypes
 open import Leios.Foreign.Util
@@ -22,10 +22,10 @@ module Leios.Foreign.Types where
 #-}
 
 dropDash : S.String → S.String
-dropDash = S.concat ∘ (S.wordsByᵇ ('-' C.≈ᵇ_))
+dropDash = S.concat ∘ S.wordsByᵇ ('-' C.≈ᵇ_)
 
 prefix : S.String → S.String → S.String
-prefix p = p S.++_
+prefix = S._++_
 
 instance
   HsTy-SlotUpkeep = autoHsType SlotUpkeep ⊣ onConstructors dropDash
@@ -77,7 +77,6 @@ data EndorserBlock = EndorserBlock { slotNumber :: Integer, producerID :: Intege
 {-# COMPILE GHC EndorserBlock = data EndorserBlock (EndorserBlock) #-}
 
 instance
-
   HsTy-EndorserBlock = MkHsType EndorserBlockAgda EndorserBlock
 
   Conv-EndorserBlock : Convertible EndorserBlockAgda EndorserBlock
