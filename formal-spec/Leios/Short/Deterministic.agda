@@ -56,7 +56,7 @@ data _⊢_ : LeiosInput → LeiosState → Type where
        ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-V / K.PUBKEYS pks ⟧⇀ ks'
        ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
        ────────────────────────────────────────────────────────────────
-       INIT V ⊢ initLeiosState V SD bs'
+       INIT V ⊢ initLeiosState V SD bs' pks
 
 data _-⟦Base⟧⇀_ : LeiosState → LeiosState → Type where
 
@@ -242,7 +242,7 @@ data _-⟦_/_⟧⇀_ : LeiosState → LeiosInput → LeiosOutput → LeiosState 
                     ; slot     = suc slot
                     ; Upkeep   = ∅
                     ; BaseState = bs'
-                    } ↑ L.filter isValid? msgs
+                    } ↑ L.filter (isValid? s) msgs
        in
        ∙ Upkeep ≡ᵉ allUpkeep
        ∙ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG rbs ⟧⇀ bs'
@@ -284,7 +284,7 @@ _-⟦_/_⟧ⁿᵈ*⇀_ = ReflexiveTransitiveClosure _-⟦_/_⟧ⁿᵈ⇀_
   let
     s0 = _
     upkeep≡∅ : LeiosState.Upkeep s0 ≡ ∅
-    upkeep≡∅ = sym (↑-preserves-Upkeep {x = L.filter isValid? msgs})
+    upkeep≡∅ = sym (↑-preserves-Upkeep {x = L.filter (isValid? s) msgs})
     needsAllUpkeep : ∀ {u} → LeiosState.needsUpkeep s0 u
     needsAllUpkeep {u} = subst (u ∉_) (sym upkeep≡∅) Properties.∉-∅
     needsUpkeep1 : ∀ {u} → u ≢ Base → LeiosState.needsUpkeep s1 u

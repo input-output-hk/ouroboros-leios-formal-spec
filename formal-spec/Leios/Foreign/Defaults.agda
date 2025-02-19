@@ -54,12 +54,15 @@ d-VRF : LeiosVRF
 d-VRF =
   record
     { PubKey     = ⊤
-    ; vrf        = record { isKeyPair = λ _ _ → ⊤ ; eval = λ x x₁ → x₁ , x ; verify = λ _ _ _ _ → ⊤ }
+    ; vrf        = record { isKeyPair = λ _ _ → ⊤ ; eval = λ x x₁ → x₁ , x ; verify = λ _ _ _ _ → ⊤ ; verify? = λ _ _ _ _ → true because ofʸ tt }
     ; genIBInput = id
     ; genEBInput = id
     ; genVInput  = id
     ; genV1Input = id
     ; genV2Input = id
+    ; verifySig  = λ _ _ → ⊤
+    ; verifySig? = λ _ _ → true because ofʸ tt
+    ; poolID     = λ _ → zero
     }
 
 open LeiosVRF d-VRF public
@@ -235,6 +238,3 @@ sd = record
   where
     total-rel-helper : ∀ {a : Fin 1} → a ∈ dom (singleton (zero , 1))
     total-rel-helper {zero} = to dom∈ (1 , (to ∈-singleton refl))
-
-s₀ : LeiosState
-s₀ = initLeiosState tt sd tt
