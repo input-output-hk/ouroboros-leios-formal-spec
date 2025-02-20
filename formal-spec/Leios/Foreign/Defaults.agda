@@ -8,7 +8,6 @@ open import Axiom.Set.Properties th
 open import Data.Nat.Show as N
 open import Data.Integer
 open import Data.String as S using (intersperse)
-open import Data.Fin
 open import Function.Related.TypeIsomorphisms
 open import Relation.Binary.Structures
 
@@ -18,13 +17,11 @@ open Equivalence
 
 -- The module contains very simple implementations for the functionalities
 -- that allow to build examples for traces for the different Leios variants
-module Leios.Foreign.Defaults where
-
-numberOfParties : ℕ
-numberOfParties = 1
-
-SUT-id : Fin numberOfParties
-SUT-id = zero
+--
+-- As parameters the module expects
+-- * numberOfParties: the total number of participants
+-- * SUT-id: the number of the SUT (system under test)
+module Leios.Foreign.Defaults (numberOfParties : ℕ) (SUT-id : Fin numberOfParties) where
 
 instance
   htx : Hashable (List ℕ) String
@@ -103,7 +100,7 @@ instance
   isb =
     record
       { slotNumber = λ _ → 0
-      ; producerID = λ _ → zero
+      ; producerID = λ _ → SUT-id
       ; lotteryPf = λ _ → tt
       }
 
@@ -223,18 +220,33 @@ st-2 = record
 
 open import Leios.Short st public
 
-sd : TotalMap (Fin numberOfParties) ℕ
-sd = record
-  { rel = singleton (SUT-id , 1) -- FIXME
-  ; left-unique-rel = λ x y →
-      let a = cong proj₂ (from ∈-singleton x)
-          b = cong proj₂ (from ∈-singleton y)
-      in trans a (sym b)
-  ; total-rel = total-rel-helper
-  }
-  where
-    total-rel-helper : ∀ {a : Fin 1} → a ∈ dom (singleton (zero , 1))
-    total-rel-helper {zero} = to dom∈ (1 , (to ∈-singleton refl))
+completeFin : ∀ (n : ℕ) → ℙ (Fin n)
+completeFin zero = ∅
+completeFin (ℕ.suc n) = singleton (F.fromℕ n) ∪ mapˢ F.inject₁ (completeFin n)
 
-s₀ : LeiosState
-s₀ = initLeiosState tt sd tt
+m≤n∧n≤m⇒m≡n : ∀ {n m : ℕ} → n N.≤ m → m N.≤ n → m ≡ n
+m≤n∧n≤m⇒m≡n z≤n z≤n = refl
+m≤n∧n≤m⇒m≡n (s≤s n≤m) (s≤s m≤n) = cong N.suc (m≤n∧n≤m⇒m≡n n≤m m≤n)
+
+toℕ-fromℕ : ∀ {n} {a : Fin (N.suc n)} → toℕ a ≡ n → a ≡ F.fromℕ n
+toℕ-fromℕ {zero} {fzero} x = refl
+toℕ-fromℕ {N.suc n} {fsuc a} x = cong fsuc (toℕ-fromℕ {n} {a} (N.suc-injective x))
+
+maximalFin : ∀ (n : ℕ) → isMaximal (completeFin n)
+maximalFin (ℕ.suc n) {a} with toℕ a N.<? n
+... | yes p =
+  let n≢toℕ = ≢-sym (N.<⇒≢ p)
+      fn = F.lower₁ a n≢toℕ
+      fn≡a = F.inject₁-lower₁ a n≢toℕ
+  in (to ∈-∪) (inj₂ ((to ∈-map) (fn , (sym fn≡a , maximalFin n))))
+... | no ¬p with a F.≟ F.fromℕ n
+... | yes q = (to ∈-∪) (inj₁ ((to ∈-singleton) q))
+... | no ¬q =
+  let n≢toℕ = N.≰⇒> ¬p
+      a<sucn = F.toℕ<n a
+  in ⊥-elim $ (¬q ∘ toℕ-fromℕ) (N.suc-injective (m≤n∧n≤m⇒m≡n n≢toℕ a<sucn))
+
+open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
+
+sd : TotalMap (Fin numberOfParties) ℕ
+sd = Fun⇒TotalMap toℕ

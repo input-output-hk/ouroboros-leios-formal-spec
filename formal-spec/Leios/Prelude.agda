@@ -23,6 +23,16 @@ module A where
   open import Data.List.Relation.Unary.Any public
 open A public using (here; there)
 
+module N where
+  open import Data.Nat public
+  open import Data.Nat.Properties public
+open N public using (ℕ; zero; suc)
+
+module F where
+  open import Data.Fin public
+  open import Data.Fin.Properties public
+open F public using (Fin; toℕ; #_) renaming (zero to fzero; suc to fsuc)
+
 fromTo : ℕ → ℕ → List ℕ
 fromTo m n = map (_+ m) (upTo (n ∸ m))
 

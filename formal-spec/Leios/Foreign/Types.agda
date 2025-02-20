@@ -1,6 +1,5 @@
 open import Data.Char.Base as C using (Char)
 import Data.String as S
-open import Data.Fin using (Fin; toℕ; zero; #_)
 open import Data.Integer using (+_; ∣_∣)
 
 open import Class.Convertible
@@ -9,8 +8,7 @@ open import Tactic.Derive.Convertible
 open import Tactic.Derive.HsType
 
 open import Leios.Prelude
-open import Leios.Foreign.Defaults
-  renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda)
+
 open import Leios.Foreign.BaseTypes
 open import Leios.Foreign.HsTypes
 open import Leios.Foreign.Util
@@ -20,6 +18,12 @@ module Leios.Foreign.Types where
 {-# FOREIGN GHC
   {-# LANGUAGE DuplicateRecordFields #-}
 #-}
+
+numberOfParties : ℕ
+numberOfParties = 2
+
+open import Leios.Foreign.Defaults numberOfParties fzero
+  renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda)
 
 dropDash : S.String → S.String
 dropDash = S.concat ∘ S.wordsByᵇ ('-' C.≈ᵇ_)
@@ -90,15 +94,29 @@ instance
           (no _) → error "Conversion to Fin not possible!"
       }
 
-  Listable-Fin : Listable (Fin numberOfParties)
-  Listable-Fin =
-    record
-      { listing = singleton zero
-      ; complete = λ {a} → (Equivalence.to ∈-singleton) a≡zero
-      }
-    where
-      a≡zero : ∀ {a : Fin numberOfParties} → a ≡ zero
-      a≡zero {zero} = refl
+  Listable-Fin : ∀ {n} → Listable (Fin n)
+  Listable-Fin {zero} = record { listing = ∅ ; complete = λ {a} → ⊥-elim $ (Inverse.to F.0↔⊥) a }
+  Listable-Fin {suc n} =
+    let record { listing = l ; complete = c } = Listable-Fin {n}
+    in record
+         { listing = singleton (F.fromℕ n) ∪ mapˢ F.inject₁ l
+         ; complete = complete
+         }
+       where
+         complete : ∀ {a} → a ∈ singleton (F.fromℕ n) ∪ mapˢ F.inject₁ (let record { listing = l } = Listable-Fin {n} in l)
+         complete {a} with F.toℕ a N.<? n
+         ... | yes p =
+           let record { listing = l ; complete = c } = Listable-Fin {n}
+               n≢toℕ = ≢-sym (N.<⇒≢ p)
+               fn = F.lower₁ a n≢toℕ
+               fn≡a = F.inject₁-lower₁ a n≢toℕ
+           in (Equivalence.to ∈-∪) (inj₂ ((Equivalence.to ∈-map) (fn , (sym fn≡a , c))))
+         ... | no ¬p with a F.≟ F.fromℕ n
+         ... | yes q = (Equivalence.to ∈-∪) (inj₁ ((Equivalence.to ∈-singleton) q))
+         ... | no ¬q =
+           let n≢toℕ = N.≰⇒> ¬p
+               a<sucn = F.toℕ<n a
+           in ⊥-elim $ (¬q ∘ toℕ-fromℕ) (N.suc-injective (m≤n∧n≤m⇒m≡n n≢toℕ a<sucn))
 
   HsTy-FFDState = autoHsType FFDState
   Conv-FFDState = autoConvert FFDState
@@ -108,7 +126,7 @@ instance
   Conv-Fin : HsConvertible (Fin numberOfParties)
   Conv-Fin =
     record
-      { to = Data.Fin.toℕ
+      { to = toℕ
       ; from = λ p →
                  case p <? numberOfParties of λ where
                    (yes q) → #_ p {numberOfParties} {fromWitness q}
