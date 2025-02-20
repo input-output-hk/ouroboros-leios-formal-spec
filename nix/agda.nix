@@ -38,12 +38,12 @@ let
     src = fetchFromGitHub {
       repo = "stdlib-meta";
       owner = "omelkonian";
-      rev = "v2.1.1";
-      sha256 = "qOoThYMG0dzjKvwmzzVZmGcerfb++MApbaGRzLEq3/4=";
+      rev = "480242a38feb948cafc8bcf673d057c04b0ed347";
+      sha256 = "pa6Zd9O3M1d/JMSvnfgteAbDMgHyelQrR5xyibU0EeM=";
     };
     meta = { };
     libraryFile = "agda-stdlib-meta.agda-lib";
-    everythingFile = "Main.agda";
+    everythingFile = "standard-library-meta.agda";
     buildInputs = [ agdaStdlib agdaStdlibClasses ];
   };
 
@@ -87,8 +87,11 @@ let
     name = "leios-spec";  # FIXME: Why is this entry needed?
     src = ../formal-spec;
     meta = { };
-    libraryFile = "formal-spec/leios-spec.agda-lib";
+    libraryFile = "leios-spec.agda-lib";
     everythingFile = "Everything.agda";
+    buildPhase = ''
+      OUT_DIR=$out make
+    '';
     buildInputs = deps;
   };
 
