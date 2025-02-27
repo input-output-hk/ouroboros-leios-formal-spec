@@ -23,7 +23,7 @@ record FFDAbstract : Type₁ where
     field State : Type
           initFFDState : State
           _-⟦_/_⟧⇀_ : State → Input → Output → State → Type
-          Dec-_-⟦_/_⟧⇀_ : {s : State} → {i : Input} → {o : Output} → {s' : State} → (s -⟦ i / o ⟧⇀ s') ⁇
+          ⦃ Dec-_-⟦_/_⟧⇀_ ⦄ : {s : State} → {i : Input} → {o : Output} → {s' : State} → (s -⟦ i / o ⟧⇀ s') ⁇
           FFD-Send-total : ∀ {ffds h b} → ∃[ ffds' ] ffds -⟦ Send h b / SendRes ⟧⇀ ffds'
 
     open Input public
