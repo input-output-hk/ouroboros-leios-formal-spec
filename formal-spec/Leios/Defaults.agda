@@ -6,12 +6,13 @@ open import Leios.SpecStructure
 open import Axiom.Set.Properties th
 
 open import Data.Nat.Show as N
-open import Data.Integer
+open import Data.Integer hiding (_≟_)
 open import Data.String as S using (intersperse)
 open import Function.Related.TypeIsomorphisms
 open import Relation.Binary.Structures
 
-import Data.Sum
+open import Tactic.Defaults
+open import Tactic.Derive.DecEq
 
 open Equivalence
 
@@ -21,7 +22,7 @@ open Equivalence
 -- As parameters the module expects
 -- * numberOfParties: the total number of participants
 -- * SUT-id: the number of the SUT (system under test)
-module Leios.Foreign.Defaults (numberOfParties : ℕ) (SUT-id : Fin numberOfParties) where
+module Leios.Defaults (numberOfParties : ℕ) (SUT-id : Fin numberOfParties) where
 
 instance
   htx : Hashable (List ℕ) String
@@ -85,11 +86,15 @@ d-Base =
     ; V-chkCerts = λ _ _ → true
     }
 
+
+-- data SimpleBase : ⊤ → BaseAbstract.Input d-Base → BaseAbstract.Output d-Base → ⊤ → Type where
+
 d-BaseFunctionality : BaseAbstract.Functionality d-Base
 d-BaseFunctionality =
   record
     { State = ⊤
     ; _-⟦_/_⟧⇀_ = λ _ _ _ _ → ⊤
+--    ; Dec-_-⟦_/_⟧⇀_ = ⁇ (yes tt)
     ; SUBMIT-total = tt , tt
     }
 
@@ -104,7 +109,7 @@ instance
       ; lotteryPf = λ _ → tt
       }
 
-  hhs : ∀ {b} → Hashable (IBHeaderOSig b) String
+  hhs : Hashable PreIBHeader String
   hhs = record { hash = IBHeaderOSig.bodyHash }
 
   hpe : Hashable PreEndorserBlock String
@@ -118,6 +123,8 @@ record FFDState : Type where
         outIBs : List InputBlock
         outEBs : List EndorserBlock
         outVTs : List (List Vote)
+
+unquoteDecl DecEq-FFDState = derive-DecEq ((quote FFDState , DecEq-FFDState) ∷ [])
 
 open GenFFD.Header
 open GenFFD.Body
@@ -142,14 +149,45 @@ data SimpleFFD : FFDState → FFDAbstract.Input ffdAbstract → FFDAbstract.Outp
 
   Fetch : ∀ {s} → SimpleFFD s FFDAbstract.Fetch (FFDAbstract.FetchRes (flushIns s)) (record s { inIBs = [] ; inEBs = [] ; inVTs = [] })
 
-simple-total : ∀ {s h b} → ∃[ s' ] (SimpleFFD s (FFDAbstract.Send h b) FFDAbstract.SendRes s')
-simple-total {s} {ibHeader h} {just (ibBody b)} = record s { outIBs = record {header = h; body = b} ∷ outIBs s} , SendIB
-simple-total {s} {ebHeader eb} {nothing} = record s { outEBs = eb ∷ outEBs s} , SendEB
-simple-total {s} {vHeader vs} {nothing} = record s { outVTs = vs ∷ outVTs s} , SendVS
+send-total : ∀ {s h b} → ∃[ s' ] (SimpleFFD s (FFDAbstract.Send h b) FFDAbstract.SendRes s')
+send-total {s} {ibHeader h} {just (ibBody b)} = record s { outIBs = record {header = h; body = b} ∷ outIBs s} , SendIB
+send-total {s} {ebHeader eb} {nothing} = record s { outEBs = eb ∷ outEBs s} , SendEB
+send-total {s} {vHeader vs} {nothing} = record s { outVTs = vs ∷ outVTs s} , SendVS
 
-simple-total {s} {ibHeader h} {nothing} = s , BadSendIB
-simple-total {s} {ebHeader eb} {just _} = s , BadSendEB
-simple-total {s} {vHeader vs} {just _} = s , BadSendVS
+send-total {s} {ibHeader h} {nothing} = s , BadSendIB
+send-total {s} {ebHeader eb} {just _} = s , BadSendEB
+send-total {s} {vHeader vs} {just _} = s , BadSendVS
+
+fetch-total : ∀ {s} → ∃[ x ] (∃[ s' ] (SimpleFFD s FFDAbstract.Fetch (FFDAbstract.FetchRes x) s'))
+fetch-total {s} = flushIns s , (record s { inIBs = [] ; inEBs = [] ; inVTs = [] } , Fetch)
+
+send-complete : ∀ {s h b s'} → SimpleFFD s (FFDAbstract.Send h b) FFDAbstract.SendRes s' → s' ≡ proj₁ (send-total {s} {h} {b})
+send-complete SendIB = refl
+send-complete SendEB = refl
+send-complete SendVS = refl
+send-complete BadSendIB = refl
+send-complete BadSendEB = refl
+send-complete BadSendVS = refl
+
+fetch-complete₁ : ∀ {s r s'} → SimpleFFD s FFDAbstract.Fetch (FFDAbstract.FetchRes r) s' → s' ≡ proj₁ (proj₂ (fetch-total {s}))
+fetch-complete₁ Fetch = refl
+
+fetch-complete₂ : ∀ {s r s'} → SimpleFFD s FFDAbstract.Fetch (FFDAbstract.FetchRes r) s' → r ≡ proj₁ (fetch-total {s})
+fetch-complete₂ Fetch = refl
+
+instance
+  Dec-SimpleFFD : ∀ {s i o s'} → SimpleFFD s i o s' ⁇
+  Dec-SimpleFFD {s} {FFDAbstract.Send h b} {FFDAbstract.SendRes} {s'} with s' ≟ proj₁ (send-total {s} {h} {b})
+  ... | yes p rewrite p = ⁇ yes (proj₂ send-total)
+  ... | no ¬p = ⁇ no λ x → ⊥-elim (¬p (send-complete x))
+  Dec-SimpleFFD {_} {FFDAbstract.Send _ _} {FFDAbstract.FetchRes _} {_} = ⁇ no λ ()
+  Dec-SimpleFFD {s} {FFDAbstract.Fetch} {FFDAbstract.FetchRes r} {s'}
+    with s' ≟ proj₁ (proj₂ (fetch-total {s}))
+      | r ≟ proj₁ (fetch-total {s})
+  ... | yes p | yes q rewrite p rewrite q = ⁇ yes (proj₂ (proj₂ (fetch-total {s})))
+  ... | yes p | no ¬q = ⁇ no λ x → ⊥-elim (¬q (fetch-complete₂ x))
+  ... | no ¬p | _ = ⁇ no λ x → ⊥-elim (¬p (fetch-complete₁ x))
+  Dec-SimpleFFD {_} {FFDAbstract.Fetch} {FFDAbstract.SendRes} {_} = ⁇ no λ ()
 
 d-FFDFunctionality : FFDAbstract.Functionality ffdAbstract
 d-FFDFunctionality =
@@ -157,7 +195,8 @@ d-FFDFunctionality =
     { State = FFDState
     ; initFFDState = record { inIBs = []; inEBs = []; inVTs = []; outIBs = []; outEBs = []; outVTs = [] }
     ; _-⟦_/_⟧⇀_ = SimpleFFD
-    ; FFD-Send-total = simple-total
+    ; Dec-_-⟦_/_⟧⇀_ = Dec-SimpleFFD
+    ; FFD-Send-total = send-total
     }
 
 open import Leios.Voting public
@@ -181,6 +220,8 @@ d-VotingAbstract-2 =
 st : SpecStructure 1
 st = record
       { a = d-Abstract
+      ; Hashable-PreIBHeader = hhs
+      ; Hashable-PreEndorserBlock = hpe
       ; id = SUT-id
       ; FFD' = d-FFDFunctionality
       ; vrf' = d-VRF
@@ -201,6 +242,8 @@ st = record
 st-2 : SpecStructure 2
 st-2 = record
       { a = d-Abstract
+      ; Hashable-PreIBHeader = hhs
+      ; Hashable-PreEndorserBlock = hpe
       ; id = SUT-id
       ; FFD' = d-FFDFunctionality
       ; vrf' = d-VRF

@@ -10,7 +10,7 @@ import Data.List as L
 open import Data.List.Relation.Unary.Any using (here)
 
 open import Leios.SpecStructure
-open import Leios.Trace using (st-2)
+open import Leios.Foreign.Defaults 2 fzero using (st-2)
 
 module Leios.Simplified.Deterministic.Test (Λ μ : ℕ) where
 

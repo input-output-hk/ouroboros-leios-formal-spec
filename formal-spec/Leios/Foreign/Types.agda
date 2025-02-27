@@ -22,7 +22,7 @@ module Leios.Foreign.Types where
 numberOfParties : ℕ
 numberOfParties = 2
 
-open import Leios.Foreign.Defaults numberOfParties fzero
+open import Leios.Defaults numberOfParties fzero
   renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda)
 
 dropDash : S.String → S.String
