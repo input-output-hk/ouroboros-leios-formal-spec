@@ -1,3 +1,5 @@
+{-# OPTIONS --allow-unsolved-metas #-}
+
 --------------------------------------------------------------------------------
 -- Deterministic variant of simple Leios
 --------------------------------------------------------------------------------
@@ -10,7 +12,7 @@ import Data.List as L
 open import Data.List.Relation.Unary.Any using (here)
 
 open import Leios.SpecStructure
-open import Leios.Foreign.Defaults 2 fzero using (st-2)
+open import Leios.Defaults 2 fzero using (st-2; isb; Computational-B; Computational-FFD)
 
 module Leios.Simplified.Deterministic.Test (Λ μ : ℕ) where
 
@@ -46,21 +48,6 @@ private variable s s' s0 s1 s2 s3 s4 s5 : LeiosState
 
 open Computational22 ⦃...⦄
 open import Leios.Simplified.Deterministic st-2 Λ μ
-
-instance
-  Computational-B : Computational22 B._-⟦_/_⟧⇀_ String
-  Computational-B .computeProof s (BaseAbstract.Input.INIT x) =
-    success ((BaseAbstract.Output.STAKE {!!} , tt) , tt)
-  Computational-B .computeProof s (BaseAbstract.Input.SUBMIT x) =
-    success ((BaseAbstract.Output.EMPTY , tt) , tt)
-  Computational-B .computeProof s BaseAbstract.Input.FTCH-LDG =
-    success ((BaseAbstract.Output.BASE-LDG [] , tt) , tt)
-  Computational-B .completeness = {!!}
-
-  Computational-FFD : Computational22 FFD._-⟦_/_⟧⇀_ String
-  Computational-FFD .computeProof s (FFDAbstract.Send x x₁) = success ((FFDAbstract.SendRes , tt) , tt)
-  Computational-FFD .computeProof s FFDAbstract.Fetch       = success ((FFDAbstract.FetchRes [] , tt) , tt)
-  Computational-FFD .completeness = {!!}
 
 comp = Computational--⟦/⟧⇀ ⦃ Computational-B ⦄ ⦃ Computational-FFD ⦄
 

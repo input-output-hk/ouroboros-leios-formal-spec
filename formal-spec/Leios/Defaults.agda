@@ -1,4 +1,4 @@
-{-# OPTIONS --safe #-}
+{-# OPTIONS --allow-unsolved-metas #-}
 
 open import Leios.Prelude
 open import Leios.Abstract
@@ -293,3 +293,30 @@ open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
 
 sd : TotalMap (Fin numberOfParties) ℕ
 sd = Fun⇒TotalMap toℕ
+
+open import Class.Computational
+open import Class.Computational22
+
+open Computational22
+open BaseAbstract
+open FFDAbstract
+
+open GenFFD.Header using (ibHeader; ebHeader; vHeader)
+open GenFFD.Body using (ibBody)
+open FFDState
+
+instance
+  Computational-B : Computational22 (BaseAbstract.Functionality._-⟦_/_⟧⇀_ d-BaseFunctionality) String
+  Computational-B .computeProof s (INIT x) = success ((STAKE sd , tt) , tt)
+  Computational-B .computeProof s (SUBMIT x) = success ((EMPTY , tt) , tt)
+  Computational-B .computeProof s FTCH-LDG = success (((BASE-LDG []) , tt) , tt)
+  Computational-B .completeness _ _ _ _ _ = {!!} -- TODO: Completeness proof
+
+  Computational-FFD : Computational22 (FFDAbstract.Functionality._-⟦_/_⟧⇀_ d-FFDFunctionality) String
+  Computational-FFD .computeProof s (Send (ibHeader h) (just (ibBody b))) = success ((SendRes , record s {outIBs = record {header = h; body = b} ∷ outIBs s}) , SendIB)
+  Computational-FFD .computeProof s (Send (ebHeader h) nothing) = success ((SendRes , record s {outEBs = h ∷ outEBs s}) , SendEB)
+  Computational-FFD .computeProof s (Send (vHeader h) nothing) = success ((SendRes , record s {outVTs = h ∷ outVTs s}) , SendVS)
+  Computational-FFD .computeProof s Fetch = success ((FetchRes (flushIns s) , record s {inIBs = []; inEBs = []; inVTs = []}) , Fetch)
+
+  Computational-FFD .computeProof _ _ = failure "FFD error"
+  Computational-FFD .completeness _ _ _ _ _ = {!!} -- TODO:Completeness proof
