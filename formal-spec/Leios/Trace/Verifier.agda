@@ -19,13 +19,15 @@ IB-Role? : ∀ {s π ffds'} →
          s ↝ addUpkeep record s { FFDState = ffds' } IB-Role
 IB-Role? {_} {_} {_} {p} {q} {r} = IB-Role (toWitness p) (toWitness q) (toWitness r)
 
+{-
 No-IB-Role? : ∀ {s} → let open LeiosState s
             in
             { _ : auto∶ needsUpkeep IB-Role }
             { _ : auto∶ ∀ π → ¬ canProduceIB slot sk-IB (stake s) π } →
             ─────────────────────────────────────────────
             s ↝ addUpkeep s IB-Role
-No-IB-Role? {_} {p} {q} = No-IB-Role (toWitness p) (toWitness q)
+No-IB-Role? {_} {p} = No-IB-Role (toWitness p) (toWitness q)
+-}
 
 EB-Role? : ∀ {s π ffds'} →
          let open LeiosState s renaming (FFDState to ffds)
@@ -39,13 +41,15 @@ EB-Role? : ∀ {s π ffds'} →
          s ↝ addUpkeep record s { FFDState = ffds' } EB-Role
 EB-Role? {_} {_} {_} {p} {q} {r} = EB-Role (toWitness p) (toWitness q) (toWitness r)
 
+{-
 No-EB-Role? : ∀ {s} → let open LeiosState s
             in
             { _ : auto∶ needsUpkeep EB-Role }
-            { _ : auto∶ ∀ π → ¬ canProduceEB slot sk-IB (stake s) π } →
+            { _ : auto∶ ∀ π → ¬ canProduceEB slot sk-EB (stake s) π } →
             ─────────────────────────────────────────────
             s ↝ addUpkeep s EB-Role
 No-EB-Role? {_} {p} {q} = No-EB-Role (toWitness p) (toWitness q)
+-}
 
 V-Role? : ∀ {s ffds'} →
         let open LeiosState s renaming (FFDState to ffds)
@@ -58,6 +62,13 @@ V-Role? : ∀ {s ffds'} →
         ─────────────────────────────────────────────────────────────────────────
         s ↝ addUpkeep record s { FFDState = ffds' } V-Role
 V-Role? {_} {_} {p} {q} {r} = V-Role (toWitness p) (toWitness q) (toWitness r)
+
+No-V-Role? : ∀ {s} → let open LeiosState s in
+           { _ : auto∶ needsUpkeep V-Role }
+           { _ : auto∶ ¬ canProduceV slot sk-V (stake s) } →
+           ─────────────────────────────────────────────
+           s ↝ addUpkeep s V-Role
+No-V-Role? {_} {p} {q} = No-V-Role (toWitness p) (toWitness q)
 
 {-
 Init? : ∀ {ks pks ks' SD bs' V} →
