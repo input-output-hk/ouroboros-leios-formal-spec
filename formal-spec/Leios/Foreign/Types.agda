@@ -19,10 +19,7 @@ module Leios.Foreign.Types where
   {-# LANGUAGE DuplicateRecordFields #-}
 #-}
 
-numberOfParties : ℕ
-numberOfParties = 2
-
-open import Leios.Defaults numberOfParties fzero
+open import Leios.Defaults 2 fzero -- TODO: parameters
   renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda)
 
 dropDash : S.String → S.String
@@ -49,13 +46,14 @@ data IBHeader = IBHeader {slotNumber :: Integer, producerID :: Integer, bodyHash
 
 instance
   HsTy-IBHeader = MkHsType IBHeaderAgda IBHeader
+
   Conv-IBHeader : Convertible IBHeaderAgda IBHeader
   Conv-IBHeader = record
     { to = λ (record { slotNumber = s ; producerID = p ; bodyHash = h }) →
         record { slotNumber = s ; producerID = toℕ p ; bodyHash = h}
     ; from = λ (record { slotNumber = s ; producerID = p ; bodyHash = h }) →
-        case p <? numberOfParties of λ where
-          (yes q) → record { slotNumber = s ; producerID = #_ p {numberOfParties} {fromWitness q} ; lotteryPf = tt ; bodyHash = h ; signature = tt }
+        case p <? 2 of λ where
+          (yes q) → record { slotNumber = s ; producerID = #_ p {2} {fromWitness q} ; lotteryPf = tt ; bodyHash = h ; signature = tt }
           (no _) → error "Conversion to Fin not possible!"
     }
 
@@ -89,8 +87,8 @@ instance
       { to = λ (record { slotNumber = s ; producerID = p ; ibRefs = refs }) →
           record { slotNumber = s ; producerID = toℕ p ; ibRefs = refs }
       ; from = λ (record { slotNumber = s ; producerID = p ; ibRefs = refs }) →
-        case p <? numberOfParties of λ where
-          (yes q) → record { slotNumber = s ; producerID = #_ p {numberOfParties} {fromWitness q} ; lotteryPf = tt ; signature = tt ; ibRefs = refs ; ebRefs = [] }
+        case p <? 2 of λ where
+          (yes q) → record { slotNumber = s ; producerID = #_ p {2} {fromWitness q} ; lotteryPf = tt ; signature = tt ; ibRefs = refs ; ebRefs = [] }
           (no _) → error "Conversion to Fin not possible!"
       }
 
@@ -121,16 +119,17 @@ instance
   HsTy-FFDState = autoHsType FFDState
   Conv-FFDState = autoConvert FFDState
 
-  HsTy-Fin = MkHsType (Fin numberOfParties) ℕ
+  HsTy-Fin : ∀ {n} → HasHsType (Fin n)
+  HsTy-Fin .HasHsType.HsType = ℕ
 
-  Conv-Fin : HsConvertible (Fin numberOfParties)
-  Conv-Fin =
+  Conv-Fin : ∀ {n} → HsConvertible (Fin n)
+  Conv-Fin {n} =
     record
       { to = toℕ
-      ; from = λ p →
-                 case p <? numberOfParties of λ where
-                   (yes q) → #_ p {numberOfParties} {fromWitness q}
-                   (no _) → error "Conversion to Fin not possible!"
+      ; from = λ m →
+          case m <? n of λ where
+            (yes p) → #_ m {n} {fromWitness p}
+            (no _) → error "Conversion to Fin not possible!"
       }
 
   HsTy-LeiosState = autoHsType LeiosState
