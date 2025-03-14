@@ -84,7 +84,7 @@ data _↝_ : LeiosState → LeiosState → Type where
           s ↝ addUpkeep record s { FFDState = ffds' } EB-Role
 ```
 ```agda
-  V-Role  : let open LeiosState s renaming (FFDState to ffds)
+  VT-Role : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                 votes = map (vote sk-V ∘ hash) EBs'
           in
@@ -110,7 +110,7 @@ data _↝_ : LeiosState → LeiosState → Type where
              s ↝ addUpkeep s EB-Role
 ```
 ```agda
-  No-V-Role  : let open LeiosState s in
+  No-VT-Role : let open LeiosState s in
              ∙ needsUpkeep V-Role
              ∙ ¬ canProduceV slot sk-V (stake s)
              ─────────────────────────────────────────────
