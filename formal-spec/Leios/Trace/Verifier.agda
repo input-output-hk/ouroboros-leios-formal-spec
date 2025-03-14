@@ -11,8 +11,8 @@ open import Prelude.Closures _↝_
 open GenFFD
 
 data Action : Type where
-  IB-Role-Action EB-Role-Action V-Role-Action : Action
-  No-IB-Role-Action No-EB-Role-Action No-V-Role-Action : Action
+  IB-Role-Action EB-Role-Action VT-Role-Action : Action
+  No-IB-Role-Action No-EB-Role-Action No-VT-Role-Action : Action
   Ftch-Action Slot-Action : Action
   Base₁-Action : Action
   Base₂a-Action : EndorserBlock → Action
@@ -44,14 +44,14 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
                .(ffds FFD.-⟦ FFD.Send (ebHeader h) nothing / FFD.SendRes ⟧⇀ ffds') →
                ValidAction EB-Role-Action s SLOT
 
-  V-Role  : let open LeiosState s renaming (FFDState to ffds)
-                EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
-                votes = map (vote sk-V ∘ hash) EBs'
-                ffds' = proj₁ (send-total {ffds} {vHeader votes} {nothing})
-            in .(needsUpkeep V-Role) →
-               .(canProduceV slot sk-V (stake s)) →
-               .(ffds FFD.-⟦ FFD.Send (vHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
-               ValidAction V-Role-Action s SLOT
+  VT-Role  : let open LeiosState s renaming (FFDState to ffds)
+                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
+                 votes = map (vote sk-V ∘ hash) EBs'
+                 ffds' = proj₁ (send-total {ffds} {vHeader votes} {nothing})
+             in .(needsUpkeep V-Role) →
+                .(canProduceV slot sk-V (stake s)) →
+                .(ffds FFD.-⟦ FFD.Send (vHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
+                ValidAction VT-Role-Action s SLOT
 
   No-IB-Role : let open LeiosState s
                in needsUpkeep IB-Role →
@@ -63,10 +63,10 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
                   (∀ π → ¬ canProduceEB slot sk-EB (stake s) π) →
                   ValidAction No-EB-Role-Action s SLOT
 
-  No-V-Role : let open LeiosState s
-              in needsUpkeep V-Role →
-                 (¬ canProduceV slot sk-V (stake s)) →
-                 ValidAction No-V-Role-Action s SLOT
+  No-VT-Role : let open LeiosState s
+               in needsUpkeep V-Role →
+                  (¬ canProduceV slot sk-V (stake s)) →
+                  ValidAction No-VT-Role-Action s SLOT
 
   Slot : let open LeiosState s renaming (FFDState to ffds; BaseState to bs)
              (msgs , (ffds' , _)) = fetch-total {ffds}
@@ -96,43 +96,43 @@ private variable
   o : LeiosOutput
 
 ⟦_⟧ : ValidAction α s i → LeiosState × LeiosOutput
-⟦ IB-Role {s} x x₁ x₂ ⟧ =
+⟦ IB-Role {s} _ _ _ ⟧ =
   let open LeiosState s renaming (FFDState to ffds)
       b = record { txs = ToPropose }
       h = mkIBHeader slot id tt sk-IB ToPropose
       ffds' = proj₁ (send-total {ffds} {ibHeader h} {just (ibBody b)})
   in addUpkeep record s { FFDState = ffds' } IB-Role , EMPTY
-⟦ EB-Role {s} x x₁ x₂ ⟧ =
+⟦ EB-Role {s} _ _ _ ⟧ =
   let open LeiosState s renaming (FFDState to ffds)
       LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
       h = mkEB slot id tt sk-EB LI []
       ffds' = proj₁ (send-total {ffds} {ebHeader h} {nothing})
   in addUpkeep record s { FFDState = ffds' } EB-Role , EMPTY
-⟦ V-Role {s} x x₁ x₂ ⟧ =
+⟦ VT-Role {s} _ _ _ ⟧ =
   let open LeiosState s renaming (FFDState to ffds)
       EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
       votes = map (vote sk-V ∘ hash) EBs'
       ffds' = proj₁ (send-total {ffds} {vHeader votes} {nothing})
   in addUpkeep record s { FFDState = ffds' } V-Role , EMPTY
-⟦ No-IB-Role {s} x x₁ ⟧ = addUpkeep s IB-Role , EMPTY
-⟦ No-EB-Role {s} x x₁ ⟧ = addUpkeep s EB-Role , EMPTY
-⟦ No-V-Role {s} x x₁ ⟧ = addUpkeep s V-Role , EMPTY
-⟦ Slot {s} x x₁ x₂ ⟧ =
+⟦ No-IB-Role {s} _ _ ⟧ = addUpkeep s IB-Role , EMPTY
+⟦ No-EB-Role {s} _ _ ⟧ = addUpkeep s EB-Role , EMPTY
+⟦ No-VT-Role {s} _ _ ⟧ = addUpkeep s V-Role , EMPTY
+⟦ Slot {s} _ _ _ ⟧ =
   let open LeiosState s renaming (FFDState to ffds; BaseState to bs)
       (msgs , (ffds' , _)) = fetch-total {ffds}
   in
   (record s
      { FFDState  = ffds'
-     ; BaseState = tt -- bs'
-     ; Ledger    = constructLedger [] -- rbs
+     ; BaseState = tt
+     ; Ledger    = constructLedger []
      ; slot      = suc slot
      ; Upkeep    = ∅
      } ↑ L.filter isValid? msgs
   , EMPTY)
 ⟦ Ftch {s} ⟧ = s , FTCH-LDG (LeiosState.Ledger s)
 ⟦ Base₁ {s} {txs} ⟧ = record s { ToPropose = txs } , EMPTY
-⟦ Base₂a {s} x x₁ x₂ ⟧ = addUpkeep record s { BaseState = tt } Base , EMPTY
-⟦ Base₂b {s} x x₁ x₂ ⟧ = addUpkeep record s { BaseState = tt } Base , EMPTY
+⟦ Base₂a {s} _ _ _ ⟧ = addUpkeep record s { BaseState = tt } Base , EMPTY
+⟦ Base₂b {s} _ _ _ ⟧ = addUpkeep record s { BaseState = tt } Base , EMPTY
 
 instance
   Dec-ValidAction : ValidAction ⁇³
@@ -154,15 +154,15 @@ instance
   Dec-ValidAction {EB-Role-Action} {s} {INIT _} .dec = no λ ()
   Dec-ValidAction {EB-Role-Action} {s} {SUBMIT _} .dec = no λ ()
   Dec-ValidAction {EB-Role-Action} {s} {FTCH-LDG} .dec = no λ ()
-  Dec-ValidAction {V-Role-Action} {s} {SLOT} .dec
+  Dec-ValidAction {VT-Role-Action} {s} {SLOT} .dec
     with dec | dec | dec
-  ... | yes x | yes y | yes z = yes (V-Role x y z)
-  ... | no ¬p | _ | _ = no λ where (V-Role p _ _) → ⊥-elim (¬p (recompute dec p))
-  ... | _ | no ¬p | _ = no λ where (V-Role _ p _) → ⊥-elim (¬p (recompute dec p))
-  ... | _ | _ | no ¬p = no λ where (V-Role _ _ p) → ⊥-elim (¬p (recompute dec p))
-  Dec-ValidAction {V-Role-Action} {s} {INIT _} .dec = no λ ()
-  Dec-ValidAction {V-Role-Action} {s} {SUBMIT _} .dec = no λ ()
-  Dec-ValidAction {V-Role-Action} {s} {FTCH-LDG} .dec = no λ ()
+  ... | yes x | yes y | yes z = yes (VT-Role x y z)
+  ... | no ¬p | _ | _ = no λ where (VT-Role p _ _) → ⊥-elim (¬p (recompute dec p))
+  ... | _ | no ¬p | _ = no λ where (VT-Role _ p _) → ⊥-elim (¬p (recompute dec p))
+  ... | _ | _ | no ¬p = no λ where (VT-Role _ _ p) → ⊥-elim (¬p (recompute dec p))
+  Dec-ValidAction {VT-Role-Action} {s} {INIT _} .dec = no λ ()
+  Dec-ValidAction {VT-Role-Action} {s} {SUBMIT _} .dec = no λ ()
+  Dec-ValidAction {VT-Role-Action} {s} {FTCH-LDG} .dec = no λ ()
   Dec-ValidAction {No-IB-Role-Action} {s} {SLOT} .dec
     with dec | dec
   ... | yes p | yes q = yes (No-IB-Role p q)
@@ -179,14 +179,14 @@ instance
   Dec-ValidAction {No-EB-Role-Action} {s} {INIT _} .dec = no λ ()
   Dec-ValidAction {No-EB-Role-Action} {s} {SUBMIT _} .dec = no λ ()
   Dec-ValidAction {No-EB-Role-Action} {s} {FTCH-LDG} .dec = no λ ()
-  Dec-ValidAction {No-V-Role-Action} {s} {SLOT} .dec
+  Dec-ValidAction {No-VT-Role-Action} {s} {SLOT} .dec
     with dec | dec
-  ... | yes p | yes q = yes (No-V-Role p q)
-  ... | no ¬p | _ = no λ where (No-V-Role p _) → ⊥-elim (¬p p)
-  ... | _ | no ¬q = no λ where (No-V-Role _ q) → ⊥-elim (¬q q)
-  Dec-ValidAction {No-V-Role-Action} {s} {INIT _} .dec = no λ ()
-  Dec-ValidAction {No-V-Role-Action} {s} {SUBMIT _} .dec = no λ ()
-  Dec-ValidAction {No-V-Role-Action} {s} {FTCH-LDG} .dec = no λ ()
+  ... | yes p | yes q = yes (No-VT-Role p q)
+  ... | no ¬p | _ = no λ where (No-VT-Role p _) → ⊥-elim (¬p p)
+  ... | _ | no ¬q = no λ where (No-VT-Role _ q) → ⊥-elim (¬q q)
+  Dec-ValidAction {No-VT-Role-Action} {s} {INIT _} .dec = no λ ()
+  Dec-ValidAction {No-VT-Role-Action} {s} {SUBMIT _} .dec = no λ ()
+  Dec-ValidAction {No-VT-Role-Action} {s} {FTCH-LDG} .dec = no λ ()
   Dec-ValidAction {Slot-Action} {s} {SLOT} .dec
     with dec | dec | dec
   ... | yes x | yes y | yes z = yes (Slot x y z)
@@ -241,17 +241,17 @@ mutual
   ⟦_⟧∗ (_ / _ ∷ _ ⊣ vα) = ⟦ vα ⟧
 
 Irr-ValidAction : Irrelevant (ValidAction α s i)
-Irr-ValidAction (IB-Role x x₁ x₂) (IB-Role x₃ x₄ x₅) = refl
-Irr-ValidAction (EB-Role x x₁ x₂) (EB-Role x₃ x₄ x₅) = refl
-Irr-ValidAction (V-Role x x₁ x₂) (V-Role x₃ x₄ x₅)   = refl
-Irr-ValidAction (No-IB-Role x x₁) (No-IB-Role x₂ x₃) = refl
-Irr-ValidAction (No-EB-Role x x₁) (No-EB-Role x₂ x₃) = refl
-Irr-ValidAction (No-V-Role _ _) (No-V-Role _ _)     = refl
-Irr-ValidAction (Slot x x₁ x₂) (Slot x₃ x₄ x₅) = refl
+Irr-ValidAction (IB-Role _ _ _) (IB-Role _ _ _) = refl
+Irr-ValidAction (EB-Role _ _ _) (EB-Role _ _ _) = refl
+Irr-ValidAction (VT-Role _ _ _) (VT-Role _ _ _) = refl
+Irr-ValidAction (No-IB-Role _ _) (No-IB-Role _ _) = refl
+Irr-ValidAction (No-EB-Role _ _) (No-EB-Role _ _) = refl
+Irr-ValidAction (No-VT-Role _ _) (No-VT-Role _ _) = refl
+Irr-ValidAction (Slot _ _ _) (Slot _ _ _) = refl
 Irr-ValidAction Ftch Ftch = refl
 Irr-ValidAction Base₁ Base₁ = refl
-Irr-ValidAction (Base₂a x x₁ x₂) (Base₂a x₃ x₄ x₅) = refl
-Irr-ValidAction (Base₂b x x₁ x₂) (Base₂b x₃ x₄ x₅) = refl
+Irr-ValidAction (Base₂a _ _ _) (Base₂a _ _ _) = refl
+Irr-ValidAction (Base₂b _ _ _) (Base₂b _ _ _) = refl
 
 Irr-ValidTrace : ∀ {αs} → Irrelevant (ValidTrace αs)
 Irr-ValidTrace [] [] = refl
@@ -274,58 +274,58 @@ instance
   ... | yes vα = yes $ _ / _ ∷ vαs ⊣ vα
 
 getLabel : just s -⟦ i / o ⟧⇀ s′ → Action
-getLabel (Slot _ _ _) = Slot-Action
-getLabel Ftch = Ftch-Action
-getLabel Base₁ = Base₁-Action
-getLabel (Base₂a {s} {eb} _ _ _) = Base₂a-Action eb
-getLabel (Base₂b _ _ _) = Base₂b-Action
-getLabel (Roles (IB-Role _ _ _)) = IB-Role-Action
-getLabel (Roles (EB-Role _ _ _)) = EB-Role-Action
-getLabel (Roles (V-Role _ _ _)) = V-Role-Action
+getLabel (Slot _ _ _)             = Slot-Action
+getLabel Ftch                     = Ftch-Action
+getLabel Base₁                    = Base₁-Action
+getLabel (Base₂a {s} {eb} _ _ _)  = Base₂a-Action eb
+getLabel (Base₂b _ _ _)           = Base₂b-Action
+getLabel (Roles (IB-Role _ _ _))  = IB-Role-Action
+getLabel (Roles (EB-Role _ _ _))  = EB-Role-Action
+getLabel (Roles (VT-Role _ _ _))  = VT-Role-Action
 getLabel (Roles (No-IB-Role _ _)) = No-IB-Role-Action
 getLabel (Roles (No-EB-Role _ _)) = No-EB-Role-Action
-getLabel (Roles (No-V-Role _ _)) = No-V-Role-Action
+getLabel (Roles (No-VT-Role _ _)) = No-VT-Role-Action
 
 ValidAction-sound : (va : ValidAction α s i) → let (s′ , o) = ⟦ va ⟧ in just s -⟦ i / o ⟧⇀ s′
-ValidAction-sound (Slot {s} x x₁ x₂) = Slot {s} {rbs = []} (recompute dec x) (recompute dec x₁) (recompute dec x₂)
-ValidAction-sound Ftch = Ftch
-ValidAction-sound (Base₁ {s} {txs}) = Base₁ {s} {txs}
-ValidAction-sound (Base₂a {s} x x₁ x₂) = Base₂a {s} (recompute dec x) (recompute dec x₁) (recompute dec x₂)
-ValidAction-sound (Base₂b {s} x x₁ x₂) = Base₂b {s} (recompute dec x) (recompute dec x₁) (recompute dec x₂)
+ValidAction-sound (Slot {s} x x₁ x₂)    = Slot {s} {rbs = []} (recompute dec x) (recompute dec x₁) (recompute dec x₂)
+ValidAction-sound Ftch                  = Ftch
+ValidAction-sound (Base₁ {s} {txs})     = Base₁ {s} {txs}
+ValidAction-sound (Base₂a {s} x x₁ x₂)  = Base₂a {s} (recompute dec x) (recompute dec x₁) (recompute dec x₂)
+ValidAction-sound (Base₂b {s} x x₁ x₂)  = Base₂b {s} (recompute dec x) (recompute dec x₁) (recompute dec x₂)
 ValidAction-sound (IB-Role {s} x x₁ x₂) = Roles (IB-Role {s} (recompute dec x) (recompute dec x₁) (recompute dec x₂))
 ValidAction-sound (EB-Role {s} x x₁ x₂) = Roles (EB-Role {s} (recompute dec x) (recompute dec x₁) (recompute dec x₂))
-ValidAction-sound (V-Role {s} x x₁ x₂) = Roles (V-Role {s} (recompute dec x) (recompute dec x₁) (recompute dec x₂))
+ValidAction-sound (VT-Role {s} x x₁ x₂) = Roles (VT-Role {s} (recompute dec x) (recompute dec x₁) (recompute dec x₂))
 ValidAction-sound (No-IB-Role {s} x x₁) = Roles (No-IB-Role {s} x x₁)
 ValidAction-sound (No-EB-Role {s} x x₁) = Roles (No-EB-Role {s} x x₁)
-ValidAction-sound (No-V-Role {s} x x₁)  = Roles (No-V-Role {s} x x₁)
+ValidAction-sound (No-VT-Role {s} x x₁) = Roles (No-VT-Role {s} x x₁)
 
 ValidAction-complete : (st : just s -⟦ i / o ⟧⇀ s′) → ValidAction (getLabel st) s i
-ValidAction-complete {s} {s′} (Roles (IB-Role {s} {π} {ffds'} x x₁ x₂)) =
+ValidAction-complete {s} {s′} (Roles (IB-Role {s} {π} {ffds'} x x₁ _)) =
   let open LeiosState s renaming (FFDState to ffds)
       b = record { txs = ToPropose }
       h = mkIBHeader slot id tt sk-IB ToPropose
       pr = proj₂ (send-total {ffds} {ibHeader h} {just (ibBody b)})
   in IB-Role {s} x x₁ pr
-ValidAction-complete {s} (Roles (EB-Role x x₁ x₂)) =
+ValidAction-complete {s} (Roles (EB-Role x x₁ _)) =
   let open LeiosState s renaming (FFDState to ffds)
       LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
       h = mkEB slot id tt sk-EB LI []
       pr = proj₂ (send-total {ffds} {ebHeader h} {nothing})
   in EB-Role {s} x x₁ pr
-ValidAction-complete {s} (Roles (V-Role x x₁ x₂))  =
+ValidAction-complete {s} (Roles (VT-Role x x₁ _))  =
   let open LeiosState s renaming (FFDState to ffds)
       EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
       votes = map (vote sk-V ∘ hash) EBs'
       pr = proj₂ (send-total {ffds} {vHeader votes} {nothing})
-  in V-Role {s} x x₁ pr
+  in VT-Role {s} x x₁ pr
 ValidAction-complete {s} (Roles (No-IB-Role x x₁)) = No-IB-Role {s} x x₁
 ValidAction-complete {s} (Roles (No-EB-Role x x₁)) = No-EB-Role {s} x x₁
-ValidAction-complete {s} (Roles (No-V-Role x x₁))  = No-V-Role {s} x x₁
+ValidAction-complete {s} (Roles (No-VT-Role x x₁)) = No-VT-Role {s} x x₁
 ValidAction-complete {s} Ftch = Ftch {s}
 ValidAction-complete {s} Base₁ = Base₁ {s}
 ValidAction-complete {s} (Base₂a x x₁ x₂) = Base₂a {s} x x₁ x₂
 ValidAction-complete {s} (Base₂b x x₁ x₂) = Base₂b {s} x x₁ x₂
-ValidAction-complete {s} (Slot {s} x x₁ x₂) =
+ValidAction-complete {s} (Slot {s} x x₁ _) =
   let open LeiosState s renaming (FFDState to ffds)
       (_ , (_ , pr)) = fetch-total {ffds}
   in Slot {s} x x₁ pr

@@ -198,8 +198,8 @@ data _-⟦V-Role⟧⇀_ : LeiosState → LeiosState → Type where
           s -⟦V-Role⟧⇀ addUpkeep s V-Role
 
 V-Role⇒ND : LeiosState.needsUpkeep s V-Role → s -⟦V-Role⟧⇀ s' → just s ND.-⟦ SLOT / EMPTY ⟧⇀ s'
-V-Role⇒ND u (V-Role x₁ x₂) = Roles (V-Role u x₁ x₂)
-V-Role⇒ND u (No-V-Role x₁) = Roles (No-V-Role u x₁)
+V-Role⇒ND u (V-Role x₁ x₂) = Roles (VT-Role u x₁ x₂)
+V-Role⇒ND u (No-V-Role x₁) = Roles (No-VT-Role u x₁)
 
 V-Role-Upkeep : ∀ {u} → u ≢ V-Role → LeiosState.needsUpkeep s u → s -⟦V-Role⟧⇀ s'
                   → LeiosState.needsUpkeep s' u

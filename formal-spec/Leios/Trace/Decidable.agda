@@ -58,14 +58,14 @@ module _ {s : LeiosState} (let open LeiosState s renaming (FFDState to ffds; Bas
           { _ : auto∶ ffds FFD.-⟦ FFD.Send (GenFFD.vHeader votes) nothing / FFD.SendRes ⟧⇀ ffds' } →
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } V-Role
-  V-Role? {_} {p} {q} {r} = V-Role (toWitness p) (toWitness q) (toWitness r)
+  V-Role? {_} {p} {q} {r} = VT-Role (toWitness p) (toWitness q) (toWitness r)
 
   No-V-Role? :
              { _ : auto∶ needsUpkeep V-Role }
              { _ : auto∶ ¬ canProduceV slot sk-V (stake s) } →
              ─────────────────────────────────────────────
              s ↝ addUpkeep s V-Role
-  No-V-Role? {p} {q} = No-V-Role (toWitness p) (toWitness q)
+  No-V-Role? {p} {q} = No-VT-Role (toWitness p) (toWitness q)
 
   {-
   Init? : ∀ {ks pks ks' SD bs' V} →
