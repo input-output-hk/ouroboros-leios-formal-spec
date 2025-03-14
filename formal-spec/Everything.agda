@@ -22,6 +22,7 @@ open import Leios.Simplified.Deterministic
 open import Leios.Simplified.Deterministic.Test
 open import Leios.SpecStructure
 open import Leios.Traces
+open import Leios.Trace.Decidable
 open import Leios.Trace.Verifier
 open import Leios.UniformShort
 open import Leios.Voting
