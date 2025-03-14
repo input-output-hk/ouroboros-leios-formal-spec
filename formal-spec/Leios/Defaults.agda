@@ -86,15 +86,12 @@ d-Base =
     ; V-chkCerts = λ _ _ → true
     }
 
-
--- data SimpleBase : ⊤ → BaseAbstract.Input d-Base → BaseAbstract.Output d-Base → ⊤ → Type where
-
 d-BaseFunctionality : BaseAbstract.Functionality d-Base
 d-BaseFunctionality =
   record
     { State = ⊤
     ; _-⟦_/_⟧⇀_ = λ _ _ _ _ → ⊤
---    ; Dec-_-⟦_/_⟧⇀_ = ⁇ (yes tt)
+    ; Dec-_-⟦_/_⟧⇀_ = ⁇ (yes tt)
     ; SUBMIT-total = tt , tt
     }
 
