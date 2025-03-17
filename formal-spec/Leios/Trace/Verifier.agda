@@ -273,6 +273,16 @@ instance
                   $ subst (λ x → ValidAction α x i) (cong (proj₁ ∘ ⟦_⟧∗) $ Irr-ValidTrace tr vαs) vα
   ... | yes vα = yes $ _ / _ ∷ vαs ⊣ vα
 
+private
+  opaque
+    unfolding List-Model
+
+    test : Bool
+    test = ¿ ValidTrace ((IB-Role-Action , SLOT) ∷ []) ¿ᵇ
+
+    _ : test ≡ true
+    _ = refl
+
 getLabel : just s -⟦ i / o ⟧⇀ s′ → Action
 getLabel (Slot _ _ _)             = Slot-Action
 getLabel Ftch                     = Ftch-Action

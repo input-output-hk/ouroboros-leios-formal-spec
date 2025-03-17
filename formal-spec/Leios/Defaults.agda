@@ -289,7 +289,7 @@ maximalFin (ℕ.suc n) {a} with toℕ a N.<? n
 open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
 
 sd : TotalMap (Fin numberOfParties) ℕ
-sd = Fun⇒TotalMap toℕ
+sd = Fun⇒TotalMap (const 100000000)
 
 open import Class.Computational
 open import Class.Computational22
