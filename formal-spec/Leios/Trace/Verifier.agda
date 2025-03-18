@@ -11,7 +11,7 @@ open import Prelude.Closures _↝_
 open GenFFD
 
 data Action : Type where
-  IB-Role-Action EB-Role-Action VT-Role-Action : Action
+  IB-Role-Action EB-Role-Action VT-Role-Action : ℕ → Action
   No-IB-Role-Action No-EB-Role-Action No-VT-Role-Action : Action
   Ftch-Action : Action
   Slot-Action : ℕ → Action
@@ -34,7 +34,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
             in .(needsUpkeep IB-Role) →
                .(canProduceIB slot sk-IB (stake s) tt) →
                .(ffds FFD.-⟦ FFD.Send (ibHeader h) (just (ibBody b)) / FFD.SendRes ⟧⇀ ffds') →
-               ValidAction IB-Role-Action s SLOT
+               ValidAction (IB-Role-Action slot) s SLOT
 
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
                 LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
@@ -43,7 +43,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
             in .(needsUpkeep EB-Role) →
                .(canProduceEB slot sk-EB (stake s) tt) →
                .(ffds FFD.-⟦ FFD.Send (ebHeader h) nothing / FFD.SendRes ⟧⇀ ffds') →
-               ValidAction EB-Role-Action s SLOT
+               ValidAction (EB-Role-Action slot) s SLOT
 
   VT-Role  : let open LeiosState s renaming (FFDState to ffds)
                  EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
@@ -52,7 +52,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
              in .(needsUpkeep VT-Role) →
                 .(canProduceV slot sk-V (stake s)) →
                 .(ffds FFD.-⟦ FFD.Send (vHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
-                ValidAction VT-Role-Action s SLOT
+                ValidAction (VT-Role-Action slot) s SLOT
 
   No-IB-Role : let open LeiosState s
                in needsUpkeep IB-Role →
@@ -136,37 +136,55 @@ private variable
 ⟦ Base₂b {s} _ _ _ ⟧ = addUpkeep record s { BaseState = tt } Base , EMPTY
 
 ValidAction→Eq-Slot : ∀ {s sl} → ValidAction (Slot-Action sl) s SLOT → sl ≡ LeiosState.slot s
-ValidAction→Eq-Slot (Slot {s} _ _ _) = refl
+ValidAction→Eq-Slot (Slot _ _ _) = refl
+
+ValidAction→Eq-IB : ∀ {s sl} → ValidAction (IB-Role-Action sl) s SLOT → sl ≡ LeiosState.slot s
+ValidAction→Eq-IB (IB-Role _ _ _) = refl
+
+ValidAction→Eq-EB : ∀ {s sl} → ValidAction (EB-Role-Action sl) s SLOT → sl ≡ LeiosState.slot s
+ValidAction→Eq-EB (EB-Role _ _ _) = refl
+
+ValidAction→Eq-VT : ∀ {s sl} → ValidAction (VT-Role-Action sl) s SLOT → sl ≡ LeiosState.slot s
+ValidAction→Eq-VT (VT-Role _ _ _) = refl
 
 instance
   Dec-ValidAction : ValidAction ⁇³
-  Dec-ValidAction {IB-Role-Action} {s} {SLOT} .dec
+  Dec-ValidAction {IB-Role-Action sl} {s} {SLOT} .dec
+    with sl ≟ LeiosState.slot s
+  ... | no ¬p = no λ x → ⊥-elim (¬p (ValidAction→Eq-IB x))
+  ... | yes p rewrite p
     with dec | dec | dec
   ... | yes x | yes y | yes z = yes (IB-Role x y z)
   ... | no ¬p | _ | _ = no λ where (IB-Role p _ _) → ⊥-elim (¬p (recompute dec p))
   ... | _ | no ¬p | _ = no λ where (IB-Role _ p _) → ⊥-elim (¬p (recompute dec p))
   ... | _ | _ | no ¬p = no λ where (IB-Role _ _ p) → ⊥-elim (¬p (recompute dec p))
-  Dec-ValidAction {IB-Role-Action} {s} {INIT _} .dec = no λ ()
-  Dec-ValidAction {IB-Role-Action} {s} {SUBMIT _} .dec = no λ ()
-  Dec-ValidAction {IB-Role-Action} {s} {FTCH-LDG} .dec = no λ ()
-  Dec-ValidAction {EB-Role-Action} {s} {SLOT} .dec
+  Dec-ValidAction {IB-Role-Action _} {s} {INIT _} .dec = no λ ()
+  Dec-ValidAction {IB-Role-Action _} {s} {SUBMIT _} .dec = no λ ()
+  Dec-ValidAction {IB-Role-Action _} {s} {FTCH-LDG} .dec = no λ ()
+  Dec-ValidAction {EB-Role-Action sl} {s} {SLOT} .dec
+    with sl ≟ LeiosState.slot s
+  ... | no ¬p = no λ x → ⊥-elim (¬p (ValidAction→Eq-EB x))
+  ... | yes p rewrite p
     with dec | dec | dec
   ... | yes x | yes y | yes z = yes (EB-Role x y z)
   ... | no ¬p | _ | _ = no λ where (EB-Role p _ _) → ⊥-elim (¬p (recompute dec p))
   ... | _ | no ¬p | _ = no λ where (EB-Role _ p _) → ⊥-elim (¬p (recompute dec p))
   ... | _ | _ | no ¬p = no λ where (EB-Role _ _ p) → ⊥-elim (¬p (recompute dec p))
-  Dec-ValidAction {EB-Role-Action} {s} {INIT _} .dec = no λ ()
-  Dec-ValidAction {EB-Role-Action} {s} {SUBMIT _} .dec = no λ ()
-  Dec-ValidAction {EB-Role-Action} {s} {FTCH-LDG} .dec = no λ ()
-  Dec-ValidAction {VT-Role-Action} {s} {SLOT} .dec
+  Dec-ValidAction {EB-Role-Action _} {s} {INIT _} .dec = no λ ()
+  Dec-ValidAction {EB-Role-Action _} {s} {SUBMIT _} .dec = no λ ()
+  Dec-ValidAction {EB-Role-Action _} {s} {FTCH-LDG} .dec = no λ ()
+  Dec-ValidAction {VT-Role-Action sl} {s} {SLOT} .dec
+    with sl ≟ LeiosState.slot s
+  ... | no ¬p = no λ x → ⊥-elim (¬p (ValidAction→Eq-VT x))
+  ... | yes p rewrite p
     with dec | dec | dec
   ... | yes x | yes y | yes z = yes (VT-Role x y z)
   ... | no ¬p | _ | _ = no λ where (VT-Role p _ _) → ⊥-elim (¬p (recompute dec p))
   ... | _ | no ¬p | _ = no λ where (VT-Role _ p _) → ⊥-elim (¬p (recompute dec p))
   ... | _ | _ | no ¬p = no λ where (VT-Role _ _ p) → ⊥-elim (¬p (recompute dec p))
-  Dec-ValidAction {VT-Role-Action} {s} {INIT _} .dec = no λ ()
-  Dec-ValidAction {VT-Role-Action} {s} {SUBMIT _} .dec = no λ ()
-  Dec-ValidAction {VT-Role-Action} {s} {FTCH-LDG} .dec = no λ ()
+  Dec-ValidAction {VT-Role-Action _} {s} {INIT _} .dec = no λ ()
+  Dec-ValidAction {VT-Role-Action _} {s} {SUBMIT _} .dec = no λ ()
+  Dec-ValidAction {VT-Role-Action _} {s} {FTCH-LDG} .dec = no λ ()
   Dec-ValidAction {No-IB-Role-Action} {s} {SLOT} .dec
     with dec | dec
   ... | yes p | yes q = yes (No-IB-Role p q)
@@ -285,7 +303,7 @@ private
     unfolding List-Model
 
     test₁ : Bool
-    test₁ = ¿ ValidTrace ((IB-Role-Action , SLOT) ∷ []) ¿ᵇ
+    test₁ = ¿ ValidTrace ((IB-Role-Action 0 , SLOT) ∷ []) ¿ᵇ
 
     _ : test₁ ≡ true
     _ = refl
@@ -293,16 +311,16 @@ private
     test₂ : Bool
     test₂ =
       let t = L.reverse $
-              (IB-Role-Action , SLOT)
-            ∷ (EB-Role-Action , SLOT)
-            ∷ (VT-Role-Action , SLOT)
-            ∷ (Base₂b-Action  , SLOT)
-            ∷ (Slot-Action 0  , SLOT)
-            ∷ (IB-Role-Action , SLOT)
-            ∷ (EB-Role-Action , SLOT)
-            ∷ (VT-Role-Action , SLOT)
-            ∷ (Base₂b-Action  , SLOT)
-            ∷ (Slot-Action 1  , SLOT)
+              (IB-Role-Action 0 , SLOT)
+            ∷ (EB-Role-Action 0 , SLOT)
+            ∷ (VT-Role-Action 0 , SLOT)
+            ∷ (Base₂b-Action    , SLOT)
+            ∷ (Slot-Action    0 , SLOT)
+            ∷ (IB-Role-Action 1 , SLOT)
+            ∷ (EB-Role-Action 1 , SLOT)
+            ∷ (VT-Role-Action 1 , SLOT)
+            ∷ (Base₂b-Action    , SLOT)
+            ∷ (Slot-Action    1 , SLOT)
             ∷ []
       in ¿ ValidTrace t ¿ᵇ
 
@@ -310,17 +328,17 @@ private
     _ = refl
 
 getLabel : just s -⟦ i / o ⟧⇀ s′ → Action
-getLabel (Slot {s} _ _ _)         = Slot-Action (LeiosState.slot s)
-getLabel Ftch                     = Ftch-Action
-getLabel Base₁                    = Base₁-Action
-getLabel (Base₂a {s} {eb} _ _ _)  = Base₂a-Action eb
-getLabel (Base₂b _ _ _)           = Base₂b-Action
-getLabel (Roles (IB-Role _ _ _))  = IB-Role-Action
-getLabel (Roles (EB-Role _ _ _))  = EB-Role-Action
-getLabel (Roles (VT-Role _ _ _))  = VT-Role-Action
-getLabel (Roles (No-IB-Role _ _)) = No-IB-Role-Action
-getLabel (Roles (No-EB-Role _ _)) = No-EB-Role-Action
-getLabel (Roles (No-VT-Role _ _)) = No-VT-Role-Action
+getLabel (Slot {s} _ _ _)            = Slot-Action (LeiosState.slot s)
+getLabel Ftch                        = Ftch-Action
+getLabel Base₁                       = Base₁-Action
+getLabel (Base₂a {s} {eb} _ _ _)     = Base₂a-Action eb
+getLabel (Base₂b _ _ _)              = Base₂b-Action
+getLabel (Roles (IB-Role {s} _ _ _)) = IB-Role-Action (LeiosState.slot s)
+getLabel (Roles (EB-Role {s} _ _ _)) = EB-Role-Action (LeiosState.slot s)
+getLabel (Roles (VT-Role {s} _ _ _)) = VT-Role-Action (LeiosState.slot s)
+getLabel (Roles (No-IB-Role _ _))    = No-IB-Role-Action
+getLabel (Roles (No-EB-Role _ _))    = No-EB-Role-Action
+getLabel (Roles (No-VT-Role _ _))    = No-VT-Role-Action
 
 ValidAction-sound : (va : ValidAction α s i) → let (s′ , o) = ⟦ va ⟧ in just s -⟦ i / o ⟧⇀ s′
 ValidAction-sound (Slot {s} x x₁ x₂)    = Slot {s} {rbs = []} (recompute dec x) (recompute dec x₁) (recompute dec x₂)
