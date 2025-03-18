@@ -48,7 +48,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
                  EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                  votes = map (vote sk-V ∘ hash) EBs'
                  ffds' = proj₁ (send-total {ffds} {vHeader votes} {nothing})
-             in .(needsUpkeep V-Role) →
+             in .(needsUpkeep VT-Role) →
                 .(canProduceV slot sk-V (stake s)) →
                 .(ffds FFD.-⟦ FFD.Send (vHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
                 ValidAction VT-Role-Action s SLOT
@@ -64,7 +64,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
                   ValidAction No-EB-Role-Action s SLOT
 
   No-VT-Role : let open LeiosState s
-               in needsUpkeep V-Role →
+               in needsUpkeep VT-Role →
                   (¬ canProduceV slot sk-V (stake s)) →
                   ValidAction No-VT-Role-Action s SLOT
 
@@ -113,12 +113,12 @@ private variable
       EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
       votes = map (vote sk-V ∘ hash) EBs'
       ffds' = proj₁ (send-total {ffds} {vHeader votes} {nothing})
-  in addUpkeep record s { FFDState = ffds' } V-Role , EMPTY
+  in addUpkeep record s { FFDState = ffds' } VT-Role , EMPTY
 ⟦ No-IB-Role {s} _ _ ⟧ = addUpkeep s IB-Role , EMPTY
 ⟦ No-EB-Role {s} _ _ ⟧ = addUpkeep s EB-Role , EMPTY
-⟦ No-VT-Role {s} _ _ ⟧ = addUpkeep s V-Role , EMPTY
+⟦ No-VT-Role {s} _ _ ⟧ = addUpkeep s VT-Role , EMPTY
 ⟦ Slot {s} _ _ _ ⟧ =
-  let open LeiosState s renaming (FFDState to ffds; BaseState to bs)
+  let open LeiosState s renaming (FFDState to ffds)
       (msgs , (ffds' , _)) = fetch-total {ffds}
   in
   (record s
@@ -277,10 +277,24 @@ private
   opaque
     unfolding List-Model
 
-    test : Bool
-    test = ¿ ValidTrace ((IB-Role-Action , SLOT) ∷ []) ¿ᵇ
+    test₁ : Bool
+    test₁ = ¿ ValidTrace ((IB-Role-Action , SLOT) ∷ []) ¿ᵇ
 
-    _ : test ≡ true
+    _ : test₁ ≡ true
+    _ = refl
+
+    test₂ : Bool
+    test₂ =
+      let t = L.reverse $
+              (IB-Role-Action , SLOT)
+            ∷ (EB-Role-Action , SLOT)
+            ∷ (VT-Role-Action , SLOT)
+            ∷ (Base₂b-Action  , SLOT)
+            ∷ (Slot-Action    , SLOT)
+            ∷ []
+      in ¿ ValidTrace t ¿ᵇ
+
+    _ : test₂ ≡ true
     _ = refl
 
 getLabel : just s -⟦ i / o ⟧⇀ s′ → Action

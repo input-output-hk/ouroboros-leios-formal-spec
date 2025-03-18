@@ -27,12 +27,12 @@ module Leios.Short (⋯ : SpecStructure 1)
 ```
 ```agda
 data SlotUpkeep : Type where
-  Base IB-Role EB-Role V-Role : SlotUpkeep
+  Base IB-Role EB-Role VT-Role : SlotUpkeep
 
 unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
 
 allUpkeep : ℙ SlotUpkeep
-allUpkeep = (((∅ ∪ ❴ IB-Role ❵) ∪ ❴ EB-Role ❵) ∪ ❴ V-Role ❵) ∪ ❴ Base ❵
+allUpkeep = fromList (IB-Role ∷ EB-Role ∷ VT-Role ∷ Base ∷ [])
 ```
 ```agda
 open import Leios.Protocol (⋯) SlotUpkeep public
@@ -88,11 +88,11 @@ data _↝_ : LeiosState → LeiosState → Type where
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                 votes = map (vote sk-V ∘ hash) EBs'
           in
-          ∙ needsUpkeep V-Role
+          ∙ needsUpkeep VT-Role
           ∙ canProduceV slot sk-V (stake s)
           ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ addUpkeep record s { FFDState = ffds' } V-Role
+          s ↝ addUpkeep record s { FFDState = ffds' } VT-Role
 ```
 #### Negative Block/Vote production rules
 ```agda
@@ -111,10 +111,10 @@ data _↝_ : LeiosState → LeiosState → Type where
 ```
 ```agda
   No-VT-Role : let open LeiosState s in
-             ∙ needsUpkeep V-Role
+             ∙ needsUpkeep VT-Role
              ∙ ¬ canProduceV slot sk-V (stake s)
              ─────────────────────────────────────────────
-             s ↝ addUpkeep s V-Role
+             s ↝ addUpkeep s VT-Role
 ```
 ### Uniform short-pipeline
 ```agda

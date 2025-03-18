@@ -190,18 +190,18 @@ data _-⟦V-Role⟧⇀_ : LeiosState → LeiosState → Type where
           ∙ canProduceV slot sk-V (stake s)
           ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
           ────────────────────────────────────────────────────────────────────
-          s -⟦V-Role⟧⇀ addUpkeep record s { FFDState = ffds' } V-Role
+          s -⟦V-Role⟧⇀ addUpkeep record s { FFDState = ffds' } VT-Role
 
   No-V-Role : let open LeiosState s in
           ∙ ¬ canProduceV slot sk-V (stake s)
           ────────────────────────────────────────
-          s -⟦V-Role⟧⇀ addUpkeep s V-Role
+          s -⟦V-Role⟧⇀ addUpkeep s VT-Role
 
-V-Role⇒ND : LeiosState.needsUpkeep s V-Role → s -⟦V-Role⟧⇀ s' → just s ND.-⟦ SLOT / EMPTY ⟧⇀ s'
+V-Role⇒ND : LeiosState.needsUpkeep s VT-Role → s -⟦V-Role⟧⇀ s' → just s ND.-⟦ SLOT / EMPTY ⟧⇀ s'
 V-Role⇒ND u (V-Role x₁ x₂) = Roles (VT-Role u x₁ x₂)
 V-Role⇒ND u (No-V-Role x₁) = Roles (No-VT-Role u x₁)
 
-V-Role-Upkeep : ∀ {u} → u ≢ V-Role → LeiosState.needsUpkeep s u → s -⟦V-Role⟧⇀ s'
+V-Role-Upkeep : ∀ {u} → u ≢ VT-Role → LeiosState.needsUpkeep s u → s -⟦V-Role⟧⇀ s'
                   → LeiosState.needsUpkeep s' u
 V-Role-Upkeep u≢V-Role h (V-Role _ _) u∈su = case Equivalence.from ∈-∪ u∈su of λ where
   (inj₁ x) → h x
@@ -216,7 +216,7 @@ opaque
     (yes p) → -, V-Role p (proj₂ FFD.FFD-Send-total)
     (no ¬p) → -, No-V-Role ¬p
 
-  V-Role-total' : ∃[ ffds ] s -⟦V-Role⟧⇀ addUpkeep record s { FFDState = ffds } V-Role
+  V-Role-total' : ∃[ ffds ] s -⟦V-Role⟧⇀ addUpkeep record s { FFDState = ffds } VT-Role
   V-Role-total' {s = s} = let open LeiosState s in case Dec-canProduceV of λ where
     (yes p) → -, V-Role    p (proj₂ FFD.FFD-Send-total)
     (no ¬p) → -, No-V-Role ¬p
