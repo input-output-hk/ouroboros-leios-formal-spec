@@ -13,7 +13,8 @@ open GenFFD
 data Action : Type where
   IB-Role-Action EB-Role-Action VT-Role-Action : Action
   No-IB-Role-Action No-EB-Role-Action No-VT-Role-Action : Action
-  Ftch-Action Slot-Action : Action
+  Ftch-Action : Action
+  Slot-Action : ℕ → Action
   Base₁-Action : Action
   Base₂a-Action : EndorserBlock → Action
   Base₂b-Action : Action
@@ -73,7 +74,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
          in .(Upkeep ≡ᵉ allUpkeep) →
             .(bs B.-⟦ B.FTCH-LDG / B.BASE-LDG [] ⟧⇀ tt) →
             .(ffds FFD.-⟦ FFD.Fetch / FFD.FetchRes msgs ⟧⇀ ffds') →
-            ValidAction Slot-Action s SLOT
+            ValidAction (Slot-Action slot) s SLOT
 
   Ftch : ValidAction Ftch-Action s FTCH-LDG
 
@@ -134,6 +135,9 @@ private variable
 ⟦ Base₂a {s} _ _ _ ⟧ = addUpkeep record s { BaseState = tt } Base , EMPTY
 ⟦ Base₂b {s} _ _ _ ⟧ = addUpkeep record s { BaseState = tt } Base , EMPTY
 
+ValidAction→Eq-Slot : ∀ {s sl} → ValidAction (Slot-Action sl) s SLOT → sl ≡ LeiosState.slot s
+ValidAction→Eq-Slot (Slot {s} _ _ _) = refl
+
 instance
   Dec-ValidAction : ValidAction ⁇³
   Dec-ValidAction {IB-Role-Action} {s} {SLOT} .dec
@@ -187,15 +191,18 @@ instance
   Dec-ValidAction {No-VT-Role-Action} {s} {INIT _} .dec = no λ ()
   Dec-ValidAction {No-VT-Role-Action} {s} {SUBMIT _} .dec = no λ ()
   Dec-ValidAction {No-VT-Role-Action} {s} {FTCH-LDG} .dec = no λ ()
-  Dec-ValidAction {Slot-Action} {s} {SLOT} .dec
+  Dec-ValidAction {Slot-Action sl} {s} {SLOT} .dec
+    with sl ≟ LeiosState.slot s
+  ... | no ¬p = no λ x → ⊥-elim (¬p (ValidAction→Eq-Slot x))
+  ... | yes p rewrite p
     with dec | dec | dec
   ... | yes x | yes y | yes z = yes (Slot x y z)
   ... | no ¬p | _ | _ = no λ where (Slot p _ _) → ⊥-elim (¬p (recompute dec p))
   ... | _ | no ¬p | _ = no λ where (Slot _ p _) → ⊥-elim (¬p (recompute dec p))
   ... | _ | _ | no ¬p = no λ where (Slot _ _ p) → ⊥-elim (¬p (recompute dec p))
-  Dec-ValidAction {Slot-Action} {s} {INIT _} .dec = no λ ()
-  Dec-ValidAction {Slot-Action} {s} {SUBMIT _} .dec = no λ ()
-  Dec-ValidAction {Slot-Action} {s} {FTCH-LDG} .dec = no λ ()
+  Dec-ValidAction {Slot-Action _} {s} {INIT _} .dec = no λ ()
+  Dec-ValidAction {Slot-Action _} {s} {SUBMIT _} .dec = no λ ()
+  Dec-ValidAction {Slot-Action _} {s} {FTCH-LDG} .dec = no λ ()
   Dec-ValidAction {Ftch-Action} {s} {FTCH-LDG} .dec = yes Ftch
   Dec-ValidAction {Ftch-Action} {s} {SLOT} .dec = no λ ()
   Dec-ValidAction {Ftch-Action} {s} {INIT _} .dec = no λ ()
@@ -290,7 +297,12 @@ private
             ∷ (EB-Role-Action , SLOT)
             ∷ (VT-Role-Action , SLOT)
             ∷ (Base₂b-Action  , SLOT)
-            ∷ (Slot-Action    , SLOT)
+            ∷ (Slot-Action 0  , SLOT)
+            ∷ (IB-Role-Action , SLOT)
+            ∷ (EB-Role-Action , SLOT)
+            ∷ (VT-Role-Action , SLOT)
+            ∷ (Base₂b-Action  , SLOT)
+            ∷ (Slot-Action 1  , SLOT)
             ∷ []
       in ¿ ValidTrace t ¿ᵇ
 
@@ -298,7 +310,7 @@ private
     _ = refl
 
 getLabel : just s -⟦ i / o ⟧⇀ s′ → Action
-getLabel (Slot _ _ _)             = Slot-Action
+getLabel (Slot {s} _ _ _)         = Slot-Action (LeiosState.slot s)
 getLabel Ftch                     = Ftch-Action
 getLabel Base₁                    = Base₁-Action
 getLabel (Base₂a {s} {eb} _ _ _)  = Base₂a-Action eb
