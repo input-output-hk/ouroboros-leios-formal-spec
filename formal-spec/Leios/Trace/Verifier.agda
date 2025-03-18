@@ -11,7 +11,9 @@ open import Prelude.Closures _↝_
 open GenFFD
 
 data Action : Type where
-  IB-Role-Action EB-Role-Action VT-Role-Action : ℕ → Action
+  IB-Role-Action : ℕ → Action
+  EB-Role-Action : ℕ → List String → Action
+  VT-Role-Action : ℕ → Action
   No-IB-Role-Action No-EB-Role-Action No-VT-Role-Action : Action
   Ftch-Action : Action
   Slot-Action : ℕ → Action
@@ -43,16 +45,16 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
             in .(needsUpkeep EB-Role) →
                .(canProduceEB slot sk-EB (stake s) tt) →
                .(ffds FFD.-⟦ FFD.Send (ebHeader h) nothing / FFD.SendRes ⟧⇀ ffds') →
-               ValidAction (EB-Role-Action slot) s SLOT
+               ValidAction (EB-Role-Action slot LI) s SLOT
 
-  VT-Role  : let open LeiosState s renaming (FFDState to ffds)
-                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
-                 votes = map (vote sk-V ∘ hash) EBs'
-                 ffds' = proj₁ (send-total {ffds} {vHeader votes} {nothing})
-             in .(needsUpkeep VT-Role) →
-                .(canProduceV slot sk-V (stake s)) →
-                .(ffds FFD.-⟦ FFD.Send (vHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
-                ValidAction (VT-Role-Action slot) s SLOT
+  VT-Role : let open LeiosState s renaming (FFDState to ffds)
+                EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
+                votes = map (vote sk-V ∘ hash) EBs'
+                ffds' = proj₁ (send-total {ffds} {vHeader votes} {nothing})
+            in .(needsUpkeep VT-Role) →
+               .(canProduceV slot sk-V (stake s)) →
+               .(ffds FFD.-⟦ FFD.Send (vHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
+               ValidAction (VT-Role-Action slot) s SLOT
 
   No-IB-Role : let open LeiosState s
                in needsUpkeep IB-Role →
@@ -141,8 +143,10 @@ ValidAction→Eq-Slot (Slot _ _ _) = refl
 ValidAction→Eq-IB : ∀ {s sl} → ValidAction (IB-Role-Action sl) s SLOT → sl ≡ LeiosState.slot s
 ValidAction→Eq-IB (IB-Role _ _ _) = refl
 
-ValidAction→Eq-EB : ∀ {s sl} → ValidAction (EB-Role-Action sl) s SLOT → sl ≡ LeiosState.slot s
-ValidAction→Eq-EB (EB-Role _ _ _) = refl
+ValidAction→Eq-EB : ∀ {s sl ibs} →
+  let open LeiosState s
+  in ValidAction (EB-Role-Action sl ibs) s SLOT → sl ≡ slot × ibs ≡ (map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs)
+ValidAction→Eq-EB (EB-Role _ _ _) = refl , refl
 
 ValidAction→Eq-VT : ∀ {s sl} → ValidAction (VT-Role-Action sl) s SLOT → sl ≡ LeiosState.slot s
 ValidAction→Eq-VT (VT-Role _ _ _) = refl
@@ -161,18 +165,19 @@ instance
   Dec-ValidAction {IB-Role-Action _} {s} {INIT _} .dec = no λ ()
   Dec-ValidAction {IB-Role-Action _} {s} {SUBMIT _} .dec = no λ ()
   Dec-ValidAction {IB-Role-Action _} {s} {FTCH-LDG} .dec = no λ ()
-  Dec-ValidAction {EB-Role-Action sl} {s} {SLOT} .dec
-    with sl ≟ LeiosState.slot s
-  ... | no ¬p = no λ x → ⊥-elim (¬p (ValidAction→Eq-EB x))
-  ... | yes p rewrite p
+  Dec-ValidAction {EB-Role-Action sl ibs} {s} {SLOT} .dec
+    with sl ≟ LeiosState.slot s | ibs ≟ (map getIBRef $ filter (_∈ᴮ slice L (LeiosState.slot s) 3) (LeiosState.IBs s))
+  ... | no ¬p | _ = no λ x → ⊥-elim (¬p (proj₁ $ ValidAction→Eq-EB x))
+  ... | _ | no ¬q = no λ x → ⊥-elim (¬q (proj₂ $ ValidAction→Eq-EB x))
+  ... | yes p | yes q rewrite p rewrite q
     with dec | dec | dec
   ... | yes x | yes y | yes z = yes (EB-Role x y z)
   ... | no ¬p | _ | _ = no λ where (EB-Role p _ _) → ⊥-elim (¬p (recompute dec p))
   ... | _ | no ¬p | _ = no λ where (EB-Role _ p _) → ⊥-elim (¬p (recompute dec p))
   ... | _ | _ | no ¬p = no λ where (EB-Role _ _ p) → ⊥-elim (¬p (recompute dec p))
-  Dec-ValidAction {EB-Role-Action _} {s} {INIT _} .dec = no λ ()
-  Dec-ValidAction {EB-Role-Action _} {s} {SUBMIT _} .dec = no λ ()
-  Dec-ValidAction {EB-Role-Action _} {s} {FTCH-LDG} .dec = no λ ()
+  Dec-ValidAction {EB-Role-Action _ _} {s} {INIT _} .dec = no λ ()
+  Dec-ValidAction {EB-Role-Action _ _} {s} {SUBMIT _} .dec = no λ ()
+  Dec-ValidAction {EB-Role-Action _ _} {s} {FTCH-LDG} .dec = no λ ()
   Dec-ValidAction {VT-Role-Action sl} {s} {SLOT} .dec
     with sl ≟ LeiosState.slot s
   ... | no ¬p = no λ x → ⊥-elim (¬p (ValidAction→Eq-VT x))
@@ -311,16 +316,16 @@ private
     test₂ : Bool
     test₂ =
       let t = L.reverse $
-              (IB-Role-Action 0 , SLOT)
-            ∷ (EB-Role-Action 0 , SLOT)
-            ∷ (VT-Role-Action 0 , SLOT)
-            ∷ (Base₂b-Action    , SLOT)
-            ∷ (Slot-Action    0 , SLOT)
-            ∷ (IB-Role-Action 1 , SLOT)
-            ∷ (EB-Role-Action 1 , SLOT)
-            ∷ (VT-Role-Action 1 , SLOT)
-            ∷ (Base₂b-Action    , SLOT)
-            ∷ (Slot-Action    1 , SLOT)
+              (IB-Role-Action 0    , SLOT)
+            ∷ (EB-Role-Action 0 [] , SLOT)
+            ∷ (VT-Role-Action 0    , SLOT)
+            ∷ (Base₂b-Action       , SLOT)
+            ∷ (Slot-Action    0    , SLOT)
+            ∷ (IB-Role-Action 1    , SLOT)
+            ∷ (EB-Role-Action 1 [] , SLOT)
+            ∷ (VT-Role-Action 1    , SLOT)
+            ∷ (Base₂b-Action       , SLOT)
+            ∷ (Slot-Action    1    , SLOT)
             ∷ []
       in ¿ ValidTrace t ¿ᵇ
 
@@ -334,7 +339,7 @@ getLabel Base₁                       = Base₁-Action
 getLabel (Base₂a {s} {eb} _ _ _)     = Base₂a-Action eb
 getLabel (Base₂b _ _ _)              = Base₂b-Action
 getLabel (Roles (IB-Role {s} _ _ _)) = IB-Role-Action (LeiosState.slot s)
-getLabel (Roles (EB-Role {s} _ _ _)) = EB-Role-Action (LeiosState.slot s)
+getLabel (Roles (EB-Role {s} _ _ _)) = let open LeiosState s in EB-Role-Action slot (map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs)
 getLabel (Roles (VT-Role {s} _ _ _)) = VT-Role-Action (LeiosState.slot s)
 getLabel (Roles (No-IB-Role _ _))    = No-IB-Role-Action
 getLabel (Roles (No-EB-Role _ _))    = No-EB-Role-Action
