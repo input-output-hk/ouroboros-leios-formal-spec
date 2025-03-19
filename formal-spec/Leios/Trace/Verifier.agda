@@ -399,24 +399,28 @@ private
 
 data _⇑_ : LeiosState → LeiosState → Type where
 
-  UpdateIB : ∀ {s ib} →
-    s ⇑ record s { FFDState = record (LeiosState.FFDState s) { inIBs = ib ∷ (FFDState.inIBs (LeiosState.FFDState s)) } }
+  UpdateIB : ∀ {s ib} → let open LeiosState s renaming (FFDState to ffds) in
+    s ⇑ record s { FFDState = record ffds { inIBs = ib ∷ FFDState.inIBs ffds } }
 
-  UpdateEB : ∀ {s eb} →
-    s ⇑ record s { FFDState = record (LeiosState.FFDState s) { inEBs = eb ∷ (FFDState.inEBs (LeiosState.FFDState s)) } }
+  UpdateEB : ∀ {s eb} → let open LeiosState s renaming (FFDState to ffds) in
+    s ⇑ record s { FFDState = record ffds { inEBs = eb ∷ FFDState.inEBs ffds } }
 
-  UpdateVT : ∀ {s vt} →
-    s ⇑ record s { FFDState = record (LeiosState.FFDState s) { inVTs = vt ∷ (FFDState.inVTs (LeiosState.FFDState s)) } }
+  UpdateVT : ∀ {s vt} → let open LeiosState s renaming (FFDState to ffds) in
+    s ⇑ record s { FFDState = record ffds { inVTs = vt ∷ FFDState.inVTs ffds } }
 
 data LocalStep : LeiosState → LeiosState → Type where
 
   StateStep : ∀ {s i o s′} →
-    just s -⟦ i / o ⟧⇀ s′ →
-    LocalStep s s′
+    ∙ just s -⟦ i / o ⟧⇀ s′
+      ───────────────────
+      LocalStep s s′
 
   UpdateState : ∀ {s s′} →
-    s ⇑ s′ →
-    LocalStep s s′
+    ∙ s ⇑ s′
+      ───────────────────
+      LocalStep s s′
+
+  -- TODO: add base layer update
 
 getLabel : just s -⟦ i / o ⟧⇀ s′ → Action
 getLabel (Slot {s} _ _ _)            = Slot-Action (LeiosState.slot s)
