@@ -12,6 +12,8 @@ open GenFFD
 
 data FFDUpdate : Type where
   IB-Recv-Update : InputBlock → FFDUpdate
+  EB-Recv-Update : EndorserBlock → FFDUpdate
+  VT-Recv-Update : List Vote → FFDUpdate
 
 data Action : Type where
   IB-Role-Action : ℕ → Action
@@ -30,12 +32,16 @@ private variable
   s s′ : LeiosState
   α : Action
 
-
 data ValidUpdate : FFDUpdate → LeiosState → Type where
 
   IB-Recv : ∀ {ib} →
-            let open LeiosState s renaming (FFDState to ffds)
-            in ValidUpdate (IB-Recv-Update ib) s
+    ValidUpdate (IB-Recv-Update ib) s
+
+  EB-Recv : ∀ {eb} →
+    ValidUpdate (EB-Recv-Update eb) s
+
+  VT-Recv : ∀ {vt} →
+    ValidUpdate (VT-Recv-Update vt) s
 
 data ValidAction : Action → LeiosState → LeiosInput → Type where
 
@@ -267,6 +273,8 @@ instance
 instance
   Dec-ValidUpdate : ValidUpdate ⁇²
   Dec-ValidUpdate {IB-Recv-Update _} .dec = yes IB-Recv
+  Dec-ValidUpdate {EB-Recv-Update _} .dec = yes EB-Recv
+  Dec-ValidUpdate {VT-Recv-Update _} .dec = yes VT-Recv
 
 mutual
   data ValidTrace : List ((Action × LeiosInput) ⊎ FFDUpdate) → Type where
@@ -293,6 +301,13 @@ mutual
   ⟦ _∷_ {IB-Recv-Update ib} tr vu ⟧∗ =
     let (s , o) = ⟦ tr ⟧∗
     in record s { FFDState = record (LeiosState.FFDState s) { inIBs = ib ∷ FFDState.inIBs (LeiosState.FFDState s)}} , o
+  ⟦ _∷_ {EB-Recv-Update eb} tr vu ⟧∗ =
+    let (s , o) = ⟦ tr ⟧∗
+    in record s { FFDState = record (LeiosState.FFDState s) { inEBs = eb ∷ FFDState.inEBs (LeiosState.FFDState s)}} , o
+  ⟦ _∷_ {VT-Recv-Update vt} tr vu ⟧∗ =
+    let (s , o) = ⟦ tr ⟧∗
+    in record s { FFDState = record (LeiosState.FFDState s) { inVTs = vt ∷ FFDState.inVTs (LeiosState.FFDState s)}} , o
+
 
 Irr-ValidAction : Irrelevant (ValidAction α s i)
 Irr-ValidAction (IB-Role _ _ _) (IB-Role _ _ _) = refl
@@ -309,6 +324,8 @@ Irr-ValidAction (Base₂b _ _ _) (Base₂b _ _ _) = refl
 
 Irr-ValidUpdate : ∀ {f} → Irrelevant (ValidUpdate f s)
 Irr-ValidUpdate IB-Recv IB-Recv = refl
+Irr-ValidUpdate EB-Recv EB-Recv = refl
+Irr-ValidUpdate VT-Recv VT-Recv = refl
 
 Irr-ValidTrace : ∀ {αs} → Irrelevant (ValidTrace αs)
 Irr-ValidTrace [] [] = refl
