@@ -10,6 +10,9 @@ open import Leios.Short st hiding (LeiosState; initLeiosState)
 open import Prelude.Closures _↝_
 open GenFFD
 
+data FFDUpdate : Type where
+  IB-Recv-Update : InputBlock → FFDUpdate
+
 data Action : Type where
   IB-Role-Action : ℕ → Action
   EB-Role-Action : ℕ → List String → Action
@@ -26,6 +29,13 @@ Actions = List (Action × LeiosInput)
 private variable
   s s′ : LeiosState
   α : Action
+
+
+data ValidUpdate : FFDUpdate → LeiosState → Type where
+
+  IB-Recv : ∀ {ib} →
+            let open LeiosState s renaming (FFDState to ffds)
+            in ValidUpdate (IB-Recv-Update ib) s
 
 data ValidAction : Action → LeiosState → LeiosInput → Type where
 
@@ -254,8 +264,12 @@ instance
   Dec-ValidAction {Base₂b-Action} {s} {FTCH-LDG} .dec = no λ ()
   Dec-ValidAction {Base₂b-Action} {s} {INIT _} .dec = no λ ()
 
+instance
+  Dec-ValidUpdate : ValidUpdate ⁇²
+  Dec-ValidUpdate {IB-Recv-Update _} .dec = yes IB-Recv
+
 mutual
-  data ValidTrace : Actions → Type where
+  data ValidTrace : List ((Action × LeiosInput) ⊎ FFDUpdate) → Type where
     [] :
       ─────────────
       ValidTrace []
@@ -264,11 +278,21 @@ mutual
       ∀ (tr : ValidTrace αs) →
       ∙ ValidAction α (proj₁ ⟦ tr ⟧∗) i
         ───────────────────
-        ValidTrace ((α , i) ∷ αs)
+        ValidTrace (inj₁ (α , i) ∷ αs)
 
-  ⟦_⟧∗ : ∀ {αs : Actions} → ValidTrace αs → LeiosState × LeiosOutput
+    _∷_ : ∀ {f αs} →
+      ∀ (tr : ValidTrace αs) →
+        (vu : ValidUpdate f (proj₁ ⟦ tr ⟧∗)) →
+        ───────────────────
+        ValidTrace (inj₂ f ∷ αs)
+
+
+  ⟦_⟧∗ : ∀ {αs : List ((Action × LeiosInput) ⊎ FFDUpdate)} → ValidTrace αs → LeiosState × LeiosOutput
   ⟦_⟧∗ [] = initLeiosState tt sd tt , EMPTY
   ⟦_⟧∗ (_ / _ ∷ _ ⊣ vα) = ⟦ vα ⟧
+  ⟦ _∷_ {IB-Recv-Update ib} tr vu ⟧∗ =
+    let (s , o) = ⟦ tr ⟧∗
+    in record s { FFDState = record (LeiosState.FFDState s) { inIBs = ib ∷ FFDState.inIBs (LeiosState.FFDState s)}} , o
 
 Irr-ValidAction : Irrelevant (ValidAction α s i)
 Irr-ValidAction (IB-Role _ _ _) (IB-Role _ _ _) = refl
@@ -283,17 +307,23 @@ Irr-ValidAction Base₁ Base₁ = refl
 Irr-ValidAction (Base₂a _ _ _) (Base₂a _ _ _) = refl
 Irr-ValidAction (Base₂b _ _ _) (Base₂b _ _ _) = refl
 
+Irr-ValidUpdate : ∀ {f} → Irrelevant (ValidUpdate f s)
+Irr-ValidUpdate IB-Recv IB-Recv = refl
+
 Irr-ValidTrace : ∀ {αs} → Irrelevant (ValidTrace αs)
 Irr-ValidTrace [] [] = refl
 Irr-ValidTrace (α / i ∷ vαs ⊣ vα) (.α / .i ∷ vαs′ ⊣ vα′)
   rewrite Irr-ValidTrace vαs vαs′ | Irr-ValidAction vα vα′
+  = refl
+Irr-ValidTrace (vαs ∷ u) (vαs′ ∷ u′)
+  rewrite Irr-ValidTrace vαs vαs′ | Irr-ValidUpdate u u′
   = refl
 
 instance
   Dec-ValidTrace : ValidTrace ⁇¹
   Dec-ValidTrace {tr} .dec with tr
   ... | [] = yes []
-  ... | (α , i) ∷ αs
+  ... | inj₁ (α , i) ∷ αs
     with ¿ ValidTrace αs ¿
   ... | no ¬vαs = no λ where (_ / _ ∷ vαs ⊣ _) → ¬vαs vαs
   ... | yes vαs
@@ -303,12 +333,21 @@ instance
                   $ subst (λ x → ValidAction α x i) (cong (proj₁ ∘ ⟦_⟧∗) $ Irr-ValidTrace tr vαs) vα
   ... | yes vα = yes $ _ / _ ∷ vαs ⊣ vα
 
+  Dec-ValidTrace {tr} .dec | inj₂ u ∷ αs
+    with ¿ ValidTrace αs ¿
+  ... | no ¬vαs = no λ where (vαs ∷ _) → ¬vαs vαs
+  ... | yes vαs
+    with ¿ ValidUpdate u (proj₁ ⟦ vαs ⟧∗) ¿
+  ... | yes vu = yes (vαs ∷ vu)
+  ... | no ¬vu = no λ where
+    (tr ∷ vu) → ¬vu $ subst (λ x → ValidUpdate u x) (cong (proj₁ ∘ ⟦_⟧∗) $ Irr-ValidTrace tr vαs) vu
+
 private
   opaque
     unfolding List-Model
 
     test₁ : Bool
-    test₁ = ¿ ValidTrace ((IB-Role-Action 0 , SLOT) ∷ []) ¿ᵇ
+    test₁ = ¿ ValidTrace (inj₁ (IB-Role-Action 0 , SLOT) ∷ []) ¿ᵇ
 
     _ : test₁ ≡ true
     _ = refl
@@ -316,21 +355,40 @@ private
     test₂ : Bool
     test₂ =
       let t = L.reverse $
-              (IB-Role-Action 0    , SLOT)
-            ∷ (EB-Role-Action 0 [] , SLOT)
-            ∷ (VT-Role-Action 0    , SLOT)
-            ∷ (Base₂b-Action       , SLOT)
-            ∷ (Slot-Action    0    , SLOT)
-            ∷ (IB-Role-Action 1    , SLOT)
-            ∷ (EB-Role-Action 1 [] , SLOT)
-            ∷ (VT-Role-Action 1    , SLOT)
-            ∷ (Base₂b-Action       , SLOT)
-            ∷ (Slot-Action    1    , SLOT)
+              inj₁ (IB-Role-Action 0    , SLOT)
+            ∷ inj₁ (EB-Role-Action 0 [] , SLOT)
+            ∷ inj₁ (VT-Role-Action 0    , SLOT)
+            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Slot-Action    0    , SLOT)
+            ∷ inj₁ (IB-Role-Action 1    , SLOT)
+            ∷ inj₁ (EB-Role-Action 1 [] , SLOT)
+            ∷ inj₁ (VT-Role-Action 1    , SLOT)
+            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Slot-Action    1    , SLOT)
+            ∷ inj₂ (IB-Recv-Update
+                (record { header =
+                  record { slotNumber = 1
+                         ; producerID = fsuc fzero
+                         ; lotteryPf = tt
+                         ; bodyHash = "0,1,2"
+                         ; signature = tt
+                         }
+                        ; body = record { txs = 0 ∷ 1 ∷ 2 ∷ [] }}))
             ∷ []
       in ¿ ValidTrace t ¿ᵇ
 
     _ : test₂ ≡ true
     _ = refl
+
+data LocalStep : LeiosState → LeiosState → Type where
+
+  StateStep : ∀ {s i o s′} →
+    just s -⟦ i / o ⟧⇀ s′ →
+    LocalStep s s′
+
+  UpdateIB : ∀ {s ib} →
+    LocalStep s (record s { FFDState = record (LeiosState.FFDState s) { inIBs = ib ∷ (FFDState.inIBs (LeiosState.FFDState s)) } })
+
 
 getLabel : just s -⟦ i / o ⟧⇀ s′ → Action
 getLabel (Slot {s} _ _ _)            = Slot-Action (LeiosState.slot s)
