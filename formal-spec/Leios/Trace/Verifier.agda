@@ -397,15 +397,26 @@ private
     _ : test₂ ≡ true
     _ = refl
 
+data _⇑_ : LeiosState → LeiosState → Type where
+
+  UpdateIB : ∀ {s ib} →
+    s ⇑ record s { FFDState = record (LeiosState.FFDState s) { inIBs = ib ∷ (FFDState.inIBs (LeiosState.FFDState s)) } }
+
+  UpdateEB : ∀ {s eb} →
+    s ⇑ record s { FFDState = record (LeiosState.FFDState s) { inEBs = eb ∷ (FFDState.inEBs (LeiosState.FFDState s)) } }
+
+  UpdateVT : ∀ {s vt} →
+    s ⇑ record s { FFDState = record (LeiosState.FFDState s) { inVTs = vt ∷ (FFDState.inVTs (LeiosState.FFDState s)) } }
+
 data LocalStep : LeiosState → LeiosState → Type where
 
   StateStep : ∀ {s i o s′} →
     just s -⟦ i / o ⟧⇀ s′ →
     LocalStep s s′
 
-  UpdateIB : ∀ {s ib} →
-    LocalStep s (record s { FFDState = record (LeiosState.FFDState s) { inIBs = ib ∷ (FFDState.inIBs (LeiosState.FFDState s)) } })
-
+  UpdateState : ∀ {s s′} →
+    s ⇑ s′ →
+    LocalStep s s′
 
 getLabel : just s -⟦ i / o ⟧⇀ s′ → Action
 getLabel (Slot {s} _ _ _)            = Slot-Action (LeiosState.slot s)
