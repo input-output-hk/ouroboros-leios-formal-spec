@@ -1,9 +1,9 @@
 open import Leios.Prelude hiding (id)
 
-module Leios.Trace.Verifier where
+module Leios.Trace.Verifier (numberOfParties : ℕ) (SUT-id : Fin numberOfParties) where
 
 open import Leios.SpecStructure using (SpecStructure)
-open import Leios.Defaults 2 fzero using (st; sd; LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD; send-total; fetch-total)
+open import Leios.Defaults numberOfParties SUT-id using (st; sd; LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD; send-total; fetch-total)
 open SpecStructure st hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified)
 
 open import Leios.Short st hiding (LeiosState; initLeiosState)
@@ -358,44 +358,6 @@ instance
   ... | yes vu = yes (vαs ∷ vu)
   ... | no ¬vu = no λ where
     (tr ∷ vu) → ¬vu $ subst (λ x → ValidUpdate u x) (cong (proj₁ ∘ ⟦_⟧∗) $ Irr-ValidTrace tr vαs) vu
-
-private
-  opaque
-    unfolding List-Model
-
-    test₁ : Bool
-    test₁ = ¿ ValidTrace (inj₁ (IB-Role-Action 0 , SLOT) ∷ []) ¿ᵇ
-
-    _ : test₁ ≡ true
-    _ = refl
-
-    test₂ : Bool
-    test₂ =
-      let t = L.reverse $
-              inj₁ (IB-Role-Action 0    , SLOT)
-            ∷ inj₁ (EB-Role-Action 0 [] , SLOT)
-            ∷ inj₁ (VT-Role-Action 0    , SLOT)
-            ∷ inj₁ (Base₂b-Action       , SLOT)
-            ∷ inj₁ (Slot-Action    0    , SLOT)
-            ∷ inj₁ (IB-Role-Action 1    , SLOT)
-            ∷ inj₁ (EB-Role-Action 1 [] , SLOT)
-            ∷ inj₁ (VT-Role-Action 1    , SLOT)
-            ∷ inj₁ (Base₂b-Action       , SLOT)
-            ∷ inj₁ (Slot-Action    1    , SLOT)
-            ∷ inj₂ (IB-Recv-Update
-                (record { header =
-                  record { slotNumber = 1
-                         ; producerID = fsuc fzero
-                         ; lotteryPf = tt
-                         ; bodyHash = "0,1,2"
-                         ; signature = tt
-                         }
-                        ; body = record { txs = 0 ∷ 1 ∷ 2 ∷ [] }}))
-            ∷ []
-      in ¿ ValidTrace t ¿ᵇ
-
-    _ : test₂ ≡ true
-    _ = refl
 
 data _⇑_ : LeiosState → LeiosState → Type where
 

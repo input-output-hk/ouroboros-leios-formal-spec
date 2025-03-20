@@ -24,6 +24,7 @@ open import Leios.SpecStructure
 open import Leios.Traces
 open import Leios.Trace.Decidable
 open import Leios.Trace.Verifier
+open import Leios.Trace.Verifier.Test
 open import Leios.UniformShort
 open import Leios.Voting
 open import Leios.VRF
