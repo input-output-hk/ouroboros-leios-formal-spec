@@ -61,7 +61,7 @@ d-VRF =
     ; genV1Input = id
     ; genV2Input = id
     ; verifySig  = λ _ _ → ⊤
-    ; verifySig? = λ _ _ → true because ofʸ tt
+    ; verifySig? = λ _ _ → yes tt
     ; poolID     = λ _ → zero
     }
 
