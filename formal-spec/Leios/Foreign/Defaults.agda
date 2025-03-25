@@ -54,7 +54,7 @@ d-VRF : LeiosVRF
 d-VRF =
   record
     { PubKey     = ⊤
-    ; vrf        = record { isKeyPair = λ _ _ → ⊤ ; eval = λ x x₁ → x₁ , x ; verify = λ _ _ _ _ → ⊤ ; verify? = λ _ _ _ _ → true because ofʸ tt }
+    ; vrf        = record { isKeyPair = λ _ _ → ⊤ ; eval = λ x x₁ → x₁ , x ; verify = λ _ _ _ _ → ⊤ ; verify? = λ _ _ _ _ → yes tt }
     ; genIBInput = id
     ; genEBInput = id
     ; genVInput  = id
