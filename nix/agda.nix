@@ -87,7 +87,7 @@ let
     name = "leios-spec";  # FIXME: Why is this entry needed?
     src = ../formal-spec;
     meta = { };
-    libraryFile = "formal-spec/leios-spec.agda-lib";
+    libraryFile = "leios-spec.agda-lib";
     everythingFile = "Everything.agda";
     buildPhase = ''
       OUT_DIR=$out make
