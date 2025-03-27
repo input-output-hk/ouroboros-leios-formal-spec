@@ -3,6 +3,8 @@
 open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.FFD
+open import Tactic.Defaults
+open import Tactic.Derive.DecEq
 
 module Leios.Blocks (a : LeiosAbstract) (let open LeiosAbstract a) where
 
@@ -21,10 +23,6 @@ record IsBlock (B : Type) : Type where
 
 open IsBlock ⦃...⦄ public
 
-OSig : Bool → Type
-OSig true  = Sig
-OSig false = ⊤
-
 IBRef = Hash
 EBRef = Hash
 
@@ -32,15 +30,15 @@ EBRef = Hash
 -- Input Blocks
 --------------------------------------------------------------------------------
 
-record IBHeaderOSig (b : Bool) : Type where
+record IBHeaderOSig (sig : Type) : Type where
   field slotNumber : ℕ
         producerID : PoolID
         lotteryPf  : VrfPf
         bodyHash   : Hash
-        signature  : OSig b
+        signature  : sig
 
-IBHeader    = IBHeaderOSig true
-PreIBHeader = IBHeaderOSig false
+IBHeader    = IBHeaderOSig Sig
+PreIBHeader = IBHeaderOSig ⊤
 
 record IBBody : Type where
   field txs : List Tx
@@ -51,12 +49,22 @@ record InputBlock : Type where
 
   open IBHeaderOSig header public
 
+unquoteDecl DecEq-IBBody DecEq-IBHeaderOSig DecEq-InputBlock =
+  derive-DecEq (
+      (quote IBBody , DecEq-IBBody)
+    ∷ (quote IBHeaderOSig , DecEq-IBHeaderOSig)
+    ∷ (quote InputBlock , DecEq-InputBlock) ∷ [])
+
 instance
-  IsBlock-IBHeaderOSig : IsBlock IBHeader
-  IsBlock-IBHeaderOSig = record { IBHeaderOSig }
+  IsBlock-IBHeader : IsBlock IBHeader
+  IsBlock-IBHeader = record { IBHeaderOSig }
 
   Hashable-IBBody : Hashable IBBody Hash
   Hashable-IBBody .hash b = hash (b .IBBody.txs)
+
+  Hashable-IBHeader : ⦃ Hashable PreIBHeader Hash ⦄ → Hashable IBHeader Hash
+  Hashable-IBHeader .hash b = hash {T = PreIBHeader}
+    record { IBHeaderOSig b hiding (signature) ; signature = _ }
 
   IsBlock-InputBlock : IsBlock InputBlock
   IsBlock-InputBlock = record { InputBlock }
@@ -64,7 +72,7 @@ instance
 mkIBHeader : ⦃ Hashable PreIBHeader Hash ⦄ → ℕ → PoolID → VrfPf → PrivKey → List Tx → IBHeader
 mkIBHeader slot id π pKey txs = record { signature = sign pKey (hash h) ; IBHeaderOSig h }
   where
-    h : IBHeaderOSig false
+    h : IBHeaderOSig ⊤
     h = record { slotNumber = slot
                ; producerID = id
                ; lotteryPf  = π
@@ -72,31 +80,33 @@ mkIBHeader slot id π pKey txs = record { signature = sign pKey (hash h) ; IBHea
                ; signature  = _
                }
 
-getIBRef : ⦃ Hashable IBHeader Hash ⦄ → InputBlock → IBRef
+getIBRef : ⦃ Hashable PreIBHeader Hash ⦄ → InputBlock → IBRef
 getIBRef = hash ∘ InputBlock.header
 
 --------------------------------------------------------------------------------
 -- Endorser Blocks
 --------------------------------------------------------------------------------
 
-record EndorserBlockOSig (b : Bool) : Type where
+record EndorserBlockOSig (sig : Type) : Type where
   field slotNumber : ℕ
         producerID : PoolID
         lotteryPf  : VrfPf
         ibRefs     : List IBRef
         ebRefs     : List EBRef
-        signature  : OSig b
+        signature  : sig
 
-EndorserBlock    = EndorserBlockOSig true
-PreEndorserBlock = EndorserBlockOSig false
+EndorserBlock    = EndorserBlockOSig Sig
+PreEndorserBlock = EndorserBlockOSig ⊤
 
 instance
   Hashable-EndorserBlock : ⦃ Hashable PreEndorserBlock Hash ⦄ → Hashable EndorserBlock Hash
   Hashable-EndorserBlock .hash b = hash {T = PreEndorserBlock}
     record { EndorserBlockOSig b hiding (signature) ; signature = _ }
 
-  IsBlock-EndorserBlockOSig : IsBlock EndorserBlock
-  IsBlock-EndorserBlockOSig = record { EndorserBlockOSig }
+  IsBlock-EndorserBlock : IsBlock EndorserBlock
+  IsBlock-EndorserBlock = record { EndorserBlockOSig }
+
+unquoteDecl DecEq-EndorserBlockOSig = derive-DecEq ((quote EndorserBlockOSig , DecEq-EndorserBlockOSig) ∷ [])
 
 mkEB : ⦃ Hashable PreEndorserBlock Hash ⦄ → ℕ → PoolID → VrfPf → PrivKey → List IBRef → List EBRef → EndorserBlock
 mkEB slot id π pKey LI LE = record { signature = sign pKey (hash b) ; EndorserBlockOSig b }
@@ -131,6 +141,9 @@ module GenFFD ⦃ _ : IsBlock (List Vote) ⦄ where
 
   data Body : Type where
     ibBody : IBBody → Body
+
+  unquoteDecl DecEq-Header DecEq-Body =
+    derive-DecEq ((quote Header , DecEq-Header) ∷ (quote Body , DecEq-Body) ∷ [])
 
   ID : Type
   ID = ℕ × PoolID

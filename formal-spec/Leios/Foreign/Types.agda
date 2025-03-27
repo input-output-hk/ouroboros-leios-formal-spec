@@ -22,7 +22,7 @@ module Leios.Foreign.Types where
 numberOfParties : ℕ
 numberOfParties = 2
 
-open import Leios.Foreign.Defaults numberOfParties fzero
+open import Leios.Defaults numberOfParties fzero
   renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda)
 
 dropDash : S.String → S.String
@@ -49,6 +49,7 @@ data IBHeader = IBHeader {slotNumber :: Integer, producerID :: Integer, bodyHash
 
 instance
   HsTy-IBHeader = MkHsType IBHeaderAgda IBHeader
+
   Conv-IBHeader : Convertible IBHeaderAgda IBHeader
   Conv-IBHeader = record
     { to = λ (record { slotNumber = s ; producerID = p ; bodyHash = h }) →
@@ -121,16 +122,17 @@ instance
   HsTy-FFDState = autoHsType FFDState
   Conv-FFDState = autoConvert FFDState
 
-  HsTy-Fin = MkHsType (Fin numberOfParties) ℕ
+  HsTy-Fin : ∀ {n} → HasHsType (Fin n)
+  HsTy-Fin .HasHsType.HsType = ℕ
 
-  Conv-Fin : HsConvertible (Fin numberOfParties)
-  Conv-Fin =
+  Conv-Fin : ∀ {n} → HsConvertible (Fin n)
+  Conv-Fin {n} =
     record
       { to = toℕ
-      ; from = λ p →
-                 case p <? numberOfParties of λ where
-                   (yes q) → #_ p {numberOfParties} {fromWitness q}
-                   (no _) → error "Conversion to Fin not possible!"
+      ; from = λ m →
+          case m <? n of λ where
+            (yes p) → #_ m {n} {fromWitness p}
+            (no _) → error "Conversion to Fin not possible!"
       }
 
   HsTy-LeiosState = autoHsType LeiosState
@@ -153,23 +155,7 @@ open GenFFD.Header using (ibHeader; ebHeader; vHeader)
 open GenFFD.Body using (ibBody)
 open FFDState
 
-instance
-  Computational-B : Computational22 (BaseAbstract.Functionality._-⟦_/_⟧⇀_ d-BaseFunctionality) String
-  Computational-B .computeProof s (INIT x) = success ((STAKE sd , tt) , tt)
-  Computational-B .computeProof s (SUBMIT x) = success ((EMPTY , tt) , tt)
-  Computational-B .computeProof s FTCH-LDG = success (((BASE-LDG []) , tt) , tt)
-  Computational-B .completeness _ _ _ _ _ = error "Computational-B completeness"
-
-  Computational-FFD : Computational22 (FFDAbstract.Functionality._-⟦_/_⟧⇀_ d-FFDFunctionality) String
-  Computational-FFD .computeProof s (Send (ibHeader h) (just (ibBody b))) = success ((SendRes , record s {outIBs = record {header = h; body = b} ∷ outIBs s}) , SendIB)
-  Computational-FFD .computeProof s (Send (ebHeader h) nothing) = success ((SendRes , record s {outEBs = h ∷ outEBs s}) , SendEB)
-  Computational-FFD .computeProof s (Send (vHeader h) nothing) = success ((SendRes , record s {outVTs = h ∷ outVTs s}) , SendVS)
-  Computational-FFD .computeProof s Fetch = success ((FetchRes (flushIns s) , record s {inIBs = []; inEBs = []; inVTs = []}) , Fetch)
-
-  Computational-FFD .computeProof _ _ = failure "FFD error"
-  Computational-FFD .completeness _ _ _ _ _ = error "Computational-FFD completeness"
-
-open import Leios.Short.Deterministic st as D public
+open import Leios.Short.Deterministic st public
 
 stepHs : HsType (LeiosState → LeiosInput → C.ComputationResult String (LeiosOutput × LeiosState))
 stepHs = to (compute Computational--⟦/⟧⇀)
