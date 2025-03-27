@@ -146,7 +146,7 @@ private variable
      ; Ledger    = constructLedger []
      ; slot      = suc slot
      ; Upkeep    = ∅
-     } ↑ L.filter isValid? msgs
+     } ↑ L.filter (isValid? s) msgs
   , EMPTY)
 ⟦ Ftch {s} ⟧ = s , FTCH-LDG (LeiosState.Ledger s)
 ⟦ Base₁ {s} {txs} ⟧ = record s { ToPropose = txs } , EMPTY
@@ -296,7 +296,7 @@ mutual
 
 
   ⟦_⟧∗ : ∀ {αs : List ((Action × LeiosInput) ⊎ FFDUpdate)} → ValidTrace αs → LeiosState × LeiosOutput
-  ⟦_⟧∗ [] = initLeiosState tt sd tt , EMPTY
+  ⟦_⟧∗ [] = initLeiosState tt sd tt [] , EMPTY
   ⟦_⟧∗ (_ / _ ∷ _ ⊣ vα) = ⟦ vα ⟧
   ⟦ _↥_ {IB-Recv-Update ib} tr vu ⟧∗ =
     let (s , o) = ⟦ tr ⟧∗

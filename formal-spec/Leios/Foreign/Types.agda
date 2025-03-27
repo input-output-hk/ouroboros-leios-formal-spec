@@ -19,7 +19,10 @@ module Leios.Foreign.Types where
   {-# LANGUAGE DuplicateRecordFields #-}
 #-}
 
-open import Leios.Defaults 2 fzero -- TODO: parameters
+numberOfParties : ℕ
+numberOfParties = 2
+
+open import Leios.Defaults numberOfParties fzero
   renaming (EndorserBlock to EndorserBlockAgda; IBHeader to IBHeaderAgda)
 
 dropDash : S.String → S.String
@@ -52,8 +55,8 @@ instance
     { to = λ (record { slotNumber = s ; producerID = p ; bodyHash = h }) →
         record { slotNumber = s ; producerID = toℕ p ; bodyHash = h}
     ; from = λ (record { slotNumber = s ; producerID = p ; bodyHash = h }) →
-        case p <? 2 of λ where
-          (yes q) → record { slotNumber = s ; producerID = #_ p {2} {fromWitness q} ; lotteryPf = tt ; bodyHash = h ; signature = tt }
+        case p <? numberOfParties of λ where
+          (yes q) → record { slotNumber = s ; producerID = #_ p {numberOfParties} {fromWitness q} ; lotteryPf = tt ; bodyHash = h ; signature = tt }
           (no _) → error "Conversion to Fin not possible!"
     }
 
@@ -87,8 +90,8 @@ instance
       { to = λ (record { slotNumber = s ; producerID = p ; ibRefs = refs }) →
           record { slotNumber = s ; producerID = toℕ p ; ibRefs = refs }
       ; from = λ (record { slotNumber = s ; producerID = p ; ibRefs = refs }) →
-        case p <? 2 of λ where
-          (yes q) → record { slotNumber = s ; producerID = #_ p {2} {fromWitness q} ; lotteryPf = tt ; signature = tt ; ibRefs = refs ; ebRefs = [] }
+        case p <? numberOfParties of λ where
+          (yes q) → record { slotNumber = s ; producerID = #_ p {numberOfParties} {fromWitness q} ; lotteryPf = tt ; signature = tt ; ibRefs = refs ; ebRefs = [] }
           (no _) → error "Conversion to Fin not possible!"
       }
 
@@ -143,9 +146,16 @@ instance
 
 open import Class.Computational as C
 open import Class.Computational22
-open import Leios.Short.Deterministic st public
 
 open Computational22
+open BaseAbstract
+open FFDAbstract
+
+open GenFFD.Header using (ibHeader; ebHeader; vHeader)
+open GenFFD.Body using (ibBody)
+open FFDState
+
+open import Leios.Short.Deterministic st public
 
 stepHs : HsType (LeiosState → LeiosInput → C.ComputationResult String (LeiosOutput × LeiosState))
 stepHs = to (compute Computational--⟦/⟧⇀)

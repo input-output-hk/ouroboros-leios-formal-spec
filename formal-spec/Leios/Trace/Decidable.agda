@@ -103,5 +103,5 @@ module _ {s : LeiosState} (let open LeiosState s renaming (FFDState to ffds; Bas
              ; Ledger    = constructLedger rbs
              ; slot      = suc slot
              ; Upkeep    = ∅
-             } ↑ L.filter GenFFD.isValid? msgs
+             } ↑ L.filter (isValid? s) msgs
   Slot? {_} {_} {_} {_} {p} {q} {r} = Slot (toWitness p) (toWitness q) (toWitness r)

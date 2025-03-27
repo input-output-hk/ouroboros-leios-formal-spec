@@ -51,8 +51,8 @@ open import Leios.Simplified.Deterministic st-2 Λ μ
 
 comp = Computational--⟦/⟧⇀ ⦃ Computational-B ⦄ ⦃ Computational-FFD ⦄
 
-initLeiosState : VTy → StakeDistr → B.State → LeiosState
-initLeiosState v sd bs = record (initLeiosState' v sd bs) { Upkeep = allUpkeep }
+initLeiosState : VTy → StakeDistr → B.State → List PubKey → LeiosState
+initLeiosState v sd bs pks = record (initLeiosState' v sd bs pks) { Upkeep = allUpkeep }
 
 module _ v sd bs where opaque
   unfolding List-Modelᵈ V2-Role-total
@@ -66,11 +66,11 @@ module _ v sd bs where opaque
   compute-≡ s i = refl
 
   test₁ : ∀ tx
-    → Σ[ x ∈ LeiosOutput × LeiosState ] compute (initLeiosState v sd bs) (SUBMIT (inj₂ [ tx ]))
+    → Σ[ x ∈ LeiosOutput × LeiosState ] compute (initLeiosState v sd bs []) (SUBMIT (inj₂ [ tx ]))
       ≡ success x
   test₁ tx = -, refl
 
-  test₂ : Σ[ x ∈ LeiosOutput × LeiosState ] compute (initLeiosState v sd bs) SLOT
+  test₂ : Σ[ x ∈ LeiosOutput × LeiosState ] compute (initLeiosState v sd bs []) SLOT
           ≡ success x
   test₂ = -, refl
 
@@ -78,4 +78,4 @@ module _ v sd bs where opaque
   test₃ tx = {!proj₁ test₂!}
 
   trace : ComputationResult String (List LeiosOutput × LeiosState)
-  trace = computeTrace (initLeiosState v sd bs) (SLOT ∷ SLOT ∷ [])
+  trace = computeTrace (initLeiosState v sd bs []) (SLOT ∷ SLOT ∷ [])
