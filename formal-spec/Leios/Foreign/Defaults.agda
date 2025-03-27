@@ -51,12 +51,15 @@ d-VRF : LeiosVRF
 d-VRF =
   record
     { PubKey     = ⊤
-    ; vrf        = record { isKeyPair = λ _ _ → ⊤ ; eval = λ x x₁ → x₁ , x ; verify = λ _ _ _ _ → ⊤ }
+    ; vrf        = record { isKeyPair = λ _ _ → ⊤ ; eval = λ x x₁ → x₁ , x ; verify = λ _ _ _ _ → ⊤ ; verify? = λ _ _ _ _ → yes tt }
     ; genIBInput = id
     ; genEBInput = id
     ; genVInput  = id
     ; genV1Input = id
     ; genV2Input = id
+    ; verifySig  = λ _ _ → ⊤
+    ; verifySig? = λ _ _ → yes tt
+    ; poolID     = λ _ → SUT-id
     }
 
 open LeiosVRF d-VRF public
