@@ -67,6 +67,9 @@ record LeiosState : Type where
   needsUpkeep : SlotUpkeep → Set
   needsUpkeep = _∉ Upkeep
 
+  Dec-needsUpkeep : ∀ {u : SlotUpkeep} → ⦃ DecEq SlotUpkeep ⦄ → needsUpkeep u ⁇
+  Dec-needsUpkeep {u} .dec = ¬? (u ∈? Upkeep)
+
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
 addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u ❵ }
 {-# INJECTIVE_FOR_INFERENCE addUpkeep #-}
