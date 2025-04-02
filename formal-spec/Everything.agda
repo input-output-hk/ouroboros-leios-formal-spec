@@ -9,7 +9,7 @@ open import Leios.Defaults
 open import Leios.FFD
 open import Leios.Foreign.BaseTypes
 open import Leios.Foreign.HsTypes
--- open import Leios.Foreign.Types
+open import Leios.Foreign.Types
 open import Leios.Foreign.Util
 open import Leios.KeyRegistration
 open import Leios.Network

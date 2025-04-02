@@ -144,6 +144,7 @@ instance
   HsTy-LeiosOutput = autoHsType LeiosOutput ⊣ onConstructors (prefix "O_" ∘ dropDash)
   Conv-LeiosOutput = autoConvert LeiosOutput
 
+{-
 open import Class.Computational as C
 open import Class.Computational22
 
@@ -161,3 +162,4 @@ stepHs : HsType (LeiosState → LeiosInput → C.ComputationResult String (Leios
 stepHs = to (compute Computational--⟦/⟧⇀)
 
 {-# COMPILE GHC stepHs as step #-}
+-}
