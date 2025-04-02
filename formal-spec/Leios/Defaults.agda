@@ -1,5 +1,3 @@
-{-# OPTIONS --allow-unsolved-metas #-}
-
 open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.SpecStructure
@@ -52,12 +50,15 @@ d-VRF : LeiosVRF
 d-VRF =
   record
     { PubKey     = ⊤
-    ; vrf        = record { isKeyPair = λ _ _ → ⊤ ; eval = λ x x₁ → x₁ , x ; verify = λ _ _ _ _ → ⊤ }
+    ; vrf        = record { isKeyPair = λ _ _ → ⊤ ; eval = λ x x₁ → x₁ , x ; verify = λ _ _ _ _ → ⊤  ; verify? = λ _ _ _ _ → yes tt }
     ; genIBInput = id
     ; genEBInput = id
     ; genVInput  = id
     ; genV1Input = id
     ; genV2Input = id
+    ; poolID     = λ _ → SUT-id
+    ; verifySig  = λ _ _ → ⊤
+    ; verifySig? = λ _ _ → yes tt
     }
 
 open LeiosVRF d-VRF public
@@ -285,12 +286,7 @@ maximalFin (ℕ.suc n) {a} with toℕ a N.<? n
   let n≢toℕ = N.≰⇒> ¬p
       a<sucn = F.toℕ<n a
   in ⊥-elim $ (¬q ∘ toℕ-fromℕ) (N.suc-injective (m≤n∧n≤m⇒m≡n n≢toℕ a<sucn))
-
-open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
-
-sd : TotalMap (Fin numberOfParties) ℕ
-sd = Fun⇒TotalMap (const 100000000)
-
+{-
 open import Class.Computational
 open import Class.Computational22
 
@@ -317,3 +313,4 @@ instance
 
   Computational-FFD .computeProof _ _ = failure "FFD error"
   Computational-FFD .completeness _ _ _ _ _ = {!!} -- TODO:Completeness proof
+-}

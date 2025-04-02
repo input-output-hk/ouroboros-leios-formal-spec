@@ -2,8 +2,21 @@ open import Leios.Prelude hiding (id)
 
 module Leios.Trace.Verifier.Test where
 
-open import Leios.Trace.Verifier 2 fzero
-open import Leios.Defaults 2 fzero
+
+numberOfParties : ℕ
+numberOfParties = 2
+
+SUT-id : Fin numberOfParties
+SUT-id = fzero
+
+open import Leios.Defaults numberOfParties SUT-id
+
+open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
+
+sd : TotalMap (Fin numberOfParties) ℕ
+sd = Fun⇒TotalMap (const 100000000)
+
+open import Leios.Trace.Verifier numberOfParties SUT-id sd
 
 private
   opaque

@@ -1,9 +1,10 @@
 open import Leios.Prelude hiding (id)
 
-module Leios.Trace.Verifier (numberOfParties : ℕ) (SUT-id : Fin numberOfParties) where
+module Leios.Trace.Verifier (numberOfParties : ℕ) (SUT-id : Fin numberOfParties) (sd : TotalMap (Fin numberOfParties) ℕ) where
 
 open import Leios.SpecStructure using (SpecStructure)
-open import Leios.Defaults numberOfParties SUT-id using (st; sd; LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD; send-total; fetch-total)
+
+open import Leios.Defaults numberOfParties SUT-id using (st; LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD; send-total; fetch-total)
 open SpecStructure st hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified)
 
 open import Leios.Short st hiding (LeiosState; initLeiosState)
@@ -296,7 +297,7 @@ mutual
 
 
   ⟦_⟧∗ : ∀ {αs : List ((Action × LeiosInput) ⊎ FFDUpdate)} → ValidTrace αs → LeiosState × LeiosOutput
-  ⟦_⟧∗ [] = initLeiosState tt sd tt [] , EMPTY
+  ⟦_⟧∗ [] = initLeiosState tt sd tt [] , EMPTY -- TODO: sd as parameter, rather than from Defaults
   ⟦_⟧∗ (_ / _ ∷ _ ⊣ vα) = ⟦ vα ⟧
   ⟦ _↥_ {IB-Recv-Update ib} tr vu ⟧∗ =
     let (s , o) = ⟦ tr ⟧∗
