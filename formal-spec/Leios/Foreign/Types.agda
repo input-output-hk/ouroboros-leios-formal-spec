@@ -1,3 +1,5 @@
+{-# OPTIONS --allow-unsolved-metas #-}
+
 open import Data.Char.Base as C using (Char)
 import Data.String as S
 open import Data.Integer using (+_; ∣_∣)
