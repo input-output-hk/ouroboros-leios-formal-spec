@@ -23,23 +23,23 @@ open Equivalence
 module Leios.Defaults (numberOfParties : ℕ) (SUT-id : Fin numberOfParties) where
 
 instance
-  htx : Hashable (List ℕ) String
-  htx = record { hash = S.intersperse "#" ∘ L.map N.show }
+  htx : Hashable (List ℕ) (List ℕ)
+  htx = record { hash = id }
 
 d-Abstract : LeiosAbstract
 d-Abstract =
   record
     { Tx = ℕ
     ; PoolID = Fin numberOfParties
-    ; BodyHash = ⊤
+    ; BodyHash = List ℕ
     ; VrfPf = ⊤
     ; PrivKey = ⊤
     ; Sig = ⊤
-    ; Hash = String
+    ; Hash = List ℕ
     ; Vote = ⊤
     ; vote = λ _ _ → tt
     ; sign = λ _ _ → tt
-    ; L = 5
+    ; L = 5 -- TODO: configuration parameter
     }
 
 open LeiosAbstract d-Abstract public
@@ -107,11 +107,11 @@ instance
       ; lotteryPf = λ _ → tt
       }
 
-  hhs : Hashable PreIBHeader String
+  hhs : Hashable PreIBHeader (List ℕ)
   hhs = record { hash = IBHeaderOSig.bodyHash }
 
-  hpe : Hashable PreEndorserBlock String
-  hpe = record { hash = S.intersperse "#" ∘ EndorserBlockOSig.ibRefs }
+  hpe : Hashable PreEndorserBlock (List ℕ)
+  hpe = record { hash = L.concat ∘ EndorserBlockOSig.ibRefs }
 
 record FFDState : Type where
   field inIBs : List InputBlock

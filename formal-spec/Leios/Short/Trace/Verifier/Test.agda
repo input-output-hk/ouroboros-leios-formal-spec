@@ -44,7 +44,7 @@ private
                   record { slotNumber = 1
                          ; producerID = fsuc fzero
                          ; lotteryPf = tt
-                         ; bodyHash = "0,1,2"
+                         ; bodyHash = 0 ∷ 1 ∷ 2 ∷ []
                          ; signature = tt
                          }
                         ; body = record { txs = 0 ∷ 1 ∷ 2 ∷ [] }}))

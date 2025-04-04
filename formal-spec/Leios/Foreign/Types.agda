@@ -23,6 +23,7 @@ module Leios.Foreign.Types where
 
 -- TODO: Get rid of hardcoded parameters in this module
 
+{-
 numberOfParties : ℕ
 numberOfParties = 2
 
@@ -42,7 +43,7 @@ instance
 record IBHeader : Type where
   field slotNumber : ℕ
         producerID : ℕ
-        bodyHash : String
+        bodyHash : List ℕ
 
 {-# FOREIGN GHC
 data IBHeader = IBHeader {slotNumber :: Integer, producerID :: Integer, bodyHash :: Data.Text.Text }
@@ -76,7 +77,7 @@ instance
 record EndorserBlock : Type where
   field slotNumber : ℕ
         producerID : ℕ
-        ibRefs     : List String
+        ibRefs     : List (List IBRef)
 
 {-# FOREIGN GHC
 data EndorserBlock = EndorserBlock { slotNumber :: Integer, producerID :: Integer, ibRefs :: [Data.Text.Text] }
@@ -186,3 +187,4 @@ stepHs : HsType (LeiosState → LeiosInput → C.ComputationResult String (Leios
 stepHs = to (compute Computational--⟦/⟧⇀)
 
 {-# COMPILE GHC stepHs as step #-}
+-}

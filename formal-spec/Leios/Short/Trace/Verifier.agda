@@ -20,7 +20,7 @@ data FFDUpdate : Type where
 
 data Action : Type where
   IB-Role-Action : ℕ → Action
-  EB-Role-Action : ℕ → List String → Action
+  EB-Role-Action : ℕ → List IBRef → Action
   VT-Role-Action : ℕ → Action
   No-IB-Role-Action No-EB-Role-Action No-VT-Role-Action : Action
   Ftch-Action : Action
