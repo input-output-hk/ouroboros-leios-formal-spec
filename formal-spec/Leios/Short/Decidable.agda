@@ -1,7 +1,7 @@
 open import Leios.Prelude hiding (id)
 open import Leios.SpecStructure using (SpecStructure)
 
-module Leios.Trace.Decidable (⋯ : SpecStructure 1) (let open SpecStructure ⋯) where
+module Leios.Short.Decidable (⋯ : SpecStructure 1) (let open SpecStructure ⋯) where
 
 open import Leios.Short ⋯ renaming (isVoteCertified to isVoteCertified')
 open B hiding (_-⟦_/_⟧⇀_)

@@ -1,6 +1,6 @@
 open import Leios.Prelude hiding (id)
 
-module Leios.Trace.Verifier.Test where
+module Leios.Short.Trace.Verifier.Test where
 
 
 numberOfParties : ℕ
@@ -14,7 +14,7 @@ open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
 sd : TotalMap (Fin numberOfParties) ℕ
 sd = Fun⇒TotalMap (const 100000000)
 
-open import Leios.Trace.Verifier numberOfParties SUT-id sd
+open import Leios.Short.Trace.Verifier numberOfParties SUT-id sd
 
 private
   opaque

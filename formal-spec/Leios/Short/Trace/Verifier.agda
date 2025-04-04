@@ -1,6 +1,6 @@
 open import Leios.Prelude hiding (id)
 
-module Leios.Trace.Verifier (numberOfParties : ℕ) (SUT-id : Fin numberOfParties) (sd : TotalMap (Fin numberOfParties) ℕ) where
+module Leios.Short.Trace.Verifier (numberOfParties : ℕ) (SUT-id : Fin numberOfParties) (sd : TotalMap (Fin numberOfParties) ℕ) where
 
 open import Leios.Defaults numberOfParties SUT-id
   using (LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD; send-total; fetch-total)
