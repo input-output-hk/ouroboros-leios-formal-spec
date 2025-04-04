@@ -100,30 +100,6 @@ instance
           (no _) → error "Conversion to Fin not possible!"
       }
 
-  Listable-Fin : ∀ {n} → Listable (Fin n)
-  Listable-Fin {zero} = record { listing = ∅ ; complete = λ {a} → ⊥-elim $ (Inverse.to F.0↔⊥) a }
-  Listable-Fin {suc n} =
-    let record { listing = l ; complete = c } = Listable-Fin {n}
-    in record
-         { listing = singleton (F.fromℕ n) ∪ mapˢ F.inject₁ l
-         ; complete = complete
-         }
-       where
-         complete : ∀ {a} → a ∈ singleton (F.fromℕ n) ∪ mapˢ F.inject₁ (let record { listing = l } = Listable-Fin {n} in l)
-         complete {a} with F.toℕ a N.<? n
-         ... | yes p =
-           let record { listing = l ; complete = c } = Listable-Fin {n}
-               n≢toℕ = ≢-sym (N.<⇒≢ p)
-               fn = F.lower₁ a n≢toℕ
-               fn≡a = F.inject₁-lower₁ a n≢toℕ
-           in (Equivalence.to ∈-∪) (inj₂ ((Equivalence.to ∈-map) (fn , (sym fn≡a , c))))
-         ... | no ¬p with a F.≟ F.fromℕ n
-         ... | yes q = (Equivalence.to ∈-∪) (inj₁ ((Equivalence.to ∈-singleton) q))
-         ... | no ¬q =
-           let n≢toℕ = N.≰⇒> ¬p
-               a<sucn = F.toℕ<n a
-           in ⊥-elim $ (¬q ∘ toℕ-fromℕ) (N.suc-injective (m≤n∧n≤m⇒m≡n n≢toℕ a<sucn))
-
   HsTy-FFDState = autoHsType FFDState
   Conv-FFDState = autoConvert FFDState
 

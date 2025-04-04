@@ -82,21 +82,6 @@ instance
     .to   → F.MkHSMap ∘ to
     .from → from ∘ F.HSMap.assocList
 
-record Listable (A : Type) : Type where
-  field
-    listing  : ℙ A
-    complete : ∀ {a : A} → a ∈ listing
-
-totalDec : ∀ {A B : Type} → ⦃ DecEq A ⦄ → ⦃ Listable A ⦄ → {R : Rel A B} → Dec (total R)
-totalDec {A} {B} {R} with all? (_∈? dom R)
-... | yes p = yes λ {a} → p {a} ((Listable.complete it) {a})
-... | no ¬p = no λ x → ¬p λ {a} _ → x {a}
-
-instance
-
-  total? : ∀ {A B : Type} → ⦃ DecEq A ⦄ → ⦃ Listable A ⦄ → {R : Rel A B} → ({a : A} → a ∈ dom R) ⁇
-  total? = ⁇ totalDec
-
   Convertible-TotalMap : ∀ {K K' V V'} → ⦃ DecEq K ⦄ → ⦃ Listable K ⦄
     → ⦃ Convertible K K' ⦄ → ⦃ Convertible V V' ⦄
     → Convertible (TotalMap K V) (List $ Pair K' V')
