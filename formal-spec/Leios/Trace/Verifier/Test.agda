@@ -9,8 +9,6 @@ numberOfParties = 2
 SUT-id : Fin numberOfParties
 SUT-id = fzero
 
-open import Leios.Defaults numberOfParties SUT-id
-
 open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
 
 sd : TotalMap (Fin numberOfParties) ℕ

@@ -9,7 +9,7 @@ open import Leios.Defaults numberOfParties SUT-id
 open import Leios.SpecStructure using (SpecStructure)
 open SpecStructure traceSpecStructure hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified) public
 
-open import Leios.Short traceSpecStructure hiding (LeiosState; initLeiosState)
+open import Leios.Short traceSpecStructure hiding (LeiosState; initLeiosState) public
 open import Prelude.Closures _↝_
 open GenFFD
 
