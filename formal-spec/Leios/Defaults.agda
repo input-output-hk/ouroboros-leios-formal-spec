@@ -215,8 +215,8 @@ d-VotingAbstract-2 =
     ; isVoteCertified = λ _ _ → ⊤
     }
 
-st : SpecStructure 1
-st = record
+d-SpecStructure : SpecStructure 1
+d-SpecStructure = record
       { a = d-Abstract
       ; Hashable-PreIBHeader = hhs
       ; Hashable-PreEndorserBlock = hpe
@@ -237,8 +237,8 @@ st = record
       ; va = d-VotingAbstract
       }
 
-st-2 : SpecStructure 2
-st-2 = record
+d-SpecStructure-2 : SpecStructure 2
+d-SpecStructure-2 = record
       { a = d-Abstract
       ; Hashable-PreIBHeader = hhs
       ; Hashable-PreEndorserBlock = hpe
@@ -259,4 +259,4 @@ st-2 = record
       ; va = d-VotingAbstract-2
       }
 
-open import Leios.Short st public
+open import Leios.Short d-SpecStructure public

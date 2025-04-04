@@ -159,16 +159,16 @@ open GenFFD.Header using (ibHeader; ebHeader; vHeader)
 open GenFFD.Body using (ibBody)
 open FFDState
 
-open import Leios.Short.Deterministic st public
+open import Leios.Short.Deterministic d-SpecStructure public
 
 open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
 
-sd : TotalMap (Fin numberOfParties) ℕ
-sd = Fun⇒TotalMap (const 100000000)
+d-StakeDistribution : TotalMap (Fin numberOfParties) ℕ
+d-StakeDistribution = Fun⇒TotalMap (const 100000000)
 
 instance
   Computational-B : Computational22 (BaseAbstract.Functionality._-⟦_/_⟧⇀_ d-BaseFunctionality) String
-  Computational-B .computeProof s (INIT x) = success ((STAKE sd , tt) , tt)
+  Computational-B .computeProof s (INIT x) = success ((STAKE d-StakeDistribution , tt) , tt)
   Computational-B .computeProof s (SUBMIT x) = success ((EMPTY , tt) , tt)
   Computational-B .computeProof s FTCH-LDG = success (((BASE-LDG []) , tt) , tt)
   Computational-B .completeness _ _ _ _ _ = {!!} -- TODO: Completeness proof

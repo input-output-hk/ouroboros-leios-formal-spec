@@ -2,12 +2,14 @@ open import Leios.Prelude hiding (id)
 
 module Leios.Trace.Verifier (numberOfParties : ℕ) (SUT-id : Fin numberOfParties) (sd : TotalMap (Fin numberOfParties) ℕ) where
 
+open import Leios.Defaults numberOfParties SUT-id
+  using (LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD; send-total; fetch-total)
+  renaming (d-SpecStructure to traceSpecStructure)
+
 open import Leios.SpecStructure using (SpecStructure)
+open SpecStructure traceSpecStructure hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified) public
 
-open import Leios.Defaults numberOfParties SUT-id using (st; LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD; send-total; fetch-total)
-open SpecStructure st hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified)
-
-open import Leios.Short st hiding (LeiosState; initLeiosState)
+open import Leios.Short traceSpecStructure hiding (LeiosState; initLeiosState)
 open import Prelude.Closures _↝_
 open GenFFD
 
