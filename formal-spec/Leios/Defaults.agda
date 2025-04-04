@@ -108,10 +108,10 @@ instance
       }
 
   hhs : Hashable PreIBHeader (List ℕ)
-  hhs = record { hash = IBHeaderOSig.bodyHash }
+  hhs .hash = IBHeaderOSig.bodyHash
 
   hpe : Hashable PreEndorserBlock (List ℕ)
-  hpe = record { hash = L.concat ∘ EndorserBlockOSig.ibRefs }
+  hpe .hash = L.concat ∘ EndorserBlockOSig.ibRefs
 
 record FFDState : Type where
   field inIBs : List InputBlock
