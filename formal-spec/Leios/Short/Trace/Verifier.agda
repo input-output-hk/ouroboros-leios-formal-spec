@@ -1,9 +1,9 @@
 open import Leios.Prelude hiding (id)
-open import Leios.Short.Trace.Config
+open import Leios.Config
 
 module Leios.Short.Trace.Verifier (params : Params) (let open Params params) where
 
-open import Leios.Defaults numberOfParties SUT-id
+open import Leios.Defaults params
   using (LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD; send-total; fetch-total)
   renaming (d-SpecStructure to traceSpecStructure)
 

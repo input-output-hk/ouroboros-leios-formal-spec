@@ -1,6 +1,6 @@
 open import Leios.Prelude
 
-module Leios.Short.Trace.Config where
+module Leios.Config where
 
 record Params : Type where
   field numberOfParties : ℕ

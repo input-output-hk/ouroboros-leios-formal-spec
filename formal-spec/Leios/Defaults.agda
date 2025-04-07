@@ -1,8 +1,9 @@
 open import Leios.Prelude
 open import Leios.Abstract
+open import Leios.Config
 open import Leios.SpecStructure
-open import Axiom.Set.Properties th
 
+open import Axiom.Set.Properties th
 open import Data.Nat.Show as N
 open import Data.Integer hiding (_≟_)
 open import Data.String as S using (intersperse)
@@ -20,7 +21,7 @@ open Equivalence
 -- As parameters the module expects
 -- * numberOfParties: the total number of participants
 -- * SUT-id: the number of the SUT (system under test)
-module Leios.Defaults (numberOfParties : ℕ) (SUT-id : Fin numberOfParties) where
+module Leios.Defaults (params : Params) (let open Params params) where
 
 instance
   htx : Hashable (List ℕ) (List ℕ)

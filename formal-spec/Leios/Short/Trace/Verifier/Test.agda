@@ -1,5 +1,5 @@
 open import Leios.Prelude hiding (id)
-open import Leios.Short.Trace.Config
+open import Leios.Config
 
 module Leios.Short.Trace.Verifier.Test where
 

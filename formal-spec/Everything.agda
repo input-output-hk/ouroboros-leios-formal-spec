@@ -5,6 +5,7 @@ open import Class.Computational22
 open import Leios.Abstract
 open import Leios.Base
 open import Leios.Blocks
+open import Leios.Config
 open import Leios.Defaults
 open import Leios.FFD
 open import Leios.Foreign.BaseTypes
