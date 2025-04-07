@@ -4,5 +4,7 @@ module Leios.Config where
 
 record Params : Type where
   field numberOfParties : ℕ
-        SUT-id : Fin numberOfParties
-        sd : TotalMap (Fin numberOfParties) ℕ
+        sutId : Fin numberOfParties
+        stakeDistribution : TotalMap (Fin numberOfParties) ℕ
+        stageLength : ℕ
+        ⦃ NonZero-stageLength ⦄ : NonZero stageLength

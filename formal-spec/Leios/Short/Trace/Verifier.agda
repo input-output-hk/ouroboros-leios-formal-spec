@@ -300,7 +300,7 @@ mutual
 
 
   ⟦_⟧∗ : ∀ {αs : List ((Action × LeiosInput) ⊎ FFDUpdate)} → ValidTrace αs → LeiosState × LeiosOutput
-  ⟦_⟧∗ [] = initLeiosState tt sd tt [] , EMPTY
+  ⟦_⟧∗ [] = initLeiosState tt stakeDistribution tt [] , EMPTY
   ⟦_⟧∗ (_ / _ ∷ _ ⊣ vα) = ⟦ vα ⟧
   ⟦ _↥_ {IB-Recv-Update ib} tr vu ⟧∗ =
     let (s , o) = ⟦ tr ⟧∗

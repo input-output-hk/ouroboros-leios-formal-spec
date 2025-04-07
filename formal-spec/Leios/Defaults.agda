@@ -40,7 +40,7 @@ d-Abstract =
     ; Vote = ⊤
     ; vote = λ _ _ → tt
     ; sign = λ _ _ → tt
-    ; L = 5 -- TODO: configuration parameter
+    ; L = stageLength
     }
 
 open LeiosAbstract d-Abstract public
@@ -57,7 +57,7 @@ d-VRF =
     ; genVInput  = id
     ; genV1Input = id
     ; genV2Input = id
-    ; poolID     = λ _ → SUT-id
+    ; poolID     = λ _ → sutId
     ; verifySig  = λ _ _ → ⊤
     ; verifySig? = λ _ _ → yes tt
     }
@@ -104,7 +104,7 @@ instance
   isb =
     record
       { slotNumber = λ _ → 0
-      ; producerID = λ _ → SUT-id
+      ; producerID = λ _ → sutId
       ; lotteryPf = λ _ → tt
       }
 
@@ -221,7 +221,7 @@ d-SpecStructure = record
       { a = d-Abstract
       ; Hashable-PreIBHeader = hhs
       ; Hashable-PreEndorserBlock = hpe
-      ; id = SUT-id
+      ; id = sutId
       ; FFD' = d-FFDFunctionality
       ; vrf' = d-VRF
       ; sk-IB = tt
@@ -243,7 +243,7 @@ d-SpecStructure-2 = record
       { a = d-Abstract
       ; Hashable-PreIBHeader = hhs
       ; Hashable-PreEndorserBlock = hpe
-      ; id = SUT-id
+      ; id = sutId
       ; FFD' = d-FFDFunctionality
       ; vrf' = d-VRF
       ; sk-IB = tt

@@ -6,9 +6,6 @@ module Leios.Short.Trace.Verifier.Test where
 numberOfParties : ℕ
 numberOfParties = 2
 
-SUT-id : Fin numberOfParties
-SUT-id = fzero
-
 open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
 
 sd : TotalMap (Fin numberOfParties) ℕ
@@ -18,8 +15,10 @@ params : Params
 params =
   record
     { numberOfParties = numberOfParties
-    ; SUT-id = SUT-id
-    ; sd = sd }
+    ; sutId = fzero
+    ; stakeDistribution = sd
+    ; stageLength = 5
+    }
 
 open import Leios.Short.Trace.Verifier params
 
