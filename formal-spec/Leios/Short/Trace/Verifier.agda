@@ -5,7 +5,7 @@ module Leios.Short.Trace.Verifier (params : Params) (let open Params params) whe
 
 open import Leios.Defaults params
   using (LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD; send-total; fetch-total)
-  renaming (d-SpecStructure to traceSpecStructure)
+  renaming (d-SpecStructure to traceSpecStructure) public
 
 open import Leios.SpecStructure using (SpecStructure)
 open SpecStructure traceSpecStructure hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified) public
