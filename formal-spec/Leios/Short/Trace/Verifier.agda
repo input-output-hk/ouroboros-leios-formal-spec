@@ -1,12 +1,16 @@
 open import Leios.Prelude hiding (id)
+open import Leios.Config
 
-module Leios.Trace.Verifier (numberOfParties : ℕ) (SUT-id : Fin numberOfParties) where
+module Leios.Short.Trace.Verifier (params : Params) (let open Params params) where
+
+open import Leios.Defaults params
+  using (LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD; send-total; fetch-total)
+  renaming (d-SpecStructure to traceSpecStructure) public
 
 open import Leios.SpecStructure using (SpecStructure)
-open import Leios.Defaults numberOfParties SUT-id using (st; sd; LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD; send-total; fetch-total)
-open SpecStructure st hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified)
+open SpecStructure traceSpecStructure hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified) public
 
-open import Leios.Short st hiding (LeiosState; initLeiosState)
+open import Leios.Short traceSpecStructure hiding (LeiosState; initLeiosState) public
 open import Prelude.Closures _↝_
 open GenFFD
 
@@ -17,7 +21,7 @@ data FFDUpdate : Type where
 
 data Action : Type where
   IB-Role-Action : ℕ → Action
-  EB-Role-Action : ℕ → List String → Action
+  EB-Role-Action : ℕ → List IBRef → Action
   VT-Role-Action : ℕ → Action
   No-IB-Role-Action No-EB-Role-Action No-VT-Role-Action : Action
   Ftch-Action : Action
@@ -66,10 +70,10 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
   VT-Role : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                 votes = map (vote sk-V ∘ hash) EBs'
-                ffds' = proj₁ (send-total {ffds} {vHeader votes} {nothing})
+                ffds' = proj₁ (send-total {ffds} {vtHeader votes} {nothing})
             in .(needsUpkeep VT-Role) →
                .(canProduceV slot sk-V (stake s)) →
-               .(ffds FFD.-⟦ FFD.Send (vHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
+               .(ffds FFD.-⟦ FFD.Send (vtHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
                ValidAction (VT-Role-Action slot) s SLOT
 
   No-IB-Role : let open LeiosState s
@@ -131,7 +135,7 @@ private variable
   let open LeiosState s renaming (FFDState to ffds)
       EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
       votes = map (vote sk-V ∘ hash) EBs'
-      ffds' = proj₁ (send-total {ffds} {vHeader votes} {nothing})
+      ffds' = proj₁ (send-total {ffds} {vtHeader votes} {nothing})
   in addUpkeep record s { FFDState = ffds' } VT-Role , EMPTY
 ⟦ No-IB-Role {s} _ _ ⟧ = addUpkeep s IB-Role , EMPTY
 ⟦ No-EB-Role {s} _ _ ⟧ = addUpkeep s EB-Role , EMPTY
@@ -296,7 +300,7 @@ mutual
 
 
   ⟦_⟧∗ : ∀ {αs : List ((Action × LeiosInput) ⊎ FFDUpdate)} → ValidTrace αs → LeiosState × LeiosOutput
-  ⟦_⟧∗ [] = initLeiosState tt sd tt [] , EMPTY
+  ⟦_⟧∗ [] = initLeiosState tt stakeDistribution tt [] , EMPTY
   ⟦_⟧∗ (_ / _ ∷ _ ⊣ vα) = ⟦ vα ⟧
   ⟦ _↥_ {IB-Recv-Update ib} tr vu ⟧∗ =
     let (s , o) = ⟦ tr ⟧∗
@@ -349,7 +353,6 @@ instance
     (_ / _ ∷ tr ⊣ vα) → ¬vα
                   $ subst (λ x → ValidAction α x i) (cong (proj₁ ∘ ⟦_⟧∗) $ Irr-ValidTrace tr vαs) vα
   ... | yes vα = yes $ _ / _ ∷ vαs ⊣ vα
-
   Dec-ValidTrace {tr} .dec | inj₂ u ∷ αs
     with ¿ ValidTrace αs ¿
   ... | no ¬vαs = no λ where (vαs ↥ _) → ¬vαs vαs
@@ -361,14 +364,29 @@ instance
 
 data _⇑_ : LeiosState → LeiosState → Type where
 
-  UpdateIB : ∀ {s ib} → let open LeiosState s renaming (FFDState to ffds) in
-    s ⇑ record s { FFDState = record ffds { inIBs = ib ∷ FFDState.inIBs ffds } }
+  UpdateIB : ∀ {s h b ffds'} →
+    let open LeiosState s renaming (FFDState to ffds)
+        ib = FFD.Send (ibHeader h) (just (ibBody b))
+    in
+    ∙ ffds FFD.-⟦ ib / FFD.SendRes ⟧⇀ ffds'
+      ─────────────────────────────────────
+      s ⇑ record s { FFDState = ffds' }
 
-  UpdateEB : ∀ {s eb} → let open LeiosState s renaming (FFDState to ffds) in
-    s ⇑ record s { FFDState = record ffds { inEBs = eb ∷ FFDState.inEBs ffds } }
+  UpdateEB : ∀ {s h ffds'} →
+    let open LeiosState s renaming (FFDState to ffds)
+        eb = FFD.Send (ebHeader h) nothing
+    in
+    ∙ ffds FFD.-⟦ eb / FFD.SendRes ⟧⇀ ffds'
+      ─────────────────────────────────────
+      s ⇑ record s { FFDState = ffds' }
 
-  UpdateVT : ∀ {s vt} → let open LeiosState s renaming (FFDState to ffds) in
-    s ⇑ record s { FFDState = record ffds { inVTs = vt ∷ FFDState.inVTs ffds } }
+  UpdateVT : ∀ {s h ffds'} →
+    let open LeiosState s renaming (FFDState to ffds)
+        vt = FFD.Send (vtHeader h) nothing
+    in
+    ∙ ffds FFD.-⟦ vt / FFD.SendRes ⟧⇀ ffds'
+      ─────────────────────────────────────
+      s ⇑ record s { FFDState = ffds' }
 
 data LocalStep : LeiosState → LeiosState → Type where
 
@@ -427,7 +445,7 @@ ValidAction-complete {s} (Roles (VT-Role x x₁ _))  =
   let open LeiosState s renaming (FFDState to ffds)
       EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
       votes = map (vote sk-V ∘ hash) EBs'
-      pr = proj₂ (send-total {ffds} {vHeader votes} {nothing})
+      pr = proj₂ (send-total {ffds} {vtHeader votes} {nothing})
   in VT-Role {s} x x₁ pr
 ValidAction-complete (Roles (No-IB-Role x x₁)) = No-IB-Role x x₁
 ValidAction-complete (Roles (No-EB-Role x x₁)) = No-EB-Role x x₁

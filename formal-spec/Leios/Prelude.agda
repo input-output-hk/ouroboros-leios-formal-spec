@@ -53,3 +53,70 @@ open Properties
 finite⇒A≡∅⊎∃a∈A : {X : Type} → {A : ℙ X} → finite A → (A ≡ᵉ ∅) ⊎ Σ[ a ∈ X ] a ∈ A
 finite⇒A≡∅⊎∃a∈A ([]    , h) = inj₁ (∅-least (λ a∈A → ⊥-elim (case Equivalence.to h a∈A of λ ())))
 finite⇒A≡∅⊎∃a∈A (x ∷ _ , h) = inj₂ (x , Equivalence.from h (here refl))
+
+completeFin : ∀ (n : ℕ) → ℙ (Fin n)
+completeFin zero = ∅
+completeFin (ℕ.suc n) = singleton (F.fromℕ n) ∪ mapˢ F.inject₁ (completeFin n)
+
+m≤n∧n≤m⇒m≡n : ∀ {n m : ℕ} → n N.≤ m → m N.≤ n → m ≡ n
+m≤n∧n≤m⇒m≡n z≤n z≤n = refl
+m≤n∧n≤m⇒m≡n (s≤s n≤m) (s≤s m≤n) = cong N.suc (m≤n∧n≤m⇒m≡n n≤m m≤n)
+
+toℕ-fromℕ : ∀ {n} {a : Fin (N.suc n)} → toℕ a ≡ n → a ≡ F.fromℕ n
+toℕ-fromℕ {zero} {fzero} x = refl
+toℕ-fromℕ {N.suc n} {fsuc a} x = cong fsuc (toℕ-fromℕ {n} {a} (N.suc-injective x))
+
+open Equivalence
+
+maximalFin : ∀ (n : ℕ) → isMaximal (completeFin n)
+maximalFin (ℕ.suc n) {a} with toℕ a N.<? n
+... | yes p =
+  let n≢toℕ = ≢-sym (N.<⇒≢ p)
+      fn = F.lower₁ a n≢toℕ
+      fn≡a = F.inject₁-lower₁ a n≢toℕ
+  in (to ∈-∪) (inj₂ ((to ∈-map) (fn , (sym fn≡a , maximalFin n))))
+... | no ¬p with a F.≟ F.fromℕ n
+... | yes q = (to ∈-∪) (inj₁ ((to ∈-singleton) q))
+... | no ¬q =
+  let n≢toℕ = N.≰⇒> ¬p
+      a<sucn = F.toℕ<n a
+  in ⊥-elim $ (¬q ∘ toℕ-fromℕ) (N.suc-injective (m≤n∧n≤m⇒m≡n n≢toℕ a<sucn))
+
+record Listable (A : Type) : Type where
+  field
+    listing  : ℙ A
+    complete : ∀ {a : A} → a ∈ listing
+
+totalDec : ∀ {A B : Type} → ⦃ DecEq A ⦄ → ⦃ Listable A ⦄ → {R : Rel A B} → Dec (total R)
+totalDec {A} {B} {R} with all? (_∈? dom R)
+... | yes p = yes λ {a} → p {a} ((Listable.complete it) {a})
+... | no ¬p = no λ x → ¬p λ {a} _ → x {a}
+
+instance
+  total? : ∀ {A B : Type} → ⦃ DecEq A ⦄ → ⦃ Listable A ⦄ → {R : Rel A B} → ({a : A} → a ∈ dom R) ⁇
+  total? = ⁇ totalDec
+
+  Listable-Fin : ∀ {n} → Listable (Fin n)
+  Listable-Fin {zero} = record { listing = ∅ ; complete = λ {a} → ⊥-elim $ (Inverse.to F.0↔⊥) a }
+  Listable-Fin {suc n} =
+    let record { listing = l ; complete = c } = Listable-Fin {n}
+    in record
+         { listing = singleton (F.fromℕ n) ∪ mapˢ F.inject₁ l
+         ; complete = complete
+         }
+       where
+         complete : ∀ {a} → a ∈ singleton (F.fromℕ n) ∪ mapˢ F.inject₁ (let record { listing = l } = Listable-Fin {n} in l)
+         complete {a} with F.toℕ a N.<? n
+         ... | yes p =
+           let record { listing = l ; complete = c } = Listable-Fin {n}
+               n≢toℕ = ≢-sym (N.<⇒≢ p)
+               fn = F.lower₁ a n≢toℕ
+               fn≡a = F.inject₁-lower₁ a n≢toℕ
+           in (Equivalence.to ∈-∪) (inj₂ ((Equivalence.to ∈-map) (fn , (sym fn≡a , c))))
+         ... | no ¬p with a F.≟ F.fromℕ n
+         ... | yes q = (Equivalence.to ∈-∪) (inj₁ ((Equivalence.to ∈-singleton) q))
+         ... | no ¬q =
+           let n≢toℕ = N.≰⇒> ¬p
+               a<sucn = F.toℕ<n a
+           in ⊥-elim $ (¬q ∘ toℕ-fromℕ) (N.suc-injective (m≤n∧n≤m⇒m≡n n≢toℕ a<sucn))
+

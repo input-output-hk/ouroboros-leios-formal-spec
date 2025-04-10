@@ -19,6 +19,9 @@ module Leios.Foreign.Types where
   {-# LANGUAGE DuplicateRecordFields #-}
 #-}
 
+-- TODO: Get rid of hardcoded parameters in this module
+
+{-
 numberOfParties : ℕ
 numberOfParties = 2
 
@@ -38,7 +41,7 @@ instance
 record IBHeader : Type where
   field slotNumber : ℕ
         producerID : ℕ
-        bodyHash : String
+        bodyHash : List ℕ
 
 {-# FOREIGN GHC
 data IBHeader = IBHeader {slotNumber :: Integer, producerID :: Integer, bodyHash :: Data.Text.Text }
@@ -72,7 +75,7 @@ instance
 record EndorserBlock : Type where
   field slotNumber : ℕ
         producerID : ℕ
-        ibRefs     : List String
+        ibRefs     : List (List IBRef)
 
 {-# FOREIGN GHC
 data EndorserBlock = EndorserBlock { slotNumber :: Integer, producerID :: Integer, ibRefs :: [Data.Text.Text] }
@@ -94,30 +97,6 @@ instance
           (yes q) → record { slotNumber = s ; producerID = #_ p {numberOfParties} {fromWitness q} ; lotteryPf = tt ; signature = tt ; ibRefs = refs ; ebRefs = [] }
           (no _) → error "Conversion to Fin not possible!"
       }
-
-  Listable-Fin : ∀ {n} → Listable (Fin n)
-  Listable-Fin {zero} = record { listing = ∅ ; complete = λ {a} → ⊥-elim $ (Inverse.to F.0↔⊥) a }
-  Listable-Fin {suc n} =
-    let record { listing = l ; complete = c } = Listable-Fin {n}
-    in record
-         { listing = singleton (F.fromℕ n) ∪ mapˢ F.inject₁ l
-         ; complete = complete
-         }
-       where
-         complete : ∀ {a} → a ∈ singleton (F.fromℕ n) ∪ mapˢ F.inject₁ (let record { listing = l } = Listable-Fin {n} in l)
-         complete {a} with F.toℕ a N.<? n
-         ... | yes p =
-           let record { listing = l ; complete = c } = Listable-Fin {n}
-               n≢toℕ = ≢-sym (N.<⇒≢ p)
-               fn = F.lower₁ a n≢toℕ
-               fn≡a = F.inject₁-lower₁ a n≢toℕ
-           in (Equivalence.to ∈-∪) (inj₂ ((Equivalence.to ∈-map) (fn , (sym fn≡a , c))))
-         ... | no ¬p with a F.≟ F.fromℕ n
-         ... | yes q = (Equivalence.to ∈-∪) (inj₁ ((Equivalence.to ∈-singleton) q))
-         ... | no ¬q =
-           let n≢toℕ = N.≰⇒> ¬p
-               a<sucn = F.toℕ<n a
-           in ⊥-elim $ (¬q ∘ toℕ-fromℕ) (N.suc-injective (m≤n∧n≤m⇒m≡n n≢toℕ a<sucn))
 
   HsTy-FFDState = autoHsType FFDState
   Conv-FFDState = autoConvert FFDState
@@ -151,13 +130,35 @@ open Computational22
 open BaseAbstract
 open FFDAbstract
 
-open GenFFD.Header using (ibHeader; ebHeader; vHeader)
+open GenFFD.Header using (ibHeader; ebHeader; vtHeader)
 open GenFFD.Body using (ibBody)
 open FFDState
 
-open import Leios.Short.Deterministic st public
+open import Leios.Short.Deterministic d-SpecStructure public
+
+open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
+
+d-StakeDistribution : TotalMap (Fin numberOfParties) ℕ
+d-StakeDistribution = Fun⇒TotalMap (const 100000000)
+
+instance
+  Computational-B : Computational22 (BaseAbstract.Functionality._-⟦_/_⟧⇀_ d-BaseFunctionality) String
+  Computational-B .computeProof s (INIT x) = success ((STAKE d-StakeDistribution , tt) , tt)
+  Computational-B .computeProof s (SUBMIT x) = success ((EMPTY , tt) , tt)
+  Computational-B .computeProof s FTCH-LDG = success (((BASE-LDG []) , tt) , tt)
+  Computational-B .completeness _ _ _ _ _ = {!!} -- TODO: Completeness proof
+
+  Computational-FFD : Computational22 (FFDAbstract.Functionality._-⟦_/_⟧⇀_ d-FFDFunctionality) String
+  Computational-FFD .computeProof s (Send (ibHeader h) (just (ibBody b))) = success ((SendRes , record s {outIBs = record {header = h; body = b} ∷ outIBs s}) , SendIB)
+  Computational-FFD .computeProof s (Send (ebHeader h) nothing) = success ((SendRes , record s {outEBs = h ∷ outEBs s}) , SendEB)
+  Computational-FFD .computeProof s (Send (vtHeader h) nothing) = success ((SendRes , record s {outVTs = h ∷ outVTs s}) , SendVS)
+  Computational-FFD .computeProof s Fetch = success ((FetchRes (flushIns s) , record s {inIBs = []; inEBs = []; inVTs = []}) , Fetch)
+
+  Computational-FFD .computeProof _ _ = failure "FFD error"
+  Computational-FFD .completeness _ _ _ _ _ = {!!} -- TODO:Completeness proof
 
 stepHs : HsType (LeiosState → LeiosInput → C.ComputationResult String (LeiosOutput × LeiosState))
 stepHs = to (compute Computational--⟦/⟧⇀)
 
 {-# COMPILE GHC stepHs as step #-}
+-}

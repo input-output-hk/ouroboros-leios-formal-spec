@@ -172,7 +172,7 @@ module _ (s : LeiosState)  where
     with lookupPubKeyAndStake s h
   ... | just (pk , pid) = ebValid h pk (stake'' pk s)
   ... | nothing = ⊥
-  headerValid (vHeader h)  = vsValid h
+  headerValid (vtHeader h) = vsValid h
 
   headerValid? : (h : Header) → Dec (headerValid h)
   headerValid? (ibHeader h)
@@ -183,7 +183,7 @@ module _ (s : LeiosState)  where
     with lookupPubKeyAndStake s h
   ... | just (pk , pid) = ebValid? h pk (stake'' pk s)
   ... | nothing = no λ x → x
-  headerValid? (vHeader h) = vsValid? h
+  headerValid? (vtHeader h) = vsValid? h
 
   bodyValid : Body → Type
   bodyValid (ibBody b) = ibBodyValid b
@@ -213,7 +213,7 @@ module _ (s : LeiosState) where
 
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs = eb ∷ EBs }
-  upd (inj₁ (vHeader vs)) = record s { Vs = vs ∷ Vs }
+  upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs }
   upd (inj₁ (ibHeader h)) with A.any? (matchIB? h) IBBodies
   ... | yes p =
     record s
@@ -244,7 +244,7 @@ module _ {s s'} where
   ... | yes p = refl
   ... | no ¬p = refl
   upd-preserves-Upkeep {inj₁ (ebHeader x)} refl = refl
-  upd-preserves-Upkeep {inj₁ (vHeader x)} refl = refl
+  upd-preserves-Upkeep {inj₁ (vtHeader x)} refl = refl
   upd-preserves-Upkeep {inj₂ (ibBody x)} refl with A.any? (flip matchIB? x) IBHeaders
   ... | yes p = refl
   ... | no ¬p = refl

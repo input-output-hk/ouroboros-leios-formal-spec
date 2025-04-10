@@ -84,7 +84,7 @@ data _↝_ : LeiosState → LeiosState → Type where
           in
           ∙ needsUpkeep V1-Role
           ∙ canProduceV1 slot sk-V (stake s)
-          ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
+          ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } V1-Role
 
@@ -94,7 +94,7 @@ data _↝_ : LeiosState → LeiosState → Type where
           in
           ∙ needsUpkeep V2-Role
           ∙ canProduceV2 slot sk-V (stake s)
-          ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
+          ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } V2-Role
 

@@ -188,7 +188,7 @@ data _-⟦V-Role⟧⇀_ : LeiosState → LeiosState → Type where
                votes = map (vote sk-V ∘ hash) EBs'
           in
           ∙ canProduceV slot sk-V (stake s)
-          ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
+          ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ────────────────────────────────────────────────────────────────────
           s -⟦V-Role⟧⇀ addUpkeep record s { FFDState = ffds' } VT-Role
 
@@ -226,7 +226,7 @@ upd-Upkeep {record { IBBodies = bds }} {inj₁ (ibHeader h)} with A.any? (matchI
 ... | yes p = refl
 ... | no ¬p = refl
 upd-Upkeep {_} {inj₁ (ebHeader _)} = refl
-upd-Upkeep {_} {inj₁ (vHeader _)} = refl
+upd-Upkeep {_} {inj₁ (vtHeader _)} = refl
 upd-Upkeep {record { IBHeaders = hds }} {inj₂ (ibBody b)} with A.any? (flip matchIB? b) hds
 ... | yes p = refl
 ... | no ¬p = refl

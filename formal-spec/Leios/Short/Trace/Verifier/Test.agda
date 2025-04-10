@@ -1,9 +1,20 @@
 open import Leios.Prelude hiding (id)
+open import Leios.Config
 
-module Leios.Trace.Verifier.Test where
+module Leios.Short.Trace.Verifier.Test where
 
-open import Leios.Trace.Verifier 2 fzero
-open import Leios.Defaults 2 fzero
+params : Params
+params =
+  record
+    { numberOfParties = 2
+    ; sutId = fzero
+    ; stakeDistribution =
+        let open FunTot (completeFin 2) (maximalFin 2)
+        in Fun⇒TotalMap (const 100000000)
+    ; stageLength = 5
+    }
+
+open import Leios.Short.Trace.Verifier params
 
 private
   opaque
@@ -33,7 +44,7 @@ private
                   record { slotNumber = 1
                          ; producerID = fsuc fzero
                          ; lotteryPf = tt
-                         ; bodyHash = "0,1,2"
+                         ; bodyHash = 0 ∷ 1 ∷ 2 ∷ []
                          ; signature = tt
                          }
                         ; body = record { txs = 0 ∷ 1 ∷ 2 ∷ [] }}))

@@ -190,7 +190,7 @@ data _-⟦V1-Role⟧⇀_ : LeiosState → LeiosState → Type where
                 votes = map (vote sk-V ∘ hash) EBs'
           in
           ∙ canProduceV1 slot sk-V (stake s)
-          ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
+          ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ────────────────────────────────────────────────────────────────────
           s -⟦V1-Role⟧⇀ addUpkeep record s { FFDState = ffds' } V1-Role
 
@@ -230,7 +230,7 @@ data _-⟦V2-Role⟧⇀_ : LeiosState → LeiosState → Type where
                 votes = map (vote sk-V ∘ hash) EBs'
           in
           ∙ canProduceV2 slot sk-V (stake s)
-          ∙ ffds FFD.-⟦ Send (vHeader votes) nothing / SendRes ⟧⇀ ffds'
+          ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ────────────────────────────────────────────────────────────────────
           s -⟦V2-Role⟧⇀ addUpkeep record s { FFDState = ffds' } V2-Role
 
