@@ -3,20 +3,14 @@ open import Leios.Config
 
 module Leios.Short.Trace.Verifier.Test where
 
-numberOfParties : ℕ
-numberOfParties = 2
-
-open FunTot (completeFin numberOfParties) (maximalFin numberOfParties)
-
-sd : TotalMap (Fin numberOfParties) ℕ
-sd = Fun⇒TotalMap (const 100000000)
-
 params : Params
 params =
   record
-    { numberOfParties = numberOfParties
+    { numberOfParties = 2
     ; sutId = fzero
-    ; stakeDistribution = sd
+    ; stakeDistribution =
+        let open FunTot (completeFin 2) (maximalFin 2)
+        in Fun⇒TotalMap (const 100000000)
     ; stageLength = 5
     }
 
