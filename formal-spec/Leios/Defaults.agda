@@ -17,10 +17,6 @@ open Equivalence
 
 -- The module contains very simple implementations for the functionalities
 -- that allow to build examples for traces for the different Leios variants
---
--- As parameters the module expects
--- * numberOfParties: the total number of participants
--- * SUT-id: the number of the SUT (system under test)
 module Leios.Defaults (params : Params) (let open Params params) where
 
 instance
@@ -30,17 +26,17 @@ instance
 d-Abstract : LeiosAbstract
 d-Abstract =
   record
-    { Tx = ℕ
-    ; PoolID = Fin numberOfParties
+    { Tx       = ℕ
+    ; PoolID   = Fin numberOfParties
     ; BodyHash = List ℕ
-    ; VrfPf = ⊤
-    ; PrivKey = ⊤
-    ; Sig = ⊤
-    ; Hash = List ℕ
-    ; Vote = ⊤
-    ; vote = λ _ _ → tt
-    ; sign = λ _ _ → tt
-    ; L = stageLength
+    ; VrfPf    = ⊤
+    ; PrivKey  = ⊤
+    ; Sig      = ⊤
+    ; Hash     = List ℕ
+    ; Vote     = ⊤
+    ; vote     = λ _ _ → tt
+    ; sign     = λ _ _ → tt
+    ; L        = stageLength
     }
 
 open LeiosAbstract d-Abstract public
@@ -73,7 +69,7 @@ d-KeyRegistration = _
 d-KeyRegistrationFunctionality : KeyRegistrationAbstract.Functionality d-KeyRegistration
 d-KeyRegistrationFunctionality =
   record
-    { State = ⊤
+    { State     = ⊤
     ; _-⟦_/_⟧⇀_ = λ _ _ _ _ → ⊤
     }
 
@@ -82,19 +78,19 @@ open import Leios.Base d-Abstract d-VRF public
 d-Base : BaseAbstract
 d-Base =
   record
-    { Cert = ⊤
-    ; VTy = ⊤
-    ; initSlot = λ _ → 0
+    { Cert       = ⊤
+    ; VTy        = ⊤
+    ; initSlot   = λ _ → 0
     ; V-chkCerts = λ _ _ → true
     }
 
 d-BaseFunctionality : BaseAbstract.Functionality d-Base
 d-BaseFunctionality =
   record
-    { State = ⊤
-    ; _-⟦_/_⟧⇀_ = λ _ _ _ _ → ⊤
+    { State         = ⊤
+    ; _-⟦_/_⟧⇀_     = λ _ _ _ _ → ⊤
     ; Dec-_-⟦_/_⟧⇀_ = ⁇ (yes tt)
-    ; SUBMIT-total = tt , tt
+    ; SUBMIT-total  = tt , tt
     }
 
 open import Leios.FFD public
@@ -105,7 +101,7 @@ instance
     record
       { slotNumber = λ _ → 0
       ; producerID = λ _ → sutId
-      ; lotteryPf = λ _ → tt
+      ; lotteryPf  = λ _ → tt
       }
 
   hhs : Hashable PreIBHeader (List ℕ)
@@ -138,20 +134,20 @@ flushIns record { inIBs = ibs ; inEBs = ebs ; inVTs = vts } =
     flushIBs (record {header = h; body = b} ∷ ibs) = inj₁ (ibHeader h) ∷ inj₂ (ibBody b) ∷ flushIBs ibs
 
 data SimpleFFD : FFDState → FFDAbstract.Input ffdAbstract → FFDAbstract.Output ffdAbstract → FFDState → Type where
-  SendIB : ∀ {s h b} → SimpleFFD s (FFDAbstract.Send (ibHeader h) (just (ibBody b))) FFDAbstract.SendRes (record s { outIBs = record {header = h; body = b} ∷ outIBs s})
-  SendEB : ∀ {s eb} → SimpleFFD s (FFDAbstract.Send (ebHeader eb) nothing) FFDAbstract.SendRes (record s { outEBs = eb ∷ outEBs s})
-  SendVS : ∀ {s vs} → SimpleFFD s (FFDAbstract.Send (vtHeader vs) nothing) FFDAbstract.SendRes (record s { outVTs = vs ∷ outVTs s})
+  SendIB : ∀ {s h b}    → SimpleFFD s (FFDAbstract.Send (ibHeader h) (just (ibBody b))) FFDAbstract.SendRes (record s { outIBs = record {header = h; body = b} ∷ outIBs s})
+  SendEB : ∀ {s eb}     → SimpleFFD s (FFDAbstract.Send (ebHeader eb) nothing) FFDAbstract.SendRes (record s { outEBs = eb ∷ outEBs s})
+  SendVS : ∀ {s vs}     → SimpleFFD s (FFDAbstract.Send (vtHeader vs) nothing) FFDAbstract.SendRes (record s { outVTs = vs ∷ outVTs s})
 
-  BadSendIB : ∀ {s h} → SimpleFFD s (FFDAbstract.Send (ibHeader h) nothing) FFDAbstract.SendRes s
+  BadSendIB : ∀ {s h}   → SimpleFFD s (FFDAbstract.Send (ibHeader h) nothing) FFDAbstract.SendRes s
   BadSendEB : ∀ {s h b} → SimpleFFD s (FFDAbstract.Send (ebHeader h) (just b)) FFDAbstract.SendRes s
   BadSendVS : ∀ {s h b} → SimpleFFD s (FFDAbstract.Send (vtHeader h) (just b)) FFDAbstract.SendRes s
 
-  Fetch : ∀ {s} → SimpleFFD s FFDAbstract.Fetch (FFDAbstract.FetchRes (flushIns s)) (record s { inIBs = [] ; inEBs = [] ; inVTs = [] })
+  Fetch : ∀ {s}         → SimpleFFD s FFDAbstract.Fetch (FFDAbstract.FetchRes (flushIns s)) (record s { inIBs = [] ; inEBs = [] ; inVTs = [] })
 
 send-total : ∀ {s h b} → ∃[ s' ] (SimpleFFD s (FFDAbstract.Send h b) FFDAbstract.SendRes s')
 send-total {s} {ibHeader h} {just (ibBody b)} = record s { outIBs = record {header = h; body = b} ∷ outIBs s} , SendIB
-send-total {s} {ebHeader eb} {nothing} = record s { outEBs = eb ∷ outEBs s} , SendEB
-send-total {s} {vtHeader vs} {nothing} = record s { outVTs = vs ∷ outVTs s} , SendVS
+send-total {s} {ebHeader eb} {nothing}        = record s { outEBs = eb ∷ outEBs s} , SendEB
+send-total {s} {vtHeader vs} {nothing}        = record s { outVTs = vs ∷ outVTs s} , SendVS
 
 send-total {s} {ibHeader h} {nothing} = s , BadSendIB
 send-total {s} {ebHeader eb} {just _} = s , BadSendEB
@@ -161,9 +157,9 @@ fetch-total : ∀ {s} → ∃[ x ] (∃[ s' ] (SimpleFFD s FFDAbstract.Fetch (FF
 fetch-total {s} = flushIns s , (record s { inIBs = [] ; inEBs = [] ; inVTs = [] } , Fetch)
 
 send-complete : ∀ {s h b s'} → SimpleFFD s (FFDAbstract.Send h b) FFDAbstract.SendRes s' → s' ≡ proj₁ (send-total {s} {h} {b})
-send-complete SendIB = refl
-send-complete SendEB = refl
-send-complete SendVS = refl
+send-complete SendIB    = refl
+send-complete SendEB    = refl
+send-complete SendVS    = refl
 send-complete BadSendIB = refl
 send-complete BadSendEB = refl
 send-complete BadSendVS = refl
@@ -191,10 +187,10 @@ instance
 d-FFDFunctionality : FFDAbstract.Functionality ffdAbstract
 d-FFDFunctionality =
   record
-    { State = FFDState
-    ; initFFDState = record { inIBs = []; inEBs = []; inVTs = []; outIBs = []; outEBs = []; outVTs = [] }
-    ; _-⟦_/_⟧⇀_ = SimpleFFD
-    ; Dec-_-⟦_/_⟧⇀_ = Dec-SimpleFFD
+    { State          = FFDState
+    ; initFFDState   = record { inIBs = []; inEBs = []; inVTs = []; outIBs = []; outEBs = []; outVTs = [] }
+    ; _-⟦_/_⟧⇀_      = SimpleFFD
+    ; Dec-_-⟦_/_⟧⇀_  = Dec-SimpleFFD
     ; FFD-Send-total = send-total
     }
 
@@ -203,7 +199,7 @@ open import Leios.Voting public
 d-VotingAbstract : VotingAbstract (Fin 1 × EndorserBlock)
 d-VotingAbstract =
   record
-    { VotingState = ⊤
+    { VotingState     = ⊤
     ; initVotingState = tt
     ; isVoteCertified = λ _ _ → ⊤
     }
@@ -211,53 +207,53 @@ d-VotingAbstract =
 d-VotingAbstract-2 : VotingAbstract (Fin 2 × EndorserBlock)
 d-VotingAbstract-2 =
   record
-    { VotingState = ⊤
+    { VotingState     = ⊤
     ; initVotingState = tt
     ; isVoteCertified = λ _ _ → ⊤
     }
 
 d-SpecStructure : SpecStructure 1
 d-SpecStructure = record
-      { a = d-Abstract
-      ; Hashable-PreIBHeader = hhs
+      { a                         = d-Abstract
+      ; Hashable-PreIBHeader      = hhs
       ; Hashable-PreEndorserBlock = hpe
-      ; id = sutId
-      ; FFD' = d-FFDFunctionality
-      ; vrf' = d-VRF
-      ; sk-IB = tt
-      ; sk-EB = tt
-      ; sk-V = tt
-      ; pk-IB = tt
-      ; pk-EB = tt
-      ; pk-V = tt
-      ; B' = d-Base
-      ; BF = d-BaseFunctionality
-      ; initBaseState = tt
-      ; K' = d-KeyRegistration
-      ; KF = d-KeyRegistrationFunctionality
-      ; va = d-VotingAbstract
+      ; id                        = sutId
+      ; FFD'                      = d-FFDFunctionality
+      ; vrf'                      = d-VRF
+      ; sk-IB                     = tt
+      ; sk-EB                     = tt
+      ; sk-V                      = tt
+      ; pk-IB                     = tt
+      ; pk-EB                     = tt
+      ; pk-V                      = tt
+      ; B'                        = d-Base
+      ; BF                        = d-BaseFunctionality
+      ; initBaseState             = tt
+      ; K'                        = d-KeyRegistration
+      ; KF                        = d-KeyRegistrationFunctionality
+      ; va                        = d-VotingAbstract
       }
 
 d-SpecStructure-2 : SpecStructure 2
 d-SpecStructure-2 = record
-      { a = d-Abstract
-      ; Hashable-PreIBHeader = hhs
+      { a                         = d-Abstract
+      ; Hashable-PreIBHeader      = hhs
       ; Hashable-PreEndorserBlock = hpe
-      ; id = sutId
-      ; FFD' = d-FFDFunctionality
-      ; vrf' = d-VRF
-      ; sk-IB = tt
-      ; sk-EB = tt
-      ; sk-V = tt
-      ; pk-IB = tt
-      ; pk-EB = tt
-      ; pk-V = tt
-      ; B' = d-Base
-      ; BF = d-BaseFunctionality
-      ; initBaseState = tt
-      ; K' = d-KeyRegistration
-      ; KF = d-KeyRegistrationFunctionality
-      ; va = d-VotingAbstract-2
+      ; id                        = sutId
+      ; FFD'                      = d-FFDFunctionality
+      ; vrf'                      = d-VRF
+      ; sk-IB                     = tt
+      ; sk-EB                     = tt
+      ; sk-V                      = tt
+      ; pk-IB                     = tt
+      ; pk-EB                     = tt
+      ; pk-V                      = tt
+      ; B'                        = d-Base
+      ; BF                        = d-BaseFunctionality
+      ; initBaseState             = tt
+      ; K'                        = d-KeyRegistration
+      ; KF                        = d-KeyRegistrationFunctionality
+      ; va                        = d-VotingAbstract-2
       }
 
 open import Leios.Short d-SpecStructure public
