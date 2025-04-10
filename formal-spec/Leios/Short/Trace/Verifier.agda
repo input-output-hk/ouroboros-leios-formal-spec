@@ -303,15 +303,26 @@ mutual
   ⟦_⟧∗ [] = initLeiosState tt stakeDistribution tt [] , EMPTY
   ⟦_⟧∗ (_ / _ ∷ _ ⊣ vα) = ⟦ vα ⟧
   ⟦ _↥_ {IB-Recv-Update ib} tr vu ⟧∗ =
-    let (s , o) = ⟦ tr ⟧∗
-    in record s { FFDState = record (LeiosState.FFDState s) { inIBs = ib ∷ FFDState.inIBs (LeiosState.FFDState s)}} , o
+    let (s , o)     = ⟦ tr ⟧∗
+        (ffds' , _) = FFD.FFD-Send-total
+                        {LeiosState.FFDState s}
+                        {ibHeader (InputBlock.header ib)}
+                        {just $ ibBody (InputBlock.body ib)}
+    in record s { FFDState = ffds' } , o
   ⟦ _↥_ {EB-Recv-Update eb} tr vu ⟧∗ =
-    let (s , o) = ⟦ tr ⟧∗
-    in record s { FFDState = record (LeiosState.FFDState s) { inEBs = eb ∷ FFDState.inEBs (LeiosState.FFDState s)}} , o
+    let (s , o)     = ⟦ tr ⟧∗
+        (ffds' , _) = FFD.FFD-Send-total
+                        {LeiosState.FFDState s}
+                        {ebHeader eb}
+                        {nothing}
+    in record s { FFDState = ffds' } , o
   ⟦ _↥_ {VT-Recv-Update vt} tr vu ⟧∗ =
-    let (s , o) = ⟦ tr ⟧∗
-    in record s { FFDState = record (LeiosState.FFDState s) { inVTs = vt ∷ FFDState.inVTs (LeiosState.FFDState s)}} , o
-
+    let (s , o)     = ⟦ tr ⟧∗
+        (ffds' , _) = FFD.FFD-Send-total
+                        {LeiosState.FFDState s}
+                        {vtHeader vt}
+                        {nothing}
+    in record s { FFDState = ffds' } , o
 
 Irr-ValidAction : Irrelevant (ValidAction α s i)
 Irr-ValidAction (IB-Role _ _ _) (IB-Role _ _ _) = refl
