@@ -365,14 +365,29 @@ instance
 
 data _⇑_ : LeiosState → LeiosState → Type where
 
-  UpdateIB : ∀ {s ib} → let open LeiosState s renaming (FFDState to ffds) in
-    s ⇑ record s { FFDState = record ffds { inIBs = ib ∷ FFDState.inIBs ffds } }
+  UpdateIB : ∀ {s h b ffds'} →
+    let open LeiosState s renaming (FFDState to ffds)
+        ib = FFD.Send (ibHeader h) (just (ibBody b))
+    in
+    ∙ ffds FFD.-⟦ ib / FFD.SendRes ⟧⇀ ffds'
+      ─────────────────────────────────────
+      s ⇑ record s { FFDState = ffds' }
 
-  UpdateEB : ∀ {s eb} → let open LeiosState s renaming (FFDState to ffds) in
-    s ⇑ record s { FFDState = record ffds { inEBs = eb ∷ FFDState.inEBs ffds } }
+  UpdateEB : ∀ {s h ffds'} →
+    let open LeiosState s renaming (FFDState to ffds)
+        eb = FFD.Send (ebHeader h) nothing
+    in
+    ∙ ffds FFD.-⟦ eb / FFD.SendRes ⟧⇀ ffds'
+      ─────────────────────────────────────
+      s ⇑ record s { FFDState = ffds' }
 
-  UpdateVT : ∀ {s vt} → let open LeiosState s renaming (FFDState to ffds) in
-    s ⇑ record s { FFDState = record ffds { inVTs = vt ∷ FFDState.inVTs ffds } }
+  UpdateVT : ∀ {s h ffds'} →
+    let open LeiosState s renaming (FFDState to ffds)
+        vt = FFD.Send (vHeader h) nothing
+    in
+    ∙ ffds FFD.-⟦ vt / FFD.SendRes ⟧⇀ ffds'
+      ─────────────────────────────────────
+      s ⇑ record s { FFDState = ffds' }
 
 data LocalStep : LeiosState → LeiosState → Type where
 
