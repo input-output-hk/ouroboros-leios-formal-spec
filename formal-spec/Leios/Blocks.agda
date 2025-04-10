@@ -137,7 +137,7 @@ module GenFFD ⦃ _ : IsBlock (List Vote) ⦄ where
   data Header : Type where
     ibHeader : IBHeader → Header
     ebHeader : EndorserBlock → Header
-    vHeader  : List Vote → Header
+    vtHeader : List Vote → Header
 
   data Body : Type where
     ibBody : IBBody → Body
@@ -164,7 +164,7 @@ module GenFFD ⦃ _ : IsBlock (List Vote) ⦄ where
   msgID : Header → ID
   msgID (ibHeader h) = (slotNumber h , producerID h)
   msgID (ebHeader h) = (slotNumber h , producerID h) -- NOTE: this isn't in the paper
-  msgID (vHeader  h) = (slotNumber h , producerID h) -- NOTE: this isn't in the paper
+  msgID (vtHeader  h) = (slotNumber h , producerID h) -- NOTE: this isn't in the paper
 
 ffdAbstract : ⦃ _ : IsBlock (List Vote) ⦄ → FFDAbstract
 ffdAbstract = record { GenFFD }

@@ -131,7 +131,7 @@ open FFDState
 
 flushIns : FFDState → List (GenFFD.Header ⊎ GenFFD.Body)
 flushIns record { inIBs = ibs ; inEBs = ebs ; inVTs = vts } =
-  flushIBs ibs ++ L.map (inj₁ ∘ ebHeader) ebs ++ L.map (inj₁ ∘ vHeader) vts
+  flushIBs ibs ++ L.map (inj₁ ∘ ebHeader) ebs ++ L.map (inj₁ ∘ vtHeader) vts
   where
     flushIBs : List InputBlock → List (GenFFD.Header ⊎ GenFFD.Body)
     flushIBs [] = []
@@ -140,22 +140,22 @@ flushIns record { inIBs = ibs ; inEBs = ebs ; inVTs = vts } =
 data SimpleFFD : FFDState → FFDAbstract.Input ffdAbstract → FFDAbstract.Output ffdAbstract → FFDState → Type where
   SendIB : ∀ {s h b} → SimpleFFD s (FFDAbstract.Send (ibHeader h) (just (ibBody b))) FFDAbstract.SendRes (record s { outIBs = record {header = h; body = b} ∷ outIBs s})
   SendEB : ∀ {s eb} → SimpleFFD s (FFDAbstract.Send (ebHeader eb) nothing) FFDAbstract.SendRes (record s { outEBs = eb ∷ outEBs s})
-  SendVS : ∀ {s vs} → SimpleFFD s (FFDAbstract.Send (vHeader vs) nothing) FFDAbstract.SendRes (record s { outVTs = vs ∷ outVTs s})
+  SendVS : ∀ {s vs} → SimpleFFD s (FFDAbstract.Send (vtHeader vs) nothing) FFDAbstract.SendRes (record s { outVTs = vs ∷ outVTs s})
 
   BadSendIB : ∀ {s h} → SimpleFFD s (FFDAbstract.Send (ibHeader h) nothing) FFDAbstract.SendRes s
   BadSendEB : ∀ {s h b} → SimpleFFD s (FFDAbstract.Send (ebHeader h) (just b)) FFDAbstract.SendRes s
-  BadSendVS : ∀ {s h b} → SimpleFFD s (FFDAbstract.Send (vHeader h) (just b)) FFDAbstract.SendRes s
+  BadSendVS : ∀ {s h b} → SimpleFFD s (FFDAbstract.Send (vtHeader h) (just b)) FFDAbstract.SendRes s
 
   Fetch : ∀ {s} → SimpleFFD s FFDAbstract.Fetch (FFDAbstract.FetchRes (flushIns s)) (record s { inIBs = [] ; inEBs = [] ; inVTs = [] })
 
 send-total : ∀ {s h b} → ∃[ s' ] (SimpleFFD s (FFDAbstract.Send h b) FFDAbstract.SendRes s')
 send-total {s} {ibHeader h} {just (ibBody b)} = record s { outIBs = record {header = h; body = b} ∷ outIBs s} , SendIB
 send-total {s} {ebHeader eb} {nothing} = record s { outEBs = eb ∷ outEBs s} , SendEB
-send-total {s} {vHeader vs} {nothing} = record s { outVTs = vs ∷ outVTs s} , SendVS
+send-total {s} {vtHeader vs} {nothing} = record s { outVTs = vs ∷ outVTs s} , SendVS
 
 send-total {s} {ibHeader h} {nothing} = s , BadSendIB
 send-total {s} {ebHeader eb} {just _} = s , BadSendEB
-send-total {s} {vHeader vs} {just _} = s , BadSendVS
+send-total {s} {vtHeader vs} {just _} = s , BadSendVS
 
 fetch-total : ∀ {s} → ∃[ x ] (∃[ s' ] (SimpleFFD s FFDAbstract.Fetch (FFDAbstract.FetchRes x) s'))
 fetch-total {s} = flushIns s , (record s { inIBs = [] ; inEBs = [] ; inVTs = [] } , Fetch)

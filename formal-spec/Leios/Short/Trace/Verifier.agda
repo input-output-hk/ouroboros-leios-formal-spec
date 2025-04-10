@@ -70,10 +70,10 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
   VT-Role : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                 votes = map (vote sk-V ∘ hash) EBs'
-                ffds' = proj₁ (send-total {ffds} {vHeader votes} {nothing})
+                ffds' = proj₁ (send-total {ffds} {vtHeader votes} {nothing})
             in .(needsUpkeep VT-Role) →
                .(canProduceV slot sk-V (stake s)) →
-               .(ffds FFD.-⟦ FFD.Send (vHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
+               .(ffds FFD.-⟦ FFD.Send (vtHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
                ValidAction (VT-Role-Action slot) s SLOT
 
   No-IB-Role : let open LeiosState s
@@ -135,7 +135,7 @@ private variable
   let open LeiosState s renaming (FFDState to ffds)
       EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
       votes = map (vote sk-V ∘ hash) EBs'
-      ffds' = proj₁ (send-total {ffds} {vHeader votes} {nothing})
+      ffds' = proj₁ (send-total {ffds} {vtHeader votes} {nothing})
   in addUpkeep record s { FFDState = ffds' } VT-Role , EMPTY
 ⟦ No-IB-Role {s} _ _ ⟧ = addUpkeep s IB-Role , EMPTY
 ⟦ No-EB-Role {s} _ _ ⟧ = addUpkeep s EB-Role , EMPTY
@@ -353,7 +353,6 @@ instance
     (_ / _ ∷ tr ⊣ vα) → ¬vα
                   $ subst (λ x → ValidAction α x i) (cong (proj₁ ∘ ⟦_⟧∗) $ Irr-ValidTrace tr vαs) vα
   ... | yes vα = yes $ _ / _ ∷ vαs ⊣ vα
-
   Dec-ValidTrace {tr} .dec | inj₂ u ∷ αs
     with ¿ ValidTrace αs ¿
   ... | no ¬vαs = no λ where (vαs ↥ _) → ¬vαs vαs
@@ -383,7 +382,7 @@ data _⇑_ : LeiosState → LeiosState → Type where
 
   UpdateVT : ∀ {s h ffds'} →
     let open LeiosState s renaming (FFDState to ffds)
-        vt = FFD.Send (vHeader h) nothing
+        vt = FFD.Send (vtHeader h) nothing
     in
     ∙ ffds FFD.-⟦ vt / FFD.SendRes ⟧⇀ ffds'
       ─────────────────────────────────────
@@ -446,7 +445,7 @@ ValidAction-complete {s} (Roles (VT-Role x x₁ _))  =
   let open LeiosState s renaming (FFDState to ffds)
       EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
       votes = map (vote sk-V ∘ hash) EBs'
-      pr = proj₂ (send-total {ffds} {vHeader votes} {nothing})
+      pr = proj₂ (send-total {ffds} {vtHeader votes} {nothing})
   in VT-Role {s} x x₁ pr
 ValidAction-complete (Roles (No-IB-Role x x₁)) = No-IB-Role x x₁
 ValidAction-complete (Roles (No-EB-Role x x₁)) = No-EB-Role x x₁
