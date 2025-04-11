@@ -118,6 +118,18 @@ data _↝_ : LeiosState → LeiosState → Type where
 ```
 ### Uniform short-pipeline
 ```agda
+stage : ℕ → ⦃ _ : NonZero L ⦄ → ℕ
+stage s = s / L
+
+beginningOfStage : ℕ → Type
+beginningOfStage s = stage s * L ≡ s
+
+allDone : LeiosState → Type
+allDone s =
+  let open LeiosState s
+  in   (beginningOfStage slot × Upkeep ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ VT-Role ∷ Base ∷ []))
+   ⊎ (¬ beginningOfStage slot × Upkeep ≡ᵉ fromList (IB-Role ∷ VT-Role ∷ Base ∷ []))
+
 data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
 ```
 #### Initialization
@@ -131,7 +143,7 @@ data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → Leios
 #### Network and Ledger
 ```agda
   Slot : let open LeiosState s renaming (FFDState to ffds; BaseState to bs) in
-       ∙ Upkeep ≡ᵉ allUpkeep
+       ∙ allDone s
        ∙ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG rbs ⟧⇀ bs'
        ∙ ffds FFD.-⟦ Fetch / FetchRes msgs ⟧⇀ ffds'
        ───────────────────────────────────────────────────────────────────────

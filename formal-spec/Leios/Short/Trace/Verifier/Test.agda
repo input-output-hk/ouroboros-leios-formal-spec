@@ -35,7 +35,6 @@ private
             ∷ inj₁ (Base₂b-Action       , SLOT)
             ∷ inj₁ (Slot-Action    0    , SLOT)
             ∷ inj₁ (IB-Role-Action 1    , SLOT)
-            ∷ inj₁ (EB-Role-Action 1 [] , SLOT)
             ∷ inj₁ (VT-Role-Action 1    , SLOT)
             ∷ inj₁ (Base₂b-Action       , SLOT)
             ∷ inj₁ (Slot-Action    1    , SLOT)

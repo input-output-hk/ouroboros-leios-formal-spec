@@ -93,7 +93,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
 
   Slot : let open LeiosState s renaming (FFDState to ffds; BaseState to bs)
              (msgs , (ffds' , _)) = fetch-total {ffds}
-         in .(Upkeep ≡ᵉ allUpkeep) →
+         in .(allDone s) →
             .(bs B.-⟦ B.FTCH-LDG / B.BASE-LDG [] ⟧⇀ tt) →
             .(ffds FFD.-⟦ FFD.Fetch / FFD.FetchRes msgs ⟧⇀ ffds') →
             ValidAction (Slot-Action slot) s SLOT
@@ -300,8 +300,8 @@ mutual
 
 
   ⟦_⟧∗ : ∀ {αs : List ((Action × LeiosInput) ⊎ FFDUpdate)} → ValidTrace αs → LeiosState × LeiosOutput
-  ⟦_⟧∗ [] = initLeiosState tt stakeDistribution tt [] , EMPTY
-  ⟦_⟧∗ (_ / _ ∷ _ ⊣ vα) = ⟦ vα ⟧
+  ⟦ [] ⟧∗ = initLeiosState tt stakeDistribution tt [] , EMPTY
+  ⟦ _ / _ ∷ _ ⊣ vα ⟧∗ = ⟦ vα ⟧
   ⟦ _↥_ {IB-Recv-Update ib} tr vu ⟧∗ =
     let (s , o)     = ⟦ tr ⟧∗
         (ffds' , _) = FFD.FFD-Send-total

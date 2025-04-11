@@ -18,7 +18,7 @@ open import Leios.Prelude
 open import Leios.Protocol
 open import Leios.Short
 open import Leios.Short.Decidable
-open import Leios.Short.Deterministic
+-- open import Leios.Short.Deterministic
 open import Leios.Short.Trace.Verifier
 open import Leios.Short.Trace.Verifier.Test
 open import Leios.Simplified
