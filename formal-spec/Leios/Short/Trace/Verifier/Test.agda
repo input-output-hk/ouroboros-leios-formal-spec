@@ -74,6 +74,15 @@ private
             ∷ inj₁ (Base₂b-Action       , SLOT)
             ∷ inj₁ (Slot-Action    2    , SLOT)
             -- slot 3
+            ∷ inj₂ (IB-Recv-Update
+                (record { header =
+                  record { slotNumber = 2
+                         ; producerID = fsuc fzero
+                         ; lotteryPf = tt
+                         ; bodyHash = 3 ∷ 4 ∷ 5 ∷ []
+                         ; signature = tt
+                         }
+                        ; body = record { txs = 3 ∷ 4 ∷ 5 ∷ [] }}))
             ∷ inj₁ (IB-Role-Action 3    , SLOT)
             ∷ inj₁ (VT-Role-Action 3    , SLOT)
             ∷ inj₁ (Base₂b-Action       , SLOT)
@@ -102,7 +111,7 @@ private
             ∷ inj₁ (Slot-Action    7    , SLOT)
             -- slot 8
             ∷ inj₁ (IB-Role-Action 8    , SLOT)
-            ∷ inj₁ (EB-Role-Action 8 [] , SLOT)
+            ∷ inj₁ (EB-Role-Action 8 ((3 ∷ 4 ∷ 5 ∷ []) ∷ []) , SLOT)
             ∷ inj₁ (VT-Role-Action 8    , SLOT)
             ∷ inj₁ (Base₂b-Action       , SLOT)
             ∷ inj₁ (Slot-Action    8    , SLOT)
