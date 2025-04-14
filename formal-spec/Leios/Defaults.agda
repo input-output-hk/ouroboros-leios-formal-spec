@@ -46,14 +46,14 @@ open import Leios.VRF d-Abstract public
 d-VRF : LeiosVRF
 d-VRF =
   record
-    { PubKey     = ⊤
+    { PubKey     = Fin numberOfParties × ⊤
     ; vrf        = record { isKeyPair = λ _ _ → ⊤ ; eval = λ x x₁ → x₁ , x ; verify = λ _ _ _ _ → ⊤  ; verify? = λ _ _ _ _ → yes tt }
     ; genIBInput = id
     ; genEBInput = id
     ; genVInput  = id
     ; genV1Input = id
     ; genV2Input = id
-    ; poolID     = λ _ → sutId
+    ; poolID     = proj₁
     ; verifySig  = λ _ _ → ⊤
     ; verifySig? = λ _ _ → yes tt
     }
@@ -223,9 +223,9 @@ d-SpecStructure = record
       ; sk-IB                     = tt
       ; sk-EB                     = tt
       ; sk-V                      = tt
-      ; pk-IB                     = tt
-      ; pk-EB                     = tt
-      ; pk-V                      = tt
+      ; pk-IB                     = (sutId , tt)
+      ; pk-EB                     = (sutId , tt)
+      ; pk-V                      = (sutId , tt)
       ; B'                        = d-Base
       ; BF                        = d-BaseFunctionality
       ; initBaseState             = tt
@@ -245,9 +245,9 @@ d-SpecStructure-2 = record
       ; sk-IB                     = tt
       ; sk-EB                     = tt
       ; sk-V                      = tt
-      ; pk-IB                     = tt
-      ; pk-EB                     = tt
-      ; pk-V                      = tt
+      ; pk-IB                     = (sutId , tt)
+      ; pk-EB                     = (sutId , tt)
+      ; pk-V                      = (sutId , tt)
       ; B'                        = d-Base
       ; BF                        = d-BaseFunctionality
       ; initBaseState             = tt

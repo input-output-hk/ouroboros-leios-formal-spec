@@ -120,3 +120,6 @@ instance
                a<sucn = F.toℕ<n a
            in ⊥-elim $ (¬q ∘ toℕ-fromℕ) (N.suc-injective (m≤n∧n≤m⇒m≡n n≢toℕ a<sucn))
 
+completeFinL : ∀ (n : ℕ) → List (Fin n)
+completeFinL zero = []
+completeFinL (ℕ.suc n) = F.fromℕ n ∷ L.map F.inject₁ (completeFinL n)

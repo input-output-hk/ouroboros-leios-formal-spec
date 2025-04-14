@@ -14,6 +14,7 @@ params =
     ; stageLength = 2
     }
 
+open Params params
 open import Leios.Short.Trace.Verifier params
 
 private
@@ -24,6 +25,23 @@ private
     test₁ = ¿ ValidTrace (inj₁ (IB-Role-Action 0 , SLOT) ∷ []) ¿ᵇ
 
     _ : test₁ ≡ true
+    _ = refl
+
+    test-valid-ib : Bool
+    test-valid-ib =
+      let h = record { slotNumber = 1
+                     ; producerID = fsuc fzero
+                     ; lotteryPf = tt
+                     ; bodyHash = 0 ∷ 1 ∷ 2 ∷ []
+                     ; signature = tt
+                     }
+          b = record { txs = 0 ∷ 1 ∷ 2 ∷ [] }
+          ib = record { header = h ; body = b }
+          pks = L.zip (completeFinL numberOfParties) (L.replicate numberOfParties tt)
+          s = initLeiosState tt stakeDistribution tt pks
+      in isYes (ibValid? s ib)
+
+    _ : test-valid-ib ≡ true
     _ = refl
 
     test₂ : Bool
@@ -66,6 +84,50 @@ private
             ∷ inj₁ (VT-Role-Action 4    , SLOT)
             ∷ inj₁ (Base₂b-Action       , SLOT)
             ∷ inj₁ (Slot-Action    4    , SLOT)
+            -- slot 5
+            ∷ inj₁ (IB-Role-Action 5    , SLOT)
+            ∷ inj₁ (VT-Role-Action 5    , SLOT)
+            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Slot-Action    5    , SLOT)
+            -- slot 6
+            ∷ inj₁ (IB-Role-Action 6    , SLOT)
+            ∷ inj₁ (EB-Role-Action 6 [] , SLOT)
+            ∷ inj₁ (VT-Role-Action 6    , SLOT)
+            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Slot-Action    6    , SLOT)
+            -- slot 7
+            ∷ inj₁ (IB-Role-Action 7    , SLOT)
+            ∷ inj₁ (VT-Role-Action 7    , SLOT)
+            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Slot-Action    7    , SLOT)
+            -- slot 8
+            ∷ inj₁ (IB-Role-Action 8    , SLOT)
+            ∷ inj₁ (EB-Role-Action 8 [] , SLOT)
+            ∷ inj₁ (VT-Role-Action 8    , SLOT)
+            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Slot-Action    8    , SLOT)
+            -- slot 9
+            ∷ inj₁ (IB-Role-Action 9    , SLOT)
+            ∷ inj₁ (VT-Role-Action 9    , SLOT)
+            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Slot-Action    9    , SLOT)
+            -- slot 10
+            ∷ inj₁ (IB-Role-Action 10    , SLOT)
+            ∷ inj₁ (EB-Role-Action 10 [] , SLOT)
+            ∷ inj₁ (VT-Role-Action 10    , SLOT)
+            ∷ inj₁ (Base₂b-Action        , SLOT)
+            ∷ inj₁ (Slot-Action    10    , SLOT)
+            -- slot 11
+            ∷ inj₁ (IB-Role-Action 11    , SLOT)
+            ∷ inj₁ (VT-Role-Action 11    , SLOT)
+            ∷ inj₁ (Base₂b-Action        , SLOT)
+            ∷ inj₁ (Slot-Action    11    , SLOT)
+            -- slot 12
+            ∷ inj₁ (IB-Role-Action 12    , SLOT)
+            ∷ inj₁ (EB-Role-Action 12 [] , SLOT)
+            ∷ inj₁ (VT-Role-Action 12    , SLOT)
+            ∷ inj₁ (Base₂b-Action        , SLOT)
+            ∷ inj₁ (Slot-Action    12    , SLOT)
             ∷ []
       in ¿ ValidTrace t ¿ᵇ
 
