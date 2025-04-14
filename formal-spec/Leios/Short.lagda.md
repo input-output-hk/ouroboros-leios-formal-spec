@@ -30,9 +30,6 @@ data SlotUpkeep : Type where
   Base IB-Role EB-Role VT-Role : SlotUpkeep
 
 unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
-
-allUpkeep : ℙ SlotUpkeep
-allUpkeep = fromList (IB-Role ∷ EB-Role ∷ VT-Role ∷ Base ∷ [])
 ```
 ```agda
 open import Leios.Protocol (⋯) SlotUpkeep public
