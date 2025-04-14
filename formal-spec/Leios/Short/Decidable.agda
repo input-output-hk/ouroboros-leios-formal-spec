@@ -93,7 +93,7 @@ module _ {s : LeiosState} (let open LeiosState s renaming (FFDState to ffds; Bas
   Base₂b? {_} {p} {q} {r} = Base₂b (toWitness p) (toWitness q) (toWitness r)
 
   Slot? : ∀ {rbs bs' msgs ffds'} →
-         { _ : auto∶ Upkeep ≡ᵉ allUpkeep }
+         { _ : auto∶ allDone s }
          { _ : auto∶ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG rbs ⟧⇀ bs' }
          { _ : auto∶ ffds FFD.-⟦ FFD.Fetch / FFD.FetchRes msgs ⟧⇀ ffds' } →
          ───────────────────────────────────────────────────────────────────────

@@ -107,7 +107,7 @@ lookupPubKeyAndStake : ∀ {B} → ⦃ _ : IsBlock B ⦄ → LeiosState → B �
 lookupPubKeyAndStake s b =
   L.head $
     L.map (λ pk → (pk , stake'' pk s)) $
-      L.filter ((producerID b ≟_) ∘ poolID) (LeiosState.PubKeys s)
+      L.filter (λ pk → producerID b ≟ poolID pk) (LeiosState.PubKeys s)
 
 module _ (s : LeiosState)  where
 
