@@ -46,20 +46,20 @@ open LeiosAbstract d-Abstract public
 
 open import Leios.VRF d-Abstract public
 
-totalStake : ℕ
-totalStake = L.sum $ setToList $ range $ TotalMap.toMap stakeDistribution
+sutStake : ℕ
+sutStake = TotalMap.lookup stakeDistribution sutId
 
 open import Data.List.Membership.DecPropositional N._≟_ renaming (_∈?_ to _∈ˡ?_)
 sortition : BlockType → ℕ → ℕ
 sortition IB n with n ∈ˡ? ib-slots
 ... | yes _ = 0
-... | no _ = N.suc totalStake
+... | no _ = sutStake
 sortition EB n with n ∈ˡ? eb-slots
 ... | yes _ = 0
-... | no _ = N.suc totalStake
+... | no _ = sutStake
 sortition VT n with n ∈ˡ? vt-slots
 ... | yes _ = 0
-... | no _ = N.suc totalStake
+... | no _ = sutStake
 
 d-VRF : LeiosVRF
 d-VRF =
