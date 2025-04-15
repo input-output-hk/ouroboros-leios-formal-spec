@@ -69,10 +69,10 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
 
   VT-Role : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
-                votes = map (vote sk-V ∘ hash) EBs'
+                votes = map (vote sk-VT ∘ hash) EBs'
                 ffds' = proj₁ (send-total {ffds} {vtHeader votes} {nothing})
             in .(needsUpkeep VT-Role) →
-               .(canProduceV slot sk-V (stake s)) →
+               .(canProduceV slot sk-VT (stake s)) →
                .(ffds FFD.-⟦ FFD.Send (vtHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
                ValidAction (VT-Role-Action slot) s SLOT
 
@@ -88,7 +88,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
 
   No-VT-Role : let open LeiosState s
                in needsUpkeep VT-Role →
-                  (¬ canProduceV slot sk-V (stake s)) →
+                  (¬ canProduceV slot sk-VT (stake s)) →
                   ValidAction No-VT-Role-Action s SLOT
 
   Slot : let open LeiosState s renaming (FFDState to ffds; BaseState to bs)
@@ -134,7 +134,7 @@ private variable
 ⟦ VT-Role {s} _ _ _ ⟧ =
   let open LeiosState s renaming (FFDState to ffds)
       EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
-      votes = map (vote sk-V ∘ hash) EBs'
+      votes = map (vote sk-VT ∘ hash) EBs'
       ffds' = proj₁ (send-total {ffds} {vtHeader votes} {nothing})
   in addUpkeep record s { FFDState = ffds' } VT-Role , EMPTY
 ⟦ No-IB-Role {s} _ _ ⟧ = addUpkeep s IB-Role , EMPTY
@@ -429,7 +429,7 @@ ValidAction-complete {s} (Roles (EB-Role x x₁ _)) =
 ValidAction-complete {s} (Roles (VT-Role x x₁ _))  =
   let open LeiosState s renaming (FFDState to ffds)
       EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
-      votes = map (vote sk-V ∘ hash) EBs'
+      votes = map (vote sk-VT ∘ hash) EBs'
       pr = proj₂ (send-total {ffds} {vtHeader votes} {nothing})
   in VT-Role {s} x x₁ pr
 ValidAction-complete (Roles (No-IB-Role x x₁)) = No-IB-Role x x₁

@@ -8,3 +8,6 @@ record Params : Type where
         stakeDistribution : TotalMap (Fin numberOfParties) ℕ
         stageLength : ℕ
         ⦃ NonZero-stageLength ⦄ : NonZero stageLength
+        ib-slots : List ℕ
+        eb-slots : List ℕ
+        vt-slots : List ℕ

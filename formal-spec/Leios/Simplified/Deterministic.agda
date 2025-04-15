@@ -53,7 +53,7 @@ addUpkeep⇒¬needsUpkeep {s = s} = λ x → x (lemma {s = s})
 
 data _⊢_ : LeiosInput → LeiosState → Type where
   Init :
-       ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-V / K.PUBKEYS pks ⟧⇀ ks'
+       ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
        ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
        ────────────────────────────────────────────────────────────────
        INIT V ⊢ initLeiosState V SD bs' pks
@@ -187,15 +187,15 @@ data _-⟦V1-Role⟧⇀_ : LeiosState → LeiosState → Type where
 
   V1-Role : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot (μ + 1)) EBs
-                votes = map (vote sk-V ∘ hash) EBs'
+                votes = map (vote sk-VT ∘ hash) EBs'
           in
-          ∙ canProduceV1 slot sk-V (stake s)
+          ∙ canProduceV1 slot sk-VT (stake s)
           ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ────────────────────────────────────────────────────────────────────
           s -⟦V1-Role⟧⇀ addUpkeep record s { FFDState = ffds' } V1-Role
 
   No-V1-Role : let open LeiosState s in
-          ∙ ¬ canProduceV1 slot sk-V (stake s)
+          ∙ ¬ canProduceV1 slot sk-VT (stake s)
           ────────────────────────────────────────
           s -⟦V1-Role⟧⇀ addUpkeep s V1-Role
 
@@ -227,15 +227,15 @@ data _-⟦V2-Role⟧⇀_ : LeiosState → LeiosState → Type where
 
   V2-Role : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filter (vote2Eligible s) $ filter (_∈ᴮ slice L slot 1) EBs
-                votes = map (vote sk-V ∘ hash) EBs'
+                votes = map (vote sk-VT ∘ hash) EBs'
           in
-          ∙ canProduceV2 slot sk-V (stake s)
+          ∙ canProduceV2 slot sk-VT (stake s)
           ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ────────────────────────────────────────────────────────────────────
           s -⟦V2-Role⟧⇀ addUpkeep record s { FFDState = ffds' } V2-Role
 
   No-V2-Role : let open LeiosState s in
-          ∙ ¬ canProduceV2 slot sk-V (stake s)
+          ∙ ¬ canProduceV2 slot sk-VT (stake s)
           ────────────────────────────────────────
           s -⟦V2-Role⟧⇀ addUpkeep s V2-Role
 

@@ -80,20 +80,20 @@ data _↝_ : LeiosState → LeiosState → Type where
 
   V1-Role : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot (μ + 1)) EBs
-                votes = map (vote sk-V ∘ hash) EBs'
+                votes = map (vote sk-VT ∘ hash) EBs'
           in
           ∙ needsUpkeep V1-Role
-          ∙ canProduceV1 slot sk-V (stake s)
+          ∙ canProduceV1 slot sk-VT (stake s)
           ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } V1-Role
 
   V2-Role : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filter (vote2Eligible s) $ filter (_∈ᴮ slice L slot 1) EBs
-                votes = map (vote sk-V ∘ hash) EBs'
+                votes = map (vote sk-VT ∘ hash) EBs'
           in
           ∙ needsUpkeep V2-Role
-          ∙ canProduceV2 slot sk-V (stake s)
+          ∙ canProduceV2 slot sk-VT (stake s)
           ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } V2-Role
@@ -114,13 +114,13 @@ data _↝_ : LeiosState → LeiosState → Type where
 
   No-V1-Role : let open LeiosState s in
           ∙ needsUpkeep V1-Role
-          ∙ ¬ canProduceV1 slot sk-V (stake s)
+          ∙ ¬ canProduceV1 slot sk-VT (stake s)
           ─────────────────────────────────────────────
           s ↝ addUpkeep s V1-Role
 
   No-V2-Role : let open LeiosState s in
           ∙ needsUpkeep V2-Role
-          ∙ ¬ canProduceV2 slot sk-V (stake s)
+          ∙ ¬ canProduceV2 slot sk-VT (stake s)
           ─────────────────────────────────────────────
           s ↝ addUpkeep s V2-Role
 
@@ -129,7 +129,7 @@ data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → Leios
   -- Initialization
 
   Init :
-       ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-V / K.PUBKEYS pks ⟧⇀ ks'
+       ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
        ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
        ────────────────────────────────────────────────────────────────
        nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs' pks

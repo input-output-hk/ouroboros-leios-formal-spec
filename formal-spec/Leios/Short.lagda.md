@@ -83,10 +83,10 @@ data _↝_ : LeiosState → LeiosState → Type where
 ```agda
   VT-Role : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
-                votes = map (vote sk-V ∘ hash) EBs'
+                votes = map (vote sk-VT ∘ hash) EBs'
           in
           ∙ needsUpkeep VT-Role
-          ∙ canProduceV slot sk-V (stake s)
+          ∙ canProduceV slot sk-VT (stake s)
           ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } VT-Role
@@ -109,7 +109,7 @@ data _↝_ : LeiosState → LeiosState → Type where
 ```agda
   No-VT-Role : let open LeiosState s in
              ∙ needsUpkeep VT-Role
-             ∙ ¬ canProduceV slot sk-V (stake s)
+             ∙ ¬ canProduceV slot sk-VT (stake s)
              ─────────────────────────────────────────────
              s ↝ addUpkeep s VT-Role
 ```
@@ -132,7 +132,7 @@ data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → Leios
 #### Initialization
 ```agda
   Init :
-       ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-V / K.PUBKEYS pks ⟧⇀ ks'
+       ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
        ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
        ────────────────────────────────────────────────────────────────
        nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs' pks

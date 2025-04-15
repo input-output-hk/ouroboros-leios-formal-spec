@@ -12,6 +12,9 @@ params =
         let open FunTot (completeFin 2) (maximalFin 2)
         in Fun⇒TotalMap (const 100000000)
     ; stageLength = 2
+    ; ib-slots = 0 ∷ 1 ∷ 2 ∷ 3 ∷ 4 ∷ 5 ∷ 7 ∷ 8 ∷ []
+    ; eb-slots = 0 ∷ 1 ∷ 2 ∷ 3 ∷ 4 ∷ 5 ∷ 7 ∷ 8 ∷ []
+    ; vt-slots = 0 ∷ 1 ∷ 2 ∷ 3 ∷ 4 ∷ 5 ∷ 6 ∷ 7 ∷ 8 ∷ []
     }
 
 open Params params
@@ -99,8 +102,8 @@ private
             ∷ inj₁ (Base₂b-Action       , SLOT)
             ∷ inj₁ (Slot-Action    5    , SLOT)
             -- slot 6
-            ∷ inj₁ (IB-Role-Action 6    , SLOT)
-            ∷ inj₁ (EB-Role-Action 6 [] , SLOT)
+            ∷ inj₁ (No-IB-Role-Action   , SLOT)
+            ∷ inj₁ (No-EB-Role-Action   , SLOT)
             ∷ inj₁ (VT-Role-Action 6    , SLOT)
             ∷ inj₁ (Base₂b-Action       , SLOT)
             ∷ inj₁ (Slot-Action    6    , SLOT)
@@ -115,28 +118,6 @@ private
             ∷ inj₁ (VT-Role-Action 8    , SLOT)
             ∷ inj₁ (Base₂b-Action       , SLOT)
             ∷ inj₁ (Slot-Action    8    , SLOT)
-            -- slot 9
-            ∷ inj₁ (IB-Role-Action 9    , SLOT)
-            ∷ inj₁ (VT-Role-Action 9    , SLOT)
-            ∷ inj₁ (Base₂b-Action       , SLOT)
-            ∷ inj₁ (Slot-Action    9    , SLOT)
-            -- slot 10
-            ∷ inj₁ (IB-Role-Action 10    , SLOT)
-            ∷ inj₁ (EB-Role-Action 10 [] , SLOT)
-            ∷ inj₁ (VT-Role-Action 10    , SLOT)
-            ∷ inj₁ (Base₂b-Action        , SLOT)
-            ∷ inj₁ (Slot-Action    10    , SLOT)
-            -- slot 11
-            ∷ inj₁ (IB-Role-Action 11    , SLOT)
-            ∷ inj₁ (VT-Role-Action 11    , SLOT)
-            ∷ inj₁ (Base₂b-Action        , SLOT)
-            ∷ inj₁ (Slot-Action    11    , SLOT)
-            -- slot 12
-            ∷ inj₁ (IB-Role-Action 12    , SLOT)
-            ∷ inj₁ (EB-Role-Action 12 [] , SLOT)
-            ∷ inj₁ (VT-Role-Action 12    , SLOT)
-            ∷ inj₁ (Base₂b-Action        , SLOT)
-            ∷ inj₁ (Slot-Action    12    , SLOT)
             ∷ []
       in ¿ ValidTrace t ¿ᵇ
 
