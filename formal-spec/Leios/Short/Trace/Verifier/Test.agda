@@ -12,6 +12,17 @@ params =
         let open FunTot (completeFin 2) (maximalFin 2)
         in Fun⇒TotalMap (const 100000000)
     ; stageLength = 2
+    ; winning-slots = fromList $
+        (IB , 0) ∷ (EB , 0) ∷ (VT , 0) ∷
+        (IB , 1) ∷ (EB , 1) ∷ (VT , 1) ∷
+        (IB , 2) ∷ (EB , 2) ∷ (VT , 2) ∷
+        (IB , 3) ∷ (EB , 3) ∷ (VT , 3) ∷
+        (IB , 4) ∷ (EB , 4) ∷ (VT , 4) ∷
+        (IB , 5) ∷ (EB , 5) ∷ (VT , 5) ∷
+                              (VT , 6) ∷
+        (IB , 7) ∷ (EB , 7) ∷ (VT , 7) ∷
+        (IB , 8) ∷ (EB , 8) ∷ (VT , 8) ∷
+        []
     }
 
 open Params params
@@ -99,8 +110,8 @@ private
             ∷ inj₁ (Base₂b-Action       , SLOT)
             ∷ inj₁ (Slot-Action    5    , SLOT)
             -- slot 6
-            ∷ inj₁ (IB-Role-Action 6    , SLOT)
-            ∷ inj₁ (EB-Role-Action 6 [] , SLOT)
+            ∷ inj₁ (No-IB-Role-Action   , SLOT)
+            ∷ inj₁ (No-EB-Role-Action   , SLOT)
             ∷ inj₁ (VT-Role-Action 6    , SLOT)
             ∷ inj₁ (Base₂b-Action       , SLOT)
             ∷ inj₁ (Slot-Action    6    , SLOT)
@@ -115,28 +126,6 @@ private
             ∷ inj₁ (VT-Role-Action 8    , SLOT)
             ∷ inj₁ (Base₂b-Action       , SLOT)
             ∷ inj₁ (Slot-Action    8    , SLOT)
-            -- slot 9
-            ∷ inj₁ (IB-Role-Action 9    , SLOT)
-            ∷ inj₁ (VT-Role-Action 9    , SLOT)
-            ∷ inj₁ (Base₂b-Action       , SLOT)
-            ∷ inj₁ (Slot-Action    9    , SLOT)
-            -- slot 10
-            ∷ inj₁ (IB-Role-Action 10    , SLOT)
-            ∷ inj₁ (EB-Role-Action 10 [] , SLOT)
-            ∷ inj₁ (VT-Role-Action 10    , SLOT)
-            ∷ inj₁ (Base₂b-Action        , SLOT)
-            ∷ inj₁ (Slot-Action    10    , SLOT)
-            -- slot 11
-            ∷ inj₁ (IB-Role-Action 11    , SLOT)
-            ∷ inj₁ (VT-Role-Action 11    , SLOT)
-            ∷ inj₁ (Base₂b-Action        , SLOT)
-            ∷ inj₁ (Slot-Action    11    , SLOT)
-            -- slot 12
-            ∷ inj₁ (IB-Role-Action 12    , SLOT)
-            ∷ inj₁ (EB-Role-Action 12 [] , SLOT)
-            ∷ inj₁ (VT-Role-Action 12    , SLOT)
-            ∷ inj₁ (Base₂b-Action        , SLOT)
-            ∷ inj₁ (Slot-Action    12    , SLOT)
             ∷ []
       in ¿ ValidTrace t ¿ᵇ
 

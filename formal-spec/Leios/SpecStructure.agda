@@ -29,8 +29,8 @@ record SpecStructure (rounds : ℕ) : Type₁ where
 
   open LeiosVRF vrf' public
 
-  field sk-IB sk-EB sk-V : PrivKey
-        pk-IB pk-EB pk-V : PubKey
+  field sk-IB sk-EB sk-VT : PrivKey
+        pk-IB pk-EB pk-VT : PubKey
 
   open Leios.Base a vrf' public
 

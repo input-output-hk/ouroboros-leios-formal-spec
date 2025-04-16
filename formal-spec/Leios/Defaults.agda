@@ -30,7 +30,7 @@ d-Abstract =
     ; PoolID   = Fin numberOfParties
     ; BodyHash = List ℕ
     ; VrfPf    = ⊤
-    ; PrivKey  = ⊤
+    ; PrivKey  = BlockType × ⊤
     ; Sig      = ⊤
     ; Hash     = List ℕ
     ; Vote     = ⊤
@@ -43,6 +43,14 @@ open LeiosAbstract d-Abstract public
 
 open import Leios.VRF d-Abstract public
 
+sutStake : ℕ
+sutStake = TotalMap.lookup stakeDistribution sutId
+
+sortition : BlockType → ℕ → ℕ
+sortition b n with (b , n) ∈? winning-slots
+... | yes _ = 0
+... | no _ = sutStake
+
 d-VRF : LeiosVRF
 d-VRF =
   record
@@ -50,7 +58,7 @@ d-VRF =
     ; vrf        =
         record
           { isKeyPair = λ _ _ → ⊤
-          ; eval      = λ _ y → y , tt
+          ; eval      = λ (b , _) y → sortition b y , tt
           ; verify    = λ _ _ _ _ → ⊤
           ; verify?   = λ _ _ _ _ → yes tt
           }
@@ -193,11 +201,12 @@ instance
 d-FFDFunctionality : FFDAbstract.Functionality ffdAbstract
 d-FFDFunctionality =
   record
-    { State          = FFDState
-    ; initFFDState   = record { inIBs = []; inEBs = []; inVTs = []; outIBs = []; outEBs = []; outVTs = [] }
-    ; _-⟦_/_⟧⇀_      = SimpleFFD
-    ; Dec-_-⟦_/_⟧⇀_  = Dec-SimpleFFD
-    ; FFD-Send-total = send-total
+    { State         = FFDState
+    ; initFFDState  = record { inIBs = []; inEBs = []; inVTs = []; outIBs = []; outEBs = []; outVTs = [] }
+    ; _-⟦_/_⟧⇀_     = SimpleFFD
+    ; Dec-_-⟦_/_⟧⇀_ = Dec-SimpleFFD
+    ; Send-total    = send-total
+    ; Fetch-total   = fetch-total
     }
 
 open import Leios.Voting public
@@ -226,12 +235,12 @@ d-SpecStructure = record
       ; id                        = sutId
       ; FFD'                      = d-FFDFunctionality
       ; vrf'                      = d-VRF
-      ; sk-IB                     = tt
-      ; sk-EB                     = tt
-      ; sk-V                      = tt
-      ; pk-IB                     = (sutId , tt)
-      ; pk-EB                     = (sutId , tt)
-      ; pk-V                      = (sutId , tt)
+      ; sk-IB                     = IB , tt
+      ; sk-EB                     = EB , tt
+      ; sk-VT                     = VT , tt
+      ; pk-IB                     = sutId , tt
+      ; pk-EB                     = sutId , tt
+      ; pk-VT                     = sutId , tt
       ; B'                        = d-Base
       ; BF                        = d-BaseFunctionality
       ; initBaseState             = tt
@@ -248,12 +257,12 @@ d-SpecStructure-2 = record
       ; id                        = sutId
       ; FFD'                      = d-FFDFunctionality
       ; vrf'                      = d-VRF
-      ; sk-IB                     = tt
-      ; sk-EB                     = tt
-      ; sk-V                      = tt
-      ; pk-IB                     = (sutId , tt)
-      ; pk-EB                     = (sutId , tt)
-      ; pk-V                      = (sutId , tt)
+      ; sk-IB                     = IB , tt
+      ; sk-EB                     = EB , tt
+      ; sk-VT                     = VT , tt
+      ; pk-IB                     = sutId , tt
+      ; pk-EB                     = sutId , tt
+      ; pk-VT                     = sutId , tt
       ; B'                        = d-Base
       ; BF                        = d-BaseFunctionality
       ; initBaseState             = tt

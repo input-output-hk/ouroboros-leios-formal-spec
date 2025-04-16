@@ -51,10 +51,10 @@ module _ {s : LeiosState} (let open LeiosState s renaming (FFDState to ffds; Bas
 
   V-Role? : ∀ {ffds'} →
           let EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
-              votes = map (vote sk-V ∘ hash) EBs'
+              votes = map (vote sk-VT ∘ hash) EBs'
           in
           { _ : auto∶ needsUpkeep VT-Role }
-          { _ : auto∶ canProduceV slot sk-V (stake s) }
+          { _ : auto∶ canProduceV slot sk-VT (stake s) }
           { _ : auto∶ ffds FFD.-⟦ FFD.Send (GenFFD.vtHeader votes) nothing / FFD.SendRes ⟧⇀ ffds' } →
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } VT-Role
@@ -62,7 +62,7 @@ module _ {s : LeiosState} (let open LeiosState s renaming (FFDState to ffds; Bas
 
   No-V-Role? :
              { _ : auto∶ needsUpkeep VT-Role }
-             { _ : auto∶ ¬ canProduceV slot sk-V (stake s) } →
+             { _ : auto∶ ¬ canProduceV slot sk-VT (stake s) } →
              ─────────────────────────────────────────────
              s ↝ addUpkeep s VT-Role
   No-V-Role? {p} {q} = No-VT-Role (toWitness p) (toWitness q)
