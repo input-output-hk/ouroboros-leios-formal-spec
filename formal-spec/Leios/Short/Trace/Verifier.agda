@@ -1,6 +1,7 @@
 open import Leios.Prelude hiding (id)
 open import Leios.Config
 
+-- TODO: SpecStructure as parameter
 module Leios.Short.Trace.Verifier (params : Params) (let open Params params) where
 
 open import Leios.Defaults params
@@ -314,17 +315,17 @@ mutual
     in record s { FFDState = record (LeiosState.FFDState s) { inVTs = vt ∷ FFDState.inVTs (LeiosState.FFDState s)}} , o
 
 Irr-ValidAction : Irrelevant (ValidAction α s i)
-Irr-ValidAction (IB-Role _ _ _) (IB-Role _ _ _) = refl
-Irr-ValidAction (EB-Role _ _ _) (EB-Role _ _ _) = refl
-Irr-ValidAction (VT-Role _ _ _) (VT-Role _ _ _) = refl
+Irr-ValidAction (IB-Role _ _ _) (IB-Role _ _ _)   = refl
+Irr-ValidAction (EB-Role _ _ _) (EB-Role _ _ _)   = refl
+Irr-ValidAction (VT-Role _ _ _) (VT-Role _ _ _)   = refl
 Irr-ValidAction (No-IB-Role _ _) (No-IB-Role _ _) = refl
 Irr-ValidAction (No-EB-Role _ _) (No-EB-Role _ _) = refl
 Irr-ValidAction (No-VT-Role _ _) (No-VT-Role _ _) = refl
-Irr-ValidAction (Slot _ _ _) (Slot _ _ _) = refl
-Irr-ValidAction Ftch Ftch = refl
-Irr-ValidAction Base₁ Base₁ = refl
-Irr-ValidAction (Base₂a _ _ _) (Base₂a _ _ _) = refl
-Irr-ValidAction (Base₂b _ _ _) (Base₂b _ _ _) = refl
+Irr-ValidAction (Slot _ _ _) (Slot _ _ _)         = refl
+Irr-ValidAction Ftch Ftch                         = refl
+Irr-ValidAction Base₁ Base₁                       = refl
+Irr-ValidAction (Base₂a _ _ _) (Base₂a _ _ _)     = refl
+Irr-ValidAction (Base₂b _ _ _) (Base₂b _ _ _)     = refl
 
 Irr-ValidUpdate : ∀ {f} → Irrelevant (ValidUpdate f s)
 Irr-ValidUpdate IB-Recv IB-Recv = refl

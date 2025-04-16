@@ -12,9 +12,17 @@ params =
         let open FunTot (completeFin 2) (maximalFin 2)
         in Fun⇒TotalMap (const 100000000)
     ; stageLength = 2
-    ; ib-slots = 0 ∷ 1 ∷ 2 ∷ 3 ∷ 4 ∷ 5 ∷ 7 ∷ 8 ∷ []
-    ; eb-slots = 0 ∷ 1 ∷ 2 ∷ 3 ∷ 4 ∷ 5 ∷ 7 ∷ 8 ∷ []
-    ; vt-slots = 0 ∷ 1 ∷ 2 ∷ 3 ∷ 4 ∷ 5 ∷ 6 ∷ 7 ∷ 8 ∷ []
+    ; winning-slots = fromList $
+        (IB , 0) ∷ (EB , 0) ∷ (VT , 0) ∷
+        (IB , 1) ∷ (EB , 1) ∷ (VT , 1) ∷
+        (IB , 2) ∷ (EB , 2) ∷ (VT , 2) ∷
+        (IB , 3) ∷ (EB , 3) ∷ (VT , 3) ∷
+        (IB , 4) ∷ (EB , 4) ∷ (VT , 4) ∷
+        (IB , 5) ∷ (EB , 5) ∷ (VT , 5) ∷
+                              (VT , 6) ∷
+        (IB , 7) ∷ (EB , 7) ∷ (VT , 7) ∷
+        (IB , 8) ∷ (EB , 8) ∷ (VT , 8) ∷
+        []
     }
 
 open Params params

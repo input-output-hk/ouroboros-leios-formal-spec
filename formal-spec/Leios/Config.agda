@@ -1,6 +1,13 @@
 open import Leios.Prelude
+open import Tactic.Defaults
+open import Tactic.Derive.DecEq
 
 module Leios.Config where
+
+data BlockType : Type where
+  IB EB VT : BlockType
+
+unquoteDecl DecEq-BlockType = derive-DecEq ((quote BlockType , DecEq-BlockType) ∷ [])
 
 record Params : Type where
   field numberOfParties : ℕ
@@ -8,6 +15,4 @@ record Params : Type where
         stakeDistribution : TotalMap (Fin numberOfParties) ℕ
         stageLength : ℕ
         ⦃ NonZero-stageLength ⦄ : NonZero stageLength
-        ib-slots : List ℕ
-        eb-slots : List ℕ
-        vt-slots : List ℕ
+        winning-slots : ℙ (BlockType × ℕ)

@@ -23,9 +23,6 @@ instance
   htx : Hashable (List ℕ) (List ℕ)
   htx = record { hash = id }
 
-data BlockType : Type where
-  IB EB VT : BlockType
-
 d-Abstract : LeiosAbstract
 d-Abstract =
   record
@@ -49,15 +46,8 @@ open import Leios.VRF d-Abstract public
 sutStake : ℕ
 sutStake = TotalMap.lookup stakeDistribution sutId
 
-open import Data.List.Membership.DecPropositional N._≟_ renaming (_∈?_ to _∈ˡ?_)
 sortition : BlockType → ℕ → ℕ
-sortition IB n with n ∈ˡ? ib-slots
-... | yes _ = 0
-... | no _ = sutStake
-sortition EB n with n ∈ˡ? eb-slots
-... | yes _ = 0
-... | no _ = sutStake
-sortition VT n with n ∈ˡ? vt-slots
+sortition b n with (b , n) ∈? winning-slots
 ... | yes _ = 0
 ... | no _ = sutStake
 
