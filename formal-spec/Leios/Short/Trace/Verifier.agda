@@ -4,7 +4,7 @@ open import Leios.Config
 module Leios.Short.Trace.Verifier (params : Params) (let open Params params) where
 
 open import Leios.Defaults params
-  using (LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD; send-total; fetch-total)
+  using (LeiosState; initLeiosState; isb; hpe; hhs; htx; SendIB; FFDState; Dec-SimpleFFD)
   renaming (d-SpecStructure to traceSpecStructure) public
 
 open import Leios.SpecStructure using (SpecStructure)
@@ -52,7 +52,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
   IB-Role : let open LeiosState s renaming (FFDState to ffds)
                 b = record { txs = ToPropose }
                 h = mkIBHeader slot id tt sk-IB ToPropose
-                ffds' = proj₁ (send-total {ffds} {ibHeader h} {just (ibBody b)})
+                ffds' = proj₁ (FFD.Send-total {ffds} {ibHeader h} {just (ibBody b)})
             in .(needsUpkeep IB-Role) →
                .(canProduceIB slot sk-IB (stake s) tt) →
                .(ffds FFD.-⟦ FFD.Send (ibHeader h) (just (ibBody b)) / FFD.SendRes ⟧⇀ ffds') →
@@ -61,7 +61,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
                 LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
                 h = mkEB slot id tt sk-EB LI []
-                ffds' = proj₁ (send-total {ffds} {ebHeader h} {nothing})
+                ffds' = proj₁ (FFD.Send-total {ffds} {ebHeader h} {nothing})
             in .(needsUpkeep EB-Role) →
                .(canProduceEB slot sk-EB (stake s) tt) →
                .(ffds FFD.-⟦ FFD.Send (ebHeader h) nothing / FFD.SendRes ⟧⇀ ffds') →
@@ -70,7 +70,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
   VT-Role : let open LeiosState s renaming (FFDState to ffds)
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                 votes = map (vote sk-VT ∘ hash) EBs'
-                ffds' = proj₁ (send-total {ffds} {vtHeader votes} {nothing})
+                ffds' = proj₁ (FFD.Send-total {ffds} {vtHeader votes} {nothing})
             in .(needsUpkeep VT-Role) →
                .(canProduceV slot sk-VT (stake s)) →
                .(ffds FFD.-⟦ FFD.Send (vtHeader votes) nothing / FFD.SendRes ⟧⇀ ffds') →
@@ -92,7 +92,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
                   ValidAction No-VT-Role-Action s SLOT
 
   Slot : let open LeiosState s renaming (FFDState to ffds; BaseState to bs)
-             (msgs , (ffds' , _)) = fetch-total {ffds}
+             (msgs , (ffds' , _)) = FFD.Fetch-total {ffds}
          in .(allDone s) →
             .(bs B.-⟦ B.FTCH-LDG / B.BASE-LDG [] ⟧⇀ tt) →
             .(ffds FFD.-⟦ FFD.Fetch / FFD.FetchRes msgs ⟧⇀ ffds') →
@@ -123,26 +123,26 @@ private variable
   let open LeiosState s renaming (FFDState to ffds)
       b = record { txs = ToPropose }
       h = mkIBHeader slot id tt sk-IB ToPropose
-      ffds' = proj₁ (send-total {ffds} {ibHeader h} {just (ibBody b)})
+      ffds' = proj₁ (FFD.Send-total {ffds} {ibHeader h} {just (ibBody b)})
   in addUpkeep record s { FFDState = ffds' } IB-Role , EMPTY
 ⟦ EB-Role {s} _ _ _ ⟧ =
   let open LeiosState s renaming (FFDState to ffds)
       LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
       h = mkEB slot id tt sk-EB LI []
-      ffds' = proj₁ (send-total {ffds} {ebHeader h} {nothing})
+      ffds' = proj₁ (FFD.Send-total {ffds} {ebHeader h} {nothing})
   in addUpkeep record s { FFDState = ffds' } EB-Role , EMPTY
 ⟦ VT-Role {s} _ _ _ ⟧ =
   let open LeiosState s renaming (FFDState to ffds)
       EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
       votes = map (vote sk-VT ∘ hash) EBs'
-      ffds' = proj₁ (send-total {ffds} {vtHeader votes} {nothing})
+      ffds' = proj₁ (FFD.Send-total {ffds} {vtHeader votes} {nothing})
   in addUpkeep record s { FFDState = ffds' } VT-Role , EMPTY
 ⟦ No-IB-Role {s} _ _ ⟧ = addUpkeep s IB-Role , EMPTY
 ⟦ No-EB-Role {s} _ _ ⟧ = addUpkeep s EB-Role , EMPTY
 ⟦ No-VT-Role {s} _ _ ⟧ = addUpkeep s VT-Role , EMPTY
 ⟦ Slot {s} _ _ _ ⟧ =
   let open LeiosState s renaming (FFDState to ffds)
-      (msgs , (ffds' , _)) = fetch-total {ffds}
+      (msgs , (ffds' , _)) = FFD.Fetch-total {ffds}
   in
   (record s
      { FFDState  = ffds'
@@ -418,19 +418,19 @@ ValidAction-complete {s} {s′} (Roles (IB-Role {s} {π} {ffds'} x x₁ _)) =
   let open LeiosState s renaming (FFDState to ffds)
       b = record { txs = ToPropose }
       h = mkIBHeader slot id tt sk-IB ToPropose
-      pr = proj₂ (send-total {ffds} {ibHeader h} {just (ibBody b)})
+      pr = proj₂ (FFD.Send-total {ffds} {ibHeader h} {just (ibBody b)})
   in IB-Role {s} x x₁ pr
 ValidAction-complete {s} (Roles (EB-Role x x₁ _)) =
   let open LeiosState s renaming (FFDState to ffds)
       LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
       h = mkEB slot id tt sk-EB LI []
-      pr = proj₂ (send-total {ffds} {ebHeader h} {nothing})
+      pr = proj₂ (FFD.Send-total {ffds} {ebHeader h} {nothing})
   in EB-Role {s} x x₁ pr
 ValidAction-complete {s} (Roles (VT-Role x x₁ _))  =
   let open LeiosState s renaming (FFDState to ffds)
       EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
       votes = map (vote sk-VT ∘ hash) EBs'
-      pr = proj₂ (send-total {ffds} {vtHeader votes} {nothing})
+      pr = proj₂ (FFD.Send-total {ffds} {vtHeader votes} {nothing})
   in VT-Role {s} x x₁ pr
 ValidAction-complete (Roles (No-IB-Role x x₁)) = No-IB-Role x x₁
 ValidAction-complete (Roles (No-EB-Role x x₁)) = No-EB-Role x x₁
@@ -439,4 +439,4 @@ ValidAction-complete Ftch                      = Ftch
 ValidAction-complete Base₁                     = Base₁
 ValidAction-complete (Base₂a x x₁ x₂)          = Base₂a x x₁ x₂
 ValidAction-complete (Base₂b x x₁ x₂)          = Base₂b x x₁ x₂
-ValidAction-complete {s} (Slot x x₁ _)         = Slot x x₁ (proj₂ (proj₂ (fetch-total {LeiosState.FFDState s})))
+ValidAction-complete {s} (Slot x x₁ _)         = Slot x x₁ (proj₂ (proj₂ (FFD.Fetch-total {LeiosState.FFDState s})))
