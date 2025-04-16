@@ -124,7 +124,7 @@ instance
   hpe : Hashable PreEndorserBlock (List ℕ)
   hpe .hash = L.concat ∘ EndorserBlockOSig.ibRefs
 
-record FFDState : Type where
+record FFDBuffers : Type where
   field inIBs : List InputBlock
         inEBs : List EndorserBlock
         inVTs : List (List Vote)
@@ -133,13 +133,13 @@ record FFDState : Type where
         outEBs : List EndorserBlock
         outVTs : List (List Vote)
 
-unquoteDecl DecEq-FFDState = derive-DecEq ((quote FFDState , DecEq-FFDState) ∷ [])
+unquoteDecl DecEq-FFDBuffers = derive-DecEq ((quote FFDBuffers , DecEq-FFDBuffers) ∷ [])
 
 open GenFFD.Header
 open GenFFD.Body
-open FFDState
+open FFDBuffers
 
-flushIns : FFDState → List (GenFFD.Header ⊎ GenFFD.Body)
+flushIns : FFDBuffers → List (GenFFD.Header ⊎ GenFFD.Body)
 flushIns record { inIBs = ibs ; inEBs = ebs ; inVTs = vts } =
   flushIBs ibs ++ L.map (inj₁ ∘ ebHeader) ebs ++ L.map (inj₁ ∘ vtHeader) vts
   where
@@ -147,7 +147,7 @@ flushIns record { inIBs = ibs ; inEBs = ebs ; inVTs = vts } =
     flushIBs [] = []
     flushIBs (record {header = h; body = b} ∷ ibs) = inj₁ (ibHeader h) ∷ inj₂ (ibBody b) ∷ flushIBs ibs
 
-data SimpleFFD : FFDState → FFDAbstract.Input ffdAbstract → FFDAbstract.Output ffdAbstract → FFDState → Type where
+data SimpleFFD : FFDBuffers → FFDAbstract.Input ffdAbstract → FFDAbstract.Output ffdAbstract → FFDBuffers → Type where
   SendIB : ∀ {s h b}    → SimpleFFD s (FFDAbstract.Send (ibHeader h) (just (ibBody b))) FFDAbstract.SendRes (record s { outIBs = record {header = h; body = b} ∷ outIBs s})
   SendEB : ∀ {s eb}     → SimpleFFD s (FFDAbstract.Send (ebHeader eb) nothing) FFDAbstract.SendRes (record s { outEBs = eb ∷ outEBs s})
   SendVS : ∀ {s vs}     → SimpleFFD s (FFDAbstract.Send (vtHeader vs) nothing) FFDAbstract.SendRes (record s { outVTs = vs ∷ outVTs s})
@@ -201,7 +201,7 @@ instance
 d-FFDFunctionality : FFDAbstract.Functionality ffdAbstract
 d-FFDFunctionality =
   record
-    { State         = FFDState
+    { State         = FFDBuffers
     ; initFFDState  = record { inIBs = []; inEBs = []; inVTs = []; outIBs = []; outEBs = []; outVTs = [] }
     ; _-⟦_/_⟧⇀_     = SimpleFFD
     ; Dec-_-⟦_/_⟧⇀_ = Dec-SimpleFFD
