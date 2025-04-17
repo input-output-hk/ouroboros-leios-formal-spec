@@ -97,9 +97,27 @@ let
 
   agdaWithPkgs = p: customAgda.agda.withPackages { pkgs = p; ghc = pkgs.ghc; };
 
+  leiosDocs = stdenv.mkDerivation {
+    inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
+    pname = "leios-docs";
+    version = "0.1";
+    src = ../formal-spec;
+    meta = { };
+    buildInputs = [ (agdaWithPkgs deps) pandoc ];
+    buildPhase = ''
+      agda --html --html-highlight=auto Everything.agda
+      pandoc -s -c Agda.css html/Leios.Short.md -o html/Leios.Short.html
+    '';
+    installPhase = ''
+      mkdir "$out"
+      cp -r html "$out"
+    '';
+  };
+
 in
 {
   inherit agdaStdlib agdaStdlibClasses agdaStdlibMeta agdaSets agdaIOGPrelude ;
   agdaWithDeps = agdaWithPkgs deps;
   leiosSpec = leiosSpec;
+  leiosDocs = leiosDocs;
 }
