@@ -1,19 +1,24 @@
 ## Short-Pipeline Leios
+
 <!--
 ```agda
 {-# OPTIONS --safe #-}
-```
--->
-```agda
 open import Leios.Prelude hiding (id)
 open import Leios.FFD
 open import Leios.SpecStructure
 open import Data.Fin.Patterns
+open import Class.ToBool
 
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
+
+module Leios.Short (⋯ : SpecStructure 1)
+  (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified')) where
 ```
-Uniform Short Pipeline:
+-->
+
+This document is a specification of Short-Pipeline Leios, usually
+abbreviated as Short Leios. On a high level, the pipeline looks like this:
 
 1. If elected, propose IB
 2. Wait
@@ -21,22 +26,30 @@ Uniform Short Pipeline:
 4. If elected, propose EB
 5. If elected, vote
    If elected, propose RB
-```agda
-module Leios.Short (⋯ : SpecStructure 1)
-  (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified')) where
-```
+
+### Upkeep
+
+A node that never produces a block even though it could is not
+supposed to be an honest node, and we prevent that by tracking whether
+a node has checked if it can make a block in a particular slot.
+`LeiosState` contains a set of `SlotUpkeep` and we ensure that this
+set contains all elements before we can advance to the next slot,
+resetting this field to the empty set.
+
 ```agda
 data SlotUpkeep : Type where
   Base IB-Role EB-Role VT-Role : SlotUpkeep
-
-unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
 ```
+<!--
 ```agda
+unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
+
 open import Leios.Protocol (⋯) SlotUpkeep public
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
-
+```
+```agda
 isVoteCertified : LeiosState → EndorserBlock → Type
 isVoteCertified s eb = isVoteCertified' (LeiosState.votingState s) (0F , eb)
 ```
@@ -54,10 +67,25 @@ private variable s s'   : LeiosState
                  SD     : StakeDistr
                  pks    : List PubKey
 ```
+-->
+
+### Block/Vote production rules
+
+We now define the rules for block production given by the relation `_↝_`. These are split in two:
+
+1. Positive rules, when we do need to create a block.
+2. Negative rules, when we cannot create a block.
+
+The purpose of the negative rules is to properly adjust the upkeep if
+we cannot make a block.
+
+Note that `_↝_`, starting with an empty upkeep can always make exactly
+three steps corresponding to the three types of Leios specific blocks.
+
 ```agda
 data _↝_ : LeiosState → LeiosState → Type where
 ```
-#### Block/Vote production rules
+#### Positive rules
 ```agda
   IB-Role : let open LeiosState s renaming (FFDState to ffds)
                 b = ibBody (record { txs = ToPropose })
@@ -91,7 +119,7 @@ data _↝_ : LeiosState → LeiosState → Type where
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } VT-Role
 ```
-#### Negative Block/Vote production rules
+#### Negative rules
 ```agda
   No-IB-Role : let open LeiosState s in
              ∙ needsUpkeep IB-Role
