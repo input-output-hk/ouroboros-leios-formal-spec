@@ -36,6 +36,7 @@ record BaseAbstract : Type₁ where
           _-⟦_/_⟧⇀_ : State → Input → Output → State → Type
           ⦃ Dec-_-⟦_/_⟧⇀_ ⦄ : {s : State} → {i : Input} → {o : Output} → {s' : State} → (s -⟦ i / o ⟧⇀ s') ⁇
           SUBMIT-total : ∀ {s b} → ∃[ s' ] s -⟦ SUBMIT b / EMPTY ⟧⇀ s'
+          FTCH-total : ∀ {s} → ∃[ r ] (∃[ s' ] (s -⟦ FTCH-LDG / BASE-LDG r ⟧⇀ s'))
 
     open Input public
     open Output public

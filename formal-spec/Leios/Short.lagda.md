@@ -43,7 +43,6 @@ isVoteCertified s eb = isVoteCertified' (LeiosState.votingState s) (0F , eb)
 ```agda
 private variable s s'   : LeiosState
                  ffds'  : FFD.State
-                 π      : VrfPf
                  bs'    : B.State
                  ks ks' : K.State
                  msgs   : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract)
@@ -61,6 +60,7 @@ data _↝_ : LeiosState → LeiosState → Type where
 ```agda
   IB-Role : let open LeiosState s renaming (FFDState to ffds)
                 b = ibBody (record { txs = ToPropose })
+                π = proj₂ (eval sk-IB (genIBInput slot))
                 h = ibHeader (mkIBHeader slot id π sk-IB ToPropose)
           in
           ∙ needsUpkeep IB-Role
@@ -72,6 +72,7 @@ data _↝_ : LeiosState → LeiosState → Type where
 ```agda
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
                 LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
+                π = proj₂ (eval sk-EB (genEBInput slot))
                 h = mkEB slot id π sk-EB LI []
           in
           ∙ needsUpkeep EB-Role
