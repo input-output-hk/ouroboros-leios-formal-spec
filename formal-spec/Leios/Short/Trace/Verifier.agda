@@ -93,9 +93,10 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
                   ValidAction No-VT-Role-Action s SLOT
 
   Slot : let open LeiosState s renaming (FFDState to ffds; BaseState to bs)
+             (res , (bs' , _))    = B.FTCH-total {bs}
              (msgs , (ffds' , _)) = FFD.Fetch-total {ffds}
          in .(allDone s) →
-            .(bs B.-⟦ B.FTCH-LDG / B.BASE-LDG [] ⟧⇀ tt) →
+            .(bs B.-⟦ B.FTCH-LDG / B.BASE-LDG res ⟧⇀ bs') →
             .(ffds FFD.-⟦ FFD.Fetch / FFD.FetchRes msgs ⟧⇀ ffds') →
             ValidAction (Slot-Action slot) s SLOT
 
@@ -142,21 +143,26 @@ private variable
 ⟦ No-EB-Role {s} _ _ ⟧ = addUpkeep s EB-Role , EMPTY
 ⟦ No-VT-Role {s} _ _ ⟧ = addUpkeep s VT-Role , EMPTY
 ⟦ Slot {s} _ _ _ ⟧ =
-  let open LeiosState s renaming (FFDState to ffds)
+  let open LeiosState s renaming (FFDState to ffds; BaseState to bs)
+      (res , (bs' , _))    = B.FTCH-total {bs}
       (msgs , (ffds' , _)) = FFD.Fetch-total {ffds}
   in
   (record s
      { FFDState  = ffds'
-     ; BaseState = tt
-     ; Ledger    = constructLedger []
+     ; BaseState = bs'
+     ; Ledger    = constructLedger res
      ; slot      = suc slot
      ; Upkeep    = ∅
      } ↑ L.filter (isValid? s) msgs
   , EMPTY)
 ⟦ Ftch {s} ⟧ = s , FTCH-LDG (LeiosState.Ledger s)
 ⟦ Base₁ {s} {txs} ⟧ = record s { ToPropose = txs } , EMPTY
-⟦ Base₂a {s} _ _ _ ⟧ = addUpkeep record s { BaseState = tt } Base , EMPTY
-⟦ Base₂b {s} _ _ _ ⟧ = addUpkeep record s { BaseState = tt } Base , EMPTY
+⟦ Base₂a {s} {eb} _ _ _ ⟧ =
+  let (bs' , _) = B.SUBMIT-total {LeiosState.BaseState s} {this eb}
+  in addUpkeep record s { BaseState = bs' } Base , EMPTY
+⟦ Base₂b {s} _ _ _ ⟧ =
+  let (bs' , _) = B.SUBMIT-total {LeiosState.BaseState s} {that (LeiosState.ToPropose s)}
+  in addUpkeep record s { BaseState = bs' } Base , EMPTY
 
 open LeiosState
 open FFDBuffers
