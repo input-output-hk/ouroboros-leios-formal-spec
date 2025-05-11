@@ -12,7 +12,6 @@ open import Leios.SpecStructure using (SpecStructure)
 open SpecStructure traceSpecStructure hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified) public
 
 open import Leios.Short traceSpecStructure hiding (LeiosState; initLeiosState) public
-open import Prelude.Closures _↝_
 open GenFFD
 
 data FFDUpdate : Type where
@@ -288,113 +287,6 @@ instance
   Dec-ValidUpdate {EB-Recv-Update _} .dec = yes EB-Recv
   Dec-ValidUpdate {VT-Recv-Update _} .dec = yes VT-Recv
 
-mutual
-  data ValidTrace : List ((Action × LeiosInput) ⊎ FFDUpdate) → Type where
-    [] :
-      ─────────────
-      ValidTrace []
-
-    _/_∷_⊣_ : ∀ α i {αs} →
-      ∀ (tr : ValidTrace αs) →
-      ∙ ValidAction α (proj₁ ⟦ tr ⟧∗) i
-        ───────────────────
-        ValidTrace (inj₁ (α , i) ∷ αs)
-
-    _↥_ : ∀ {f αs} →
-      ∀ (tr : ValidTrace αs) →
-        (vu : ValidUpdate f (proj₁ ⟦ tr ⟧∗)) →
-        ───────────────────
-        ValidTrace (inj₂ f ∷ αs)
-
-
-  ⟦_⟧∗ : ∀ {αs : List ((Action × LeiosInput) ⊎ FFDUpdate)} → ValidTrace αs → LeiosState × LeiosOutput
-  ⟦ [] ⟧∗ = initLeiosState tt stakeDistribution tt pks , EMPTY
-    where pks = L.zip (completeFinL numberOfParties) (L.replicate numberOfParties tt)
-  ⟦ _ / _ ∷ _ ⊣ vα ⟧∗ = ⟦ vα ⟧
-  ⟦ _↥_ {IB-Recv-Update ib} tr vu ⟧∗ =
-    let (s , o) = ⟦ tr ⟧∗
-    in record s { FFDState = record (FFDState s) { inIBs = ib ∷ inIBs (FFDState s)}} , o
-  ⟦ _↥_ {EB-Recv-Update eb} tr vu ⟧∗ =
-    let (s , o) = ⟦ tr ⟧∗
-    in record s { FFDState = record (FFDState s) { inEBs = eb ∷ inEBs (FFDState s)}} , o
-  ⟦ _↥_ {VT-Recv-Update vt} tr vu ⟧∗ =
-    let (s , o) = ⟦ tr ⟧∗
-    in record s { FFDState = record (FFDState s) { inVTs = vt ∷ inVTs (FFDState s)}} , o
-
-Irr-ValidAction : Irrelevant (ValidAction α s i)
-Irr-ValidAction (IB-Role _ _ _) (IB-Role _ _ _)   = refl
-Irr-ValidAction (EB-Role _ _ _) (EB-Role _ _ _)   = refl
-Irr-ValidAction (VT-Role _ _ _) (VT-Role _ _ _)   = refl
-Irr-ValidAction (No-IB-Role _ _) (No-IB-Role _ _) = refl
-Irr-ValidAction (No-EB-Role _ _) (No-EB-Role _ _) = refl
-Irr-ValidAction (No-VT-Role _ _) (No-VT-Role _ _) = refl
-Irr-ValidAction (Slot _ _ _) (Slot _ _ _)         = refl
-Irr-ValidAction Ftch Ftch                         = refl
-Irr-ValidAction Base₁ Base₁                       = refl
-Irr-ValidAction (Base₂a _ _ _) (Base₂a _ _ _)     = refl
-Irr-ValidAction (Base₂b _ _ _) (Base₂b _ _ _)     = refl
-
-Irr-ValidUpdate : ∀ {f} → Irrelevant (ValidUpdate f s)
-Irr-ValidUpdate IB-Recv IB-Recv = refl
-Irr-ValidUpdate EB-Recv EB-Recv = refl
-Irr-ValidUpdate VT-Recv VT-Recv = refl
-
-Irr-ValidTrace : ∀ {αs} → Irrelevant (ValidTrace αs)
-Irr-ValidTrace [] [] = refl
-Irr-ValidTrace (α / i ∷ vαs ⊣ vα) (.α / .i ∷ vαs′ ⊣ vα′)
-  rewrite Irr-ValidTrace vαs vαs′ | Irr-ValidAction vα vα′
-  = refl
-Irr-ValidTrace (vαs ↥ u) (vαs′ ↥ u′)
-  rewrite Irr-ValidTrace vαs vαs′ | Irr-ValidUpdate u u′
-  = refl
-
-instance
-  Dec-ValidTrace : ValidTrace ⁇¹
-  Dec-ValidTrace {tr} .dec with tr
-  ... | [] = yes []
-  ... | inj₁ (α , i) ∷ αs
-    with ¿ ValidTrace αs ¿
-  ... | no ¬vαs = no λ where (_ / _ ∷ vαs ⊣ _) → ¬vαs vαs
-  ... | yes vαs
-    with ¿ ValidAction α (proj₁ ⟦ vαs ⟧∗) i ¿
-  ... | no ¬vα = no λ where
-    (_ / _ ∷ tr ⊣ vα) → ¬vα
-                  $ subst (λ x → ValidAction α x i) (cong (proj₁ ∘ ⟦_⟧∗) $ Irr-ValidTrace tr vαs) vα
-  ... | yes vα = yes $ _ / _ ∷ vαs ⊣ vα
-  Dec-ValidTrace {tr} .dec | inj₂ u ∷ αs
-    with ¿ ValidTrace αs ¿
-  ... | no ¬vαs = no λ where (vαs ↥ _) → ¬vαs vαs
-  ... | yes vαs
-    with ¿ ValidUpdate u (proj₁ ⟦ vαs ⟧∗) ¿
-  ... | yes vu = yes (vαs ↥ vu)
-  ... | no ¬vu = no λ where
-    (tr ↥ vu) → ¬vu $ subst (λ x → ValidUpdate u x) (cong (proj₁ ∘ ⟦_⟧∗) $ Irr-ValidTrace tr vαs) vu
-
-data _⇑_ : LeiosState → LeiosState → Type where
-
-  UpdateIB : ∀ {s ib} → let open LeiosState s renaming (FFDState to ffds) in
-    s ⇑ record s { FFDState = record ffds { inIBs = ib ∷ inIBs ffds } }
-
-  UpdateEB : ∀ {s eb} → let open LeiosState s renaming (FFDState to ffds) in
-    s ⇑ record s { FFDState = record ffds { inEBs = eb ∷ inEBs ffds } }
-
-  UpdateVT : ∀ {s vt} → let open LeiosState s renaming (FFDState to ffds) in
-    s ⇑ record s { FFDState = record ffds { inVTs = vt ∷ inVTs ffds } }
-
-data LocalStep : LeiosState → LeiosState → Type where
-
-  StateStep : ∀ {s i o s′} →
-    ∙ just s -⟦ i / o ⟧⇀ s′
-      ───────────────────
-      LocalStep s s′
-
-  UpdateState : ∀ {s s′} →
-    ∙ s ⇑ s′
-      ───────────────────
-      LocalStep s s′
-
-  -- TODO: add base layer update
-
 getLabel : just s -⟦ i / o ⟧⇀ s′ → Action
 getLabel (Slot {s} _ _ _)            = Slot-Action (slot s)
 getLabel Ftch                        = Ftch-Action
@@ -445,3 +337,84 @@ ValidAction-complete Base₁                     = Base₁
 ValidAction-complete (Base₂a x x₁ x₂)          = Base₂a x x₁ x₂
 ValidAction-complete (Base₂b x x₁ x₂)          = Base₂b x x₁ x₂
 ValidAction-complete {s} (Slot x x₁ _)         = Slot x x₁ (proj₂ (proj₂ (FFD.Fetch-total {FFDState s})))
+
+data _⇑_ : LeiosState → LeiosState → Type where
+
+  UpdateIB : ∀ {s ib} → let open LeiosState s renaming (FFDState to ffds) in
+    s ⇑ record s { FFDState = record ffds { inIBs = ib ∷ inIBs ffds } }
+
+  UpdateEB : ∀ {s eb} → let open LeiosState s renaming (FFDState to ffds) in
+    s ⇑ record s { FFDState = record ffds { inEBs = eb ∷ inEBs ffds } }
+
+  UpdateVT : ∀ {s vt} → let open LeiosState s renaming (FFDState to ffds) in
+    s ⇑ record s { FFDState = record ffds { inVTs = vt ∷ inVTs ffds } }
+
+data _—→_ : LeiosState → LeiosState → Type where
+
+  StateStep : ∀ {s i o s′} →
+    ∙ just s -⟦ i / o ⟧⇀ s′
+      ───────────────────
+      s′ —→ s
+
+  UpdateStep : ∀ {s s′} →
+    ∙ s ⇑ s′
+      ───────────────────
+      s′ —→ s
+
+  -- TODO: add base layer update
+
+open import Prelude.Closures _—→_
+
+TestTrace = List ((Action × LeiosInput) ⊎ FFDUpdate)
+
+infix 0 _≈_
+
+ValidUpdate-sound : ∀ {μ} → ValidUpdate μ s → ∃[ s′ ](s ⇑ s′)
+ValidUpdate-sound {s} (IB-Recv {ib = ib}) = record s { FFDState = record (FFDState s) { inIBs = ib ∷ inIBs (FFDState s)}} , UpdateIB
+ValidUpdate-sound {s} (EB-Recv {eb = eb}) = record s { FFDState = record (FFDState s) { inEBs = eb ∷ inEBs (FFDState s)}} , UpdateEB
+ValidUpdate-sound {s} (VT-Recv {vt = vt}) = record s { FFDState = record (FFDState s) { inVTs = vt ∷ inVTs (FFDState s)}} , UpdateVT
+
+data _≈_ : TestTrace → s′ —↠ s → Type where
+
+  Step :
+    ∀ α i {αs s₁} {tr : s₁ —↠ s}
+      → αs ≈ tr
+      → (vα : ValidAction α s₁ i)
+      → inj₁ (α , i) ∷ αs ≈ ⟦ vα ⟧ .proj₁ —→⟨ StateStep (ValidAction-sound vα) ⟩ tr
+
+  Update :
+    ∀ {s} μ {αs s₁} {tr : s₁ —↠ s}
+      → αs ≈ tr
+      → (vμ : ValidUpdate μ s₁)
+      → inj₂ μ ∷ αs ≈ ValidUpdate-sound vμ .proj₁ —→⟨ UpdateStep (proj₂ (ValidUpdate-sound vμ)) ⟩ tr
+
+  Done : [] ≈ s ∎
+
+data ValidTrace (es : TestTrace) (s : LeiosState) : Type where
+  Valid : (tr : s′ —↠ s) → es ≈ tr → ValidTrace es s
+
+data Result (E A : Type) : Type where
+  Ok  : A → Result E A
+  Err : E → Result E A
+
+verifyTrace : ∀ (αs : TestTrace)
+              → (s : LeiosState)
+              → Result String -- TODO: (Err-verifyTrace es s)
+                       (ValidTrace αs s)
+verifyTrace [] s = Ok (Valid (s ∎) Done)
+verifyTrace (inj₁ (α , i) ∷ αs) s
+  with verifyTrace αs s
+... | Err e = Err e
+... | Ok (Valid {s′} tr eq)
+  with ¿ ValidAction α s′ i ¿
+... | no ¬p = Err "Action not valid"
+... | yes p =
+  Ok (Valid {s′ = ⟦ p ⟧ .proj₁} (⟦ p ⟧ .proj₁ —→⟨ StateStep (ValidAction-sound p) ⟩ tr ) (Step α i eq p))
+verifyTrace (inj₂ μ ∷ αs) s
+  with verifyTrace αs s
+... | Err e = Err e
+... | Ok (Valid {s′} tr eq)
+  with ¿ ValidUpdate μ s′ ¿
+... | no ¬p = Err "Update not valid"
+... | yes p =
+  Ok (Valid (ValidUpdate-sound p .proj₁ —→⟨ UpdateStep (ValidUpdate-sound p .proj₂) ⟩ tr) (Update μ eq p))
