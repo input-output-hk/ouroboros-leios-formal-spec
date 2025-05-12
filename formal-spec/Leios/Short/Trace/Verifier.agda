@@ -178,12 +178,6 @@ ValidAction→Eq-EB (EB-Role _ _ _) = refl , refl
 ValidAction→Eq-VT : ∀ {s sl} → ValidAction (VT-Role-Action sl) s SLOT → sl ≡ slot s
 ValidAction→Eq-VT (VT-Role _ _ _) = refl
 
-instance
-  Dec-ValidUpdate : ValidUpdate ⁇²
-  Dec-ValidUpdate {IB-Recv-Update _} .dec = yes IB-Recv
-  Dec-ValidUpdate {EB-Recv-Update _} .dec = yes EB-Recv
-  Dec-ValidUpdate {VT-Recv-Update _} .dec = yes VT-Recv
-
 getLabel : just s -⟦ i / o ⟧⇀ s′ → Action
 getLabel (Slot {s} _ _ _)            = Slot-Action (slot s)
 getLabel Ftch                        = Ftch-Action
