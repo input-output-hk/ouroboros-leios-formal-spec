@@ -238,13 +238,17 @@ ValidAction-complete {s} (Slot x x₁ _)         = Slot x x₁ (proj₂ (proj₂
 private variable
   A B E E₁ : Type
 
-data Result {ℓ} (E A : Type ℓ) : Type ℓ where
+data Result (E A : Type) : Type where
   Ok  : A → Result E A
   Err : E → Result E A
 
 mapErr : (E → E₁) → Result E A → Result E₁ A
 mapErr f (Ok x)  = Ok x
 mapErr f (Err e) = Err (f e)
+
+IsOk : Result E A → Type
+IsOk (Ok _)  = ⊤
+IsOk (Err _) = ⊥
 
 data Err-verifyAction (α : Action) (i : LeiosInput) (s : LeiosState) : Type where
   E-Err : ¬ ValidAction α s i → Err-verifyAction α i s
