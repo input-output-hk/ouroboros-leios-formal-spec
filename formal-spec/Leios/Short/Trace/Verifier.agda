@@ -20,32 +20,34 @@ data FFDUpdate : Type where
   VT-Recv-Update : List Vote → FFDUpdate
 
 data Action : Type where
-  IB-Role-Action : ℕ → Action
-  EB-Role-Action : ℕ → List IBRef → Action
-  VT-Role-Action : ℕ → Action
-  No-IB-Role-Action No-EB-Role-Action No-VT-Role-Action : Action
-  Ftch-Action : Action
-  Slot-Action : ℕ → Action
-  Base₁-Action : Action
-  Base₂a-Action : EndorserBlock → Action
-  Base₂b-Action : Action
+  IB-Role-Action    : ℕ → Action
+  EB-Role-Action    : ℕ → List IBRef → Action
+  VT-Role-Action    : ℕ → Action
+  No-IB-Role-Action : Action
+  No-EB-Role-Action : Action
+  No-VT-Role-Action : Action
+  Ftch-Action       : Action
+  Slot-Action       : ℕ → Action
+  Base₁-Action      : Action
+  Base₂a-Action     : EndorserBlock → Action
+  Base₂b-Action     : Action
 
-Actions = List (Action × LeiosInput)
+TestTrace = List ((Action × LeiosInput) ⊎ FFDUpdate)
 
 private variable
   s s′ : LeiosState
-  α : Action
+  α    : Action
+  αs   : TestTrace
+  μ    : FFDUpdate
+  μs   : List FFDUpdate
+  ib   : InputBlock
+  eb   : EndorserBlock
+  vt   : List Vote
 
 data ValidUpdate : FFDUpdate → LeiosState → Type where
-
-  IB-Recv : ∀ {ib} →
-    ValidUpdate (IB-Recv-Update ib) s
-
-  EB-Recv : ∀ {eb} →
-    ValidUpdate (EB-Recv-Update eb) s
-
-  VT-Recv : ∀ {vt} →
-    ValidUpdate (VT-Recv-Update vt) s
+  IB-Recv : ValidUpdate (IB-Recv-Update ib) s
+  EB-Recv : ValidUpdate (EB-Recv-Update eb) s
+  VT-Recv : ValidUpdate (VT-Recv-Update vt) s
 
 data ValidAction : Action → LeiosState → LeiosInput → Type where
 
@@ -229,6 +231,7 @@ ValidAction-complete (Base₂a x x₁ x₂)          = Base₂a x x₁ x₂
 ValidAction-complete (Base₂b x x₁ x₂)          = Base₂b x x₁ x₂
 ValidAction-complete {s} (Slot x x₁ _)         = Slot x x₁ (proj₂ (proj₂ (FFD.Fetch-total {FFDState s})))
 
+-- TODO: Use Result type from Prelude
 private variable
   A B E E₁ : Type
 
@@ -383,16 +386,14 @@ data _—→_ : LeiosState → LeiosState → Type where
 
   -- TODO: add base layer update
 
-open import Prelude.Closures _—→_
-
-TestTrace = List ((Action × LeiosInput) ⊎ FFDUpdate)
-
-infix 0 _≈_
-
 ValidUpdate-sound : ∀ {μ} → ValidUpdate μ s → ∃[ s′ ](s ⇑ s′)
 ValidUpdate-sound {s} (IB-Recv {ib = ib}) = record s { FFDState = record (FFDState s) { inIBs = ib ∷ inIBs (FFDState s)}} , UpdateIB
 ValidUpdate-sound {s} (EB-Recv {eb = eb}) = record s { FFDState = record (FFDState s) { inEBs = eb ∷ inEBs (FFDState s)}} , UpdateEB
 ValidUpdate-sound {s} (VT-Recv {vt = vt}) = record s { FFDState = record (FFDState s) { inVTs = vt ∷ inVTs (FFDState s)}} , UpdateVT
+
+open import Prelude.Closures _—→_
+
+infix 0 _≈_
 
 data _≈_ : TestTrace → s′ —↠ s → Type where
 
@@ -413,11 +414,11 @@ data _≈_ : TestTrace → s′ —↠ s → Type where
 data ValidTrace (es : TestTrace) (s : LeiosState) : Type where
   Valid : (tr : s′ —↠ s) → es ≈ tr → ValidTrace es s
 
-data Err-verifyTrace : (αs : TestTrace) → (s : LeiosState) → Type where
-  Err-StepOk : ∀ {α αs s i} → Err-verifyTrace αs s → Err-verifyTrace (inj₁ (α , i) ∷ αs) s
-  Err-UpdateOk : ∀ {μ αs s} → Err-verifyTrace αs s → Err-verifyTrace (inj₂ μ ∷ αs) s
-  Err-Action : ∀ {α i s s′ αs} → Err-verifyAction α i s′ → Err-verifyTrace (inj₁ (α , i) ∷ αs) s
-  Err-Update : ∀ {μ s s′ αs} → Err-verifyUpdate μ s′ → Err-verifyTrace (inj₂ μ ∷ αs) s
+data Err-verifyTrace : TestTrace → LeiosState → Type where
+  Err-StepOk   : Err-verifyTrace αs s → Err-verifyTrace (inj₁ (α , i) ∷ αs) s
+  Err-UpdateOk : Err-verifyTrace αs s → Err-verifyTrace (inj₂ μ ∷ αs) s
+  Err-Action   : Err-verifyAction α i s′ → Err-verifyTrace (inj₁ (α , i) ∷ αs) s
+  Err-Update   : Err-verifyUpdate μ s′ → Err-verifyTrace (inj₂ μ ∷ αs) s
 
 verifyTrace : ∀ (αs : TestTrace) → (s : LeiosState) → Result (Err-verifyTrace αs s) (ValidTrace αs s)
 verifyTrace [] s = Ok (Valid (s ∎) Done)
@@ -426,7 +427,7 @@ verifyTrace (inj₁ (α , i) ∷ αs) s
 ... | Err e = mapErr Err-StepOk (Err e)
 ... | Ok (Valid {s′} tr eq)
   with verifyAction α i s′
-... | Err ¬p = mapErr Err-Action (Err ¬p)
+... | Err e = mapErr Err-Action (Err e)
 ... | Ok p = Ok (Valid {s′ = ⟦ p ⟧ .proj₁} (⟦ p ⟧ .proj₁ —→⟨ StateStep (ValidAction-sound p) ⟩ tr ) (Step α i eq p))
 verifyTrace (inj₂ μ ∷ αs) s
   with verifyTrace αs s
