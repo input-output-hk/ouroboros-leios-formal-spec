@@ -55,8 +55,7 @@ private
     _ : test-valid-ib ≡ true
     _ = refl
 
-    test₂ :
-      let t = L.reverse $
+    test₂ : IsOk (verifyTrace (L.reverse $
             -- slot 0
               inj₁ (IB-Role-Action 0    , SLOT)
             ∷ inj₁ (EB-Role-Action 0 [] , SLOT)
@@ -125,6 +124,5 @@ private
             ∷ inj₁ (VT-Role-Action 8    , SLOT)
             ∷ inj₁ (Base₂b-Action       , SLOT)
             ∷ inj₁ (Slot-Action    8    , SLOT)
-            ∷ []
-      in IsOk (verifyTrace t s₀)
+            ∷ []) s₀)
     test₂ = _
