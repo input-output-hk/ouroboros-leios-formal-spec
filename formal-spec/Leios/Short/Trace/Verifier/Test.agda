@@ -32,11 +32,11 @@ private
   opaque
     unfolding List-Model
 
-    test₁ : Bool
-    test₁ = ¿ ValidTrace (inj₁ (IB-Role-Action 0 , SLOT) ∷ []) ¿ᵇ
+    s₀ : LeiosState
+    s₀ = initLeiosState tt stakeDistribution tt ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
 
-    _ : test₁ ≡ true
-    _ = refl
+    test₁ : IsOk (verifyTrace (inj₁ (IB-Role-Action 0 , SLOT) ∷ []) s₀)
+    test₁ = _
 
     test-valid-ib : Bool
     test-valid-ib =
@@ -55,9 +55,7 @@ private
     _ : test-valid-ib ≡ true
     _ = refl
 
-    test₂ : Bool
-    test₂ =
-      let t = L.reverse $
+    test₂ : IsOk (verifyTrace (L.reverse $
             -- slot 0
               inj₁ (IB-Role-Action 0    , SLOT)
             ∷ inj₁ (EB-Role-Action 0 [] , SLOT)
@@ -126,8 +124,5 @@ private
             ∷ inj₁ (VT-Role-Action 8    , SLOT)
             ∷ inj₁ (Base₂b-Action       , SLOT)
             ∷ inj₁ (Slot-Action    8    , SLOT)
-            ∷ []
-      in ¿ ValidTrace t ¿ᵇ
-
-    _ : test₂ ≡ true
-    _ = refl
+            ∷ []) s₀)
+    test₂ = _
