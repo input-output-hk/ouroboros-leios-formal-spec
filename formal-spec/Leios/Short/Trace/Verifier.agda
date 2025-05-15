@@ -23,14 +23,14 @@ data Action : Type where
   IB-Role-Action    : ℕ → Action
   EB-Role-Action    : ℕ → List IBRef → Action
   VT-Role-Action    : ℕ → Action
-  No-IB-Role-Action : Action
-  No-EB-Role-Action : Action
-  No-VT-Role-Action : Action
-  Ftch-Action       : Action
+  No-IB-Role-Action : ℕ → Action
+  No-EB-Role-Action : ℕ → Action
+  No-VT-Role-Action : ℕ → Action
+  Ftch-Action       : ℕ → Action
   Slot-Action       : ℕ → Action
-  Base₁-Action      : Action
-  Base₂a-Action     : EndorserBlock → Action
-  Base₂b-Action     : Action
+  Base₁-Action      : ℕ → Action
+  Base₂a-Action     : ℕ → EndorserBlock → Action
+  Base₂b-Action     : ℕ → Action
 
 TestTrace = List ((Action × LeiosInput) ⊎ FFDUpdate)
 
@@ -81,17 +81,17 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
   No-IB-Role : let open LeiosState s
                in needsUpkeep IB-Role →
                   (∀ π → ¬ canProduceIB slot sk-IB (stake s) π) →
-                  ValidAction No-IB-Role-Action s SLOT
+                  ValidAction (No-IB-Role-Action slot) s SLOT
 
   No-EB-Role : let open LeiosState s
                in needsUpkeep EB-Role →
                   (∀ π → ¬ canProduceEB slot sk-EB (stake s) π) →
-                  ValidAction No-EB-Role-Action s SLOT
+                  ValidAction (No-EB-Role-Action slot) s SLOT
 
   No-VT-Role : let open LeiosState s
                in needsUpkeep VT-Role →
                   (¬ canProduceV slot sk-VT (stake s)) →
-                  ValidAction No-VT-Role-Action s SLOT
+                  ValidAction (No-VT-Role-Action slot) s SLOT
 
   Slot : let open LeiosState s renaming (FFDState to ffds; BaseState to bs)
              (res , (bs' , _))    = B.FTCH-total {bs}
@@ -101,21 +101,21 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
             .(ffds FFD.-⟦ FFD.Fetch / FFD.FetchRes msgs ⟧⇀ ffds') →
             ValidAction (Slot-Action slot) s SLOT
 
-  Ftch : ValidAction Ftch-Action s FTCH-LDG
+  Ftch : ValidAction (Ftch-Action (LeiosState.slot s)) s FTCH-LDG
 
-  Base₁ : ∀ {txs} → ValidAction Base₁-Action s (SUBMIT (inj₂ txs))
+  Base₁ : ∀ {txs} → ValidAction (Base₁-Action (LeiosState.slot s)) s (SUBMIT (inj₂ txs))
 
   Base₂a : ∀ {eb} → let open LeiosState s renaming (BaseState to bs)
            in .(needsUpkeep Base) →
               .(eb ∈ filter (λ eb → isVoteCertified s eb × eb ∈ᴮ slice L slot 2) EBs) →
               .(bs B.-⟦ B.SUBMIT (this eb) / B.EMPTY ⟧⇀ tt) →
-              ValidAction (Base₂a-Action eb) s SLOT
+              ValidAction (Base₂a-Action slot eb) s SLOT
 
   Base₂b : let open LeiosState s renaming (BaseState to bs)
            in .(needsUpkeep Base) →
               .([] ≡ filter (λ eb → isVoteCertified s eb × eb ∈ᴮ slice L slot 2) EBs) →
               .(bs B.-⟦ B.SUBMIT (that ToPropose) / B.EMPTY ⟧⇀ tt) →
-              ValidAction Base₂b-Action s SLOT
+              ValidAction (Base₂b-Action slot) s SLOT
 
 private variable
   i : LeiosInput
@@ -181,17 +181,17 @@ ValidAction→Eq-VT : ∀ {s sl} → ValidAction (VT-Role-Action sl) s SLOT → 
 ValidAction→Eq-VT (VT-Role _ _ _) = refl
 
 getLabel : just s -⟦ i / o ⟧⇀ s′ → Action
-getLabel (Slot {s} _ _ _)            = Slot-Action (slot s)
-getLabel Ftch                        = Ftch-Action
-getLabel Base₁                       = Base₁-Action
-getLabel (Base₂a {s} {eb} _ _ _)     = Base₂a-Action eb
-getLabel (Base₂b _ _ _)              = Base₂b-Action
-getLabel (Roles (IB-Role {s} _ _ _)) = IB-Role-Action (slot s)
-getLabel (Roles (EB-Role {s} _ _ _)) = EB-Role-Action (slot s) (map getIBRef $ filter (_∈ᴮ slice L (slot s) 3) (IBs s))
-getLabel (Roles (VT-Role {s} _ _ _)) = VT-Role-Action (slot s)
-getLabel (Roles (No-IB-Role _ _))    = No-IB-Role-Action
-getLabel (Roles (No-EB-Role _ _))    = No-EB-Role-Action
-getLabel (Roles (No-VT-Role _ _))    = No-VT-Role-Action
+getLabel (Slot {s} _ _ _)             = Slot-Action (slot s)
+getLabel (Ftch {s})                   = Ftch-Action (slot s)
+getLabel (Base₁ {s})                  = Base₁-Action (slot s)
+getLabel (Base₂a {s} {eb} _ _ _)      = Base₂a-Action (slot s) eb
+getLabel (Base₂b {s} _ _ _)           = Base₂b-Action (slot s)
+getLabel (Roles (IB-Role {s} _ _ _))  = IB-Role-Action (slot s)
+getLabel (Roles (EB-Role {s} _ _ _))  = EB-Role-Action (slot s) (map getIBRef $ filter (_∈ᴮ slice L (slot s) 3) (IBs s))
+getLabel (Roles (VT-Role {s} _ _ _))  = VT-Role-Action (slot s)
+getLabel (Roles (No-IB-Role {s} _ _)) = No-IB-Role-Action (slot s)
+getLabel (Roles (No-EB-Role {s} _ _)) = No-EB-Role-Action (slot s)
+getLabel (Roles (No-VT-Role {s} _ _)) = No-VT-Role-Action (slot s)
 
 ValidAction-sound : (vα : ValidAction α s i) → let (s′ , o) = ⟦ vα ⟧ in just s -⟦ i / o ⟧⇀ s′
 ValidAction-sound (Slot x x₁ x₂)    = Slot {rbs = []} (recompute dec x) (recompute dec x₁) (recompute dec x₂)
@@ -251,8 +251,8 @@ data Err-verifyAction (α : Action) (i : LeiosInput) (s : LeiosState) : Type whe
   E-Err : ¬ ValidAction α s i → Err-verifyAction α i s
 
 verifyAction : ∀ (α : Action) → (i : LeiosInput) → (s : LeiosState) → Result (Err-verifyAction α i s) (ValidAction α s i)
-verifyAction (IB-Role-Action x) (INIT x₁) s = Err (E-Err λ ())
-verifyAction (IB-Role-Action x) (SUBMIT x₁) s = Err (E-Err λ ())
+verifyAction (IB-Role-Action _) (INIT _) _ = Err (E-Err λ ())
+verifyAction (IB-Role-Action _) (SUBMIT _) _ = Err (E-Err λ ())
 verifyAction (IB-Role-Action sl) SLOT s
   with sl ≟ slot s
 ... | no ¬p = Err (E-Err λ x → ⊥-elim (¬p (ValidAction→Eq-IB x)))
@@ -262,9 +262,9 @@ verifyAction (IB-Role-Action sl) SLOT s
 ... | no ¬p | _ | _ = Err (E-Err λ where (IB-Role p _ _) → ⊥-elim (¬p (recompute dec p)))
 ... | _ | no ¬p | _ = Err (E-Err λ where (IB-Role _ p _) → ⊥-elim (¬p (recompute dec p)))
 ... | _ | _ | no ¬p = Err (E-Err λ where (IB-Role _ _ p) → ⊥-elim (¬p (recompute dec p)))
-verifyAction (IB-Role-Action x) FTCH-LDG s = Err (E-Err λ ())
-verifyAction (EB-Role-Action x x₁) (INIT x₂) s = Err (E-Err λ ())
-verifyAction (EB-Role-Action x x₁) (SUBMIT x₂) s = Err (E-Err λ ())
+verifyAction (IB-Role-Action _) FTCH-LDG _ = Err (E-Err λ ())
+verifyAction (EB-Role-Action _ _) (INIT _) _ = Err (E-Err λ ())
+verifyAction (EB-Role-Action _ _) (SUBMIT _) _ = Err (E-Err λ ())
 verifyAction (EB-Role-Action sl ibs) SLOT s
   with sl ≟ slot s | ibs ≟ (map getIBRef $ filter (_∈ᴮ slice L (slot s) 3) (IBs s))
 ... | no ¬p | _ = Err (E-Err λ x → ⊥-elim (¬p (proj₁ $ ValidAction→Eq-EB x)))
@@ -275,9 +275,9 @@ verifyAction (EB-Role-Action sl ibs) SLOT s
 ... | no ¬p | _ | _ = Err (E-Err λ where (EB-Role p _ _) → ⊥-elim (¬p (recompute dec p)))
 ... | _ | no ¬p | _ = Err (E-Err λ where (EB-Role _ p _) → ⊥-elim (¬p (recompute dec p)))
 ... | _ | _ | no ¬p = Err (E-Err λ where (EB-Role _ _ p) → ⊥-elim (¬p (recompute dec p)))
-verifyAction (EB-Role-Action x x₁) FTCH-LDG s = Err (E-Err λ ())
-verifyAction (VT-Role-Action x) (INIT x₁) s = Err (E-Err λ ())
-verifyAction (VT-Role-Action x) (SUBMIT x₁) s = Err (E-Err λ ())
+verifyAction (EB-Role-Action _ _) FTCH-LDG _ = Err (E-Err λ ())
+verifyAction (VT-Role-Action _) (INIT _) _ = Err (E-Err λ ())
+verifyAction (VT-Role-Action _) (SUBMIT _) _ = Err (E-Err λ ())
 verifyAction (VT-Role-Action sl) SLOT s
   with sl ≟ slot s
 ... | no ¬p = Err (E-Err λ x → ⊥-elim (¬p (ValidAction→Eq-VT x)))
@@ -287,37 +287,61 @@ verifyAction (VT-Role-Action sl) SLOT s
 ... | no ¬p | _ | _ = Err (E-Err λ where (VT-Role p _ _) → ⊥-elim (¬p (recompute dec p)))
 ... | _ | no ¬p | _ = Err (E-Err λ where (VT-Role _ p _) → ⊥-elim (¬p (recompute dec p)))
 ... | _ | _ | no ¬p = Err (E-Err λ where (VT-Role _ _ p) → ⊥-elim (¬p (recompute dec p)))
-verifyAction (VT-Role-Action x) FTCH-LDG s = Err (E-Err λ ())
-verifyAction No-IB-Role-Action (INIT x) s = Err (E-Err λ ())
-verifyAction No-IB-Role-Action (SUBMIT x) s = Err (E-Err λ ())
-verifyAction No-IB-Role-Action SLOT s
+verifyAction (VT-Role-Action _) FTCH-LDG _ = Err (E-Err λ ())
+verifyAction (No-IB-Role-Action _) (INIT _) _ = Err (E-Err λ ())
+verifyAction (No-IB-Role-Action _) (SUBMIT _) _ = Err (E-Err λ ())
+verifyAction (No-IB-Role-Action sl) SLOT s
+  with sl ≟ slot s
+... | no ¬p = Err (E-Err λ x → ⊥-elim (¬p (sl≡slot x)))
+  where
+    sl≡slot : ∀ {s sl} → ValidAction (No-IB-Role-Action sl) s SLOT → sl ≡ slot s
+    sl≡slot (No-IB-Role _ _) = refl
+... | yes p rewrite p
   with dec | dec
 ... | yes p | yes q = Ok (No-IB-Role p q)
 ... | no ¬p | _ = Err (E-Err λ where (No-IB-Role p _) → ⊥-elim (¬p p))
 ... | _ | no ¬q = Err (E-Err λ where (No-IB-Role _ q) → ⊥-elim (¬q q))
-verifyAction No-IB-Role-Action FTCH-LDG s = Err (E-Err λ ())
-verifyAction No-EB-Role-Action (INIT x) s = Err (E-Err λ ())
-verifyAction No-EB-Role-Action (SUBMIT x) s = Err (E-Err λ ())
-verifyAction No-EB-Role-Action SLOT s
+verifyAction (No-IB-Role-Action _) FTCH-LDG _ = Err (E-Err λ ())
+verifyAction (No-EB-Role-Action _) (INIT _) _ = Err (E-Err λ ())
+verifyAction (No-EB-Role-Action _) (SUBMIT _) _ = Err (E-Err λ ())
+verifyAction (No-EB-Role-Action sl) SLOT s
+  with sl ≟ slot s
+... | no ¬p = Err (E-Err λ x → ⊥-elim (¬p (sl≡slot x)))
+  where
+    sl≡slot : ∀ {s sl} → ValidAction (No-EB-Role-Action sl) s SLOT → sl ≡ slot s
+    sl≡slot (No-EB-Role _ _) = refl
+... | yes p rewrite p
   with dec | dec
 ... | yes p | yes q = Ok (No-EB-Role p q)
 ... | no ¬p | _ = Err (E-Err λ where (No-EB-Role p _) → ⊥-elim (¬p p))
 ... | _ | no ¬q = Err (E-Err λ where (No-EB-Role _ q) → ⊥-elim (¬q q))
-verifyAction No-EB-Role-Action FTCH-LDG s = Err (E-Err λ ())
-verifyAction No-VT-Role-Action (INIT x) s = Err (E-Err λ ())
-verifyAction No-VT-Role-Action (SUBMIT x) s = Err (E-Err λ ())
-verifyAction No-VT-Role-Action SLOT s
+verifyAction (No-EB-Role-Action _) FTCH-LDG _ = Err (E-Err λ ())
+verifyAction (No-VT-Role-Action _) (INIT _) _ = Err (E-Err λ ())
+verifyAction (No-VT-Role-Action _) (SUBMIT _) _ = Err (E-Err λ ())
+verifyAction (No-VT-Role-Action sl) SLOT s
+  with sl ≟ slot s
+... | no ¬p = Err (E-Err λ x → ⊥-elim (¬p (sl≡slot x)))
+  where
+    sl≡slot : ∀ {s sl} → ValidAction (No-VT-Role-Action sl) s SLOT → sl ≡ slot s
+    sl≡slot (No-VT-Role _ _) = refl
+... | yes p rewrite p
   with dec | dec
 ... | yes p | yes q = Ok (No-VT-Role p q)
 ... | no ¬p | _ = Err (E-Err λ where (No-VT-Role p _) → ⊥-elim (¬p p))
 ... | _ | no ¬q = Err (E-Err λ where (No-VT-Role _ q) → ⊥-elim (¬q q))
-verifyAction No-VT-Role-Action FTCH-LDG s = Err (E-Err λ ())
-verifyAction Ftch-Action (INIT x) s = Err (E-Err λ ())
-verifyAction Ftch-Action (SUBMIT x) s = Err (E-Err λ ())
-verifyAction Ftch-Action SLOT s = Err (E-Err λ ())
-verifyAction Ftch-Action FTCH-LDG s = Ok Ftch
-verifyAction (Slot-Action x) (INIT x₁) s = Err (E-Err λ ())
-verifyAction (Slot-Action x) (SUBMIT x₁) s = Err (E-Err λ ())
+verifyAction (No-VT-Role-Action _) FTCH-LDG _ = Err (E-Err λ ())
+verifyAction (Ftch-Action _) (INIT _) _ = Err (E-Err λ ())
+verifyAction (Ftch-Action _) (SUBMIT _) _ = Err (E-Err λ ())
+verifyAction (Ftch-Action _) SLOT _ = Err (E-Err λ ())
+verifyAction (Ftch-Action sl) FTCH-LDG s
+  with sl ≟ slot s
+... | no ¬p = Err (E-Err λ x → ⊥-elim (¬p (sl≡slot x)))
+  where
+    sl≡slot : ∀ {s sl} → ValidAction (Ftch-Action sl) s FTCH-LDG → sl ≡ slot s
+    sl≡slot Ftch = refl
+... | yes p rewrite p = Ok Ftch
+verifyAction (Slot-Action _) (INIT _) _ = Err (E-Err λ ())
+verifyAction (Slot-Action _) (SUBMIT _) _ = Err (E-Err λ ())
 verifyAction (Slot-Action sl) SLOT s
   with sl ≟ slot s
 ... | no ¬p = Err (E-Err λ x → ⊥-elim (¬p (ValidAction→Eq-Slot x)))
@@ -327,30 +351,48 @@ verifyAction (Slot-Action sl) SLOT s
 ... | no ¬p | _ | _ = Err (E-Err λ where (Slot p _ _) → ⊥-elim (¬p (recompute dec p)))
 ... | _ | no ¬p | _ = Err (E-Err λ where (Slot _ p _) → ⊥-elim (¬p (recompute dec p)))
 ... | _ | _ | no ¬p = Err (E-Err λ where (Slot _ _ p) → ⊥-elim (¬p (recompute dec p)))
-verifyAction (Slot-Action x) FTCH-LDG s = Err (E-Err λ ())
-verifyAction Base₁-Action (INIT x) s = Err (E-Err λ ())
-verifyAction Base₁-Action (SUBMIT (inj₁ ebs)) s = Err (E-Err λ ())
-verifyAction Base₁-Action (SUBMIT (inj₂ txs)) s = Ok (Base₁ {s} {txs})
-verifyAction Base₁-Action SLOT s = Err (E-Err λ ())
-verifyAction Base₁-Action FTCH-LDG s = Err (E-Err λ ())
-verifyAction (Base₂a-Action x) (INIT x₁) s = Err (E-Err λ ())
-verifyAction (Base₂a-Action x) (SUBMIT x₁) s = Err (E-Err λ ())
-verifyAction (Base₂a-Action x) SLOT s
+verifyAction (Slot-Action _) FTCH-LDG _ = Err (E-Err λ ())
+verifyAction (Base₁-Action _) (INIT _) _ = Err (E-Err λ ())
+verifyAction (Base₁-Action _) (SUBMIT (inj₁ _)) _ = Err (E-Err λ ())
+verifyAction (Base₁-Action sl) (SUBMIT (inj₂ _)) s
+  with sl ≟ slot s
+... | no ¬p = Err (E-Err λ x → ⊥-elim (¬p (sl≡slot x)))
+  where
+    sl≡slot : ∀ {s sl} → ValidAction (Base₁-Action sl) s (SUBMIT (inj₂ _)) → sl ≡ slot s
+    sl≡slot Base₁ = refl
+... | yes p rewrite p = Ok Base₁
+verifyAction (Base₁-Action _) SLOT _ = Err (E-Err λ ())
+verifyAction (Base₁-Action _) FTCH-LDG _ = Err (E-Err λ ())
+verifyAction (Base₂a-Action _ _) (INIT _) _ = Err (E-Err λ ())
+verifyAction (Base₂a-Action _ _) (SUBMIT _) _ = Err (E-Err λ ())
+verifyAction (Base₂a-Action sl _) SLOT s
+  with sl ≟ slot s
+... | no ¬p = Err (E-Err λ x → ⊥-elim (¬p (sl≡slot x)))
+  where
+    sl≡slot : ∀ {s sl} → ValidAction (Base₂a-Action sl _) s SLOT → sl ≡ slot s
+    sl≡slot (Base₂a _ _ _) = refl
+... | yes p rewrite p
   with dec | dec | dec
 ... | yes x | yes y | yes z = Ok (Base₂a x y z)
 ... | no ¬p | _ | _ = Err (E-Err λ where (Base₂a p _ _) → ⊥-elim (¬p (recompute dec p)))
-... | _ | no ¬p | _ = Err (E-Err λ where (Base₂a {s} {eb} _ p _) → ⊥-elim (¬p (recompute dec p)))
+... | _ | no ¬p | _ = Err (E-Err λ where (Base₂a _ p _) → ⊥-elim (¬p (recompute dec p)))
 ... | _ | _ | no ¬p = Err (E-Err λ where (Base₂a _ _ p) → ⊥-elim (¬p (recompute dec p)))
-verifyAction (Base₂a-Action x) FTCH-LDG s = Err (E-Err λ ())
-verifyAction Base₂b-Action (INIT x) s = Err (E-Err λ ())
-verifyAction Base₂b-Action (SUBMIT x) s = Err (E-Err λ ())
-verifyAction Base₂b-Action SLOT s
+verifyAction (Base₂a-Action _ _) FTCH-LDG _ = Err (E-Err λ ())
+verifyAction (Base₂b-Action _) (INIT _) _ = Err (E-Err λ ())
+verifyAction (Base₂b-Action _) (SUBMIT _) _ = Err (E-Err λ ())
+verifyAction (Base₂b-Action sl) SLOT s
+  with sl ≟ slot s
+... | no ¬p = Err (E-Err λ x → ⊥-elim (¬p (sl≡slot x)))
+  where
+    sl≡slot : ∀ {s sl} → ValidAction (Base₂b-Action sl) s SLOT → sl ≡ slot s
+    sl≡slot (Base₂b _ _ _) = refl
+... | yes p rewrite p
   with dec | dec | dec
 ... | yes x | yes y | yes z = Ok (Base₂b x y z)
 ... | no ¬p | _ | _ = Err (E-Err λ where (Base₂b p _ _) → ⊥-elim (¬p (recompute dec p)))
 ... | _ | no ¬p | _ = Err (E-Err λ where (Base₂b _ p _) → ⊥-elim (¬p (recompute dec p)))
 ... | _ | _ | no ¬p = Err (E-Err λ where (Base₂b _ _ p) → ⊥-elim (¬p (recompute dec p)))
-verifyAction Base₂b-Action FTCH-LDG s = Err (E-Err λ ())
+verifyAction (Base₂b-Action _) FTCH-LDG _ = Err (E-Err λ ())
 
 data Err-verifyUpdate (μ : FFDUpdate) (s : LeiosState) : Type where
   E-Err : ¬ ValidUpdate μ s → Err-verifyUpdate μ s
