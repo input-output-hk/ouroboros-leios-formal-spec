@@ -21,6 +21,14 @@ params =
                               (VT , 6) ∷
         (IB , 7) ∷ (EB , 7) ∷ (VT , 7) ∷
         (IB , 8) ∷ (EB , 8) ∷ (VT , 8) ∷
+        (IB , 101) ∷ (EB , 101) ∷ (VT , 101) ∷
+        (IB , 102) ∷ (EB , 102) ∷ (VT , 102) ∷
+        (IB , 103) ∷ (EB , 103) ∷ (VT , 103) ∷
+        (IB , 104) ∷ (EB , 104) ∷ (VT , 104) ∷
+        (IB , 105) ∷ (EB , 105) ∷ (VT , 105) ∷
+                                  (VT , 106) ∷
+        (IB , 107) ∷ (EB , 107) ∷ (VT , 107) ∷
+        (IB , 108) ∷ (EB , 108) ∷ (VT , 108) ∷
         []
     }
 
@@ -34,7 +42,7 @@ private
     s₀ : LeiosState
     s₀ = initLeiosState tt stakeDistribution tt ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
 
-    test₁ : IsOk (verifyTrace (inj₁ (Slot-Action 0 , SLOT) ∷ inj₁ (Base₂b-Action 0 , SLOT) ∷ []) s₀)
+    test₁ : IsOk (verifyTrace (inj₁ (Slot-Action 0 , SLOT) ∷ inj₁ (Base₂b-Action 0 , SLOT) ∷ inj₁ (No-IB-Role-Action 0 , SLOT) ∷ []) s₀)
     test₁ = _
 
     test-valid-ib : Bool
@@ -54,71 +62,79 @@ private
     _ : test-valid-ib ≡ true
     _ = refl
 
+    -- section of trace, slot 100 - 108
+
+    s₁₀₀ : LeiosState
+    s₁₀₀ = record s₀ { slot = 100 }
+
     test₂ : IsOk (verifyTrace (L.reverse $
-            -- slot 0
-              inj₁ (Base₂b-Action  0    , SLOT)
-            ∷ inj₁ (Slot-Action    0    , SLOT)
-            -- slot 1
-            ∷ inj₁ (IB-Role-Action 1    , SLOT)
-            ∷ inj₁ (VT-Role-Action 1    , SLOT)
-            ∷ inj₁ (Base₂b-Action  1    , SLOT)
-            ∷ inj₁ (Slot-Action    1    , SLOT)
-            -- slot 2
+            -- slot 100
+              inj₁ (No-IB-Role-Action 100 , SLOT)
+            ∷ inj₁ (No-EB-Role-Action 100 , SLOT)
+            ∷ inj₁ (No-VT-Role-Action 100 , SLOT)
+            ∷ inj₁ (Base₂b-Action     100 , SLOT)
+            ∷ inj₁ (Slot-Action       100 , SLOT)
+            -- slot 101
+            ∷ inj₁ (IB-Role-Action 101    , SLOT)
+            ∷ inj₁ (VT-Role-Action 101    , SLOT)
+            ∷ inj₁ (Base₂b-Action  101    , SLOT)
+            ∷ inj₁ (Slot-Action    101    , SLOT)
+            -- slot 102
             ∷ inj₂ (IB-Recv-Update
                 (record { header =
-                  record { slotNumber = 1
+                  record { slotNumber = 101
                          ; producerID = fsuc fzero
                          ; lotteryPf = tt
                          ; bodyHash = 0 ∷ 1 ∷ 2 ∷ []
                          ; signature = tt
                          }
                         ; body = record { txs = 0 ∷ 1 ∷ 2 ∷ [] }}))
-            ∷ inj₁ (IB-Role-Action 2    , SLOT)
-            ∷ inj₁ (EB-Role-Action 2 [] , SLOT)
-            ∷ inj₁ (VT-Role-Action 2    , SLOT)
-            ∷ inj₁ (Base₂b-Action  2    , SLOT)
-            ∷ inj₁ (Slot-Action    2    , SLOT)
-            -- slot 3
+            ∷ inj₁ (IB-Role-Action 102    , SLOT)
+            ∷ inj₁ (EB-Role-Action 102 [] , SLOT)
+            ∷ inj₁ (VT-Role-Action 102    , SLOT)
+            ∷ inj₁ (Base₂b-Action  102    , SLOT)
+            ∷ inj₁ (Slot-Action    102    , SLOT)
+            -- slot 103
             ∷ inj₂ (IB-Recv-Update
                 (record { header =
-                  record { slotNumber = 2
+                  record { slotNumber = 102
                          ; producerID = fsuc fzero
                          ; lotteryPf = tt
                          ; bodyHash = 3 ∷ 4 ∷ 5 ∷ []
                          ; signature = tt
                          }
                         ; body = record { txs = 3 ∷ 4 ∷ 5 ∷ [] }}))
-            ∷ inj₁ (IB-Role-Action 3    , SLOT)
-            ∷ inj₁ (VT-Role-Action 3    , SLOT)
-            ∷ inj₁ (Base₂b-Action  3    , SLOT)
-            ∷ inj₁ (Slot-Action    3    , SLOT)
-            -- slot 4
-            ∷ inj₁ (IB-Role-Action 4    , SLOT)
-            ∷ inj₁ (EB-Role-Action 4 [] , SLOT)
-            ∷ inj₁ (VT-Role-Action 4    , SLOT)
-            ∷ inj₁ (Base₂b-Action  4    , SLOT)
-            ∷ inj₁ (Slot-Action    4    , SLOT)
-            -- slot 5
-            ∷ inj₁ (IB-Role-Action 5    , SLOT)
-            ∷ inj₁ (VT-Role-Action 5    , SLOT)
-            ∷ inj₁ (Base₂b-Action  5    , SLOT)
-            ∷ inj₁ (Slot-Action    5    , SLOT)
-            -- slot 6
-            ∷ inj₁ (No-IB-Role-Action 6 , SLOT)
-            ∷ inj₁ (No-EB-Role-Action 6 , SLOT)
-            ∷ inj₁ (VT-Role-Action    6 , SLOT)
-            ∷ inj₁ (Base₂b-Action     6 , SLOT)
-            ∷ inj₁ (Slot-Action       6 , SLOT)
-            -- slot 7
-            ∷ inj₁ (IB-Role-Action 7    , SLOT)
-            ∷ inj₁ (VT-Role-Action 7    , SLOT)
-            ∷ inj₁ (Base₂b-Action  7    , SLOT)
-            ∷ inj₁ (Slot-Action    7    , SLOT)
-            -- slot 8
-            ∷ inj₁ (IB-Role-Action 8    , SLOT)
-            ∷ inj₁ (EB-Role-Action 8 ((3 ∷ 4 ∷ 5 ∷ []) ∷ []) , SLOT)
-            ∷ inj₁ (VT-Role-Action 8    , SLOT)
-            ∷ inj₁ (Base₂b-Action  8    , SLOT)
-            ∷ inj₁ (Slot-Action    8    , SLOT)
-            ∷ []) s₀)
+            ∷ inj₁ (IB-Role-Action 103    , SLOT)
+            ∷ inj₁ (VT-Role-Action 103    , SLOT)
+            ∷ inj₁ (Base₂b-Action  103    , SLOT)
+            ∷ inj₁ (Slot-Action    103    , SLOT)
+            -- slot 104
+            ∷ inj₁ (IB-Role-Action 104    , SLOT)
+            ∷ inj₁ (EB-Role-Action 104 [] , SLOT)
+            ∷ inj₁ (VT-Role-Action 104    , SLOT)
+            ∷ inj₁ (Base₂b-Action  104    , SLOT)
+            ∷ inj₁ (Slot-Action    104    , SLOT)
+            -- slot 105
+            ∷ inj₁ (IB-Role-Action 105    , SLOT)
+            ∷ inj₁ (VT-Role-Action 105    , SLOT)
+            ∷ inj₁ (Base₂b-Action  105    , SLOT)
+            ∷ inj₁ (Slot-Action    105    , SLOT)
+            -- slot 106
+            ∷ inj₁ (No-IB-Role-Action 106 , SLOT)
+            ∷ inj₁ (No-EB-Role-Action 106 , SLOT)
+            ∷ inj₁ (VT-Role-Action    106 , SLOT)
+            ∷ inj₁ (Base₂b-Action     106 , SLOT)
+            ∷ inj₁ (Slot-Action       106 , SLOT)
+            -- slot 107
+            ∷ inj₁ (IB-Role-Action 107    , SLOT)
+            ∷ inj₁ (VT-Role-Action 107    , SLOT)
+            ∷ inj₁ (Base₂b-Action  107    , SLOT)
+            ∷ inj₁ (Slot-Action    107    , SLOT)
+            -- slot 108
+            ∷ inj₁ (IB-Role-Action 108    , SLOT)
+            ∷ inj₁ (EB-Role-Action 108 ((3 ∷ 4 ∷ 5 ∷ []) ∷ []) , SLOT)
+            ∷ inj₁ (VT-Role-Action 108    , SLOT)
+            ∷ inj₁ (Base₂b-Action  108    , SLOT)
+            ∷ inj₁ (Slot-Action    108    , SLOT)
+            ∷ []) s₁₀₀)
     test₂ = _

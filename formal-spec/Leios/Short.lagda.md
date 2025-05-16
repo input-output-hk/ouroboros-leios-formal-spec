@@ -122,10 +122,14 @@ beginningOfStage : ℕ → Type
 beginningOfStage s = stage s * L ≡ s
 
 allDone : LeiosState → Type
-allDone record { slot = slot ; Upkeep = Upkeep } =
-      (beginningOfStage slot × Upkeep ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ VT-Role ∷ Base ∷ []))
-  ⊎ (¬ beginningOfStage slot × Upkeep ≡ᵉ fromList (IB-Role ∷ VT-Role ∷ Base ∷ []))
-  ⊎ (slot ≡ zero × Upkeep ≡ᵉ fromList (Base ∷ []))
+allDone record { slot = s ; Upkeep = u } =
+  -- bootstrapping
+    (stage s < 3 × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []))
+  ⊎ (stage s ≡ 3 × beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
+  ⊎ (stage s ≡ 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []))
+  -- done
+  ⊎ (stage s > 3 × beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ VT-Role ∷ Base ∷ []))
+  ⊎ (stage s > 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ VT-Role ∷ Base ∷ []))
 
 data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
 ```
