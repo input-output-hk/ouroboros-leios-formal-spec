@@ -13,7 +13,6 @@ params =
         in Fun⇒TotalMap (const 100000000)
     ; stageLength = 2
     ; winning-slots = fromList $
-        (IB , 0) ∷ (EB , 0) ∷ (VT , 0) ∷
         (IB , 1) ∷ (EB , 1) ∷ (VT , 1) ∷
         (IB , 2) ∷ (EB , 2) ∷ (VT , 2) ∷
         (IB , 3) ∷ (EB , 3) ∷ (VT , 3) ∷
@@ -32,11 +31,11 @@ private
   opaque
     unfolding List-Model
 
-    test₁ : Bool
-    test₁ = ¿ ValidTrace (inj₁ (IB-Role-Action 0 , SLOT) ∷ []) ¿ᵇ
+    s₀ : LeiosState
+    s₀ = initLeiosState tt stakeDistribution tt ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
 
-    _ : test₁ ≡ true
-    _ = refl
+    test₁ : IsOk (verifyTrace (inj₁ (Slot-Action 0 , SLOT) ∷ inj₁ (Base₂b-Action 0 , SLOT) ∷ []) s₀)
+    test₁ = _
 
     test-valid-ib : Bool
     test-valid-ib =
@@ -55,19 +54,14 @@ private
     _ : test-valid-ib ≡ true
     _ = refl
 
-    test₂ : Bool
-    test₂ =
-      let t = L.reverse $
+    test₂ : IsOk (verifyTrace (L.reverse $
             -- slot 0
-              inj₁ (IB-Role-Action 0    , SLOT)
-            ∷ inj₁ (EB-Role-Action 0 [] , SLOT)
-            ∷ inj₁ (VT-Role-Action 0    , SLOT)
-            ∷ inj₁ (Base₂b-Action       , SLOT)
+              inj₁ (Base₂b-Action  0    , SLOT)
             ∷ inj₁ (Slot-Action    0    , SLOT)
             -- slot 1
             ∷ inj₁ (IB-Role-Action 1    , SLOT)
             ∷ inj₁ (VT-Role-Action 1    , SLOT)
-            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Base₂b-Action  1    , SLOT)
             ∷ inj₁ (Slot-Action    1    , SLOT)
             -- slot 2
             ∷ inj₂ (IB-Recv-Update
@@ -82,7 +76,7 @@ private
             ∷ inj₁ (IB-Role-Action 2    , SLOT)
             ∷ inj₁ (EB-Role-Action 2 [] , SLOT)
             ∷ inj₁ (VT-Role-Action 2    , SLOT)
-            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Base₂b-Action  2    , SLOT)
             ∷ inj₁ (Slot-Action    2    , SLOT)
             -- slot 3
             ∷ inj₂ (IB-Recv-Update
@@ -96,38 +90,35 @@ private
                         ; body = record { txs = 3 ∷ 4 ∷ 5 ∷ [] }}))
             ∷ inj₁ (IB-Role-Action 3    , SLOT)
             ∷ inj₁ (VT-Role-Action 3    , SLOT)
-            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Base₂b-Action  3    , SLOT)
             ∷ inj₁ (Slot-Action    3    , SLOT)
             -- slot 4
             ∷ inj₁ (IB-Role-Action 4    , SLOT)
             ∷ inj₁ (EB-Role-Action 4 [] , SLOT)
             ∷ inj₁ (VT-Role-Action 4    , SLOT)
-            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Base₂b-Action  4    , SLOT)
             ∷ inj₁ (Slot-Action    4    , SLOT)
             -- slot 5
             ∷ inj₁ (IB-Role-Action 5    , SLOT)
             ∷ inj₁ (VT-Role-Action 5    , SLOT)
-            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Base₂b-Action  5    , SLOT)
             ∷ inj₁ (Slot-Action    5    , SLOT)
             -- slot 6
-            ∷ inj₁ (No-IB-Role-Action   , SLOT)
-            ∷ inj₁ (No-EB-Role-Action   , SLOT)
-            ∷ inj₁ (VT-Role-Action 6    , SLOT)
-            ∷ inj₁ (Base₂b-Action       , SLOT)
-            ∷ inj₁ (Slot-Action    6    , SLOT)
+            ∷ inj₁ (No-IB-Role-Action 6 , SLOT)
+            ∷ inj₁ (No-EB-Role-Action 6 , SLOT)
+            ∷ inj₁ (VT-Role-Action    6 , SLOT)
+            ∷ inj₁ (Base₂b-Action     6 , SLOT)
+            ∷ inj₁ (Slot-Action       6 , SLOT)
             -- slot 7
             ∷ inj₁ (IB-Role-Action 7    , SLOT)
             ∷ inj₁ (VT-Role-Action 7    , SLOT)
-            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Base₂b-Action  7    , SLOT)
             ∷ inj₁ (Slot-Action    7    , SLOT)
             -- slot 8
             ∷ inj₁ (IB-Role-Action 8    , SLOT)
             ∷ inj₁ (EB-Role-Action 8 ((3 ∷ 4 ∷ 5 ∷ []) ∷ []) , SLOT)
             ∷ inj₁ (VT-Role-Action 8    , SLOT)
-            ∷ inj₁ (Base₂b-Action       , SLOT)
+            ∷ inj₁ (Base₂b-Action  8    , SLOT)
             ∷ inj₁ (Slot-Action    8    , SLOT)
-            ∷ []
-      in ¿ ValidTrace t ¿ᵇ
-
-    _ : test₂ ≡ true
-    _ = refl
+            ∷ []) s₀)
+    test₂ = _

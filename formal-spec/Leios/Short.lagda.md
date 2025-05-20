@@ -150,10 +150,10 @@ beginningOfStage : ℕ → Type
 beginningOfStage s = stage s * L ≡ s
 
 allDone : LeiosState → Type
-allDone s =
-  let open LeiosState s
-  in   (beginningOfStage slot × Upkeep ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ VT-Role ∷ Base ∷ []))
-   ⊎ (¬ beginningOfStage slot × Upkeep ≡ᵉ fromList (IB-Role ∷ VT-Role ∷ Base ∷ []))
+allDone record { slot = slot ; Upkeep = Upkeep } =
+      (beginningOfStage slot × Upkeep ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ VT-Role ∷ Base ∷ []))
+  ⊎ (¬ beginningOfStage slot × Upkeep ≡ᵉ fromList (IB-Role ∷ VT-Role ∷ Base ∷ []))
+  ⊎ (slot ≡ zero × Upkeep ≡ᵉ fromList (Base ∷ []))
 
 data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
 ```
