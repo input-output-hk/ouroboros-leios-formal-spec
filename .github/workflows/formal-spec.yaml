@@ -66,3 +66,33 @@ jobs:
         run:
           "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') >
           /tmp/nixcache"
+
+  formal-spec-html:
+    name: "Generate HTML"
+    needs: formal-spec-typecheck
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🛠️ Install Nix
+        uses: cachix/install-nix-action@v21
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          install_url: https://releases.nixos.org/nix/nix-2.10.3/install
+          extra_nix_config: |
+            allowed-uris = ${{ env.ALLOWED_URIS }}
+            trusted-public-keys = ${{ env.TRUSTED_PUBLIC_KEYS }}
+            substituters = ${{ env.SUBSTITUTERS }}
+            experimental-features = nix-command flakes
+
+      - name: 🏗️ Generate HTML documentation
+        run: |
+          nix build --show-trace --accept-flake-config .#leiosDocs
+
+      - name: 🚀 Upload HTML output
+        uses: actions/upload-artifact@v4
+        with:
+          name: formal-spec-html
+          path: result/html
+          retention-days: 5
