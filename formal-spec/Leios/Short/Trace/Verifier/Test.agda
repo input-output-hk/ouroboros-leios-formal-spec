@@ -76,7 +76,6 @@ private
             ∷ inj₁ (Slot-Action       100 , SLOT)
             -- slot 101
             ∷ inj₁ (IB-Role-Action 101    , SLOT)
-            ∷ inj₁ (VT-Role-Action 101    , SLOT)
             ∷ inj₁ (Base₂b-Action  101    , SLOT)
             ∷ inj₁ (Slot-Action    101    , SLOT)
             -- slot 102
@@ -105,7 +104,6 @@ private
                          }
                         ; body = record { txs = 3 ∷ 4 ∷ 5 ∷ [] }}))
             ∷ inj₁ (IB-Role-Action 103    , SLOT)
-            ∷ inj₁ (VT-Role-Action 103    , SLOT)
             ∷ inj₁ (Base₂b-Action  103    , SLOT)
             ∷ inj₁ (Slot-Action    103    , SLOT)
             -- slot 104
@@ -116,7 +114,6 @@ private
             ∷ inj₁ (Slot-Action    104    , SLOT)
             -- slot 105
             ∷ inj₁ (IB-Role-Action 105    , SLOT)
-            ∷ inj₁ (VT-Role-Action 105    , SLOT)
             ∷ inj₁ (Base₂b-Action  105    , SLOT)
             ∷ inj₁ (Slot-Action    105    , SLOT)
             -- slot 106
@@ -126,8 +123,7 @@ private
             ∷ inj₁ (Base₂b-Action     106 , SLOT)
             ∷ inj₁ (Slot-Action       106 , SLOT)
             -- slot 107
-            ∷ inj₁ (IB-Role-Action 107    , SLOT)
-            ∷ inj₁ (VT-Role-Action 107    , SLOT)
+            ∷ inj₁ (IB-Role-Action 107    , SLOT)            
             ∷ inj₁ (Base₂b-Action  107    , SLOT)
             ∷ inj₁ (Slot-Action    107    , SLOT)
             -- slot 108
