@@ -1,5 +1,12 @@
 {-# OPTIONS --safe #-}
 
+{- Module: Leios.Blocks
+   
+   This module defines the block structures used in the Leios protocol.
+   It provides implementations for Input Blocks, Endorser Blocks, Votes, 
+   and defines a Freshest First Delivery (FFD) for Leios Blocks.
+-}
+
 open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.FFD
