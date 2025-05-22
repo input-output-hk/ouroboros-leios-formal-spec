@@ -90,7 +90,7 @@ jobs:
             # For pull requests, check if any .agda or .lagda files changed
             git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} > changed_files.txt
           fi
-          
+
           # Check if any Agda files changed
           if grep -q "\.agda$\|\.lagda$" changed_files.txt; then
             echo "Agda file changes detected, generating docs"
@@ -136,4 +136,4 @@ jobs:
           curl -X POST https://api.github.com/repos/input-output-hk/ouroboros-leios/dispatches \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: token ${{ secrets.LEIOS_TRIGGER_PAT }}" \
-            -d '{"event_type":"formal-spec-updated"}'
+            -d '{"event_type":"formal-spec-updated", "client_payload": {"run_id": "${{ github.run_id }}"}}'
