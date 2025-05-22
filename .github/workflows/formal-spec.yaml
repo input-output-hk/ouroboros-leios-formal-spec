@@ -68,7 +68,7 @@ jobs:
           /tmp/nixcache"
 
   formal-spec-html:
-    name: "Generate HTML"
+    name: "Generate Web Documentation"
     needs: formal-spec-typecheck
     runs-on: ubuntu-22.04
     outputs:
