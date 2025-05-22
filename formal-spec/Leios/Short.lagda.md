@@ -91,7 +91,6 @@ data _↝_ : LeiosState → LeiosState → Type where
                 b = ibBody (record { txs = ToPropose })
                 h = ibHeader (mkIBHeader slot id π sk-IB ToPropose)
           in
-          ∙ needsUpkeep IB-Role
           ∙ canProduceIB slot sk-IB (stake s) π
           ∙ ffds FFD.-⟦ Send h (just b) / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
@@ -102,7 +101,6 @@ data _↝_ : LeiosState → LeiosState → Type where
                 LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
                 h = mkEB slot id π sk-EB LI []
           in
-          ∙ needsUpkeep EB-Role
           ∙ canProduceEB slot sk-EB (stake s) π
           ∙ ffds FFD.-⟦ Send (ebHeader h) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
@@ -113,7 +111,6 @@ data _↝_ : LeiosState → LeiosState → Type where
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                 votes = map (vote sk-VT ∘ hash) EBs'
           in
-          ∙ needsUpkeep VT-Role
           ∙ canProduceV slot sk-VT (stake s)
           ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
@@ -150,10 +147,14 @@ beginningOfStage : ℕ → Type
 beginningOfStage s = stage s * L ≡ s
 
 allDone : LeiosState → Type
-allDone record { slot = slot ; Upkeep = Upkeep } =
-      (beginningOfStage slot × Upkeep ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ VT-Role ∷ Base ∷ []))
-  ⊎ (¬ beginningOfStage slot × Upkeep ≡ᵉ fromList (IB-Role ∷ VT-Role ∷ Base ∷ []))
-  ⊎ (slot ≡ zero × Upkeep ≡ᵉ fromList (Base ∷ []))
+allDone record { slot = s ; Upkeep = u } =
+  -- bootstrapping
+    (stage s < 3 × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []))
+  ⊎ (stage s ≡ 3 × beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
+  ⊎ (stage s ≡ 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []))
+  -- done
+  ⊎ (stage s > 3 × beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ VT-Role ∷ Base ∷ []))
+  ⊎ (stage s > 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []))
 
 data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
 ```
