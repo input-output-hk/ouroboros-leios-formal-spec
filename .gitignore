@@ -11,3 +11,4 @@ dist-newstyle/
 _build
 *.log
 .DS_Store
+result
