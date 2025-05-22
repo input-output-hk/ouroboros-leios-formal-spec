@@ -4,7 +4,7 @@ open import Leios.Prelude hiding (id)
 open import Leios.FFD
 open import Leios.SpecStructure
 
-module Leios.Protocol {n} (⋯ : SpecStructure n) (let open SpecStructure ⋯) (SlotUpkeep : Type) where
+module Leios.Protocol {n} (⋯ : SpecStructure n) (let open SpecStructure ⋯) (SlotUpkeep : Type) (StageUpkeep : Type) where
 
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open GenFFD
@@ -31,21 +31,22 @@ data LeiosOutput : Type where
   EMPTY    : LeiosOutput
 
 record LeiosState : Type where
-  field V           : VTy
-        SD          : StakeDistr
-        FFDState    : FFD.State
-        Ledger      : List Tx
-        ToPropose   : List Tx
-        IBs         : List InputBlock
-        EBs         : List EndorserBlock
-        Vs          : List (List Vote)
-        slot        : ℕ
-        IBHeaders   : List IBHeader
-        IBBodies    : List IBBody
-        Upkeep      : ℙ SlotUpkeep
-        BaseState   : B.State
-        votingState : VotingState
-        PubKeys     : List PubKey
+  field V            : VTy
+        SD           : StakeDistr
+        FFDState     : FFD.State
+        Ledger       : List Tx
+        ToPropose    : List Tx
+        IBs          : List InputBlock
+        EBs          : List EndorserBlock
+        Vs           : List (List Vote)
+        slot         : ℕ
+        IBHeaders    : List IBHeader
+        IBBodies     : List IBBody
+        Upkeep       : ℙ SlotUpkeep
+        Upkeep-Stage : ℙ StageUpkeep
+        BaseState    : B.State
+        votingState  : VotingState
+        PubKeys      : List PubKey
 
   lookupEB : EBRef → Maybe EndorserBlock
   lookupEB r = find (λ b → getEBRef b ≟ r) EBs
@@ -68,30 +69,40 @@ record LeiosState : Type where
   needsUpkeep : SlotUpkeep → Set
   needsUpkeep = _∉ Upkeep
 
+  needsUpkeep-Stage : StageUpkeep → Set
+  needsUpkeep-Stage = _∉ Upkeep-Stage
+
   Dec-needsUpkeep : ∀ {u : SlotUpkeep} → ⦃ DecEq SlotUpkeep ⦄ → needsUpkeep u ⁇
   Dec-needsUpkeep {u} .dec = ¬? (u ∈? Upkeep)
+
+  Dec-needsUpkeep-Stage : ∀ {u : StageUpkeep} → ⦃ DecEq StageUpkeep ⦄ → needsUpkeep-Stage u ⁇
+  Dec-needsUpkeep-Stage {u} .dec = ¬? (u ∈? Upkeep-Stage)
 
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
 addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u ❵ }
 {-# INJECTIVE_FOR_INFERENCE addUpkeep #-}
 
+addUpkeep-Stage : LeiosState → StageUpkeep → LeiosState
+addUpkeep-Stage s u = let open LeiosState s in record s { Upkeep-Stage = Upkeep-Stage ∪ ❴ u ❵ }
+
 initLeiosState : VTy → StakeDistr → B.State → List PubKey → LeiosState
 initLeiosState V SD bs pks = record
-  { V           = V
-  ; SD          = SD
-  ; FFDState    = FFD.initFFDState
-  ; Ledger      = []
-  ; ToPropose   = []
-  ; IBs         = []
-  ; EBs         = []
-  ; Vs          = []
-  ; slot        = initSlot V
-  ; IBHeaders   = []
-  ; IBBodies    = []
-  ; Upkeep      = ∅
-  ; BaseState   = bs
-  ; votingState = initVotingState
-  ; PubKeys     = pks
+  { V            = V
+  ; SD           = SD
+  ; FFDState     = FFD.initFFDState
+  ; Ledger       = []
+  ; ToPropose    = []
+  ; IBs          = []
+  ; EBs          = []
+  ; Vs           = []
+  ; slot         = initSlot V
+  ; IBHeaders    = []
+  ; IBBodies     = []
+  ; Upkeep       = ∅
+  ; Upkeep-Stage = ∅
+  ; BaseState    = bs
+  ; votingState  = initVotingState
+  ; PubKeys      = pks
   }
 
 stake' : PoolID → LeiosState → ℕ

@@ -86,7 +86,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
                   ValidAction (No-EB-Role-Action slot) s SLOT
 
   No-VT-Role : let open LeiosState s
-               in needsUpkeep VT-Role →
+               in needsUpkeep-Stage VT-Role →
                   (¬ canProduceV slot sk-VT (stake s)) →
                   ValidAction (No-VT-Role-Action slot) s SLOT
 
@@ -136,21 +136,22 @@ private variable
       EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
       votes = map (vote sk-VT ∘ hash) EBs'
       ffds' = proj₁ (FFD.Send-total {ffds} {vtHeader votes} {nothing})
-  in addUpkeep record s { FFDState = ffds' } VT-Role , EMPTY
+  in addUpkeep-Stage record s { FFDState = ffds' } VT-Role , EMPTY
 ⟦ No-IB-Role {s} _ _ ⟧ = addUpkeep s IB-Role , EMPTY
 ⟦ No-EB-Role {s} _ _ ⟧ = addUpkeep s EB-Role , EMPTY
-⟦ No-VT-Role {s} _ _ ⟧ = addUpkeep s VT-Role , EMPTY
+⟦ No-VT-Role {s} _ _ ⟧ = addUpkeep-Stage s VT-Role , EMPTY
 ⟦ Slot {s} _ _ _ ⟧ =
   let open LeiosState s renaming (FFDState to ffds; BaseState to bs)
       (res , (bs' , _))    = B.FTCH-total {bs}
       (msgs , (ffds' , _)) = FFD.Fetch-total {ffds}
   in
   (record s
-     { FFDState  = ffds'
-     ; BaseState = bs'
-     ; Ledger    = constructLedger res
-     ; slot      = suc slot
-     ; Upkeep    = ∅
+     { FFDState     = ffds'
+     ; BaseState    = bs'
+     ; Ledger       = constructLedger res
+     ; slot         = suc slot
+     ; Upkeep       = ∅
+     ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
      } ↑ L.filter (isValid? s) msgs
   , EMPTY)
 ⟦ Ftch {s} ⟧ = s , FTCH-LDG (LeiosState.Ledger s)

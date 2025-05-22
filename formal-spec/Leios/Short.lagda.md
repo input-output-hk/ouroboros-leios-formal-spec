@@ -27,12 +27,18 @@ module Leios.Short (⋯ : SpecStructure 1)
 ```
 ```agda
 data SlotUpkeep : Type where
-  Base IB-Role EB-Role VT-Role : SlotUpkeep
+  Base IB-Role EB-Role : SlotUpkeep
 
 unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
 ```
 ```agda
-open import Leios.Protocol (⋯) SlotUpkeep public
+data StageUpkeep : Type where
+  VT-Role : StageUpkeep
+
+unquoteDecl DecEq-StageUpkeep = derive-DecEq ((quote StageUpkeep , DecEq-StageUpkeep) ∷ [])
+```
+```agda
+open import Leios.Protocol (⋯) SlotUpkeep StageUpkeep public
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
@@ -86,7 +92,7 @@ data _↝_ : LeiosState → LeiosState → Type where
           ∙ canProduceV slot sk-VT (stake s)
           ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ addUpkeep record s { FFDState = ffds' } VT-Role
+          s ↝ addUpkeep-Stage record s { FFDState = ffds' } VT-Role
 ```
 #### Negative Block/Vote production rules
 ```agda
@@ -105,10 +111,10 @@ data _↝_ : LeiosState → LeiosState → Type where
 ```
 ```agda
   No-VT-Role : let open LeiosState s in
-             ∙ needsUpkeep VT-Role
+             ∙ needsUpkeep-Stage VT-Role
              ∙ ¬ canProduceV slot sk-VT (stake s)
              ─────────────────────────────────────────────
-             s ↝ addUpkeep s VT-Role
+             s ↝ addUpkeep-Stage s VT-Role
 ```
 ### Uniform short-pipeline
 ```agda
@@ -118,15 +124,19 @@ stage s = s / L
 beginningOfStage : ℕ → Type
 beginningOfStage s = stage s * L ≡ s
 
+endOfStage : ℕ → Type
+endOfStage s = suc (stage s) ≡ stage (suc s)
+
+endOfStage? : ∀ (s : ℕ) → endOfStage s ⁇
+endOfStage? s .dec = suc (stage s) ≟ stage (suc s)
+
 allDone : LeiosState → Type
-allDone record { slot = s ; Upkeep = u } =
-  -- bootstrapping
-    (stage s < 3 × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []))
-  ⊎ (stage s ≡ 3 × beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
-  ⊎ (stage s ≡ 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []))
-  -- done
-  ⊎ (stage s > 3 × beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ VT-Role ∷ Base ∷ []))
-  ⊎ (stage s > 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []))
+allDone record { slot = s ; Upkeep = u ; Upkeep-Stage = v } =
+    (beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
+  ⊎ (¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []) ×
+       (((endOfStage s × v ≡ᵉ fromList (VT-Role ∷ []))
+       ⊎ (¬ endOfStage s)))
+    )
 
 data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
 ```
@@ -146,11 +156,12 @@ data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → Leios
        ∙ ffds FFD.-⟦ Fetch / FetchRes msgs ⟧⇀ ffds'
        ───────────────────────────────────────────────────────────────────────
        just s -⟦ SLOT / EMPTY ⟧⇀ record s
-           { FFDState  = ffds'
-           ; BaseState = bs'
-           ; Ledger    = constructLedger rbs
-           ; slot      = suc slot
-           ; Upkeep    = ∅
+           { FFDState     = ffds'
+           ; BaseState    = bs'
+           ; Ledger       = constructLedger rbs
+           ; slot         = suc slot
+           ; Upkeep       = ∅
+           ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
            } ↑ L.filter (isValid? s) msgs
 ```
 ```agda
