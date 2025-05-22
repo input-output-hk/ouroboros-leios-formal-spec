@@ -66,3 +66,74 @@ jobs:
         run:
           "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') >
           /tmp/nixcache"
+
+  formal-spec-html:
+    name: "Generate HTML"
+    needs: formal-spec-typecheck
+    runs-on: ubuntu-22.04
+    outputs:
+      changed: ${{ steps.check-changes.outputs.changed }}
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for Agda file changes
+        id: check-changes
+        run: |
+          # For main branch pushes, check changed files compared to the previous commit
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            git fetch origin ${{ github.event.before }} --depth=1
+            git diff --name-only ${{ github.event.before }} ${{ github.event.after }} > changed_files.txt
+          else
+            # For pull requests, check if any .agda or .lagda files changed
+            git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} > changed_files.txt
+          fi
+          
+          # Check if any Agda files changed
+          if grep -q "\.agda$\|\.lagda$" changed_files.txt; then
+            echo "Agda file changes detected, generating docs"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "No Agda file changes detected, skipping docs generation"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🛠️ Install Nix
+        if: steps.check-changes.outputs.changed == 'true'
+        uses: cachix/install-nix-action@v21
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          install_url: https://releases.nixos.org/nix/nix-2.10.3/install
+          extra_nix_config: |
+            allowed-uris = ${{ env.ALLOWED_URIS }}
+            trusted-public-keys = ${{ env.TRUSTED_PUBLIC_KEYS }}
+            substituters = ${{ env.SUBSTITUTERS }}
+            experimental-features = nix-command flakes
+
+      - name: 🏗️ Generate HTML documentation
+        if: steps.check-changes.outputs.changed == 'true'
+        run: |
+          nix build --show-trace --accept-flake-config .#leiosDocs
+
+      - name: 🚀 Upload HTML output
+        if: steps.check-changes.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: formal-spec-html
+          path: result/html
+          retention-days: 5
+
+  notify-leios-repo:
+    name: "Notify Leios Repo"
+    needs: formal-spec-html
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.formal-spec-html.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔔 Trigger Leios repo
+        run: |
+          curl -X POST https://api.github.com/repos/input-output-hk/ouroboros-leios/dispatches \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: token ${{ secrets.LEIOS_TRIGGER_PAT }}" \
+            -d '{"event_type":"formal-spec-updated"}'
