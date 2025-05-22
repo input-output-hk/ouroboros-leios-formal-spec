@@ -115,7 +115,7 @@ jobs:
       - name: 🏗️ Generate HTML documentation
         if: steps.check-changes.outputs.changed == 'true'
         run: |
-          nix build --show-trace --accept-flake-config .#leiosDocs
+          nix build .#leiosDocs
 
       - name: 🚀 Upload HTML output
         if: steps.check-changes.outputs.changed == 'true'
