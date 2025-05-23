@@ -132,11 +132,15 @@ endOfStage? s .dec = suc (stage s) ≟ stage (suc s)
 
 allDone : LeiosState → Type
 allDone record { slot = s ; Upkeep = u ; Upkeep-Stage = v } =
-    (beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
-  ⊎ (¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []) ×
+  -- bootstrapping
+    (stage s < 3 × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []))
+  ⊎ (stage s ≡ 3 × beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
+  ⊎ (stage s ≡ 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []))
+  -- done
+  ⊎ (stage s > 3 × beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
+  ⊎ (stage s > 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []) ×
        (((endOfStage s × v ≡ᵉ fromList (VT-Role ∷ []))
-       ⊎ (¬ endOfStage s)))
-    )
+       ⊎ (¬ endOfStage s))))
 
 data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
 ```
