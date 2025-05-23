@@ -20,9 +20,9 @@ open import Leios.Short
 -- open import Leios.Short.Decidable
 -- open import Leios.Short.Deterministic
 open import Leios.Short.Trace.Verifier
--- open import Leios.Short.Trace.Verifier.Test
--- open import Leios.Simplified
--- open import Leios.Simplified.Deterministic
+open import Leios.Short.Trace.Verifier.Test
+open import Leios.Simplified
+open import Leios.Simplified.Deterministic
 -- open import Leios.Simplified.Deterministic.Test
 open import Leios.SpecStructure
 open import Leios.Traces

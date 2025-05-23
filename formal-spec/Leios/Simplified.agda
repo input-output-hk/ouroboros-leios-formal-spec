@@ -18,7 +18,7 @@ unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkee
 allUpkeep : ℙ SlotUpkeep
 allUpkeep = fromList (Base ∷ IB-Role ∷ EB-Role ∷ V1-Role ∷ V2-Role ∷ [])
 
-open import Leios.Protocol (⋯) SlotUpkeep public
+open import Leios.Protocol (⋯) SlotUpkeep ⊥ public
 
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
