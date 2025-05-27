@@ -1,3 +1,15 @@
+{-# OPTIONS --safe #-}
+
+{- Module: Leios.Defaults
+   
+   This module provides simple default implementations for the core components
+   and functionalities of the Leios protocol. These defaults are intended for
+   building examples and traces for different Leios variants, and include
+   basic instances for abstract types, VRF, key registration, base layer,
+   FFD buffers, and voting. The implementations are minimal and primarily
+   for testing and illustration purposes.
+-}
+
 open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.Config
