@@ -1,3 +1,12 @@
+{- Module: Leios.Network
+   
+   This module defines the network abstractions and communication channels
+   for the Leios protocol. It provides generic broadcast and header diffusion
+   mechanisms, including channel types, message formats, and state transition
+   systems for networked message propagation. The abstractions here are used
+   to model peer-to-peer communication and header forwarding in the protocol.
+-}
+
 module Leios.Network where
 
 open import abstract-set-theory.Prelude hiding (_∘_; _⊗_)
