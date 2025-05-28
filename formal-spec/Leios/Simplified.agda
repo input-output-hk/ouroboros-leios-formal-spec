@@ -1,5 +1,14 @@
 {-# OPTIONS --safe #-}
 
+{- Module: Leios.Simplified
+
+   This module defines the simplified variant of the Leios protocol.
+   It specifies the main state machine, slot upkeep roles, and protocol
+   rules for block production, endorsement, and voting. The simplified
+   model abstracts the core protocol logic, including upkeep tracking,
+   slot transitions, and the interaction with the base and FFD layers.
+-}
+
 open import Leios.Prelude hiding (id)
 open import Leios.FFD
 open import Leios.SpecStructure
