@@ -9,13 +9,7 @@ env:
 
 on:
   pull_request:
-    paths:
-      - "flake.lock"
-      - "flake.nix"
-      - "formal-spec/**"
-      - "nix/**"
-  pull_request:
-    types: [closed]
+    types: [opened, synchronize, reopened, closed]
     branches:
       - main
     paths:
@@ -39,6 +33,8 @@ jobs:
   formal-spec-typecheck:
     name: "Typecheck"
     runs-on: ubuntu-22.04
+    # Skip if PR was closed without merging
+    if: github.event_name != 'pull_request' || github.event.action != 'closed' || github.event.pull_request.merged == true
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -80,6 +76,8 @@ jobs:
     name: "Generate Web Documentation"
     needs: formal-spec-typecheck
     runs-on: ubuntu-22.04
+    # Skip if PR was closed without merging
+    if: github.event_name != 'pull_request' || github.event.action != 'closed' || github.event.pull_request.merged == true
     outputs:
       changed: ${{ steps.check-changes.outputs.changed }}
     steps:
