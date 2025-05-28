@@ -1,42 +1,47 @@
-module Network.BasicBroadcast where
-
 open import Leios.Prelude hiding (_⊗_; module A)
 open import CategoricalCrypto
 
-module _ (Participants : ℕ) (Message : Type) where
-  Participant = Fin Participants
+module Network.BasicBroadcast (Participants : ℕ) (Message : Type) where
 
-  A : Channel
-  A = simpleChannel (Message × Participant) (ℕ ⊎ ℕ)
+data NetworkT : ChannelDir → Type where
+  RcvMessage : Message → NetworkT In
+  Activate   : NetworkT In
+  SndMessage : List Message → NetworkT Out
 
-  M : Channel
-  M = simpleChannel (⊤ ⊎ Message) Message
+Participant = Fin Participants
 
-  Ms : Channel
-  Ms = ⨂ const {B = Participant} M
+A : Channel
+A = simpleChannel (Message × Participant) (ℕ ⊎ ℕ)
 
-  data Receive_withState_return_ : MachineType I (Ms ⊗ A) (List (Message × Participant)) where
+M : Channel
+M = simpleChannel' NetworkT
 
-    Send : ∀ {buffer m} → {p : Participant}
-         → Receive (honestInputI $ snd⨂ p (-, m)) -- p wants to send message m
-           withState buffer
-           return (tabulate (m ,_) ++ buffer -- buffer a copy of m for every participant
-             , just (honestOutputO $ rcv⨂ p (-, inj₁ _))) -- return control to p
+Ms : Channel
+Ms = ⨂ const {B = Participant} M
 
-    Deliver : ∀ {buffer₁ m buffer₂ k} → {p : Participant}
-            → length buffer₁ ≡ k
-            → Receive (adversarialInput (-, inj₁ k)) -- adversary wants to deliver k-th message
-              withState (buffer₁ ++ (m , p) ∷ buffer₂) -- state decomposes appropriately
-              return (buffer₁ ++ buffer₂ -- remove message
-                , just (honestOutputO $ rcv⨂ p (-, inj₂ m))) -- deliver it
+data Receive_withState_return_ : MachineType I (Ms ⊗ A) (List (Message × Participant)) where
 
-    Eavesdrop : ∀ {buffer₁ x buffer₂ k}
-            → length buffer₁ ≡ k
-            → Receive (adversarialInput (-, inj₂ k)) -- adversary wants to know k-th message
-              withState (buffer₁ ++ x ∷ buffer₂) -- state decomposes appropriately
-              return (buffer₁ ++ x ∷ buffer₂
-                , just (adversarialOutput (-, x))) -- deliver it
+  Send : ∀ {buffer ms} → {p : Participant}
+       → Receive (honestInputI $ snd⨂ p (-, SndMessage ms)) -- p wants to send messages ms
+         withState buffer
+                -- buffer a copy of every message for every participant
+         return (concatMap (λ m → tabulate (m ,_)) ms ++ buffer
+           , just (honestOutputO $ rcv⨂ p (-, Activate))) -- return control to p
 
-  Network : Machine I (Ms ⊗ A)
-  Network .Machine.State = List (Message × Participant)
-  Network .Machine.stepRel = Receive_withState_return_
+  Deliver : ∀ {buffer₁ m buffer₂ k} → {p : Participant}
+          → length buffer₁ ≡ k
+          → Receive (adversarialInput (-, inj₁ k)) -- adversary wants to deliver k-th message
+            withState (buffer₁ ++ (m , p) ∷ buffer₂) -- state decomposes appropriately
+            return (buffer₁ ++ buffer₂ -- remove message
+              , just (honestOutputO $ rcv⨂ p (-, RcvMessage m))) -- deliver it
+
+  Eavesdrop : ∀ {buffer₁ x buffer₂ k}
+          → length buffer₁ ≡ k
+          → Receive (adversarialInput (-, inj₂ k)) -- adversary wants to know k-th message
+            withState (buffer₁ ++ x ∷ buffer₂) -- state decomposes appropriately
+            return (buffer₁ ++ x ∷ buffer₂
+              , just (adversarialOutput (-, x))) -- deliver it
+
+Network : Machine I (Ms ⊗ A)
+Network .Machine.State = List (Message × Participant)
+Network .Machine.stepRel = Receive_withState_return_

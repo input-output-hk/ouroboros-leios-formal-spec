@@ -63,9 +63,18 @@ honestInputO = sndˡ
 simpleChannel : Type → Type → Channel
 simpleChannel X Y = record { P = ⊤ ; rcvType = const X ; sndType = const Y }
 
+data ChannelDir : Type where
+  In Out : ChannelDir
+
+simpleChannel' : (ChannelDir → Type) → Channel
+simpleChannel' T = simpleChannel (T In) (T Out)
+
 ⨂_ : {n : ℕ} → (F : Fin n → Channel) → Channel
 ⨂_ {zero} F = I
 ⨂_ {suc n} F = F fzero ⊗ ⨂ (F Leios.Prelude.∘ fsuc)
+
+postulate
+  ⨂≡ : ∀ {n} → {A B : Fin n → Channel} → (∀ {k} → A k ≡ B k) → ⨂ A ≡ ⨂ B
 
 rcv⨂ : {n : ℕ} {F : Fin n → Channel} → (k : Fin n) → ∃ (Channel.rcvType (F k)) → ∃ (Channel.rcvType (⨂ F))
 rcv⨂ fzero = rcvˡ
@@ -74,10 +83,6 @@ rcv⨂ (fsuc k) x = rcvʳ (rcv⨂ k x)
 snd⨂ : {n : ℕ} {F : Fin n → Channel} → (k : Fin n) → ∃ (Channel.sndType (F k)) → ∃ (Channel.sndType (⨂ F))
 snd⨂ fzero = sndˡ
 snd⨂ (fsuc k) x = sndʳ (snd⨂ k x)
-
--- being lazy here, this should be an iso instead
-postulate
-  ⊗-assoc : ∀ {A B C} → (A ⊗ B) ⊗ C ≡ A ⊗ (B ⊗ C)
 
 --------------------------------------------------------------------------------
 -- Machines, which form the morphisms
@@ -102,10 +107,13 @@ module _ {A B} (let open Channel (A ⊗ B ᵀ)) where
   FunctionMachine : (∃ rcvType → Maybe (∃ sndType)) → Machine A B
   FunctionMachine f = StatelessMachine (λ i o → f i ≡ o)
 
+  TotalFunctionMachine : (∃ rcvType → ∃ sndType) → Machine A B
+  TotalFunctionMachine f = FunctionMachine (just Leios.Prelude.∘ f)
+
 id : ∀ {A} → Machine A A
-id .Machine.State   = ⊤
-id .Machine.stepRel (inj₁ a , m) _ (_ , m') = m' ≡ just (inj₂ a , m)
-id .Machine.stepRel (inj₂ a , m) _ (_ , m') = m' ≡ just (inj₁ a , m)
+id = TotalFunctionMachine λ where
+  (inj₁ p , m) → (inj₂ p , m)
+  (inj₂ p , m) → (inj₁ p , m)
 
 module Tensor {A B C D} (M₁ : Machine A B) (M₂ : Machine C D) where
   open Machine M₁ renaming (State to State₁; stepRel to stepRel₁)
@@ -183,6 +191,66 @@ module Comp {A B C} (M₁ : Machine B C) (M₂ : Machine A B) where
         s (s' ,  ((λ where (inj₁ x , m) → inj₁ (inj₁ x) , m ; (inj₂ y , m) → inj₂ (inj₂ y) , m) <$> m'))
 
 open Comp using (_∘_) public
+
+module Machine-Reasoning where
+  open import Relation.Binary.Reasoning.Syntax
+
+  open begin-syntax Machine Leios.Prelude.id public
+  open ⟶-syntax {R = Machine} Machine Machine (λ M₁ M₂ → M₂ ∘ M₁) public
+  open end-syntax Machine id public
+
+postulate
+  ⊗-assoc : ∀ {A B C} → Machine ((A ⊗ B) ⊗ C) (A ⊗ (B ⊗ C))
+  ⊗-assoc⃖ : ∀ {A B C} → Machine (A ⊗ (B ⊗ C)) ((A ⊗ B) ⊗ C)
+
+⊗-sym : ∀ {A B} → Machine (A ⊗ B) (B ⊗ A)
+⊗-sym = TotalFunctionMachine λ where
+  (inj₁ (inj₁ p) , m) → inj₂ (inj₂ p) , m
+  (inj₁ (inj₂ p) , m) → inj₂ (inj₁ p) , m
+  (inj₂ (inj₁ p) , m) → inj₁ (inj₂ p) , m
+  (inj₂ (inj₂ p) , m) → inj₁ (inj₁ p) , m
+
+idᴷ : Machine I (I ⊗ I)
+idᴷ = TotalFunctionMachine λ where
+  (inj₂ (inj₁ ()) , _)
+  (inj₂ (inj₂ ()) , _)
+
+_∘ᴷ_ : ∀ {A B C E₁ E₂}
+     → Machine B (C ⊗ E₂) → Machine A (B ⊗ E₁) → Machine A (C ⊗ (E₁ ⊗ E₂))
+_∘ᴷ_ {A} {B} {C} {E₁} {E₂} M₂ M₁ = rew ∘ (M₂ ⊗ʳ E₁ ∘ M₁)
+  where
+    open Machine-Reasoning
+    rew : Machine ((C ⊗ E₂) ⊗ E₁) (C ⊗ (E₁ ⊗ E₂))
+    rew = begin
+      (C ⊗ E₂) ⊗ E₁
+        ⟶⟨ ⊗-assoc ⟩
+      C ⊗ (E₂ ⊗ E₁)
+        ⟶⟨ C ⊗ˡ ⊗-sym ⟩
+      C ⊗ (E₁ ⊗ E₂) ∎
+
+_⊗ᴷ_ : ∀ {A₁ B₁ E₁ A₂ B₂ E₂}
+     → Machine A₁ (B₁ ⊗ E₁) → Machine A₂ (B₂ ⊗ E₂) → Machine (A₁ ⊗ A₂) ((B₁ ⊗ B₂) ⊗ (E₁ ⊗ E₂))
+_⊗ᴷ_ {A₁} {B₁} {E₁} {A₂} {B₂} {E₂} M₁ M₂ = rew ∘ M₁ ⊗' M₂
+  where
+    open Machine-Reasoning
+    rew : Machine ((B₁ ⊗ E₁) ⊗ (B₂ ⊗ E₂)) ((B₁ ⊗ B₂) ⊗ (E₁ ⊗ E₂))
+    rew = begin
+      (B₁ ⊗ E₁) ⊗ (B₂ ⊗ E₂)
+        ⟶⟨ ⊗-assoc ⟩
+      B₁ ⊗ (E₁ ⊗ (B₂ ⊗ E₂))
+        ⟶⟨ B₁ ⊗ˡ ⊗-assoc⃖ ⟩
+      B₁ ⊗ ((E₁ ⊗ B₂) ⊗ E₂)
+        ⟶⟨ B₁ ⊗ˡ (⊗-sym ⊗ʳ E₂) ⟩
+      B₁ ⊗ ((B₂ ⊗ E₁) ⊗ E₂)
+        ⟶⟨ B₁ ⊗ˡ ⊗-assoc ⟩
+      B₁ ⊗ (B₂ ⊗ (E₁ ⊗ E₂))
+        ⟶⟨ ⊗-assoc⃖ ⟩
+      (B₁ ⊗ B₂) ⊗ (E₁ ⊗ E₂) ∎
+
+⨂ᴷ : ∀ {n} → {A B E : Fin n → Channel} → ((k : Fin n) → Machine (A k) (B k ⊗ E k))
+    → Machine (⨂ A) (⨂ B ⊗ ⨂ E)
+⨂ᴷ {zero} M = idᴷ
+⨂ᴷ {suc n} M = M fzero ⊗ᴷ ⨂ᴷ (M Leios.Prelude.∘ fsuc)
 
 --------------------------------------------------------------------------------
 -- Environment model
