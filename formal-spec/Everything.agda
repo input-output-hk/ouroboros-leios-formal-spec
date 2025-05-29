@@ -1,5 +1,3 @@
-{-# OPTIONS --safe #-}
-
 {- | 
 This module serves as the main entry point for the Leios formal specification.
 It imports all the core modules that together define the complete Leios protocol.
