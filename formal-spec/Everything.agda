@@ -30,6 +30,7 @@ The specification is organized into several key areas:
 ## Verification and Testing
 - `Leios.Short.Trace.Verifier` - Trace verification for protocol properties
 - State machine abstractions for protocol verification
+
 -}
 
 module Everything where
