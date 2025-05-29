@@ -9,16 +9,7 @@ env:
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
-    branches:
-      - main
-    paths:
-      - "flake.lock"
-      - "flake.nix"
-      - "formal-spec/**"
-      - "nix/**"
-  pull_request:
-    types: [closed]
+    types: [opened, synchronize, reopened, closed]
     branches:
       - main
     paths:
