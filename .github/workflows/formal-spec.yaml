@@ -2,23 +2,14 @@ name: "formal-spec"
 
 env:
   ALLOWED_URIS: "https://github.com https://api.github.com"
-  TRUSTED_PUBLIC_KEYS: >
-    cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
-    hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
+  TRUSTED_PUBLIC_KEYS:
+    "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+    hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
   SUBSTITUTERS: "https://cache.nixos.org/ https://cache.iog.io"
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
-    branches:
-      - main
-    paths:
-      - "flake.lock"
-      - "flake.nix"
-      - "formal-spec/**"
-      - "nix/**"
-  pull_request:
-    types: [closed]
+    types: [opened, synchronize, reopened, closed]
     branches:
       - main
     paths:
@@ -42,8 +33,8 @@ jobs:
   formal-spec-typecheck:
     name: "Typecheck"
     runs-on: ubuntu-22.04
-    # Only run typecheck for active PRs and pushes, skip for closed PRs
-    if: github.event_name != 'pull_request' || github.event.action != 'closed'
+    # Skip if PR was closed without merging
+    if: github.event_name != 'pull_request' || github.event.action != 'closed' || github.event.pull_request.merged == true
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -85,8 +76,8 @@ jobs:
     name: "Generate Web Documentation"
     needs: formal-spec-typecheck
     runs-on: ubuntu-22.04
-    # Only run for pushes to main and merged PRs
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+    # Skip if PR was closed without merging
+    if: github.event_name != 'pull_request' || github.event.action != 'closed' || github.event.pull_request.merged == true
     outputs:
       changed: ${{ steps.check-changes.outputs.changed }}
     steps:
@@ -144,7 +135,7 @@ jobs:
   notify-leios-repo:
     name: "Notify Leios Repo"
     needs: formal-spec-html
-    if: needs.formal-spec-html.outputs.changed == 'true'
+    if: ((github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.base.ref == 'main')) && needs.formal-spec-html.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: 🔔 Trigger Leios repo
