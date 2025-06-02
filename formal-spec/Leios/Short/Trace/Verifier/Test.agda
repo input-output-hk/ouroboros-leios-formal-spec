@@ -3,15 +3,21 @@ open import Leios.Config
 
 module Leios.Short.Trace.Verifier.Test where
 
-params : Params
-params =
+networkParams : NetworkParams
+networkParams =
   record
     { numberOfParties = 2
-    ; sutId = fzero
     ; stakeDistribution =
         let open FunTot (completeFin 2) (maximalFin 2)
         in Fun⇒TotalMap (const 100000000)
     ; stageLength = 2
+    }
+
+params : Params
+params =
+  record
+    { networkParams = networkParams
+    ; sutId = fzero
     ; winning-slots = fromList $
         (IB , 1) ∷ (EB , 1) ∷ (VT , 1) ∷
         (IB , 2) ∷ (EB , 2) ∷ (VT , 2) ∷

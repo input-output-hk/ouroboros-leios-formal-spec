@@ -1,3 +1,35 @@
+{- | 
+This module serves as the main entry point for the Leios formal specification.
+It imports all the core modules that together define the complete Leios protocol.
+
+The specification is organized into several key areas:
+
+## Core Protocol Components
+- `Leios.Protocol` - Main protocol definition
+- `Leios.Base` - Fundamental types and structures
+- `Leios.Blocks` - Block structure and validation
+- `Leios.Voting` - Voting mechanism specification
+
+## Cryptographic Foundations  
+- `CategoricalCrypto` - Category-theoretic approach to cryptography
+- `Leios.VRF` - Verifiable Random Function implementation
+
+## Network Layer
+- `Network.Leios` - Leios-specific networking protocols
+- `Network.BasicBroadcast` - Basic broadcast networking primitives
+
+## Simplified Models
+- `Leios.Simplified` - Simplified protocol models for analysis
+- `Leios.Short` - Short protocol variants
+
+## Foreign Function Interface
+- `Leios.Foreign.*` - Haskell interoperability types and utilities
+
+## Verification and Testing
+- `Leios.Short.Trace.Verifier` - Trace verification for protocol properties
+- State machine abstractions for protocol verification
+-}
+
 module Everything where
 
 open import CategoricalCrypto
@@ -29,3 +61,7 @@ open import Leios.Traces
 open import Leios.Voting
 open import Leios.VRF
 open import StateMachine
+
+-- Networking
+open import Network.BasicBroadcast
+open import Network.Leios

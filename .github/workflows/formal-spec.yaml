@@ -2,13 +2,16 @@ name: "formal-spec"
 
 env:
   ALLOWED_URIS: "https://github.com https://api.github.com"
-  TRUSTED_PUBLIC_KEYS:
-    "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
-    hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
+  TRUSTED_PUBLIC_KEYS: >
+    cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+    hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
   SUBSTITUTERS: "https://cache.nixos.org/ https://cache.iog.io"
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches:
+      - main
     paths:
       - "flake.lock"
       - "flake.nix"
@@ -30,6 +33,8 @@ jobs:
   formal-spec-typecheck:
     name: "Typecheck"
     runs-on: ubuntu-22.04
+    # Only run typecheck for active PRs and pushes, skip for closed PRs
+    if: github.event_name != 'pull_request' || github.event.action != 'closed'
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -66,3 +71,76 @@ jobs:
         run:
           "nix-store --export $(find /nix/store -maxdepth 1 -name '*-*') >
           /tmp/nixcache"
+
+  formal-spec-html:
+    name: "Generate Web Documentation"
+    needs: formal-spec-typecheck
+    runs-on: ubuntu-22.04
+    # Only run for pushes to main and merged PRs
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+    outputs:
+      changed: ${{ steps.check-changes.outputs.changed }}
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for Agda file changes
+        id: check-changes
+        run: |
+          # For main branch pushes, check changed files compared to the previous commit
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            git fetch origin ${{ github.event.before }} --depth=1
+            git diff --name-only ${{ github.event.before }} ${{ github.event.after }} > changed_files.txt
+          else
+            # For pull requests, check if any .agda or .lagda files changed
+            git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} > changed_files.txt
+          fi
+
+          # Check if any Agda files changed
+          if grep -q "\.agda$\|\.lagda$" changed_files.txt; then
+            echo "Agda file changes detected, generating docs"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "No Agda file changes detected, skipping docs generation"
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🛠️ Install Nix
+        if: steps.check-changes.outputs.changed == 'true'
+        uses: cachix/install-nix-action@v21
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          install_url: https://releases.nixos.org/nix/nix-2.10.3/install
+          extra_nix_config: |
+            allowed-uris = ${{ env.ALLOWED_URIS }}
+            trusted-public-keys = ${{ env.TRUSTED_PUBLIC_KEYS }}
+            substituters = ${{ env.SUBSTITUTERS }}
+            experimental-features = nix-command flakes
+
+      - name: 🏗️ Generate HTML documentation
+        if: steps.check-changes.outputs.changed == 'true'
+        run: |
+          nix build .#leiosDocs
+
+      - name: 🚀 Upload HTML output
+        if: steps.check-changes.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: formal-spec-html
+          path: result/html
+          retention-days: 5
+
+  notify-leios-repo:
+    name: "Notify Leios Repo"
+    needs: formal-spec-html
+    if: needs.formal-spec-html.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔔 Trigger Leios repo
+        run: |
+          curl -X POST https://api.github.com/repos/input-output-hk/ouroboros-leios/dispatches \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: token ${{ secrets.LEIOS_TRIGGER_PAT }}" \
+            -d '{"event_type":"formal-spec-updated", "client_payload": {"run_id": "${{ github.run_id }}"}}'
