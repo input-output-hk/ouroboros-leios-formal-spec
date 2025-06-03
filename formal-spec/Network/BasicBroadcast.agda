@@ -22,25 +22,24 @@ Ms = ⨂ const {B = Participant} M
 data Receive_withState_return_ : MachineType I (Ms ⊗ A) (List (Message × Participant)) where
 
   Send : ∀ {buffer ms} → {p : Participant}
-       → Receive (honestInputI $ snd⨂ p (-, SndMessage ms)) -- p wants to send messages ms
+       → Receive (honestInputI $ snd⨂ p (-, SndMessage ms))      -- p wants to send messages ms
          withState buffer
-                -- buffer a copy of every message for every participant
-         return (concatMap (λ m → tabulate (m ,_)) ms ++ buffer
-           , just (honestOutputO $ rcv⨂ p (-, Activate))) -- return control to p
+         return (concatMap (λ m → tabulate (m ,_)) ms ++ buffer   -- buffer a copy of every message for every participant
+           , just (honestOutputO $ rcv⨂ p (-, Activate)))        -- return control to p
 
   Deliver : ∀ {buffer₁ m buffer₂ k} → {p : Participant}
           → length buffer₁ ≡ k
-          → Receive (adversarialInput (-, inj₁ k)) -- adversary wants to deliver k-th message
-            withState (buffer₁ ++ (m , p) ∷ buffer₂) -- state decomposes appropriately
-            return (buffer₁ ++ buffer₂ -- remove message
+          → Receive (adversarialInput (-, inj₁ k))                -- adversary wants to deliver k-th message
+            withState (buffer₁ ++ (m , p) ∷ buffer₂)              -- state decomposes appropriately
+            return    (buffer₁ ++ buffer₂                         -- remove message
               , just (honestOutputO $ rcv⨂ p (-, RcvMessage m))) -- deliver it
 
   Eavesdrop : ∀ {buffer₁ x buffer₂ k}
           → length buffer₁ ≡ k
-          → Receive (adversarialInput (-, inj₂ k)) -- adversary wants to know k-th message
-            withState (buffer₁ ++ x ∷ buffer₂) -- state decomposes appropriately
-            return (buffer₁ ++ x ∷ buffer₂
-              , just (adversarialOutput (-, x))) -- deliver it
+          → Receive (adversarialInput (-, inj₂ k))                -- adversary wants to know k-th message
+            withState (buffer₁ ++ x ∷ buffer₂)                    -- state decomposes appropriately
+            return    (buffer₁ ++ x ∷ buffer₂
+              , just  (adversarialOutput (-, x)))                 -- deliver it
 
 Network : Machine I (Ms ⊗ A)
 Network .Machine.State = List (Message × Participant)
