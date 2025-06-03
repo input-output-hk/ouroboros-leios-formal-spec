@@ -13,12 +13,11 @@ module _ {s : LeiosState} (let open LeiosState s renaming (FFDState to ffds; Bas
            let b = GenFFD.ibBody (record { txs = ToPropose })
                h = GenFFD.ibHeader (mkIBHeader slot id π sk-IB ToPropose)
            in
-           { _ : auto∶ needsUpkeep IB-Role }
            { _ : auto∶ canProduceIB slot sk-IB (stake s) π }
            { _ : auto∶ ffds FFD.-⟦ FFD.Send h (just b) / FFD.SendRes ⟧⇀ ffds' } →
            ─────────────────────────────────────────────────────────────────────────
            s ↝ addUpkeep record s { FFDState = ffds' } IB-Role
-  IB-Role? {_} {_} {p} {q} {r} = IB-Role (toWitness p) (toWitness q) (toWitness r)
+  IB-Role? {_} {_} {p} {q} = IB-Role (toWitness p) (toWitness q)
 
   {-
   No-IB-Role? :
@@ -33,12 +32,11 @@ module _ {s : LeiosState} (let open LeiosState s renaming (FFDState to ffds; Bas
            let LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
                h = mkEB slot id π sk-EB LI []
            in
-           { _ : auto∶ needsUpkeep EB-Role }
            { _ : auto∶ canProduceEB slot sk-EB (stake s) π }
            { _ : auto∶ ffds FFD.-⟦ FFD.Send (GenFFD.ebHeader h) nothing / FFD.SendRes ⟧⇀ ffds' } →
            ─────────────────────────────────────────────────────────────────────────
            s ↝ addUpkeep record s { FFDState = ffds' } EB-Role
-  EB-Role? {_} {_} {p} {q} {r} = EB-Role (toWitness p) (toWitness q) (toWitness r)
+  EB-Role? {_} {_} {p} {q} = EB-Role (toWitness p) (toWitness q)
 
   {-
   No-EB-Role? :
@@ -53,12 +51,11 @@ module _ {s : LeiosState} (let open LeiosState s renaming (FFDState to ffds; Bas
           let EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
               votes = map (vote sk-VT ∘ hash) EBs'
           in
-          { _ : auto∶ needsUpkeep VT-Role }
           { _ : auto∶ canProduceV slot sk-VT (stake s) }
           { _ : auto∶ ffds FFD.-⟦ FFD.Send (GenFFD.vtHeader votes) nothing / FFD.SendRes ⟧⇀ ffds' } →
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } VT-Role
-  V-Role? {_} {p} {q} {r} = VT-Role (toWitness p) (toWitness q) (toWitness r)
+  V-Role? {_} {p} {q} = VT-Role (toWitness p) (toWitness q)
 
   No-V-Role? :
              { _ : auto∶ needsUpkeep VT-Role }
