@@ -14,6 +14,12 @@ open import Data.Fin
 
 module Leios.SpecStructure where
 
+{- SpecStructure: A record that bundles all parameters and dependent functionalities
+   required to define specifications of Leios variants.
+
+   Parameters:
+   - rounds: The number of voting rounds of the protocol.
+-}
 record SpecStructure (rounds : ℕ) : Type₁ where
   field a : LeiosAbstract
 

@@ -33,12 +33,19 @@ module F where
   open import Data.Fin.Properties public
 open F public using (Fin; toℕ; #_) renaming (zero to fzero; suc to fsuc)
 
-fromTo : ℕ → ℕ → List ℕ
-fromTo m n = map (_+ m) (upTo (n ∸ m))
+from_To_ : ℕ → ℕ → List ℕ
+from m To n = map (_+ m) (upTo (n ∸ m))
 
+{- slice: the slice of length L x slices before slot s
+-}
 slice : (L : ℕ) → ⦃ NonZero L ⦄ → ℕ → ℕ → ℙ ℕ
-slice L s x = fromList (fromTo s' (s' + (L ∸ 1)))
+slice L s x = fromList (from s' To (s' + (L ∸ 1)))
   where s' = ((s / L) ∸ x) * L -- equivalent to the formula in the paper
+
+{- slices: all slots starting x slices before and ending y slices before (exclusive) slot s
+-}
+slices : (L : ℕ) → ⦃ NonZero L ⦄ → ℕ → ℕ → ℕ → ℙ ℕ
+slices L s x y = foldl _∪_ ∅ $ map (slice L s) (from x To y)
 
 filter : {A : Set} → (P : A → Type) ⦃ _ : P ⁇¹ ⦄ → List A → List A
 filter P = L.filter ¿ P ¿¹
