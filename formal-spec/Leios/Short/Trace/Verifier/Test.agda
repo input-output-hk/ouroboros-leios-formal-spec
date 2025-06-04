@@ -11,6 +11,7 @@ networkParams =
         let open FunTot (completeFin 2) (maximalFin 2)
         in Fun⇒TotalMap (const 100000000)
     ; stageLength = 2
+    ; eta = 0
     }
 
 params : Params
