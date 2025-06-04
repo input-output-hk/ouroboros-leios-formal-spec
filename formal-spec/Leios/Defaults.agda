@@ -47,6 +47,7 @@ d-Abstract =
     ; vote     = λ _ _ → tt
     ; sign     = λ _ _ → tt
     ; L        = stageLength
+    ; η        = 0
     }
 
 open LeiosAbstract d-Abstract public
