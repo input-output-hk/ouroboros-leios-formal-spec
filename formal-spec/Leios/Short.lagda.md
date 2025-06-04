@@ -64,10 +64,6 @@ isVoteCertified : LeiosState → EndorserBlock → Type
 isVoteCertified s eb = isVoteCertified' (LeiosState.votingState s) (0F , eb)
 ```
 ```agda
-numberOfPipelinesToReference : ℕ
-numberOfPipelinesToReference = 5
-```
-```agda
 private variable s s'   : LeiosState
                  ffds'  : FFD.State
                  π      : VrfPf
