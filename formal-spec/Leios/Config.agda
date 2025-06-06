@@ -18,9 +18,10 @@ data BlockType : Type where
 unquoteDecl DecEq-BlockType = derive-DecEq ((quote BlockType , DecEq-BlockType) ∷ [])
 
 record NetworkParams : Type where
-  field numberOfParties : ℕ
+  field numberOfParties   : ℕ
         stakeDistribution : TotalMap (Fin numberOfParties) ℕ
-        stageLength : ℕ
+        stageLength       : ℕ
+        eta               : ℕ
         ⦃ NonZero-stageLength ⦄ : NonZero stageLength
         ⦃ NonZero-numberOfParties ⦄ : NonZero numberOfParties
 
