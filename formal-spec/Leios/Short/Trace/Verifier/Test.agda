@@ -204,11 +204,9 @@ module _ where
           (IB , 109) ∷ (EB , 109) ∷ (VT , 109) ∷
           (IB , 110) ∷ (EB , 110) ∷ (VT , 110) ∷
           (IB , 111) ∷ (EB , 111) ∷ (VT , 111) ∷
-          (IB , 112) ∷ (EB , 112) ∷ (VT , 112) ∷
-          (IB , 113) ∷ (EB , 113) ∷ (VT , 113) ∷
-          (IB , 114) ∷ (EB , 114) ∷ (VT , 114) ∷
-          (IB , 115) ∷ (EB , 115) ∷ (VT , 115) ∷
-          (IB , 116) ∷ (EB , 116) ∷ (VT , 116) ∷
+          (IB , 112)              ∷ (VT , 112) ∷
+          (IB , 113)              ∷ (VT , 113) ∷
+          (IB , 114)              ∷ (VT , 114) ∷
           []
       }
 
@@ -247,7 +245,7 @@ module _ where
                            }
                           ; body = record { txs = 0 ∷ 1 ∷ 2 ∷ [] }}))
               ∷ inj₂ (EB-Recv-Update
-                  record { slotNumber = 97
+                  record { slotNumber = 96
                          ; producerID = fsuc fzero
                          ; lotteryPf = tt
                          ; ibRefs = (10 ∷ 20 ∷ []) ∷ []
@@ -274,7 +272,14 @@ module _ where
               ∷ inj₁ (Slot-Action    103    , SLOT)
               -- slot 104
               ∷ inj₁ (IB-Role-Action 104    , SLOT)
-              ∷ inj₁ (EB-Role-Action 104 [] [] , SLOT)
+              ∷ inj₁ (EB-Role-Action 104 []
+                 (record { slotNumber = 96
+                         ; producerID = fsuc fzero
+                         ; lotteryPf = tt
+                         ; ibRefs = (10 ∷ 20 ∷ []) ∷ []
+                         ; ebRefs = []
+                         ; signature = tt
+                         } ∷ []) , SLOT)
               ∷ inj₁ (VT-Role-Action 104    , SLOT)
               ∷ inj₁ (Base₂b-Action  104    , SLOT)
               ∷ inj₁ (Slot-Action    104    , SLOT)
@@ -303,45 +308,39 @@ module _ where
               ∷ inj₁ (Slot-Action    107    , SLOT)
               -- slot 108
               ∷ inj₁ (IB-Role-Action 108    , SLOT)
-              ∷ inj₁ (EB-Role-Action 108 ((3 ∷ 4 ∷ 5 ∷ []) ∷ []) [] , SLOT)
+              ∷ inj₁ (EB-Role-Action 108 ((3 ∷ 4 ∷ 5 ∷ []) ∷ [])
+                 (record { slotNumber = 96
+                         ; producerID = fsuc fzero
+                         ; lotteryPf = tt
+                         ; ibRefs = (10 ∷ 20 ∷ []) ∷ []
+                         ; ebRefs = []
+                         ; signature = tt
+                         } ∷ []) , SLOT)
               ∷ inj₂ (EB-Recv-Update
                   record { slotNumber = 108
                          ; producerID = fzero
                          ; lotteryPf = tt
                          ; ibRefs = (3 ∷ 4 ∷ 5 ∷ []) ∷ []
-                         ; ebRefs = []
+                         ; ebRefs = (10 ∷ 20 ∷ []) ∷ []
                          ; signature = tt
                          })
               ∷ inj₁ (VT-Role-Action 108    , SLOT)
               ∷ inj₁ (Base₂b-Action  108    , SLOT)
-              {-
-              ∷ inj₁ (Base₂a-Action  108
-                  record { slotNumber = 104
-                         ; producerID = fsuc fzero
-                         ; lotteryPf = tt
-                         ; ibRefs = (3 ∷ 4 ∷ 5 ∷ []) ∷ []
-                         ; ebRefs = []
-                         ; signature = tt
-                         }, SLOT)
-              -}
               ∷ inj₁ (Slot-Action    108    , SLOT)
               -- slot 109
               ∷ inj₁ (IB-Role-Action 109    , SLOT)
               ∷ inj₁ (Base₂b-Action  109    , SLOT)
-              {-
-              ∷ inj₁ (Base₂a-Action  109
-                  record { slotNumber = 104
-                         ; producerID = fsuc fzero
-                         ; lotteryPf = tt
-                         ; ibRefs = (3 ∷ 4 ∷ 5 ∷ []) ∷ []
-                         ; ebRefs = []
-                         ; signature = tt
-                         }, SLOT)
-              -}
               ∷ inj₁ (Slot-Action    109    , SLOT)
               -- slot 110
               ∷ inj₁ (IB-Role-Action 110    , SLOT)
-              ∷ inj₁ (EB-Role-Action 110 [] [] , SLOT)
+              ∷ inj₁ (EB-Role-Action 110 []
+                 (record { slotNumber = 96
+                         ; producerID = fsuc fzero
+                         ; lotteryPf = tt
+                         ; ibRefs = (10 ∷ 20 ∷ []) ∷ []
+                         ; ebRefs = []
+                         ; signature = tt
+                         } ∷ []) , SLOT)
               ∷ inj₁ (VT-Role-Action 110    , SLOT)
               ∷ inj₁ (Base₂b-Action  110    , SLOT)
               ∷ inj₁ (Slot-Action    110    , SLOT)
@@ -351,14 +350,14 @@ module _ where
               ∷ inj₁ (Slot-Action    111    , SLOT)
               -- slot 112
               ∷ inj₁ (IB-Role-Action 112    , SLOT)
-              ∷ inj₁ (EB-Role-Action 112 [] [] , SLOT)
+              ∷ inj₁ (No-EB-Role-Action 112 , SLOT)
               ∷ inj₁ (VT-Role-Action 112    , SLOT)
               ∷ inj₁ (Base₂a-Action  112
                   record { slotNumber = 108
                          ; producerID = fzero
                          ; lotteryPf = tt
                          ; ibRefs = (3 ∷ 4 ∷ 5 ∷ []) ∷ []
-                         ; ebRefs = []
+                         ; ebRefs = (10 ∷ 20 ∷ []) ∷ []
                          ; signature = tt
                          }, SLOT)
               ∷ inj₁ (Slot-Action    112    , SLOT)
@@ -369,13 +368,13 @@ module _ where
                          ; producerID = fzero
                          ; lotteryPf = tt
                          ; ibRefs = (3 ∷ 4 ∷ 5 ∷ []) ∷ []
-                         ; ebRefs = []
+                         ; ebRefs = (10 ∷ 20 ∷ []) ∷ []
                          ; signature = tt
                          }, SLOT)
               ∷ inj₁ (Slot-Action    113    , SLOT)
               -- slot 114
               ∷ inj₁ (IB-Role-Action 114    , SLOT)
-              ∷ inj₁ (EB-Role-Action 114 [] [] , SLOT)
+              ∷ inj₁ (No-EB-Role-Action 114 , SLOT)
               ∷ inj₁ (VT-Role-Action 114    , SLOT)
               ∷ inj₁ (Base₂b-Action  114    , SLOT)
               ∷ inj₁ (Slot-Action    114    , SLOT)

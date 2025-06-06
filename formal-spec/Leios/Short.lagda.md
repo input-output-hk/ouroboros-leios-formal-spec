@@ -113,7 +113,7 @@ data _↝_ : LeiosState → LeiosState → Type where
                 h = mkEB slot id π sk-EB LI (L.map getEBRef ebs)
                 P = λ eb' → eb' ∈ˡ EBs
                           × isVoteCertified s eb'
-                          × eb' ∈ᴮ slices L slot (3 * η / L) 2
+                          × eb' ∈ᴮ slices L slot 2 (3 * η / L)
                 slots = map slotNumber
           in
           ∙ canProduceEB slot sk-EB (stake s) π

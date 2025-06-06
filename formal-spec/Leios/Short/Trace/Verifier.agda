@@ -71,7 +71,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
                 ffds' = proj₁ (FFD.Send-total {ffds} {ebHeader h} {nothing})
                 P = λ eb' → eb' ∈ˡ EBs
                           × isVoteCertified s eb'
-                          × eb' ∈ᴮ slices L slot (3 * η / L) 2
+                          × eb' ∈ᴮ slices L slot 2 (3 * η / L)
                 slots = map slotNumber
             in
             ∙ canProduceEB slot sk-EB (stake s) tt
