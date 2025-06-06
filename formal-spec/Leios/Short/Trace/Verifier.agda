@@ -207,30 +207,30 @@ ValidAction→Eq-VT : ∀ {s sl} → ValidAction (VT-Role-Action sl) s SLOT → 
 ValidAction→Eq-VT (VT-Role _ _) = refl
 
 getLabel : just s -⟦ i / o ⟧⇀ s′ → Action
-getLabel (Slot {s} _ _ _)             = Slot-Action (slot s)
-getLabel (Ftch {s})                   = Ftch-Action (slot s)
-getLabel (Base₁ {s})                  = Base₁-Action (slot s)
-getLabel (Base₂a {s} {eb} _ _ _)      = Base₂a-Action (slot s) eb
-getLabel (Base₂b {s} _ _ _)           = Base₂b-Action (slot s)
-getLabel (Roles (IB-Role {s} _ _))    = IB-Role-Action (slot s)
-getLabel (Roles (EB-Role {s} {ebs = ebs} _ _ _ _)) = EB-Role-Action (slot s) (map getIBRef $ filter (_∈ᴮ slice L (slot s) 3) (IBs s)) ebs
-getLabel (Roles (VT-Role {s} _ _))    = VT-Role-Action (slot s)
-getLabel (Roles (No-IB-Role {s} _ _)) = No-IB-Role-Action (slot s)
-getLabel (Roles (No-EB-Role {s} _ _)) = No-EB-Role-Action (slot s)
-getLabel (Roles (No-VT-Role {s} _ _)) = No-VT-Role-Action (slot s)
+getLabel (Slot {s} _ _ _)                        = Slot-Action (slot s)
+getLabel (Ftch {s})                              = Ftch-Action (slot s)
+getLabel (Base₁ {s})                             = Base₁-Action (slot s)
+getLabel (Base₂a {s} {eb} _ _ _)                 = Base₂a-Action (slot s) eb
+getLabel (Base₂b {s} _ _ _)                      = Base₂b-Action (slot s)
+getLabel (Roles (IB-Role {s} _ _))               = IB-Role-Action (slot s)
+getLabel (Roles (EB-Role {s} {_} {ebs} _ _ _ _)) = EB-Role-Action (slot s) (map getIBRef $ filter (_∈ᴮ slice L (slot s) 3) (IBs s)) ebs
+getLabel (Roles (VT-Role {s} _ _))               = VT-Role-Action (slot s)
+getLabel (Roles (No-IB-Role {s} _ _))            = No-IB-Role-Action (slot s)
+getLabel (Roles (No-EB-Role {s} _ _))            = No-EB-Role-Action (slot s)
+getLabel (Roles (No-VT-Role {s} _ _))            = No-VT-Role-Action (slot s)
 
 ValidAction-sound : (vα : ValidAction α s i) → let (s′ , o) = ⟦ vα ⟧ in just s -⟦ i / o ⟧⇀ s′
-ValidAction-sound (Slot x x₁ x₂)    = Slot {rbs = []} x x₁ x₂
-ValidAction-sound Ftch              = Ftch
-ValidAction-sound Base₁             = Base₁
-ValidAction-sound (Base₂a x x₁ x₂)  = Base₂a x x₁ x₂
-ValidAction-sound (Base₂b x x₁ x₂)  = Base₂b x x₁ x₂
-ValidAction-sound (IB-Role x₁ x₂)   = Roles (IB-Role x₁ x₂)
+ValidAction-sound (Slot x x₁ x₂)       = Slot {rbs = []} x x₁ x₂
+ValidAction-sound Ftch                 = Ftch
+ValidAction-sound Base₁                = Base₁
+ValidAction-sound (Base₂a x x₁ x₂)     = Base₂a x x₁ x₂
+ValidAction-sound (Base₂b x x₁ x₂)     = Base₂b x x₁ x₂
+ValidAction-sound (IB-Role x₁ x₂)      = Roles (IB-Role x₁ x₂)
 ValidAction-sound (EB-Role x x₁ x₂ x₃) = Roles (EB-Role x x₁ x₂ x₃)
-ValidAction-sound (VT-Role x₁ x₂)   = Roles (VT-Role x₁ x₂)
-ValidAction-sound (No-IB-Role x x₁) = Roles (No-IB-Role x x₁)
-ValidAction-sound (No-EB-Role x x₁) = Roles (No-EB-Role x x₁)
-ValidAction-sound (No-VT-Role x x₁) = Roles (No-VT-Role x x₁)
+ValidAction-sound (VT-Role x₁ x₂)      = Roles (VT-Role x₁ x₂)
+ValidAction-sound (No-IB-Role x x₁)    = Roles (No-IB-Role x x₁)
+ValidAction-sound (No-EB-Role x x₁)    = Roles (No-EB-Role x x₁)
+ValidAction-sound (No-VT-Role x x₁)    = Roles (No-VT-Role x x₁)
 
 ValidAction-complete : (st : just s -⟦ i / o ⟧⇀ s′) → ValidAction (getLabel st) s i
 ValidAction-complete {s} {s′} (Roles (IB-Role {s} {π} {ffds'} x₁ _)) =
@@ -441,7 +441,7 @@ data _⇑_ : LeiosState → LeiosState → Type where
 -- NOTE: this goes backwards, from the current state to the initial state
 data _—→_ : LeiosState → LeiosState → Type where
 
-  StateStep : ∀ {s i o s′} →
+  ActionStep : ∀ {s i o s′} →
     ∙ just s -⟦ i / o ⟧⇀ s′
       ───────────────────
       s′ —→ s
@@ -464,13 +464,13 @@ infix 0 _≈_
 
 data _≈_ : TestTrace → s′ —↠ s → Type where
 
-  Step :
+  FromAction :
     ∀ α i {αs s₁} {tr : s₁ —↠ s}
       → αs ≈ tr
       → (vα : ValidAction α s₁ i)
-      → inj₁ (α , i) ∷ αs ≈ ⟦ vα ⟧ .proj₁ —→⟨ StateStep (ValidAction-sound vα) ⟩ tr
+      → inj₁ (α , i) ∷ αs ≈ ⟦ vα ⟧ .proj₁ —→⟨ ActionStep (ValidAction-sound vα) ⟩ tr
 
-  Update :
+  FromUpdate :
     ∀ {s} μ {αs s₁} {tr : s₁ —↠ s}
       → αs ≈ tr
       → (vμ : ValidUpdate μ s₁)
@@ -495,11 +495,11 @@ verifyTrace (inj₁ (α , i) ∷ αs) s
 ... | Ok (Valid {s′} tr eq)
   with verifyAction α i s′
 ... | Err e = mapErr Err-Action (Err e)
-... | Ok p = Ok (Valid {s′ = ⟦ p ⟧ .proj₁} (⟦ p ⟧ .proj₁ —→⟨ StateStep (ValidAction-sound p) ⟩ tr ) (Step α i eq p))
+... | Ok p = Ok (Valid {s′ = ⟦ p ⟧ .proj₁} (⟦ p ⟧ .proj₁ —→⟨ ActionStep (ValidAction-sound p) ⟩ tr ) (FromAction α i eq p))
 verifyTrace (inj₂ μ ∷ αs) s
   with verifyTrace αs s
 ... | Err e = mapErr Err-UpdateOk (Err e)
 ... | Ok (Valid {s′} tr eq)
   with verifyUpdate μ s′
 ... | Err e = mapErr Err-Update (Err e)
-... | Ok p = Ok (Valid (ValidUpdate-sound p .proj₁ —→⟨ UpdateStep (ValidUpdate-sound p .proj₂) ⟩ tr) (Update μ eq p))
+... | Ok p = Ok (Valid (ValidUpdate-sound p .proj₁ —→⟨ UpdateStep (ValidUpdate-sound p .proj₂) ⟩ tr) (FromUpdate μ eq p))
