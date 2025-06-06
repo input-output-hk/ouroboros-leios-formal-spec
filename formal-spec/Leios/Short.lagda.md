@@ -111,10 +111,14 @@ data _↝_ : LeiosState → LeiosState → Type where
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
                 LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
                 h = mkEB slot id π sk-EB LI (L.map getEBRef ebs)
+                P = λ eb' → eb' ∈ˡ EBs
+                          × isVoteCertified s eb'
+                          × eb' ∈ᴮ slices L slot (3 * η / L) 2
+                slots = map slotNumber
           in
           ∙ canProduceEB slot sk-EB (stake s) π
-          ∙ A.All (λ eb' → eb' ∈ˡ EBs × isVoteCertified s eb' × eb' ∈ᴮ slices L slot (3 * η / L) 2) ebs
-          ∙ Unique (map slotNumber ebs)
+          ∙ A.All P ebs
+          ∙ Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
           ∙ ffds FFD.-⟦ Send (ebHeader h) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } EB-Role

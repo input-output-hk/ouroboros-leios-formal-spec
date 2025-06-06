@@ -69,10 +69,14 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
                 LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
                 h = mkEB slot id tt sk-EB LI (L.map getEBRef ebs)
                 ffds' = proj₁ (FFD.Send-total {ffds} {ebHeader h} {nothing})
+                P = λ eb' → eb' ∈ˡ EBs
+                          × isVoteCertified s eb'
+                          × eb' ∈ᴮ slices L slot (3 * η / L) 2
+                slots = map slotNumber
             in
             ∙ canProduceEB slot sk-EB (stake s) tt
-            ∙ A.All (λ eb' → eb' ∈ˡ EBs × isVoteCertified s eb' × eb' ∈ᴮ slices L slot (3 * η / L) 2) ebs
-            ∙ Unique (map slotNumber ebs)
+            ∙ A.All P ebs
+            ∙ Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
             ∙ ffds FFD.-⟦ FFD.Send (ebHeader h) nothing / FFD.SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
             ValidAction (EB-Role-Action slot LI ebs) s SLOT
@@ -125,7 +129,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
   Base₂a : ∀ {eb} → let open LeiosState s renaming (BaseState to bs)
            in
            ∙ needsUpkeep Base
-           ∙ eb ∈ filter (λ eb → isVoteCertified s eb × eb ∈ᴮ slice L slot 2) EBs
+           ∙ eb ∈ filter (λ eb' → isVoteCertified s eb' × eb' ∈ᴮ slice L slot 2) EBs
            ∙ bs B.-⟦ B.SUBMIT (this eb) / B.EMPTY ⟧⇀ tt
            ─────────────────────────────────────────────────────────────────────────
            ValidAction (Base₂a-Action slot eb) s SLOT
@@ -133,7 +137,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
   Base₂b : let open LeiosState s renaming (BaseState to bs)
            in
            ∙ needsUpkeep Base
-           ∙ [] ≡ filter (λ eb → isVoteCertified s eb × eb ∈ᴮ slice L slot 2) EBs
+           ∙ [] ≡ filter (λ eb' → isVoteCertified s eb' × eb' ∈ᴮ slice L slot 2) EBs
            ∙ bs B.-⟦ B.SUBMIT (that ToPropose) / B.EMPTY ⟧⇀ tt
            ─────────────────────────────────────────────────────────────────────────
            ValidAction (Base₂b-Action slot) s SLOT
