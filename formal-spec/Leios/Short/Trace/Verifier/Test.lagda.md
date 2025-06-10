@@ -1,8 +1,12 @@
+## Trace verification examples
+
+```agda
 open import Leios.Prelude hiding (id)
 open import Leios.Config
 
 module Leios.Short.Trace.Verifier.Test where
-
+```
+```agda
 module _ where
 
   private
@@ -60,9 +64,9 @@ module _ where
 
       _ : test-valid-ib ≡ true
       _ = refl
-
-{- # Short Leios
--}
+```
+### Short Leios
+```agda
 module _ where
 
   private
@@ -171,11 +175,10 @@ module _ where
               ∷ inj₁ (Slot-Action    108    , SLOT)
               ∷ []) s₁₀₀)
       test₂ = _
-
-
-{- # Full Short Leios
+```
+### Full Short Leios
 * η > 0
--}
+```agda
 module _ where
 
   private
@@ -380,3 +383,4 @@ module _ where
               ∷ inj₁ (Slot-Action    114    , SLOT)
               ∷ []) s₁₀₀)
       test₂ = tt
+```
