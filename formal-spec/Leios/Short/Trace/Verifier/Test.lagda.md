@@ -227,17 +227,23 @@ module _ where
           s₀ = initLeiosState tt stakeDistribution tt ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
 
       test₂ : IsOk (verifyTrace (L.reverse $
-              -- slot 100
+```
+#### Slot 100
+```agda
                 inj₁ (No-IB-Role-Action 100 , SLOT)
               ∷ inj₁ (No-EB-Role-Action 100 , SLOT)
               ∷ inj₁ (No-VT-Role-Action 100 , SLOT)
               ∷ inj₁ (Base₂b-Action     100 , SLOT)
               ∷ inj₁ (Slot-Action       100 , SLOT)
-              -- slot 101
+```
+#### Slot 101
+```agda
               ∷ inj₁ (IB-Role-Action 101    , SLOT)
               ∷ inj₁ (Base₂b-Action  101    , SLOT)
               ∷ inj₁ (Slot-Action    101    , SLOT)
-              -- slot 102
+```
+#### Slot 102
+```agda
               ∷ inj₂ (IB-Recv-Update
                   (record { header =
                     record { slotNumber = 101
@@ -260,7 +266,9 @@ module _ where
               ∷ inj₁ (VT-Role-Action 102    , SLOT)
               ∷ inj₁ (Base₂b-Action  102    , SLOT)
               ∷ inj₁ (Slot-Action    102    , SLOT)
-              -- slot 103
+```
+#### Slot 103
+```agda
               ∷ inj₂ (IB-Recv-Update
                   (record { header =
                     record { slotNumber = 102
@@ -273,7 +281,9 @@ module _ where
               ∷ inj₁ (IB-Role-Action 103    , SLOT)
               ∷ inj₁ (Base₂b-Action  103    , SLOT)
               ∷ inj₁ (Slot-Action    103    , SLOT)
-              -- slot 104
+```
+#### Slot 104
+```agda
               ∷ inj₁ (IB-Role-Action 104    , SLOT)
               ∷ inj₁ (EB-Role-Action 104 []
                  (record { slotNumber = 96
@@ -286,17 +296,23 @@ module _ where
               ∷ inj₁ (VT-Role-Action 104    , SLOT)
               ∷ inj₁ (Base₂b-Action  104    , SLOT)
               ∷ inj₁ (Slot-Action    104    , SLOT)
-              -- slot 105
+```
+#### Slot 105
+```agda
               ∷ inj₁ (IB-Role-Action 105    , SLOT)
               ∷ inj₁ (Base₂b-Action  105    , SLOT)
               ∷ inj₁ (Slot-Action    105    , SLOT)
-              -- slot 106
+```
+#### Slot 106
+```agda
               ∷ inj₁ (No-IB-Role-Action 106 , SLOT)
               ∷ inj₁ (No-EB-Role-Action 106 , SLOT)
               ∷ inj₁ (VT-Role-Action    106 , SLOT)
               ∷ inj₁ (Base₂b-Action     106 , SLOT)
               ∷ inj₁ (Slot-Action       106 , SLOT)
-              -- slot 107
+```
+#### Slot 107
+```agda
               ∷ inj₂ (IB-Recv-Update
                   (record { header =
                     record { slotNumber = 105
@@ -309,7 +325,9 @@ module _ where
               ∷ inj₁ (IB-Role-Action 107    , SLOT)
               ∷ inj₁ (Base₂b-Action  107    , SLOT)
               ∷ inj₁ (Slot-Action    107    , SLOT)
-              -- slot 108
+```
+#### Slot 108
+```agda
               ∷ inj₁ (IB-Role-Action 108    , SLOT)
               ∷ inj₁ (EB-Role-Action 108 ((3 ∷ 4 ∷ 5 ∷ []) ∷ [])
                  (record { slotNumber = 96
@@ -330,11 +348,15 @@ module _ where
               ∷ inj₁ (VT-Role-Action 108    , SLOT)
               ∷ inj₁ (Base₂b-Action  108    , SLOT)
               ∷ inj₁ (Slot-Action    108    , SLOT)
-              -- slot 109
+```
+#### Slot 109
+```agda
               ∷ inj₁ (IB-Role-Action 109    , SLOT)
               ∷ inj₁ (Base₂b-Action  109    , SLOT)
               ∷ inj₁ (Slot-Action    109    , SLOT)
-              -- slot 110
+```
+#### Slot 110
+```agda
               ∷ inj₁ (IB-Role-Action 110    , SLOT)
               ∷ inj₁ (EB-Role-Action 110 []
                  (record { slotNumber = 96
@@ -347,11 +369,15 @@ module _ where
               ∷ inj₁ (VT-Role-Action 110    , SLOT)
               ∷ inj₁ (Base₂b-Action  110    , SLOT)
               ∷ inj₁ (Slot-Action    110    , SLOT)
-              -- slot 111
+```
+#### Slot 111
+```agda
               ∷ inj₁ (IB-Role-Action 111    , SLOT)
               ∷ inj₁ (Base₂b-Action  111    , SLOT)
               ∷ inj₁ (Slot-Action    111    , SLOT)
-              -- slot 112
+```
+#### Slot 112
+```agda
               ∷ inj₁ (IB-Role-Action 112    , SLOT)
               ∷ inj₁ (No-EB-Role-Action 112 , SLOT)
               ∷ inj₁ (VT-Role-Action 112    , SLOT)
@@ -364,7 +390,9 @@ module _ where
                          ; signature = tt
                          }, SLOT)
               ∷ inj₁ (Slot-Action    112    , SLOT)
-              -- slot 113
+```
+#### Slot 113
+```agda
               ∷ inj₁ (IB-Role-Action 113    , SLOT)
               ∷ inj₁ (Base₂a-Action  113
                   record { slotNumber = 108
@@ -375,7 +403,9 @@ module _ where
                          ; signature = tt
                          }, SLOT)
               ∷ inj₁ (Slot-Action    113    , SLOT)
-              -- slot 114
+```
+#### Slot 114
+```agda
               ∷ inj₁ (IB-Role-Action 114    , SLOT)
               ∷ inj₁ (No-EB-Role-Action 114 , SLOT)
               ∷ inj₁ (VT-Role-Action 114    , SLOT)
