@@ -182,6 +182,9 @@ module _ where
 module _ where
 
   private
+```
+Parameters are as follows
+```agda
     params : Params
     params =
       record
@@ -212,7 +215,8 @@ module _ where
           (IB , 114)              ∷ (VT , 114) ∷
           []
       }
-
+```
+```agda
     open Params params
     open import Leios.Short.Trace.Verifier params
 
@@ -228,7 +232,7 @@ module _ where
 
       test₂ : IsOk (verifyTrace (L.reverse $
 ```
-#### Slot 100
+#### Slot 100, Stage 50
 ```agda
                 inj₁ (No-IB-Role-Action 100 , SLOT)
               ∷ inj₁ (No-EB-Role-Action 100 , SLOT)
@@ -242,7 +246,10 @@ module _ where
               ∷ inj₁ (Base₂b-Action  101    , SLOT)
               ∷ inj₁ (Slot-Action    101    , SLOT)
 ```
-#### Slot 102
+#### Slot 102, Stage 51
+The Leios state is updated by
+* IB created in slot 101 by the other party
+* EB created in slot 96 by the other party
 ```agda
               ∷ inj₂ (IB-Recv-Update
                   (record { header =
@@ -268,6 +275,8 @@ module _ where
               ∷ inj₁ (Slot-Action    102    , SLOT)
 ```
 #### Slot 103
+The Leios state is updated by
+* IB created in slot 102 by the other party
 ```agda
               ∷ inj₂ (IB-Recv-Update
                   (record { header =
@@ -282,7 +291,8 @@ module _ where
               ∷ inj₁ (Base₂b-Action  103    , SLOT)
               ∷ inj₁ (Slot-Action    103    , SLOT)
 ```
-#### Slot 104
+#### Slot 104, Stage 52
+* EB created references EB created in slot 96 by the other party
 ```agda
               ∷ inj₁ (IB-Role-Action 104    , SLOT)
               ∷ inj₁ (EB-Role-Action 104 []
@@ -303,7 +313,7 @@ module _ where
               ∷ inj₁ (Base₂b-Action  105    , SLOT)
               ∷ inj₁ (Slot-Action    105    , SLOT)
 ```
-#### Slot 106
+#### Slot 106, Stage 53
 ```agda
               ∷ inj₁ (No-IB-Role-Action 106 , SLOT)
               ∷ inj₁ (No-EB-Role-Action 106 , SLOT)
@@ -312,6 +322,8 @@ module _ where
               ∷ inj₁ (Slot-Action       106 , SLOT)
 ```
 #### Slot 107
+The Leios state is updated by
+* IB created in slot 105 by the other party
 ```agda
               ∷ inj₂ (IB-Recv-Update
                   (record { header =
@@ -326,7 +338,9 @@ module _ where
               ∷ inj₁ (Base₂b-Action  107    , SLOT)
               ∷ inj₁ (Slot-Action    107    , SLOT)
 ```
-#### Slot 108
+#### Slot 108, Stage 54
+* EB created references EB created in slot 96 by the other party
+* Receive EB created in slot 96 by the other party that references older EB
 ```agda
               ∷ inj₁ (IB-Role-Action 108    , SLOT)
               ∷ inj₁ (EB-Role-Action 108 ((3 ∷ 4 ∷ 5 ∷ []) ∷ [])
@@ -355,7 +369,8 @@ module _ where
               ∷ inj₁ (Base₂b-Action  109    , SLOT)
               ∷ inj₁ (Slot-Action    109    , SLOT)
 ```
-#### Slot 110
+#### Slot 110, Stage 55
+* Create EB referencing older EB
 ```agda
               ∷ inj₁ (IB-Role-Action 110    , SLOT)
               ∷ inj₁ (EB-Role-Action 110 []
@@ -376,7 +391,8 @@ module _ where
               ∷ inj₁ (Base₂b-Action  111    , SLOT)
               ∷ inj₁ (Slot-Action    111    , SLOT)
 ```
-#### Slot 112
+#### Slot 112, Stage 56
+* Send EB to underlying chain
 ```agda
               ∷ inj₁ (IB-Role-Action 112    , SLOT)
               ∷ inj₁ (No-EB-Role-Action 112 , SLOT)
@@ -392,6 +408,7 @@ module _ where
               ∷ inj₁ (Slot-Action    112    , SLOT)
 ```
 #### Slot 113
+* Send EB to underlying chain
 ```agda
               ∷ inj₁ (IB-Role-Action 113    , SLOT)
               ∷ inj₁ (Base₂a-Action  113
@@ -404,13 +421,15 @@ module _ where
                          }, SLOT)
               ∷ inj₁ (Slot-Action    113    , SLOT)
 ```
-#### Slot 114
+#### Slot 114, Stage 57
 ```agda
               ∷ inj₁ (IB-Role-Action 114    , SLOT)
               ∷ inj₁ (No-EB-Role-Action 114 , SLOT)
               ∷ inj₁ (VT-Role-Action 114    , SLOT)
               ∷ inj₁ (Base₂b-Action  114    , SLOT)
               ∷ inj₁ (Slot-Action    114    , SLOT)
+```
+```agda
               ∷ []) s₁₀₀)
       test₂ = tt
 ```

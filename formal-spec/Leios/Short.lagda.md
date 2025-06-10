@@ -107,6 +107,8 @@ data _↝_ : LeiosState → LeiosState → Type where
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } IB-Role
 ```
+When η = 0 there is no indirect ledger inclusion; in case η > 0 earlier EBs might
+be referenced (Full-Short Leios).
 ```agda
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
                 LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
