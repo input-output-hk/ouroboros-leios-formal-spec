@@ -1,9 +1,6 @@
 open import Leios.Prelude hiding (id)
 open import Leios.Config
 
-import Data.List.Relation.Unary.All as A
-open import Data.List.Relation.Unary.Unique.DecPropositional N._≟_
-
 -- TODO: SpecStructure as parameter
 module Leios.Short.Trace.Verifier (params : Params) (let open Params params) where
 
@@ -76,7 +73,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
             in
             ∙ canProduceEB slot sk-EB (stake s) tt
             ∙ All.All P ebs
-            ∙ All.Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
+            ∙ Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
             ∙ ffds FFD.-⟦ FFD.Send (ebHeader h) nothing / FFD.SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
             ValidAction (EB-Role-Action slot LI ebs) s SLOT

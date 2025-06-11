@@ -115,7 +115,7 @@ be referenced (Full-Short Leios).
           in
           ∙ canProduceEB slot sk-EB (stake s) π
           ∙ All.All P ebs
-          ∙ All.Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
+          ∙ Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
           ∙ ffds FFD.-⟦ Send (ebHeader h) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } EB-Role

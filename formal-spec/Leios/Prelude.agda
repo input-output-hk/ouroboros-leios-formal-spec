@@ -36,8 +36,8 @@ open Any public using (here; there)
 
 module All where
   open import Data.List.Relation.Unary.All public
-  open import Data.List.Relation.Unary.Unique.DecPropositional N._≟_ using (Unique) public
-open All public using (Unique)
+
+open import Data.List.Relation.Unary.Unique.DecPropositional N._≟_ using (Unique) public
 
 from_To_ : ℕ → ℕ → List ℕ
 from m To n = map (_+ m) (upTo (n ∸ m))
