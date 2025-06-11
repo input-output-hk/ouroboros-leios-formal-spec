@@ -28,3 +28,4 @@ record LeiosAbstract : Type₁ where
         ⦃ Hashable-Txs ⦄ : Hashable (List Tx) Hash
         L : ℕ
         ⦃ NonZero-L ⦄ : NonZero L
+        η : ℕ

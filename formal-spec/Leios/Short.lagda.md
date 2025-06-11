@@ -9,6 +9,9 @@ open import Leios.SpecStructure
 open import Data.Fin.Patterns
 open import Class.ToBool
 
+import Data.List.Relation.Unary.All as A
+open import Data.List.Relation.Unary.Unique.DecPropositional N._≟_
+
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
@@ -68,6 +71,7 @@ private variable s s'   : LeiosState
                  ks ks' : K.State
                  msgs   : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract)
                  eb     : EndorserBlock
+                 ebs    : List EndorserBlock
                  rbs    : List RankingBlock
                  txs    : List Tx
                  V      : VTy
@@ -103,12 +107,20 @@ data _↝_ : LeiosState → LeiosState → Type where
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } IB-Role
 ```
+When η = 0 there is no indirect ledger inclusion; in case η > 0 earlier EBs might
+be referenced (Full-Short Leios).
 ```agda
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
                 LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
-                h = mkEB slot id π sk-EB LI []
+                h = mkEB slot id π sk-EB LI (L.map getEBRef ebs)
+                P = λ eb' → eb' ∈ˡ EBs
+                          × isVoteCertified s eb'
+                          × eb' ∈ᴮ slices L slot 2 (3 * η / L)
+                slots = map slotNumber
           in
           ∙ canProduceEB slot sk-EB (stake s) π
+          ∙ A.All P ebs
+          ∙ Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
           ∙ ffds FFD.-⟦ Send (ebHeader h) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } EB-Role
@@ -215,7 +227,7 @@ Note: Submitted data to the base chain is only taken into account
 ```agda
   Base₂a  : let open LeiosState s renaming (BaseState to bs) in
           ∙ needsUpkeep Base
-          ∙ eb ∈ filter (λ eb → isVoteCertified s eb × eb ∈ᴮ slice L slot 2) EBs
+          ∙ eb ∈ filter (λ eb' → isVoteCertified s eb' × eb' ∈ᴮ slice L slot 2) EBs
           ∙ bs B.-⟦ B.SUBMIT (this eb) / B.EMPTY ⟧⇀ bs'
           ───────────────────────────────────────────────────────────────────────
           just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base
