@@ -52,7 +52,10 @@ Initial state
 ```
 Check a simple trace
 ```agda
-      test₁ : IsOk (verifyTrace (inj₁ (Slot-Action 0 , SLOT) ∷ inj₁ (Base₂b-Action 0 , SLOT) ∷ inj₁ (No-IB-Role-Action 0 , SLOT) ∷ []) s₀)
+      test₁ : IsOk $ verifyTrace
+        ( inj₁ (Slot-Action 0 , SLOT)
+        ∷ inj₁ (Base₂b-Action 0 , SLOT) ∷ inj₁ (No-IB-Role-Action 0 , SLOT)
+        ∷ []) s₀
       test₁ = _
 ```
 Check IB validity
