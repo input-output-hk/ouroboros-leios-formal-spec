@@ -10,7 +10,9 @@ module Leios.Short.Trace.Verifier.Test where
 module _ where
 
   private
-
+```
+Parameters are as follows
+```agda
     params : Params
     params =
       record
@@ -35,19 +37,26 @@ module _ where
             (IB , 8) ∷ (EB , 8) ∷ (VT , 8) ∷
             []
       }
-
+```
+```agda
     open Params params
     open import Leios.Short.Trace.Verifier params
 
     opaque
       unfolding List-Model
-
+```
+Initial state
+```agda
       s₀ : LeiosState
       s₀ = initLeiosState tt stakeDistribution tt ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
-
+```
+Check a simple trace
+```agda
       test₁ : IsOk (verifyTrace (inj₁ (Slot-Action 0 , SLOT) ∷ inj₁ (Base₂b-Action 0 , SLOT) ∷ inj₁ (No-IB-Role-Action 0 , SLOT) ∷ []) s₀)
       test₁ = _
-
+```
+Check IB validity
+```agda
       test-valid-ib : Bool
       test-valid-ib =
         let h = record { slotNumber = 1
@@ -70,6 +79,7 @@ module _ where
 module _ where
 
   private
+
     params : Params
     params =
       record
@@ -100,26 +110,35 @@ module _ where
 
     opaque
       unfolding List-Model
-
-      -- section of trace, slot 100 - 108
+```
+Starting at slot 100
+```agda
       s₁₀₀ : LeiosState
       s₁₀₀ = record s₀ { slot = 100 }
         where
           s₀ : LeiosState
           s₀ = initLeiosState tt stakeDistribution tt ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
-
+```
+Checking trace
+```agda
       test₂ : IsOk (verifyTrace (L.reverse $
-              -- slot 100
+```
+#### Slot 100, Stage 50
+```agda
                 inj₁ (No-IB-Role-Action 100 , SLOT)
               ∷ inj₁ (No-EB-Role-Action 100 , SLOT)
               ∷ inj₁ (No-VT-Role-Action 100 , SLOT)
               ∷ inj₁ (Base₂b-Action     100 , SLOT)
               ∷ inj₁ (Slot-Action       100 , SLOT)
-              -- slot 101
+```
+#### Slot 101, Stage 50
+```agda
               ∷ inj₁ (IB-Role-Action 101    , SLOT)
               ∷ inj₁ (Base₂b-Action  101    , SLOT)
               ∷ inj₁ (Slot-Action    101    , SLOT)
-              -- slot 102
+```
+#### Slot 102, Stage 51
+```agda
               ∷ inj₂ (IB-Recv-Update
                   (record { header =
                     record { slotNumber = 101
@@ -134,7 +153,9 @@ module _ where
               ∷ inj₁ (VT-Role-Action 102    , SLOT)
               ∷ inj₁ (Base₂b-Action  102    , SLOT)
               ∷ inj₁ (Slot-Action    102    , SLOT)
-              -- slot 103
+```
+#### Slot 103, Stage 51
+```agda
               ∷ inj₂ (IB-Recv-Update
                   (record { header =
                     record { slotNumber = 102
@@ -147,27 +168,37 @@ module _ where
               ∷ inj₁ (IB-Role-Action 103    , SLOT)
               ∷ inj₁ (Base₂b-Action  103    , SLOT)
               ∷ inj₁ (Slot-Action    103    , SLOT)
-              -- slot 104
+```
+#### Slot 104, Stage 52
+```agda
               ∷ inj₁ (IB-Role-Action 104    , SLOT)
               ∷ inj₁ (EB-Role-Action 104 [] [] , SLOT)
               ∷ inj₁ (VT-Role-Action 104    , SLOT)
               ∷ inj₁ (Base₂b-Action  104    , SLOT)
               ∷ inj₁ (Slot-Action    104    , SLOT)
-              -- slot 105
+```
+#### Slot 105, Stage 52
+```agda
               ∷ inj₁ (IB-Role-Action 105    , SLOT)
               ∷ inj₁ (Base₂b-Action  105    , SLOT)
               ∷ inj₁ (Slot-Action    105    , SLOT)
-              -- slot 106
+```
+#### Slot 106, Stage 53
+```agda
               ∷ inj₁ (No-IB-Role-Action 106 , SLOT)
               ∷ inj₁ (No-EB-Role-Action 106 , SLOT)
               ∷ inj₁ (VT-Role-Action    106 , SLOT)
               ∷ inj₁ (Base₂b-Action     106 , SLOT)
               ∷ inj₁ (Slot-Action       106 , SLOT)
-              -- slot 107
+```
+#### Slot 107, Stage 53
+```agda
               ∷ inj₁ (IB-Role-Action 107    , SLOT)
               ∷ inj₁ (Base₂b-Action  107    , SLOT)
               ∷ inj₁ (Slot-Action    107    , SLOT)
-              -- slot 108
+```
+#### Slot 108, Stage 54
+```agda
               ∷ inj₁ (IB-Role-Action 108    , SLOT)
               ∷ inj₁ (EB-Role-Action 108 ((3 ∷ 4 ∷ 5 ∷ []) ∷ []) [] , SLOT)
               ∷ inj₁ (VT-Role-Action 108    , SLOT)
@@ -222,15 +253,18 @@ Parameters are as follows
 
     opaque
       unfolding List-Model
-
-      -- section of trace, slot 100 - 108
+```
+Starting at slot 100
+```agda
       s₁₀₀ : LeiosState
       s₁₀₀ = record s₀ { slot = 100 }
         where
           s₀ : LeiosState
           s₀ = initLeiosState tt stakeDistribution tt ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
-
-      test₂ : IsOk (verifyTrace (L.reverse $
+```
+Checking trace
+```agda
+      test : IsOk (verifyTrace (L.reverse $
 ```
 #### Slot 100, Stage 50
 ```agda
@@ -431,5 +465,5 @@ The Leios state is updated by
 ```
 ```agda
               ∷ []) s₁₀₀)
-      test₂ = tt
+      test = _
 ```
