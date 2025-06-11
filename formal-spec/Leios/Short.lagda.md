@@ -113,6 +113,7 @@ be referenced (Full-Short Leios).
                           × eb' ∈ᴮ slices L slot 2 (3 * η / L)
                 slots = map slotNumber
           in
+          ∙ needsUpkeep EB-Role
           ∙ canProduceEB slot sk-EB (stake s) π
           ∙ All.All P ebs
           ∙ Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
@@ -125,6 +126,7 @@ be referenced (Full-Short Leios).
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                 votes = map (vote sk-VT ∘ hash) EBs'
           in
+          ∙ needsUpkeep-Stage VT-Role
           ∙ canProduceV slot sk-VT (stake s)
           ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
