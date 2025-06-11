@@ -75,8 +75,8 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
                 slots = map slotNumber
             in
             ∙ canProduceEB slot sk-EB (stake s) tt
-            ∙ A.All P ebs
-            ∙ Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
+            ∙ All.All P ebs
+            ∙ All.Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
             ∙ ffds FFD.-⟦ FFD.Send (ebHeader h) nothing / FFD.SendRes ⟧⇀ ffds'
             ─────────────────────────────────────────────────────────────────────────
             ValidAction (EB-Role-Action slot LI ebs) s SLOT

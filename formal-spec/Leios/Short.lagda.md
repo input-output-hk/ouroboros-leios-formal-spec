@@ -6,11 +6,6 @@
 open import Leios.Prelude hiding (id)
 open import Leios.FFD
 open import Leios.SpecStructure
-open import Data.Fin.Patterns
-open import Class.ToBool
-
-import Data.List.Relation.Unary.All as A
-open import Data.List.Relation.Unary.Unique.DecPropositional N._≟_
 
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
@@ -119,8 +114,8 @@ be referenced (Full-Short Leios).
                 slots = map slotNumber
           in
           ∙ canProduceEB slot sk-EB (stake s) π
-          ∙ A.All P ebs
-          ∙ Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
+          ∙ All.All P ebs
+          ∙ All.Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
           ∙ ffds FFD.-⟦ Send (ebHeader h) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
           s ↝ addUpkeep record s { FFDState = ffds' } EB-Role

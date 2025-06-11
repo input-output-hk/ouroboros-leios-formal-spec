@@ -1,4 +1,4 @@
-open import Leios.Prelude hiding (_⊗_; module A)
+open import Leios.Prelude hiding (_⊗_; module Any)
 open import CategoricalCrypto
 
 module Network.BasicBroadcast (Participants : ℕ) (Message : Type) where

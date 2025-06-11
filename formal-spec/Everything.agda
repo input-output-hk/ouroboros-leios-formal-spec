@@ -49,6 +49,7 @@ open import Leios.Network
 open import Leios.Prelude
 open import Leios.Protocol
 open import Leios.Short
+-- TODO: drop Decidable and Deterministic
 -- open import Leios.Short.Decidable
 -- open import Leios.Short.Deterministic
 open import Leios.Short.Trace.Verifier

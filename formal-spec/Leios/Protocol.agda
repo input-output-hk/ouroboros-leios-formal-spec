@@ -235,21 +235,21 @@ module _ (s : LeiosState) where
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs = eb ∷ EBs }
   upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs }
-  upd (inj₁ (ibHeader h)) with A.any? (matchIB? h) IBBodies
+  upd (inj₁ (ibHeader h)) with Any.any? (matchIB? h) IBBodies
   ... | yes p =
     record s
-      { IBs = record { header = h ; body = A.lookup p } ∷ IBs
-      ; IBBodies = IBBodies A.─ p
+      { IBs = record { header = h ; body = Any.lookup p } ∷ IBs
+      ; IBBodies = IBBodies Any.─ p
       }
   ... | no _ =
     record s
       { IBHeaders = h ∷ IBHeaders
       }
-  upd (inj₂ (ibBody b)) with A.any? (flip matchIB? b) IBHeaders
+  upd (inj₂ (ibBody b)) with Any.any? (flip matchIB? b) IBHeaders
   ... | yes p =
     record s
-      { IBs = record { header = A.lookup p ; body = b } ∷ IBs
-      ; IBHeaders = IBHeaders A.─ p
+      { IBs = record { header = Any.lookup p ; body = b } ∷ IBs
+      ; IBHeaders = IBHeaders Any.─ p
       }
   ... | no _ =
     record s
@@ -261,12 +261,12 @@ module _ {s s'} where
 
   upd-preserves-Upkeep : ∀ {x} → LeiosState.Upkeep s ≡ LeiosState.Upkeep s'
                                → LeiosState.Upkeep s ≡ LeiosState.Upkeep (upd s' x)
-  upd-preserves-Upkeep {inj₁ (ibHeader x)} refl with A.any? (matchIB? x) IBBodies
+  upd-preserves-Upkeep {inj₁ (ibHeader x)} refl with Any.any? (matchIB? x) IBBodies
   ... | yes p = refl
   ... | no ¬p = refl
   upd-preserves-Upkeep {inj₁ (ebHeader x)} refl = refl
   upd-preserves-Upkeep {inj₁ (vtHeader x)} refl = refl
-  upd-preserves-Upkeep {inj₂ (ibBody x)} refl with A.any? (flip matchIB? x) IBHeaders
+  upd-preserves-Upkeep {inj₂ (ibBody x)} refl with Any.any? (flip matchIB? x) IBHeaders
   ... | yes p = refl
   ... | no ¬p = refl
 

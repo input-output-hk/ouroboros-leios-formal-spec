@@ -15,14 +15,6 @@ module T where
   open import Data.These public
 open T public using (These; this; that)
 
-module L where
-  open import Data.List public
-open L public using (List; []; _∷_; _++_; catMaybes; head; length; sum; and; or; any)
-
-module A where
-  open import Data.List.Relation.Unary.Any public
-open A public using (here; there)
-
 module N where
   open import Data.Nat public
   open import Data.Nat.Properties public
@@ -30,8 +22,22 @@ open N public using (ℕ; zero; suc)
 
 module F where
   open import Data.Fin public
+  open import Data.Fin.Patterns public
   open import Data.Fin.Properties public
-open F public using (Fin; toℕ; #_) renaming (zero to fzero; suc to fsuc)
+open F public using (Fin; toℕ; #_; 0F) renaming (zero to fzero; suc to fsuc)
+
+module L where
+  open import Data.List public
+open L public using (List; []; _∷_; _++_; catMaybes; head; length; sum; and; or; any)
+
+module Any where
+  open import Data.List.Relation.Unary.Any public
+open Any public using (here; there)
+
+module All where
+  open import Data.List.Relation.Unary.All public
+  open import Data.List.Relation.Unary.Unique.DecPropositional N._≟_ using (Unique) public
+open All public using (Unique)
 
 from_To_ : ℕ → ℕ → List ℕ
 from m To n = map (_+ m) (upTo (n ∸ m))
