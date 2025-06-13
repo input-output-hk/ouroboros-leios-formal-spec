@@ -22,9 +22,6 @@ The specification is organized into several key areas:
 - `Leios.Simplified` - Simplified protocol models for analysis
 - `Leios.Short` - Short protocol variants
 
-## Foreign Function Interface
-- `Leios.Foreign.*` - Haskell interoperability types and utilities
-
 ## Verification and Testing
 - `Leios.Short.Trace.Verifier` - Trace verification for protocol properties
 - State machine abstractions for protocol verification
@@ -40,25 +37,17 @@ open import Leios.Blocks
 open import Leios.Config
 open import Leios.Defaults
 open import Leios.FFD
-open import Leios.Foreign.BaseTypes
-open import Leios.Foreign.HsTypes
-open import Leios.Foreign.Types
-open import Leios.Foreign.Util
 open import Leios.KeyRegistration
 open import Leios.Network
 open import Leios.Prelude
 open import Leios.Protocol
 open import Leios.Short
--- TODO: drop Decidable and Deterministic
--- open import Leios.Short.Decidable
--- open import Leios.Short.Deterministic
 open import Leios.Short.Trace.Verifier
 open import Leios.Short.Trace.Verifier.Test
 open import Leios.Simplified
 open import Leios.Simplified.Deterministic
 -- open import Leios.Simplified.Deterministic.Test
 open import Leios.SpecStructure
-open import Leios.Traces
 open import Leios.Voting
 open import Leios.VRF
 open import StateMachine
