@@ -164,22 +164,25 @@ beginningOfStage s = stage s * L ≡ s
 
 endOfStage : ℕ → Type
 endOfStage s = suc (stage s) ≡ stage (suc s)
-
-endOfStage? : ∀ (s : ℕ) → endOfStage s ⁇
-endOfStage? s .dec = suc (stage s) ≟ stage (suc s)
-
+```
+Predicate needed for slot transition. Special care needs to be taken when starting from
+genesis.
+```agda
 allDone : LeiosState → Type
 allDone record { slot = s ; Upkeep = u ; Upkeep-Stage = v } =
   -- bootstrapping
-    (stage s < 3 × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []))
-  ⊎ (stage s ≡ 3 × beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
-  ⊎ (stage s ≡ 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []))
+    (stage s < 3 ×                        u ≡ᵉ fromList (IB-Role           ∷ Base ∷ []))
+  ⊎ (stage s ≡ 3 ×   beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
+  ⊎ (stage s ≡ 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role           ∷ Base ∷ []))
   -- done
-  ⊎ (stage s > 3 × beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
-  ⊎ (stage s > 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ Base ∷ []) ×
-       (((endOfStage s × v ≡ᵉ fromList (VT-Role ∷ []))
+  ⊎ (stage s > 3 ×   beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
+  ⊎ (stage s > 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role           ∷ Base ∷ []) ×
+       (((  endOfStage s × v ≡ᵉ fromList (VT-Role ∷ []))
        ⊎ (¬ endOfStage s))))
-
+```
+### (Full-)Short Leios transitions
+The relation describing the transition given input and state
+```agda
 data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
 ```
 #### Initialization
