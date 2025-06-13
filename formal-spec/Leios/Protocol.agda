@@ -4,7 +4,7 @@ open import Leios.Prelude hiding (id)
 open import Leios.FFD
 open import Leios.SpecStructure
 
-module Leios.Protocol {n} (⋯ : SpecStructure n) (let open SpecStructure ⋯) (SlotUpkeep : Type) where
+module Leios.Protocol {n} (⋯ : SpecStructure n) (let open SpecStructure ⋯) (SlotUpkeep : Type) (StageUpkeep : Type) where
 
 {- Module: Leios.Protocol
    
@@ -41,21 +41,22 @@ data LeiosOutput : Type where
   EMPTY    : LeiosOutput
 
 record LeiosState : Type where
-  field V           : VTy
-        SD          : StakeDistr
-        FFDState    : FFD.State
-        Ledger      : List Tx
-        ToPropose   : List Tx
-        IBs         : List InputBlock
-        EBs         : List EndorserBlock
-        Vs          : List (List Vote)
-        slot        : ℕ
-        IBHeaders   : List IBHeader
-        IBBodies    : List IBBody
-        Upkeep      : ℙ SlotUpkeep
-        BaseState   : B.State
-        votingState : VotingState
-        PubKeys     : List PubKey
+  field V            : VTy
+        SD           : StakeDistr
+        FFDState     : FFD.State
+        Ledger       : List Tx
+        ToPropose    : List Tx
+        IBs          : List InputBlock
+        EBs          : List EndorserBlock
+        Vs           : List (List Vote)
+        slot         : ℕ
+        IBHeaders    : List IBHeader
+        IBBodies     : List IBBody
+        Upkeep       : ℙ SlotUpkeep
+        Upkeep-Stage : ℙ StageUpkeep
+        BaseState    : B.State
+        votingState  : VotingState
+        PubKeys      : List PubKey
 
   lookupEB : EBRef → Maybe EndorserBlock
   lookupEB r = find (λ b → getEBRef b ≟ r) EBs
@@ -78,30 +79,40 @@ record LeiosState : Type where
   needsUpkeep : SlotUpkeep → Set
   needsUpkeep = _∉ Upkeep
 
+  needsUpkeep-Stage : StageUpkeep → Set
+  needsUpkeep-Stage = _∉ Upkeep-Stage
+
   Dec-needsUpkeep : ∀ {u : SlotUpkeep} → ⦃ DecEq SlotUpkeep ⦄ → needsUpkeep u ⁇
   Dec-needsUpkeep {u} .dec = ¬? (u ∈? Upkeep)
+
+  Dec-needsUpkeep-Stage : ∀ {u : StageUpkeep} → ⦃ DecEq StageUpkeep ⦄ → needsUpkeep-Stage u ⁇
+  Dec-needsUpkeep-Stage {u} .dec = ¬? (u ∈? Upkeep-Stage)
 
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
 addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u ❵ }
 {-# INJECTIVE_FOR_INFERENCE addUpkeep #-}
 
+addUpkeep-Stage : LeiosState → StageUpkeep → LeiosState
+addUpkeep-Stage s u = let open LeiosState s in record s { Upkeep-Stage = Upkeep-Stage ∪ ❴ u ❵ }
+
 initLeiosState : VTy → StakeDistr → B.State → List PubKey → LeiosState
 initLeiosState V SD bs pks = record
-  { V           = V
-  ; SD          = SD
-  ; FFDState    = FFD.initFFDState
-  ; Ledger      = []
-  ; ToPropose   = []
-  ; IBs         = []
-  ; EBs         = []
-  ; Vs          = []
-  ; slot        = initSlot V
-  ; IBHeaders   = []
-  ; IBBodies    = []
-  ; Upkeep      = ∅
-  ; BaseState   = bs
-  ; votingState = initVotingState
-  ; PubKeys     = pks
+  { V            = V
+  ; SD           = SD
+  ; FFDState     = FFD.initFFDState
+  ; Ledger       = []
+  ; ToPropose    = []
+  ; IBs          = []
+  ; EBs          = []
+  ; Vs           = []
+  ; slot         = initSlot V
+  ; IBHeaders    = []
+  ; IBBodies     = []
+  ; Upkeep       = ∅
+  ; Upkeep-Stage = ∅
+  ; BaseState    = bs
+  ; votingState  = initVotingState
+  ; PubKeys      = pks
   }
 
 stake' : PoolID → LeiosState → ℕ
@@ -224,21 +235,21 @@ module _ (s : LeiosState) where
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs = eb ∷ EBs }
   upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs }
-  upd (inj₁ (ibHeader h)) with A.any? (matchIB? h) IBBodies
+  upd (inj₁ (ibHeader h)) with Any.any? (matchIB? h) IBBodies
   ... | yes p =
     record s
-      { IBs = record { header = h ; body = A.lookup p } ∷ IBs
-      ; IBBodies = IBBodies A.─ p
+      { IBs = record { header = h ; body = Any.lookup p } ∷ IBs
+      ; IBBodies = IBBodies Any.─ p
       }
   ... | no _ =
     record s
       { IBHeaders = h ∷ IBHeaders
       }
-  upd (inj₂ (ibBody b)) with A.any? (flip matchIB? b) IBHeaders
+  upd (inj₂ (ibBody b)) with Any.any? (flip matchIB? b) IBHeaders
   ... | yes p =
     record s
-      { IBs = record { header = A.lookup p ; body = b } ∷ IBs
-      ; IBHeaders = IBHeaders A.─ p
+      { IBs = record { header = Any.lookup p ; body = b } ∷ IBs
+      ; IBHeaders = IBHeaders Any.─ p
       }
   ... | no _ =
     record s
@@ -250,12 +261,12 @@ module _ {s s'} where
 
   upd-preserves-Upkeep : ∀ {x} → LeiosState.Upkeep s ≡ LeiosState.Upkeep s'
                                → LeiosState.Upkeep s ≡ LeiosState.Upkeep (upd s' x)
-  upd-preserves-Upkeep {inj₁ (ibHeader x)} refl with A.any? (matchIB? x) IBBodies
+  upd-preserves-Upkeep {inj₁ (ibHeader x)} refl with Any.any? (matchIB? x) IBBodies
   ... | yes p = refl
   ... | no ¬p = refl
   upd-preserves-Upkeep {inj₁ (ebHeader x)} refl = refl
   upd-preserves-Upkeep {inj₁ (vtHeader x)} refl = refl
-  upd-preserves-Upkeep {inj₂ (ibBody x)} refl with A.any? (flip matchIB? x) IBHeaders
+  upd-preserves-Upkeep {inj₂ (ibBody x)} refl with Any.any? (flip matchIB? x) IBHeaders
   ... | yes p = refl
   ... | no ¬p = refl
 

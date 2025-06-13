@@ -15,14 +15,6 @@ module T where
   open import Data.These public
 open T public using (These; this; that)
 
-module L where
-  open import Data.List public
-open L public using (List; []; _∷_; _++_; catMaybes; head; length; sum; and; or; any)
-
-module A where
-  open import Data.List.Relation.Unary.Any public
-open A public using (here; there)
-
 module N where
   open import Data.Nat public
   open import Data.Nat.Properties public
@@ -30,15 +22,34 @@ open N public using (ℕ; zero; suc)
 
 module F where
   open import Data.Fin public
+  open import Data.Fin.Patterns public
   open import Data.Fin.Properties public
-open F public using (Fin; toℕ; #_) renaming (zero to fzero; suc to fsuc)
+open F public using (Fin; toℕ; #_; 0F) renaming (zero to fzero; suc to fsuc)
 
-fromTo : ℕ → ℕ → List ℕ
-fromTo m n = map (_+ m) (upTo (n ∸ m))
+module L where
+  open import Data.List public
+open L public using (List; []; _∷_; _++_; catMaybes; head; length; sum; and; or; any)
+
+module Any where
+  open import Data.List.Relation.Unary.Any public
+open Any public using (here; there)
+
+module All where
+  open import Data.List.Relation.Unary.All public
+
+open import Data.List.Relation.Unary.Unique.DecPropositional N._≟_ using (Unique) public
+
+from_To_ : ℕ → ℕ → List ℕ
+from m To n = map (_+ m) (upTo (n ∸ m))
 
 slice : (L : ℕ) → ⦃ NonZero L ⦄ → ℕ → ℕ → ℙ ℕ
-slice L s x = fromList (fromTo s' (s' + (L ∸ 1)))
+slice L s x = fromList (from s' To (s' + (L ∸ 1)))
   where s' = ((s / L) ∸ x) * L -- equivalent to the formula in the paper
+
+{- slices: all slots starting x slices before and ending y slices before (exclusive) slot s
+-}
+slices : (L : ℕ) → ⦃ NonZero L ⦄ → ℕ → ℕ → ℕ → ℙ ℕ
+slices L s x y = foldl _∪_ ∅ $ map (slice L s) (from x To y)
 
 filter : {A : Set} → (P : A → Type) ⦃ _ : P ⁇¹ ⦄ → List A → List A
 filter P = L.filter ¿ P ¿¹
