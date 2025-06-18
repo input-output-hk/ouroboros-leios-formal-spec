@@ -106,11 +106,12 @@ When η = 0 there is no indirect ledger inclusion; in case η > 0 earlier EBs mi
 be referenced (Full-Short Leios).
 ```agda
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
-                LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
-                h = mkEB slot id π sk-EB LI (L.map getEBRef ebs)
-                P = λ eb' → eb' ∈ˡ EBs
-                          × isVoteCertified s eb'
-                          × eb' ∈ᴮ slices L slot 2 (3 * η / L)
+                LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs -- TODO: add late IB inclusion
+                LE = map getEBRef ebs
+                h  = mkEB slot id π sk-EB LI LE
+                P  = λ x → isVoteCertified s x
+                         × x ∈ˡ EBs
+                         × x ∈ᴮ slices L slot 2 (3 * η / L)
                 slots = map slotNumber
           in
           ∙ needsUpkeep EB-Role
@@ -227,14 +228,14 @@ Note: Submitted data to the base chain is only taken into account
 ```agda
   Base₂a  : let open LeiosState s renaming (BaseState to bs) in
           ∙ needsUpkeep Base
-          ∙ eb ∈ filter (λ eb' → isVoteCertified s eb' × eb' ∈ᴮ slice L slot 2) EBs
+          ∙ eb ∈ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
           ∙ bs B.-⟦ B.SUBMIT (this eb) / B.EMPTY ⟧⇀ bs'
           ───────────────────────────────────────────────────────────────────────
           just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base
 
   Base₂b  : let open LeiosState s renaming (BaseState to bs) in
           ∙ needsUpkeep Base
-          ∙ [] ≡ filter (λ eb → isVoteCertified s eb × eb ∈ᴮ slice L slot 2) EBs
+          ∙ [] ≡ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
           ∙ bs B.-⟦ B.SUBMIT (that ToPropose) / B.EMPTY ⟧⇀ bs'
           ───────────────────────────────────────────────────────────────────────
           just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base

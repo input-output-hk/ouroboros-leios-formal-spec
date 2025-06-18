@@ -64,11 +64,12 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
 
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
                 LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
-                h = mkEB slot id tt sk-EB LI (L.map getEBRef ebs)
+                LE = map getEBRef ebs
+                h  = mkEB slot id tt sk-EB LI LE
+                P  = λ x → isVoteCertified s x
+                         × x ∈ˡ EBs
+                         × x ∈ᴮ slices L slot 2 (3 * η / L)
                 ffds' = proj₁ (FFD.Send-total {ffds} {ebHeader h} {nothing})
-                P = λ eb' → eb' ∈ˡ EBs
-                          × isVoteCertified s eb'
-                          × eb' ∈ᴮ slices L slot 2 (3 * η / L)
                 slots = map slotNumber
             in
             ∙ needsUpkeep EB-Role
@@ -128,7 +129,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
   Base₂a : ∀ {eb} → let open LeiosState s renaming (BaseState to bs)
            in
            ∙ needsUpkeep Base
-           ∙ eb ∈ filter (λ eb' → isVoteCertified s eb' × eb' ∈ᴮ slice L slot 2) EBs
+           ∙ eb ∈ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
            ∙ bs B.-⟦ B.SUBMIT (this eb) / B.EMPTY ⟧⇀ tt
            ─────────────────────────────────────────────────────────────────────────
            ValidAction (Base₂a-Action slot eb) s SLOT
@@ -136,7 +137,7 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
   Base₂b : let open LeiosState s renaming (BaseState to bs)
            in
            ∙ needsUpkeep Base
-           ∙ [] ≡ filter (λ eb' → isVoteCertified s eb' × eb' ∈ᴮ slice L slot 2) EBs
+           ∙ [] ≡ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
            ∙ bs B.-⟦ B.SUBMIT (that ToPropose) / B.EMPTY ⟧⇀ tt
            ─────────────────────────────────────────────────────────────────────────
            ValidAction (Base₂b-Action slot) s SLOT
@@ -155,7 +156,8 @@ private variable
 ⟦ EB-Role {s} {ebs} _ _ _ _ _ ⟧ =
   let open LeiosState s renaming (FFDState to ffds)
       LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
-      h = mkEB slot id tt sk-EB LI (L.map getEBRef ebs)
+      LE = map getEBRef ebs
+      h = mkEB slot id tt sk-EB LI LE
       ffds' = proj₁ (FFD.Send-total {ffds} {ebHeader h} {nothing})
   in addUpkeep record s { FFDState = ffds' } EB-Role , EMPTY
 ⟦ VT-Role {s} _ _ _ ⟧ =
@@ -206,17 +208,17 @@ ValidAction→Eq-VT : ∀ {s sl} → ValidAction (VT-Role-Action sl) s SLOT → 
 ValidAction→Eq-VT (VT-Role _ _ _) = refl
 
 getLabel : just s -⟦ i / o ⟧⇀ s′ → Action
-getLabel (Slot {s} _ _ _)                          = Slot-Action (slot s)
-getLabel (Ftch {s})                                = Ftch-Action (slot s)
-getLabel (Base₁ {s})                               = Base₁-Action (slot s)
-getLabel (Base₂a {s} {eb} _ _ _)                   = Base₂a-Action (slot s) eb
-getLabel (Base₂b {s} _ _ _)                        = Base₂b-Action (slot s)
-getLabel (Roles (IB-Role {s} _ _))                 = IB-Role-Action (slot s)
-getLabel (Roles (EB-Role {s} {_} {ebs} _ _ _ _ _)) = EB-Role-Action (slot s) (map getIBRef $ filter (_∈ᴮ slice L (slot s) 3) (IBs s)) ebs
-getLabel (Roles (VT-Role {s} _ _ _))               = VT-Role-Action (slot s)
-getLabel (Roles (No-IB-Role {s} _ _))              = No-IB-Role-Action (slot s)
-getLabel (Roles (No-EB-Role {s} _ _))              = No-EB-Role-Action (slot s)
-getLabel (Roles (No-VT-Role {s} _ _))              = No-VT-Role-Action (slot s)
+getLabel (Slot {s} _ _ _)                      = Slot-Action (slot s)
+getLabel (Ftch {s})                            = Ftch-Action (slot s)
+getLabel (Base₁ {s})                           = Base₁-Action (slot s)
+getLabel (Base₂a {s} {eb} _ _ _)               = Base₂a-Action (slot s) eb
+getLabel (Base₂b {s} _ _ _)                    = Base₂b-Action (slot s)
+getLabel (Roles (IB-Role {s} _ _))             = IB-Role-Action (slot s)
+getLabel (Roles (EB-Role {s} {ebs} _ _ _ _ _)) = EB-Role-Action (slot s) (map getIBRef $ filter (_∈ᴮ slice L (slot s) 3) (IBs s)) ebs
+getLabel (Roles (VT-Role {s} _ _ _))           = VT-Role-Action (slot s)
+getLabel (Roles (No-IB-Role {s} _ _))          = No-IB-Role-Action (slot s)
+getLabel (Roles (No-EB-Role {s} _ _))          = No-EB-Role-Action (slot s)
+getLabel (Roles (No-VT-Role {s} _ _))          = No-VT-Role-Action (slot s)
 
 ValidAction-sound : (vα : ValidAction α s i) → let (s′ , o) = ⟦ vα ⟧ in just s -⟦ i / o ⟧⇀ s′
 ValidAction-sound (Slot x x₁ x₂)          = Slot {rbs = []} x x₁ x₂

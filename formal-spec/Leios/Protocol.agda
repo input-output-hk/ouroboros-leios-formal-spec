@@ -232,6 +232,7 @@ module _ (s : LeiosState) where
 
   open LeiosState s
 
+  {- Update the LeiosState upon receiving a message (a header or body) -}
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs = eb ∷ EBs }
   upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs }
