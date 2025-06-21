@@ -29,3 +29,4 @@ record LeiosAbstract : Type₁ where
         L : ℕ
         ⦃ NonZero-L ⦄ : NonZero L
         η : ℕ
+        Late-IB-Inclusion : Bool

@@ -63,7 +63,8 @@ data ValidAction : Action → LeiosState → LeiosInput → Type where
             ValidAction (IB-Role-Action slot) s SLOT
 
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
-                LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
+                ibs = L.filter (IBSelection? s Late-IB-Inclusion) IBs
+                LI  = map getIBRef ibs
                 LE = map getEBRef ebs
                 h  = mkEB slot id tt sk-EB LI LE
                 P  = λ x → isVoteCertified s x
@@ -155,7 +156,8 @@ private variable
   in addUpkeep record s { FFDState = ffds' } IB-Role , EMPTY
 ⟦ EB-Role {s} {ebs} _ _ _ _ _ ⟧ =
   let open LeiosState s renaming (FFDState to ffds)
-      LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs
+      ibs = L.filter (IBSelection? s Late-IB-Inclusion) IBs
+      LI  = map getIBRef ibs
       LE = map getEBRef ebs
       h = mkEB slot id tt sk-EB LI LE
       ffds' = proj₁ (FFD.Send-total {ffds} {ebHeader h} {nothing})
@@ -201,7 +203,7 @@ ValidAction→Eq-Slot (Slot _ _ _) = refl
 ValidAction→Eq-IB : ∀ {s sl} → ValidAction (IB-Role-Action sl) s SLOT → sl ≡ slot s
 ValidAction→Eq-IB (IB-Role _ _) = refl
 
-ValidAction→Eq-EB : ∀ {s sl ibs ebs} → ValidAction (EB-Role-Action sl ibs ebs) s SLOT → sl ≡ slot s × ibs ≡ (map getIBRef $ filter (_∈ᴮ slice L (slot s) 3) (IBs s))
+ValidAction→Eq-EB : ∀ {s sl ibs ebs} → ValidAction (EB-Role-Action sl ibs ebs) s SLOT → sl ≡ slot s × ibs ≡ map getIBRef (L.filter (IBSelection? s Late-IB-Inclusion) (IBs s))
 ValidAction→Eq-EB (EB-Role _ _ _ _ _) = refl , refl
 
 ValidAction→Eq-VT : ∀ {s sl} → ValidAction (VT-Role-Action sl) s SLOT → sl ≡ slot s
@@ -214,7 +216,10 @@ getLabel (Base₁ {s})                           = Base₁-Action (slot s)
 getLabel (Base₂a {s} {eb} _ _ _)               = Base₂a-Action (slot s) eb
 getLabel (Base₂b {s} _ _ _)                    = Base₂b-Action (slot s)
 getLabel (Roles (IB-Role {s} _ _))             = IB-Role-Action (slot s)
-getLabel (Roles (EB-Role {s} {ebs} _ _ _ _ _)) = EB-Role-Action (slot s) (map getIBRef $ filter (_∈ᴮ slice L (slot s) 3) (IBs s)) ebs
+getLabel (Roles (EB-Role {s} {ebs} _ _ _ _ _)) =
+  let ibs = L.filter (IBSelection? s Late-IB-Inclusion) (IBs s)
+      LI  = map getIBRef ibs
+  in EB-Role-Action (slot s) LI ebs
 getLabel (Roles (VT-Role {s} _ _ _))           = VT-Role-Action (slot s)
 getLabel (Roles (No-IB-Role {s} _ _))          = No-IB-Role-Action (slot s)
 getLabel (Roles (No-EB-Role {s} _ _))          = No-EB-Role-Action (slot s)
@@ -240,9 +245,11 @@ ValidAction-complete {s} {s′} (Roles (IB-Role {s} {π} {ffds'} x₁ _)) =
       pr = proj₂ (FFD.Send-total {FFDState s} {ibHeader h} {just (ibBody b)})
   in IB-Role {s} x₁ pr
 ValidAction-complete {s} (Roles (EB-Role {ebs = ebs} x x₁ x₂ x₃ _)) =
-  let LI = map getIBRef $ filter (_∈ᴮ slice L (slot s) 3) (IBs s)
-      h  = mkEB (slot s) id tt sk-EB LI (map getEBRef ebs)
-      pr = proj₂ (FFD.Send-total {FFDState s} {ebHeader h} {nothing})
+  let ibs = L.filter (IBSelection? s Late-IB-Inclusion) (IBs s)
+      LI  = map getIBRef ibs
+      LE  = (map getEBRef ebs)
+      h   = mkEB (slot s) id tt sk-EB LI LE
+      pr  = proj₂ (FFD.Send-total {FFDState s} {ebHeader h} {nothing})
   in EB-Role {s} x x₁ x₂ x₃ pr
 ValidAction-complete {s} (Roles (VT-Role x x₁ _))  =
   let EBs'  = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L (slot s) 1) (EBs s)
@@ -292,7 +299,7 @@ verifyAction (IB-Role-Action _) FTCH-LDG _ = Err (E-Err λ ())
 verifyAction (EB-Role-Action _ _ _) (INIT _) _ = Err (E-Err λ ())
 verifyAction (EB-Role-Action _ _ _) (SUBMIT _) _ = Err (E-Err λ ())
 verifyAction (EB-Role-Action sl ibs ebs) SLOT s
-  with sl ≟ slot s | ibs ≟ (map getIBRef $ filter (_∈ᴮ slice L (slot s) 3) (IBs s))
+  with sl ≟ slot s | ibs ≟  map getIBRef (L.filter (IBSelection? s Late-IB-Inclusion) (IBs s))
 ... | no ¬p | _ = Err (E-Err λ x → ⊥-elim (¬p (proj₁ $ ValidAction→Eq-EB x)))
 ... | _ | no ¬q = Err (E-Err λ x → ⊥-elim (¬q (proj₂ $ ValidAction→Eq-EB x)))
 ... | yes p | yes q rewrite p rewrite q
