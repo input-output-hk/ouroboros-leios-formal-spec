@@ -22,6 +22,7 @@ record NetworkParams : Type where
         stakeDistribution : TotalMap (Fin numberOfParties) ℕ
         stageLength       : ℕ
         eta               : ℕ
+        lateIBInclusion   : Bool
         ⦃ NonZero-stageLength ⦄ : NonZero stageLength
         ⦃ NonZero-numberOfParties ⦄ : NonZero numberOfParties
 

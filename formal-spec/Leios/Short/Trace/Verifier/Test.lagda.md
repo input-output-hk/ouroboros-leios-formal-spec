@@ -24,6 +24,7 @@ Parameters are as follows
                   in Fun⇒TotalMap (const 100000000)
               ; stageLength = 2
               ; eta = 0
+              ; lateIBInclusion = false
               }
         ; sutId = fzero
         ; winning-slots = fromList $
@@ -94,6 +95,7 @@ module _ where
                   in Fun⇒TotalMap (const 100000000)
               ; stageLength = 2
               ; eta = 0
+              ; lateIBInclusion = false
               }
         ; sutId = fzero
         ; winning-slots = fromList $
@@ -230,6 +232,7 @@ Parameters are as follows
                   in Fun⇒TotalMap (const 100000000)
               ; stageLength = 2
               ; eta = 10
+              ; lateIBInclusion = false
               }
         ; sutId = fzero
         ; winning-slots = fromList $
