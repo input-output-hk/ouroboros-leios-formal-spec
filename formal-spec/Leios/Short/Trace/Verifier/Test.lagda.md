@@ -23,7 +23,7 @@ Parameters are as follows
                   let open FunTot (completeFin 2) (maximalFin 2)
                   in Fun⇒TotalMap (const 100000000)
               ; stageLength = 2
-              ; eta = 0
+              ; ledgerQuality = 0
               ; lateIBInclusion = false
               }
         ; sutId = fzero
@@ -94,7 +94,7 @@ module _ where
                   let open FunTot (completeFin 2) (maximalFin 2)
                   in Fun⇒TotalMap (const 100000000)
               ; stageLength = 2
-              ; eta = 0
+              ; ledgerQuality = 0
               ; lateIBInclusion = false
               }
         ; sutId = fzero
@@ -231,7 +231,7 @@ Parameters are as follows
                   let open FunTot (completeFin 2) (maximalFin 2)
                   in Fun⇒TotalMap (const 100000000)
               ; stageLength = 2
-              ; eta = 10
+              ; ledgerQuality = 10
               ; lateIBInclusion = false
               }
         ; sutId = fzero

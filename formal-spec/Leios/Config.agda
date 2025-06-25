@@ -21,7 +21,7 @@ record NetworkParams : Type where
   field numberOfParties   : ℕ
         stakeDistribution : TotalMap (Fin numberOfParties) ℕ
         stageLength       : ℕ
-        eta               : ℕ
+        ledgerQuality     : ℕ
         lateIBInclusion   : Bool
         ⦃ NonZero-stageLength ⦄ : NonZero stageLength
         ⦃ NonZero-numberOfParties ⦄ : NonZero numberOfParties
