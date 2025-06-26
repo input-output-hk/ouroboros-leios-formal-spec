@@ -88,6 +88,12 @@ we cannot make a block.
 Note that `_↝_`, starting with an empty upkeep can always make exactly
 three steps corresponding to the three types of Leios specific blocks.
 
+<!--
+```agda
+{- Step relation for block production. A node should do as many steps with it as possible in every slot.
+-}
+```
+-->
 ```agda
 data _↝_ : LeiosState → LeiosState → Type where
 ```
