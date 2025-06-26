@@ -74,9 +74,19 @@ private variable s s'   : LeiosState
                  pks    : List PubKey
 ```
 -->
+### Block/Vote production
 
-### Block/Vote production rules
+IBs from the last 3 pipelines are directly included in the EB, when the late IB inclusion
+flag is set
+```agda
+IBSelection : LeiosState → Bool → InputBlock → Type
+IBSelection s false = _∈ᴮ slice L (LeiosState.slot s) 3
+IBSelection s true  = _∈ᴮ slices L (LeiosState.slot s) 3 6
 
+IBSelection? : (s : LeiosState) → (b : Bool) → (ib : InputBlock) → Dec (IBSelection s b ib)
+IBSelection? s false ib = slotNumber ib ∈? slice L (LeiosState.slot s) 3
+IBSelection? s true ib  = slotNumber ib ∈? slices L (LeiosState.slot s) 3 6
+```
 We now define the rules for block production given by the relation `_↝_`. These are split in two:
 
 1. Positive rules, when we do need to create a block.
@@ -106,10 +116,11 @@ When η = 0 there is no indirect ledger inclusion; in case η > 0 earlier EBs mi
 be referenced (Full-Short Leios).
 ```agda
   EB-Role : let open LeiosState s renaming (FFDState to ffds)
-                LI = map getIBRef $ filter (_∈ᴮ slice L slot 3) IBs -- TODO: add late IB inclusion
-                LE = map getEBRef ebs
-                h  = mkEB slot id π sk-EB LI LE
-                P  = λ x → isVoteCertified s x
+                ibs = L.filter (IBSelection? s Late-IB-Inclusion) IBs
+                LI  = map getIBRef ibs
+                LE  = map getEBRef ebs
+                h   = mkEB slot id π sk-EB LI LE
+                P   = λ x → isVoteCertified s x
                          × x ∈ˡ EBs
                          × x ∈ᴮ slices L slot 2 (3 * η / L)
                 slots = map slotNumber

@@ -36,18 +36,19 @@ instance
 d-Abstract : LeiosAbstract
 d-Abstract =
   record
-    { Tx       = ℕ
-    ; PoolID   = Fin numberOfParties
-    ; BodyHash = List ℕ
-    ; VrfPf    = ⊤
-    ; PrivKey  = BlockType × ⊤
-    ; Sig      = ⊤
-    ; Hash     = List ℕ
-    ; Vote     = ⊤
-    ; vote     = λ _ _ → tt
-    ; sign     = λ _ _ → tt
-    ; L        = stageLength
-    ; η        = eta
+    { Tx                = ℕ
+    ; PoolID            = Fin numberOfParties
+    ; BodyHash          = List ℕ
+    ; VrfPf             = ⊤
+    ; PrivKey           = BlockType × ⊤
+    ; Sig               = ⊤
+    ; Hash              = List ℕ
+    ; Vote              = ⊤
+    ; vote              = λ _ _ → tt
+    ; sign              = λ _ _ → tt
+    ; L                 = stageLength
+    ; η                 = ledgerQuality
+    ; Late-IB-Inclusion = lateIBInclusion
     }
 
 open LeiosAbstract d-Abstract public
@@ -203,11 +204,10 @@ instance
   ... | no ¬p = ⁇ no λ x → ⊥-elim (¬p (send-complete x))
   Dec-SimpleFFD {_} {FFDAbstract.Send _ _} {FFDAbstract.FetchRes _} {_} = ⁇ no λ ()
   Dec-SimpleFFD {s} {FFDAbstract.Fetch} {FFDAbstract.FetchRes r} {s'}
-    with s' ≟ proj₁ (proj₂ (fetch-total {s}))
-      | r ≟ proj₁ (fetch-total {s})
+    with s' ≟ proj₁ (proj₂ (fetch-total {s})) | r ≟ proj₁ (fetch-total {s}) -- TODO: improve performance
   ... | yes p | yes q rewrite p rewrite q = ⁇ yes (proj₂ (proj₂ (fetch-total {s})))
-  ... | yes p | no ¬q = ⁇ no λ x → ⊥-elim (¬q (fetch-complete₂ x))
-  ... | no ¬p | _ = ⁇ no λ x → ⊥-elim (¬p (fetch-complete₁ x))
+  ... | _     | no ¬q = ⁇ no λ x → ⊥-elim (¬q (fetch-complete₂ x))
+  ... | no ¬p | _     = ⁇ no λ x → ⊥-elim (¬p (fetch-complete₁ x))
   Dec-SimpleFFD {_} {FFDAbstract.Fetch} {FFDAbstract.SendRes} {_} = ⁇ no λ ()
 
 d-FFDFunctionality : FFDAbstract.Functionality ffdAbstract
