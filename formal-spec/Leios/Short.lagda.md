@@ -81,16 +81,11 @@ flag is set
 ```agda
 IBSelection : LeiosState → Bool → InputBlock → Type
 IBSelection s false = _∈ᴮ slice L (LeiosState.slot s) 3
-IBSelection s true ib =
-    ib ∈ᴮ slice L (LeiosState.slot s) 3
-  × ib ∈ᴮ slice L (LeiosState.slot s) 4
-  × ib ∈ᴮ slice L (LeiosState.slot s) 5
+IBSelection s true  = _∈ᴮ slices L (LeiosState.slot s) 3 6
+
 IBSelection? : (s : LeiosState) → (b : Bool) → (ib : InputBlock) → Dec (IBSelection s b ib)
 IBSelection? s false ib = slotNumber ib ∈? slice L (LeiosState.slot s) 3
-IBSelection? s true ib  =
-        slotNumber ib ∈? slice L (LeiosState.slot s) 3
-  ×-dec slotNumber ib ∈? slice L (LeiosState.slot s) 4
-  ×-dec slotNumber ib ∈? slice L (LeiosState.slot s) 5
+IBSelection? s true ib  = slotNumber ib ∈? slices L (LeiosState.slot s) 3 6
 ```
 We now define the rules for block production given by the relation `_↝_`. These are split in two:
 
