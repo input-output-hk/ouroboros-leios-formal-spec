@@ -283,4 +283,4 @@ d-SpecStructure-2 = record
       ; va                        = d-VotingAbstract-2
       }
 
-open import Leios.Short d-SpecStructure public
+-- open import Leios.Short d-SpecStructure public
