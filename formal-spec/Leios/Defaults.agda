@@ -216,7 +216,6 @@ d-FFDFunctionality =
     { State         = FFDBuffers
     ; initFFDState  = record { inIBs = []; inEBs = []; inVTs = []; outIBs = []; outEBs = []; outVTs = [] }
     ; _-⟦_/_⟧⇀_     = SimpleFFD
---    ; Dec-_-⟦_/_⟧⇀_ = Dec-SimpleFFD
     ; Send-total    = send-total
     ; Fetch-total   = fetch-total
     }
