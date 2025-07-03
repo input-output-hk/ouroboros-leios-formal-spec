@@ -115,7 +115,6 @@ d-BaseFunctionality =
   record
     { State         = ⊤
     ; _-⟦_/_⟧⇀_     = λ _ _ _ _ → ⊤
-    ; Dec-_-⟦_/_⟧⇀_ = ⁇ (yes tt)
     ; SUBMIT-total  = tt , tt
     ; FTCH-total    = [] , tt , tt
     }

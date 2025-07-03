@@ -96,7 +96,6 @@ record BaseAbstract : Type₁ where
   record Functionality : Type₁ where
     field State : Type
           _-⟦_/_⟧⇀_ : State → Input → Output → State → Type
-          ⦃ Dec-_-⟦_/_⟧⇀_ ⦄ : {s : State} → {i : Input} → {o : Output} → {s' : State} → (s -⟦ i / o ⟧⇀ s') ⁇
           SUBMIT-total : ∀ {s b} → ∃[ s' ] s -⟦ SUBMIT b / EMPTY ⟧⇀ s'
           FTCH-total : ∀ {s} → ∃[ r ] (∃[ s' ] (s -⟦ FTCH-LDG / BASE-LDG r ⟧⇀ s'))
 
