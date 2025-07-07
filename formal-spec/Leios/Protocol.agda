@@ -324,3 +324,13 @@ module Types (params : Params) where
 
   Adv : Channel
   Adv = I
+
+  module FFDA = FFDAbstract ffdAbstract
+
+  data FFDT : ChannelDir → Type where
+    FFD-OUT : List (FFDA.Header ⊎ FFDA.Body) → FFDT Out
+    FFD-IN  : FFDA.Input → FFDT In
+    SLOT    : FFDT Out
+
+  FFD : Channel
+  FFD = simpleChannel' FFDT ᵀ

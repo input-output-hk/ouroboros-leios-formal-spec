@@ -6,14 +6,16 @@
 open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.FFD
 open import Leios.SpecStructure
+open import Leios.Config
 
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
-open import CategoricalCrypto using (Machine; MkMachine; _⊗_; MachineType)
+open import CategoricalCrypto hiding (id; _∘_)
 
 module Leios.Short (⋯ : SpecStructure 1)
-  (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified')) where
+  (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified'))
+  (params : Params) where
 ```
 -->
 
@@ -51,6 +53,7 @@ unquoteDecl DecEq-StageUpkeep = derive-DecEq ((quote StageUpkeep , DecEq-StageUp
 ```
 ```agda
 open import Leios.Protocol (⋯) SlotUpkeep StageUpkeep public
+open Types params
 
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
@@ -194,16 +197,17 @@ allDone record { slot = s ; Upkeep = u ; Upkeep-Stage = v } =
 ```
 ### (Full-)Short Leios transitions
 The relation describing the transition given input and state
-```agda
-data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
-```
 #### Initialization
 ```agda
+data _⊢_ : VTy → LeiosState → Type where
   Init :
-      ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
+       ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
        ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
        ────────────────────────────────────────────────────────────────
-       nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs' pks
+       V ⊢ initLeiosState V SD bs' pks
+```
+```agda
+data _-⟦_/_⟧⇀_ : MachineType FFD (IO ⊗ Adv) LeiosState where
 ```
 #### Network and Ledger
 ```agda
@@ -211,7 +215,7 @@ data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → Leios
        ∙ allDone s
        ∙ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG rbs ⟧⇀ bs'
        ───────────────────────────────────────────────────────────────────────
-       just s -⟦ FFD-OUT msgs / EMPTY ⟧⇀ record s
+       s -⟦ honestOutputI (-, SLOT) / nothing ⟧⇀ record s
            { BaseState    = bs'
            ; Ledger       = constructLedger rbs
            ; slot         = suc slot
@@ -222,7 +226,7 @@ data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → Leios
 ```agda
   Ftch :
        ────────────────────────────────────────────────────────
-       just s -⟦ FTCH-LDG / FTCH-LDG (LeiosState.Ledger s) ⟧⇀ s
+       s -⟦ honestInputI (-, FetchLdgI) / honestOutputO' (-, FetchLdgO (LeiosState.Ledger s)) ⟧⇀ s
 ```
 #### Base chain
 
@@ -232,7 +236,7 @@ Note: Submitted data to the base chain is only taken into account
 ```agda
   Base₁   :
           ───────────────────────────────────────────────────────────────────
-          just s -⟦ SUBMIT (inj₂ txs) / EMPTY ⟧⇀ record s { ToPropose = txs }
+          s -⟦ honestInputI (-, SubmitTxs txs) / nothing ⟧⇀ record s { ToPropose = txs }
 ```
 ```agda
   Base₂a  : let open LeiosState s renaming (BaseState to bs) in
@@ -240,24 +244,31 @@ Note: Submitted data to the base chain is only taken into account
           ∙ eb ∈ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
           ∙ bs B.-⟦ B.SUBMIT (this eb) / B.EMPTY ⟧⇀ bs'
           ───────────────────────────────────────────────────────────────────────
-          just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base
+          s -⟦ honestOutputI (-, SLOT) / nothing ⟧⇀ addUpkeep record s { BaseState = bs' } Base
 
   Base₂b  : let open LeiosState s renaming (BaseState to bs) in
           ∙ needsUpkeep Base
           ∙ [] ≡ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
           ∙ bs B.-⟦ B.SUBMIT (that ToPropose) / B.EMPTY ⟧⇀ bs'
           ───────────────────────────────────────────────────────────────────────
-          just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base
+          s -⟦ honestOutputI (-, SLOT) / nothing ⟧⇀ addUpkeep record s { BaseState = bs' } Base
 ```
 #### Protocol rules
 ```agda
   Roles₁ :
          ∙ s ↝ (s' , just i)
          ─────────────────────────────
-         just s -⟦ SLOT / FFD-IN i ⟧⇀ s'
+         s -⟦ honestOutputI (-, SLOT) / honestInputO' (-, FFD-IN i) ⟧⇀ s'
 
   Roles₂ :
          ∙ s ↝ (s' , nothing)
          ─────────────────────────────
-         just s -⟦ SLOT / EMPTY ⟧⇀ s'
+         s -⟦ honestOutputI (-, SLOT) / nothing ⟧⇀ s'
 ```
+<!--
+```agda
+ShortLeios : Machine FFD (IO ⊗ Adv)
+ShortLeios .Machine.State = LeiosState
+ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
+```
+--!>

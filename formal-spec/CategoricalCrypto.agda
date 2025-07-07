@@ -2,14 +2,15 @@ module CategoricalCrypto where
 
 open import abstract-set-theory.Prelude hiding (id; _∘_; _⊗_; lookup; Dec)
 import abstract-set-theory.Prelude as P
-open import Leios.Prelude using (Fin; fzero; fsuc)
+
+open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 
 --------------------------------------------------------------------------------
 -- Channels, which form the objects
 
-record Channel : Set₁ where
-  field P : Set
-        rcvType sndType : P → Set
+record Channel : Type₁ where
+  field P                : Type
+        rcvType sndType  : P → Type
 
 infixr 9 _⊗_
 
@@ -48,6 +49,9 @@ honestInputI = rcvʳ P.∘ sndˡ
 honestOutputO : ∀ {A B Adv} → ∃ (Channel.rcvType B) → ∃ (Channel.sndType (A ⊗ (B ⊗ Adv) ᵀ))
 honestOutputO = sndʳ P.∘ rcvˡ
 
+honestOutputO' : ∀ {A B Adv} → ∃ (Channel.rcvType B) → Maybe (∃ (Channel.sndType (A ⊗ (B ⊗ Adv) ᵀ)))
+honestOutputO' = just P.∘ honestOutputO
+
 adversarialInput : ∀ {A B Adv} → ∃ (Channel.sndType Adv) → ∃ (Channel.rcvType (A ⊗ (B ⊗ Adv) ᵀ))
 adversarialInput = rcvʳ P.∘ sndʳ
 
@@ -60,6 +64,9 @@ honestOutputI = rcvˡ
 honestInputO : ∀ {A B Adv} → ∃ (Channel.sndType A) → ∃ (Channel.sndType (A ⊗ (B ⊗ Adv) ᵀ))
 honestInputO = sndˡ
 
+honestInputO' : ∀ {A B Adv} → ∃ (Channel.sndType A) → Maybe (∃ (Channel.sndType (A ⊗ (B ⊗ Adv) ᵀ)))
+honestInputO' = just P.∘ honestInputO
+
 simpleChannel : Type → Type → Channel
 simpleChannel X Y = record { P = ⊤ ; rcvType = const X ; sndType = const Y }
 
@@ -71,7 +78,7 @@ simpleChannel' T = simpleChannel (T In) (T Out)
 
 ⨂_ : {n : ℕ} → (F : Fin n → Channel) → Channel
 ⨂_ {zero} F = I
-⨂_ {suc n} F = F fzero ⊗ ⨂ (F Leios.Prelude.∘ fsuc)
+⨂_ {suc n} F = F fzero ⊗ ⨂ (F P.∘ fsuc)
 
 postulate
   ⨂≡ : ∀ {n} → {A B : Fin n → Channel} → (∀ {k} → A k ≡ B k) → ⨂ A ≡ ⨂ B
@@ -88,27 +95,26 @@ snd⨂ (fsuc k) x = sndʳ (snd⨂ k x)
 -- Machines, which form the morphisms
 
 MachineType : Channel → Channel → Type → Type₁
-MachineType A B State = let open Channel (A ⊗ B ᵀ) in ∃ rcvType → State → State × Maybe (∃ sndType) → Set
+MachineType A B S = let open Channel (A ⊗ B ᵀ) in
+  S → ∃ rcvType → Maybe (∃ sndType) → S → Type
 
-record Machine (A B : Channel) : Set₁ where
+record Machine (A B : Channel) : Type₁ where
   constructor MkMachine
-  open Channel (A ⊗ B ᵀ) public
-
-  field State : Set
-        stepRel : ∃ rcvType → State → State × Maybe (∃ sndType) → Set
+  field State    : Type
+        stepRel  : MachineType A B State
 
 module _ {A B} (let open Channel (A ⊗ B ᵀ)) where
-  MkMachine' : ∀ {State} → (∃ rcvType → State → State × Maybe (∃ sndType) → Set) → Machine A B
+  MkMachine' : ∀ {State} → MachineType A B State → Machine A B
   MkMachine' = MkMachine _
 
-  StatelessMachine : (∃ rcvType → Maybe (∃ sndType) → Set) → Machine A B
-  StatelessMachine R = MkMachine ⊤ (λ i _ (_ , o) → R i o)
+  StatelessMachine : (∃ rcvType → Maybe (∃ sndType) → Type) → Machine A B
+  StatelessMachine R = MkMachine ⊤ (λ _ i o _ → R i o)
 
   FunctionMachine : (∃ rcvType → Maybe (∃ sndType)) → Machine A B
   FunctionMachine f = StatelessMachine (λ i o → f i ≡ o)
 
   TotalFunctionMachine : (∃ rcvType → ∃ sndType) → Machine A B
-  TotalFunctionMachine f = FunctionMachine (just Leios.Prelude.∘ f)
+  TotalFunctionMachine f = FunctionMachine (just P.∘ f)
 
 id : ∀ {A} → Machine A A
 id = TotalFunctionMachine λ where
@@ -123,29 +129,29 @@ module Tensor {A B C D} (M₁ : Machine A B) (M₂ : Machine C D) where
 
   AllCs = (A ⊗ B ᵀ) ⊗ (C ⊗ D ᵀ)
 
-  data CompRel : ∃ (Channel.rcvType AllCs) → State → State × Maybe (∃ (Channel.sndType AllCs)) → Set where
-    Step₁ : ∀ {p m m' s s' s₂} → stepRel₁ (p , m) s (s' , m')
-          → CompRel (inj₁ p , m) (s , s₂) ((s' , s₂) , (sndˡ <$> m'))
+  data CompRel : State → ∃ (Channel.rcvType AllCs) → Maybe (∃ (Channel.sndType AllCs)) → State → Type where
+    Step₁ : ∀ {p m m' s s' s₂} → stepRel₁ s (p , m) m' s'
+          → CompRel (s , s₂) (inj₁ p , m) (sndˡ <$> m') (s' , s₂)
 
-    Step₂ : ∀ {p m m' s s' s₁} → stepRel₂ (p , m) s (s' , m')
-          → CompRel (inj₂ p , m) (s₁ , s) ((s₁ , s') , (sndʳ <$> m'))
-
+    Step₂ : ∀ {p m m' s s' s₁} → stepRel₂ s (p , m) m' s'
+          → CompRel (s₁ , s) (inj₂ p , m) (sndʳ <$> m') (s₁ , s')
 
   _⊗'_ : Machine (A ⊗ C) (B ⊗ D)
   _⊗'_ = λ where
     .Machine.State → State
-    .Machine.stepRel m s (s' , m') → CompRel
+    .Machine.stepRel s m m' s' → CompRel
+      s
       (case m of λ where
         (inj₁ (inj₁ p) , m) → (inj₁ (inj₁ p) , m)
         (inj₁ (inj₂ p) , m) → (inj₂ (inj₁ p) , m)
         (inj₂ (inj₁ p) , m) → (inj₁ (inj₂ p) , m)
         (inj₂ (inj₂ p) , m) → (inj₂ (inj₂ p) , m))
-      s
-      (s' , ((λ where
+      ((λ where
         (inj₁ (inj₁ p) , m) → (inj₁ (inj₁ p) , m)
         (inj₁ (inj₂ p) , m) → (inj₂ (inj₁ p) , m)
         (inj₂ (inj₁ p) , m) → (inj₁ (inj₂ p) , m)
-        (inj₂ (inj₂ p) , m) → (inj₂ (inj₂ p) , m)) <$> m'))
+        (inj₂ (inj₂ p) , m) → (inj₂ (inj₂ p) , m)) <$> m')
+      s'
 
 open Tensor using (_⊗'_) public
 
@@ -163,39 +169,39 @@ module Comp {A B C} (M₁ : Machine B C) (M₂ : Machine A B) where
 
   AllCs = (A ⊗ B ᵀ) ⊗ (B ⊗ C ᵀ)
 
-  data CompRel : ∃ (Channel.rcvType AllCs) → State → State × Maybe (∃ (Channel.sndType AllCs)) → Set where
-    Step₁ : ∀ {p m m' s s' s₂} → stepRel₁ (p , m) s (s' , m')
-          → CompRel (inj₂ p , m) (s , s₂) ((s' , s₂) , (sndʳ <$> m'))
+  data CompRel : State → ∃ (Channel.rcvType AllCs) → Maybe (∃ (Channel.sndType AllCs)) → State → Type where
+    Step₁ : ∀ {p m m' s s' s₂} → stepRel₁ s (p , m) m' s'
+          → CompRel (s , s₂) (inj₂ p , m) (sndʳ <$> m') (s' , s₂)
 
-    Step₂ : ∀ {p m m' s s' s₁} → stepRel₂ (p , m) s (s' , m')
-          → CompRel (inj₁ p , m) (s₁ , s) ((s₁ , s') , (sndˡ <$> m'))
+    Step₂ : ∀ {p m m' s s' s₁} → stepRel₂ s (p , m) m' s'
+          → CompRel (s₁ , s) (inj₁ p , m) (sndˡ <$> m') (s₁ , s')
 
     Multi₁ : ∀ {p m m' m'' s s' s''}
-           → CompRel m s (s' , just ((inj₂ (inj₁ p) , m')))
-           → CompRel (inj₁ (inj₂ p) , m') s' (s'' , m'')
-           → CompRel m s (s'' , m'')
+           → CompRel s m (just ((inj₂ (inj₁ p) , m'))) s'
+           → CompRel s' (inj₁ (inj₂ p) , m') m'' s''
+           → CompRel s m m'' s''
 
     Multi₂ : ∀ {p m m' m'' s s' s''}
-           → CompRel m s (s' , just (inj₁ (inj₂ p) , m'))
-           → CompRel (inj₂ (inj₁ p) , m') s' (s'' , m'')
-           → CompRel m s (s'' , m'')
+           → CompRel s m (just (inj₁ (inj₂ p) , m')) s'
+           → CompRel s' (inj₂ (inj₁ p) , m') m'' s''
+           → CompRel s m m'' s''
 
   infixr 9 _∘_
 
   _∘_ : Machine A C
   _∘_ = λ where
     .Machine.State → State
-    .Machine.stepRel m s (s' , m') →
+    .Machine.stepRel s m m' s' →
       CompRel
-        (case m of λ where (inj₁ x , m) → inj₁ (inj₁ x) , m ; (inj₂ y , m) → inj₂ (inj₂ y) , m)
-        s (s' ,  ((λ where (inj₁ x , m) → inj₁ (inj₁ x) , m ; (inj₂ y , m) → inj₂ (inj₂ y) , m) <$> m'))
+        s (case m of λ where (inj₁ x , m) → inj₁ (inj₁ x) , m ; (inj₂ y , m) → inj₂ (inj₂ y) , m)
+        ((λ where (inj₁ x , m) → inj₁ (inj₁ x) , m ; (inj₂ y , m) → inj₂ (inj₂ y) , m) <$> m') s'
 
 open Comp using (_∘_) public
 
 module Machine-Reasoning where
   open import Relation.Binary.Reasoning.Syntax
 
-  open begin-syntax Machine Leios.Prelude.id public
+  open begin-syntax Machine P.id public
   open ⟶-syntax {R = Machine} Machine Machine (λ M₁ M₂ → M₂ ∘ M₁) public
   open end-syntax Machine id public
 
@@ -250,7 +256,14 @@ _⊗ᴷ_ {A₁} {B₁} {E₁} {A₂} {B₂} {E₂} M₁ M₂ = rew ∘ M₁ ⊗'
 ⨂ᴷ : ∀ {n} → {A B E : Fin n → Channel} → ((k : Fin n) → Machine (A k) (B k ⊗ E k))
     → Machine (⨂ A) (⨂ B ⊗ ⨂ E)
 ⨂ᴷ {zero} M = idᴷ
-⨂ᴷ {suc n} M = M fzero ⊗ᴷ ⨂ᴷ (M Leios.Prelude.∘ fsuc)
+⨂ᴷ {suc n} M = M fzero ⊗ᴷ ⨂ᴷ (M P.∘ fsuc)
+
+--------------------------------------------------------------------------------
+-- Open adersarial protocols
+record OAP (A E₁ B E₂ : Channel) : Type₁ where
+  field Adv        : Channel
+        Protocol   : Machine A (B ⊗ Adv)
+        Adversary  : Machine (Adv ⊗ E₁) E₂
 
 --------------------------------------------------------------------------------
 -- Environment model
@@ -263,7 +276,7 @@ _⊗ᴷ_ {A₁} {B₁} {E₁} {A₂} {B₂} {E₂} M₁ M₂ = rew ∘ M₁ ⊗'
 -- Presheaf on the category of channels & machines
 -- we just take machines that output a boolean
 -- for now, not on the Kleisli construction
-ℰ : Channel → Set₁
+ℰ : Channel → Type₁
 ℰ C = Machine C ℰ-Out
 
 map-ℰ : ∀ {A B} → Machine A B → ℰ B → ℰ A
@@ -273,21 +286,21 @@ map-ℰ M E = E ∘ M
 -- UC relations
 
 -- perfect equivalence
-_≈ℰ_ : ∀ {A B} → Machine A B → Machine A B → Set₁
+_≈ℰ_ : ∀ {A B} → Machine A B → Machine A B → Type₁
 _≈ℰ_ {B = B} M M' = (E : ℰ B) → map-ℰ M E ≡ map-ℰ M' E
 
-_≤UC_ : ∀ {A B E E''} → Machine A (B ⊗ E) → Machine A (B ⊗ E'') → Set₁
+_≤UC_ : ∀ {A B E E''} → Machine A (B ⊗ E) → Machine A (B ⊗ E'') → Type₁
 _≤UC_ {B = B} {E} R I = ∀ E' (A : Machine E E') → ∃[ S ] ((B ⊗ˡ A) ∘ R) ≈ℰ ((B ⊗ˡ S) ∘ I)
 
 -- equivalent to _≤UC_ by "completeness of the dummy adversary"
-_≤'UC_ : ∀ {A B E} → Machine A (B ⊗ E) → Machine A (B ⊗ E) → Set₁
+_≤'UC_ : ∀ {A B E} → Machine A (B ⊗ E) → Machine A (B ⊗ E) → Type₁
 _≤'UC_ {B = B} R I = ∃[ S ] R ≈ℰ (B ⊗ˡ S ∘ I)
 
 
 --------------------------------------------------------------------------------
 -- Example functionalities
 
-module LeakyChannel (M : Set) where
+module LeakyChannel (M : Type) where
   -- authenticated, non-lossy, leaks all messages
 
   open Channel
@@ -303,25 +316,27 @@ module LeakyChannel (M : Set) where
   -- upon request, can send next message to Eve
   E = simpleChannel M ⊤
 
-  open Machine hiding (rcvType; sndType)
+  open Machine
 
-  data Receive_withState_return_ : MachineType I ((A ⊗ B) ⊗ E) (List M) where
+  data WithState_receive_return_newState_ : MachineType I ((A ⊗ B) ⊗ E) (List M) where
 
-    Send : ∀ {m s} → Receive (honestInputI (sndˡ (-, m)))
-                     withState s
-                     return (s ∷ʳ m , just (honestOutputO (rcvʳ (-, m))))
+    Send : ∀ {m s} → WithState s
+                     receive (honestInputI (sndˡ (-, m)))
+                     return just (honestOutputO (rcvʳ (-, m)))
+                     newState (s ∷ʳ m)
 
-    Req  : ∀ {m s} → Receive (adversarialInput _)
-                     withState (m ∷ s)
-                     return (s , just (adversarialOutput (-, m)))
+    Req  : ∀ {m s} → WithState (m ∷ s)
+                     receive (adversarialInput _)
+                     return just (adversarialOutput (-, m))
+                     newState s
 
   Functionality : Machine I ((A ⊗ B) ⊗ E)
   Functionality .State = List M -- queue of messages
-  Functionality .stepRel = Receive_withState_return_
+  Functionality .stepRel = WithState_receive_return_newState_
 
 
 
-module SecureChannel (M : Set) where
+module SecureChannel (M : Type) where
   -- authenticated, non-lossy, leaks only message length
 
   open Channel
@@ -339,37 +354,39 @@ module SecureChannel (M : Set) where
 
   module _ (msgLen : M → ℕ) where
 
-    open Machine hiding (rcvType; sndType)
+    open Machine
 
-    data Receive_withState_return_ : MachineType I ((A ⊗ B) ⊗ E) (List M) where
+    data WithState_receive_return_newState_ : MachineType I ((A ⊗ B) ⊗ E) (List M) where
 
-      Send : ∀ {m s} → Receive (honestInputI (sndˡ (-, m)))
-                       withState s
-                       return (s ∷ʳ m , just (honestOutputO (rcvʳ (-, m))))
+      Send : ∀ {m s} → WithState s
+                       receive (honestInputI (sndˡ (-, m)))
+                       return just (honestOutputO (rcvʳ (-, m)))
+                       newState (s ∷ʳ m)
 
-      Req  : ∀ {m s} → Receive (adversarialInput _)
-                       withState (m ∷ s)
-                       return (s , just (adversarialOutput (-, msgLen m)))
+      Req  : ∀ {m s} → WithState (m ∷ s)
+                       receive (adversarialInput _)
+                       return just (adversarialOutput (-, msgLen m))
+                       newState s
 
     Functionality : Machine I ((A ⊗ B) ⊗ E)
     Functionality .State = List M -- queue of messages
-    Functionality .stepRel = Receive_withState_return_
+    Functionality .stepRel = WithState_receive_return_newState_
 
 
 
-module Encryption (PlainText CipherText PubKey PrivKey : Set)
+module Encryption (PlainText CipherText PubKey PrivKey : Type)
                   ⦃ _ : DecEq CipherText ⦄ ⦃ _ : DecEq PubKey ⦄
                   (genCT : ℕ → CipherText) (getPubKey : PrivKey → PubKey) where
   open Channel
-  open Machine hiding (rcvType; sndType)
+  open Machine
 
   C : Channel
   C = simpleChannel (CipherText ⊎ Maybe PlainText) (PlainText × PubKey ⊎ CipherText × PrivKey)
 
-  S : Set
+  S : Type
   S = List (PubKey × PlainText × CipherText)
 
-  lookup : {A : Set} → List A → (A → Bool) → Maybe A
+  lookup : {A : Type} → List A → (A → Bool) → Maybe A
   lookup [] f = nothing
   lookup (x ∷ l) f with f x
   ... | true  = just x
@@ -378,58 +395,64 @@ module Encryption (PlainText CipherText PubKey PrivKey : Set)
   lookupPlainText : S → CipherText × PubKey → Maybe PlainText
   lookupPlainText s (c , k) = proj₁ <$> (proj₂ <$> lookup s λ where (k' , _ , c') → ¿ k ≡ k' × c ≡ c' ¿ᵇ)
 
-  data Receive_withState_return_ : MachineType I C S where
+  data WithState_receive_return_newState_ : MachineType I C S where
 
     Enc : ∀ {p k s} → let c = genCT (length s)
-       in Receive (rcvʳ (-, inj₁ (p , k)))
-          withState s
-          return ((k , p , c) ∷ s , just (sndʳ (-, inj₁ c)))
+       in WithState s
+          receive (rcvʳ (-, inj₁ (p , k)))
+          return just (sndʳ (-, inj₁ c))
+          newState ((k , p , c) ∷ s)
 
     Dec : ∀ {c k s} → let p = lookupPlainText s (c , getPubKey k)
-       in Receive (rcvʳ (-, inj₂ (c , k)))
-          withState s
-          return (s , just (sndʳ (-, inj₂ p)))
+       in WithState s
+          receive (rcvʳ (-, inj₂ (c , k)))
+          return just (sndʳ (-, inj₂ p))
+          newState s
 
   Functionality : Machine I C
   Functionality .State   = S
-  Functionality .stepRel = Receive_withState_return_
+  Functionality .stepRel = WithState_receive_return_newState_
 
 -- Note: it's a bad idea to do this as a wrapper, just make a shim to
 -- compose with Encryption & the channel instead
-module EncryptionShim (PlainText CipherText PubKey PrivKey : Set)
+module EncryptionShim (PlainText CipherText PubKey PrivKey : Type)
                       ⦃ _ : DecEq CipherText ⦄ ⦃ _ : DecEq PubKey ⦄
                       (genCT : ℕ → CipherText) (getPubKey : PrivKey → PubKey)
                       (pubKey : PubKey) (privKey : PrivKey) where
   open Channel
-  open Machine hiding (rcvType; sndType)
+  open Machine
 
   module L = LeakyChannel CipherText
   module S = SecureChannel PlainText
   module E = Encryption PlainText CipherText PubKey PrivKey genCT getPubKey
 
-  data Receive_withState_return_ : MachineType ((L.A ⊗ L.B) ⊗ L.E) ((S.A ⊗ S.B) ⊗ S.E) (E.Functionality .State) where
+  data WithState_receive_return_newState_ : MachineType ((L.A ⊗ L.B) ⊗ L.E) ((S.A ⊗ S.B) ⊗ S.E) (E.Functionality .State) where
 
     EncSend : ∀ {m m' s s'}
-            → E.Receive (rcvʳ (-, inj₁ (m , pubKey)))
-                withState s
-                return (s' , just (sndʳ (-, inj₁ m')))
-            → Receive (rcvʳ (sndˡ (sndˡ (-, m))))
-              withState s
-              return (s' , just (sndˡ (sndˡ (sndˡ (-, m')))))
+            → E.WithState s
+                receive (rcvʳ (-, inj₁ (m , pubKey)))
+                return just (sndʳ (-, inj₁ m'))
+                newState s'
+            → WithState s
+              receive (rcvʳ (sndˡ (sndˡ (-, m))))
+              return just (sndˡ (sndˡ (sndˡ (-, m'))))
+              newState s'
 
     DecRcv  : ∀ {m m' s s'}
-            → E.Receive (rcvʳ (-, inj₂ (m , privKey)))
-                withState s
-                return (s' , just (sndʳ (-, inj₂ (just m'))))
-            → Receive (rcvˡ (rcvˡ (rcvʳ (-, m))))
-              withState s
-              return (s' , just (sndʳ (rcvˡ (rcvʳ (-, m')))))
+            → E.WithState s
+                receive (rcvʳ (-, inj₂ (m , privKey)))
+                return just (sndʳ (-, inj₂ (just m')))
+                newState s'
+            → WithState s
+              receive (rcvˡ (rcvˡ (rcvʳ (-, m))))
+              return just (sndʳ (rcvˡ (rcvʳ (-, m'))))
+              newState s'
 
   Functionality : Machine ((L.A ⊗ L.B) ⊗ L.E) ((S.A ⊗ S.B) ⊗ S.E)
   Functionality .State   = E.Functionality .State
-  Functionality .stepRel = Receive_withState_return_
+  Functionality .stepRel = WithState_receive_return_newState_
 
-module SecureFromAuthenticated (PlainText CipherText PubKey PrivKey : Set)
+module SecureFromAuthenticated (PlainText CipherText PubKey PrivKey : Type)
                                ⦃ _ : DecEq CipherText ⦄ ⦃ _ : DecEq PubKey ⦄
                                (genCT : ℕ → CipherText) (getPubKey : PrivKey → PubKey)
                                (pubKey : PubKey) (privKey : PrivKey)
