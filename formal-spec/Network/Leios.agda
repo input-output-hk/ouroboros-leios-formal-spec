@@ -132,7 +132,7 @@ module MultiNode (networkParams : NetworkParams) (let open NetworkParams network
 
   honestNodes' : Machine (⨂ constNetworkF) (⨂ IOF ⊗ ⨂ AdvF)
   honestNodes' = subst (λ c → Machine c (⨂ IOF ⊗ ⨂ AdvF))
-                       (⨂≡ (λ {k} → NetworkF≡constNetworkF {k})) honestNodes
+                       (⨂≡ (λ k → NetworkF≡constNetworkF {k})) honestNodes
 
   open Network.BasicBroadcast numberOfParties NetworkMessage
     renaming (A to NetAdv; Network to NetFunctionality)
