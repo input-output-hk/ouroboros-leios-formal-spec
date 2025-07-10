@@ -8,7 +8,8 @@
     };
 
     # Agda version 2.7
-    agda-nixpkgs.url = "github:NixOS/nixpkgs?ref=7438ebd9431243aa0b01502fae89c022e4facb0c";
+    agda-nixpkgs.url = "github:NixOS/nixpkgs?ref=f2e17db019846951e14dfac79bd9579bda3d74cf";
+    # agda-nixpkgs.url = "github:NixOS/nixpkgs?ref=25.05";
 
   };
 

@@ -18,12 +18,12 @@ let
   agdaStdlibClasses = customAgda.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
     pname = "agda-stdlib-classes";
-    version = "2.0";
+    version = "2.2";
     src = fetchFromGitHub {
       repo = "agda-stdlib-classes";
-      owner = "omelkonian";
-      rev = "2b42a6043296b4601134b8ab9371b37bda5d4424";
-      sha256 = "sha256-kTqS9p+jjv34d4JIWV9eWAI8cw9frX/K9DHuwv56AHo=";
+      owner = "agda";
+      rev = "v2.2";
+      sha256 = "iaxCETpDKVhiprhRf+3jWJYFZU7D6D4/teYdHZ5Qw24=";
     };
     meta = { };
     libraryFile = "agda-stdlib-classes.agda-lib";
@@ -34,12 +34,13 @@ let
   agdaStdlibMeta = customAgda.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
     pname = "agda-stdlib-meta";
-    version = "2.1.1";
+    version = "2.2";
+    # src = "git+file:/home/yves/code/agda-stdlib-meta?rev=7a2cfc3e68b7b38970c92673c2eeb4d6e2673e6b";
     src = fetchFromGitHub {
-      repo = "stdlib-meta";
-      owner = "omelkonian";
-      rev = "480242a38feb948cafc8bcf673d057c04b0ed347";
-      sha256 = "pa6Zd9O3M1d/JMSvnfgteAbDMgHyelQrR5xyibU0EeM=";
+      repo = "agda-stdlib-meta";
+      owner = "agda";
+      rev = "d459f65812b7eb73f8ebec771c2f6c17c9d79dc3";
+      sha256 = "oSGZAgaaA8etxJJ+0b31OBIC08k9izQEaI9OEssjV6o=";
     };
     meta = { };
     libraryFile = "agda-stdlib-meta.agda-lib";
@@ -50,12 +51,12 @@ let
   agdaSets = customAgda.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
     pname = "agda-sets";
-    version = "2.1.1";
+    version = "2.2";
     src = pkgs.fetchFromGitHub {
       repo = "agda-sets";
       owner = "input-output-hk";
-      rev = "f517d0d0c1ff1fd6dbac8b34309dea0e1aea6fc6";
-      sha256 = "sha256-OsdDNNJp9NWDgDM0pDOGv98Z+vAS1U8mORWF7/B1D7k=";
+      rev = "751b3ee39122fe33022af41e6c94dc820afde19a";
+      sha256 = "sha256-0vjmNN8wuZXT4NM3aEv4z1Y+/6LpNfb7vzeajwZ3eFY=";
     };
     meta = { };
     libraryFile = "abstract-set-theory.agda-lib";
@@ -66,12 +67,12 @@ let
   agdaIOGPrelude = customAgda.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
     pname = "agda-prelude";
-    version = "2.0";
+    version = "2.2";
     src = pkgs.fetchFromGitHub {
       repo = "iog-agda-prelude";
       owner = "input-output-hk";
-      rev = "e4f83fa59142baaad4944910217be05ebf6e2f22";
-      sha256 = "sha256-ytTOvz97lTHTiVdpmS3HUfTp/LH1Xey9bSh9zaBuacU=";
+      rev = "7c0c5b9fb84ea2ca7834833c196c693430639c35";
+      sha256 = "sha256-FJ7r0z4edw410xNJxPvVuXYR9gBpGyp4x82VwcaKU8A=";
     };
     meta = { };
     libraryFile = "iog-prelude.agda-lib";
