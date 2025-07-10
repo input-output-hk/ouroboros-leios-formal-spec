@@ -35,7 +35,6 @@ let
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
     pname = "agda-stdlib-meta";
     version = "2.2";
-    # src = "git+file:/home/yves/code/agda-stdlib-meta?rev=7a2cfc3e68b7b38970c92673c2eeb4d6e2673e6b";
     src = fetchFromGitHub {
       repo = "agda-stdlib-meta";
       owner = "agda";
