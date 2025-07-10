@@ -1,3 +1,4 @@
+{-# OPTIONS --safe #-}
 {- Module: Leios.Defaults
    
    This module provides simple default implementations for the core components

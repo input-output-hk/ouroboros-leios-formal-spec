@@ -1,3 +1,4 @@
+{-# OPTIONS --safe #-}
 open import Leios.Prelude
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq

@@ -1,3 +1,4 @@
+{-# OPTIONS --safe #-}
 module CategoricalCrypto where
 
 open import abstract-set-theory.Prelude hiding (id; _∘_; _⊗_; lookup; Dec)
@@ -80,8 +81,9 @@ simpleChannel' T = simpleChannel (T In) (T Out)
 ⨂_ {zero} F = I
 ⨂_ {suc n} F = F fzero ⊗ ⨂ (F P.∘ fsuc)
 
-postulate
-  ⨂≡ : ∀ {n} → {A B : Fin n → Channel} → (∀ {k} → A k ≡ B k) → ⨂ A ≡ ⨂ B
+⨂≡ : ∀ {n} → {A B : Fin n → Channel} → (∀ k → A k ≡ B k) → ⨂ A ≡ ⨂ B
+⨂≡ {zero}          eqs = refl
+⨂≡ {suc n} {A} {B} eqs = cong₂ _⊗_ (eqs fzero) (⨂≡ {n} {A P.∘ fsuc} {B P.∘ fsuc} (eqs P.∘ fsuc))
 
 rcv⨂ : {n : ℕ} {F : Fin n → Channel} → (k : Fin n) → ∃ (Channel.rcvType (F k)) → ∃ (Channel.rcvType (⨂ F))
 rcv⨂ fzero = rcvˡ
@@ -115,6 +117,16 @@ module _ {A B} (let open Channel (A ⊗ B ᵀ)) where
 
   TotalFunctionMachine : (∃ rcvType → ∃ sndType) → Machine A B
   TotalFunctionMachine f = FunctionMachine (just P.∘ f)
+
+-- this forces all messages to go 'through' the machine, i.e.
+-- messages on the domain become messages on the codomain and vice versa
+-- if e.g. A ≡ B then it's easy to accidentally send a message the wrong way
+-- which is prevented here
+TotalFunctionMachine' : ∀ {A B} (let open Channel)
+  → (∃ (rcvType A) → ∃ (rcvType B)) → (∃ (sndType B) → ∃ (sndType A)) → Machine A B
+TotalFunctionMachine' f g = TotalFunctionMachine λ where
+  (inj₁ p , m) → sndʳ (f (p , m))
+  (inj₂ p , m) → sndˡ (g (p , m))
 
 id : ∀ {A} → Machine A A
 id = TotalFunctionMachine λ where
@@ -205,16 +217,30 @@ module Machine-Reasoning where
   open ⟶-syntax {R = Machine} Machine Machine (λ M₁ M₂ → M₂ ∘ M₁) public
   open end-syntax Machine id public
 
-postulate
-  ⊗-assoc : ∀ {A B C} → Machine ((A ⊗ B) ⊗ C) (A ⊗ (B ⊗ C))
-  ⊗-assoc⃖ : ∀ {A B C} → Machine (A ⊗ (B ⊗ C)) ((A ⊗ B) ⊗ C)
+⊗-assoc : ∀ {A B C} → Machine ((A ⊗ B) ⊗ C) (A ⊗ (B ⊗ C))
+⊗-assoc = TotalFunctionMachine'
+  (λ where (inj₁ (inj₁ p) , m) →       inj₁ p  , m
+           (inj₁ (inj₂ p) , m) → inj₂ (inj₁ p) , m
+           (      inj₂ p  , m) → inj₂ (inj₂ p) , m)
+  (λ where (      inj₁ p  , m) → inj₁ (inj₁ p) , m
+           (inj₂ (inj₁ p) , m) → inj₁ (inj₂ p) , m
+           (inj₂ (inj₂ p) , m) →       inj₂ p  , m)
+
+⊗-assoc⃖ : ∀ {A B C} → Machine (A ⊗ (B ⊗ C)) ((A ⊗ B) ⊗ C)
+⊗-assoc⃖ = TotalFunctionMachine'
+  (λ where (      inj₁ p  , m) → inj₁ (inj₁ p) , m
+           (inj₂ (inj₁ p) , m) → inj₁ (inj₂ p) , m
+           (inj₂ (inj₂ p) , m) →       inj₂ p  , m)
+  (λ where (inj₁ (inj₁ p) , m) →       inj₁ p  , m
+           (inj₁ (inj₂ p) , m) → inj₂ (inj₁ p) , m
+           (      inj₂ p  , m) → inj₂ (inj₂ p) , m)
 
 ⊗-sym : ∀ {A B} → Machine (A ⊗ B) (B ⊗ A)
-⊗-sym = TotalFunctionMachine λ where
-  (inj₁ (inj₁ p) , m) → inj₂ (inj₂ p) , m
-  (inj₁ (inj₂ p) , m) → inj₂ (inj₁ p) , m
-  (inj₂ (inj₁ p) , m) → inj₁ (inj₂ p) , m
-  (inj₂ (inj₂ p) , m) → inj₁ (inj₁ p) , m
+⊗-sym = TotalFunctionMachine'
+  (λ where (inj₁ p , m) → inj₂ p , m
+           (inj₂ p , m) → inj₁ p , m)
+  (λ where (inj₁ p , m) → inj₂ p , m
+           (inj₂ p , m) → inj₁ p , m)
 
 idᴷ : Machine I (I ⊗ I)
 idᴷ = TotalFunctionMachine λ where

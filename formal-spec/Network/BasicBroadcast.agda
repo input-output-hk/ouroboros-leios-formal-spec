@@ -1,3 +1,4 @@
+{-# OPTIONS --safe #-}
 open import Leios.Prelude hiding (_⊗_; module Any)
 open import CategoricalCrypto
 

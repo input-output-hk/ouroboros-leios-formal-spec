@@ -2,7 +2,7 @@
 
 <!--
 ```agda
--- {-# OPTIONS --safe #-}
+{-# OPTIONS --safe #-}
 open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.FFD
 open import Leios.SpecStructure
