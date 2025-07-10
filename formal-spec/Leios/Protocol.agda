@@ -334,3 +334,11 @@ module Types (params : Params) where
 
   FFD : Channel
   FFD = simpleChannel' FFDT ᵀ
+
+  data BaseT : ChannelDir → Type where
+    FTCH-LDG : BaseT In
+    SUBMIT   : RankingBlock → BaseT In
+    BASE-LDG : List RankingBlock → BaseT Out
+
+  BaseC : Channel
+  BaseC = simpleChannel' BaseT ᵀ

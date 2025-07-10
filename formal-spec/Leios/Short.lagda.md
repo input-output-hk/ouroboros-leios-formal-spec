@@ -53,7 +53,6 @@ unquoteDecl DecEq-StageUpkeep = derive-DecEq ((quote StageUpkeep , DecEq-StageUp
 ```
 ```agda
 open import Leios.Protocol (⋯) SlotUpkeep StageUpkeep public
-open Types params
 
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
@@ -199,33 +198,38 @@ allDone record { slot = s ; Upkeep = u ; Upkeep-Stage = v } =
 The relation describing the transition given input and state
 #### Initialization
 ```agda
+open Types params
+
 data _⊢_ : VTy → LeiosState → Type where
   Init :
        ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
-       ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
+       ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs' -- TODO: replace this line
        ────────────────────────────────────────────────────────────────
        V ⊢ initLeiosState V SD bs' pks
 ```
 ```agda
-data _-⟦_/_⟧⇀_ : MachineType FFD (IO ⊗ Adv) LeiosState where
+data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```
 #### Network and Ledger
 ```agda
-  Slot : let open LeiosState s renaming (BaseState to bs) in
-       ∙ allDone s
-       ∙ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG rbs ⟧⇀ bs'
-       ───────────────────────────────────────────────────────────────────────
-       s -⟦ honestOutputI (-, SLOT) / nothing ⟧⇀ record s
-           { BaseState    = bs'
-           ; Ledger       = constructLedger rbs
-           ; slot         = suc slot
-           ; Upkeep       = ∅
-           ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
-           } ↑ L.filter (isValid? s) msgs
+  Slot₁ : let open LeiosState s renaming (BaseState to bs) in
+        ∙ allDone s
+        ────────────────────────────────────────────────────────────────────────────────────
+        s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
+            { BaseState    = bs'
+            ; slot         = suc slot
+            ; Upkeep       = ∅
+            ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
+            } ↑ L.filter (isValid? s) msgs
+
+  Slot₂ : let open LeiosState s in
+        ────────────────────────────────────────────────────────
+        s -⟦ honestOutputI (rcvʳ (-, BASE-LDG rbs)) / nothing ⟧⇀
+          record s { Ledger = constructLedger rbs }
 ```
 ```agda
   Ftch :
-       ────────────────────────────────────────────────────────
+       ───────────────────────────────────────────────────────────────────────────────────────────
        s -⟦ honestInputI (-, FetchLdgI) / honestOutputO' (-, FetchLdgO (LeiosState.Ledger s)) ⟧⇀ s
 ```
 #### Base chain
@@ -235,39 +239,39 @@ Note: Submitted data to the base chain is only taken into account
       for the given slot
 ```agda
   Base₁   :
-          ───────────────────────────────────────────────────────────────────
+          ──────────────────────────────────────────────────────────────────────────────
           s -⟦ honestInputI (-, SubmitTxs txs) / nothing ⟧⇀ record s { ToPropose = txs }
 ```
 ```agda
   Base₂a  : let open LeiosState s renaming (BaseState to bs) in
           ∙ needsUpkeep Base
           ∙ eb ∈ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
-          ∙ bs B.-⟦ B.SUBMIT (this eb) / B.EMPTY ⟧⇀ bs'
-          ───────────────────────────────────────────────────────────────────────
-          s -⟦ honestOutputI (-, SLOT) / nothing ⟧⇀ addUpkeep record s { BaseState = bs' } Base
+          ───────────────────────────────────────────────────────────────────────────────────
+          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT (this eb))) ⟧⇀
+            addUpkeep record s { BaseState = bs' } Base
 
   Base₂b  : let open LeiosState s renaming (BaseState to bs) in
           ∙ needsUpkeep Base
           ∙ [] ≡ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
-          ∙ bs B.-⟦ B.SUBMIT (that ToPropose) / B.EMPTY ⟧⇀ bs'
-          ───────────────────────────────────────────────────────────────────────
-          s -⟦ honestOutputI (-, SLOT) / nothing ⟧⇀ addUpkeep record s { BaseState = bs' } Base
+          ──────────────────────────────────────────────────────────────────────────────────────────
+          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT (that ToPropose))) ⟧⇀
+            addUpkeep record s { BaseState = bs' } Base
 ```
 #### Protocol rules
 ```agda
   Roles₁ :
          ∙ s ↝ (s' , just i)
-         ─────────────────────────────
-         s -⟦ honestOutputI (-, SLOT) / honestInputO' (-, FFD-IN i) ⟧⇀ s'
+         ──────────────────────────────────────────────────────────────────────────────
+         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
 
   Roles₂ :
          ∙ s ↝ (s' , nothing)
-         ─────────────────────────────
-         s -⟦ honestOutputI (-, SLOT) / nothing ⟧⇀ s'
+         ───────────────────────────────────────────────────
+         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ s'
 ```
 <!--
 ```agda
-ShortLeios : Machine FFD (IO ⊗ Adv)
+ShortLeios : Machine (FFD ⊗ BaseC) (IO ⊗ Adv)
 ShortLeios .Machine.State = LeiosState
 ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 ```
