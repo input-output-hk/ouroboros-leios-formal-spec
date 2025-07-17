@@ -55,7 +55,6 @@ record LeiosState : Type where
         IBBodies     : List IBBody
         Upkeep       : ℙ SlotUpkeep
         Upkeep-Stage : ℙ StageUpkeep
-        BaseState    : B.State
         votingState  : VotingState
         PubKeys      : List PubKey
 
@@ -96,8 +95,8 @@ addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u �
 addUpkeep-Stage : LeiosState → StageUpkeep → LeiosState
 addUpkeep-Stage s u = let open LeiosState s in record s { Upkeep-Stage = Upkeep-Stage ∪ ❴ u ❵ }
 
-initLeiosState : VTy → StakeDistr → B.State → List PubKey → LeiosState
-initLeiosState V SD bs pks = record
+initLeiosState : VTy → StakeDistr → List PubKey → LeiosState
+initLeiosState V SD pks = record
   { V            = V
   ; SD           = SD
   ; Ledger       = []
@@ -110,7 +109,6 @@ initLeiosState V SD bs pks = record
   ; IBBodies     = []
   ; Upkeep       = ∅
   ; Upkeep-Stage = ∅
-  ; BaseState    = bs
   ; votingState  = initVotingState
   ; PubKeys      = pks
   }
@@ -331,6 +329,7 @@ module Types (params : Params) where
     FFD-OUT : List (FFDA.Header ⊎ FFDA.Body) → FFDT Out
     FFD-IN  : FFDA.Input → FFDT In
     SLOT    : FFDT Out
+    FTCH    : FFDT Out
 
   FFD : Channel
   FFD = simpleChannel' FFDT ᵀ

@@ -205,19 +205,18 @@ data _⊢_ : VTy → LeiosState → Type where
        ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
        ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs' -- TODO: replace this line
        ────────────────────────────────────────────────────────────────
-       V ⊢ initLeiosState V SD bs' pks
+       V ⊢ initLeiosState V SD pks
 ```
 ```agda
 data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```
 #### Network and Ledger
 ```agda
-  Slot₁ : let open LeiosState s renaming (BaseState to bs) in
+  Slot₁ : let open LeiosState s in
         ∙ allDone s
         ────────────────────────────────────────────────────────────────────────────────────
         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
-            { BaseState    = bs'
-            ; slot         = suc slot
+            { slot         = suc slot
             ; Upkeep       = ∅
             ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
             } ↑ L.filter (isValid? s) msgs
@@ -243,19 +242,19 @@ Note: Submitted data to the base chain is only taken into account
           s -⟦ honestInputI (-, SubmitTxs txs) / nothing ⟧⇀ record s { ToPropose = txs }
 ```
 ```agda
-  Base₂a  : let open LeiosState s renaming (BaseState to bs) in
+  Base₂a  : let open LeiosState s in
           ∙ needsUpkeep Base
           ∙ eb ∈ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
           ───────────────────────────────────────────────────────────────────────────────────
           s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT (this eb))) ⟧⇀
-            addUpkeep record s { BaseState = bs' } Base
+            addUpkeep s Base
 
-  Base₂b  : let open LeiosState s renaming (BaseState to bs) in
+  Base₂b  : let open LeiosState s in
           ∙ needsUpkeep Base
           ∙ [] ≡ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
           ──────────────────────────────────────────────────────────────────────────────────────────
           s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT (that ToPropose))) ⟧⇀
-            addUpkeep record s { BaseState = bs' } Base
+            addUpkeep s Base
 ```
 #### Protocol rules
 ```agda
