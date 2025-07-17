@@ -1,9 +1,7 @@
-open import Leios.Prelude hiding (id; _>>=_; return)
+open import Leios.Prelude hiding (id)
 open import Leios.Config
 
-open import Prelude.Monad
 open import Prelude.Result
-
 open import CategoricalCrypto hiding (id; _∘_)
 
 -- TODO: SpecStructure as parameter
