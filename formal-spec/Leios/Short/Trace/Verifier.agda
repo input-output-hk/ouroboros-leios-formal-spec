@@ -512,14 +512,31 @@ verifyTrace ((IB-Role-Action n , FFDT.SLOT) ∷ αs) _
 ... | Ok (Valid {s′} tr eq)
   with n ≟ slot s′ | sortition IB (slot s′) <? stake s′
 --  with n ≟ slot s′ | dec
-... | yes p | yes q rewrite p = do
+... | yes p | yes q rewrite p =
   let
-    step = IB-Role {s = s′} (q , refl) -- q
-    b = ibBody (record { txs = (ToPropose s′) })
-    h = ibHeader (mkIBHeader (slot s′) id tt sk-IB (ToPropose s′))
-  let trace = (addUpkeep s′ IB-Role) —→⟨ ActionStep (Roles₁ {i = FFD.Send h (just b)} step ) ⟩ tr
-  let act = FromAction FFDT.SLOT eq (Roles₁ step)
-  return $ Valid trace act
+    st = IB-Role {s = s′} (q , refl) -- q
+    b  = ibBody (record { txs = (ToPropose s′) })
+    h  = ibHeader (mkIBHeader (slot s′) id tt sk-IB (ToPropose s′))
+    tr = (addUpkeep s′ IB-Role) —→⟨ ActionStep (Roles₁ {i = FFD.Send h (just b)} st ) ⟩ tr
+    ac = FromAction FFDT.SLOT eq (Roles₁ st)
+  in Ok (Valid tr ac)
+... | no ¬p | _ = {!!}
+... | _ | no ¬q = {!!}
+verifyTrace ((IB-Role-Action n , _) ∷ αs) _ = {!!}
+
+verifyTrace ((EB-Role-Action n ibs ebs , _) ∷ αs) _ = {!!}
+verifyTrace ((VT-Role-Action n , _) ∷ αs) _ = {!!}
+verifyTrace ((No-IB-Role-Action n , _) ∷ αs) _ = {!!}
+verifyTrace ((No-EB-Role-Action n , _) ∷ αs) _ = {!!}
+verifyTrace ((No-VT-Role-Action n , _) ∷ αs) _ = {!!}
+verifyTrace ((Ftch-Action n , _) ∷ αs) _ = {!!}
+verifyTrace ((Slot-Action n , _) ∷ αs) _ = {!!}
+verifyTrace ((Base₁-Action n , _) ∷ αs) _ = {!!}
+verifyTrace ((Base₂a-Action n eb , _) ∷ αs) _ = {!!}
+verifyTrace ((Base₂b-Action n , _) ∷ αs) _ = {!!}
+
+
+
 
 {-
 verifyTrace ((α , i) ∷ αs) s
