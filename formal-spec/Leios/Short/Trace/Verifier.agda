@@ -72,8 +72,22 @@ getLabel (Roles₂ (No-IB-Role {s} _ _))        = No-IB-Role-Action (slot s)
 getLabel (Roles₂ (No-EB-Role {s} _ _))        = No-EB-Role-Action (slot s)
 getLabel (Roles₂ (No-VT-Role {s} _ _))        = No-VT-Role-Action (slot s)
 
+getSlot : Action → ℕ
+getSlot (IB-Role-Action x) = x
+getSlot (EB-Role-Action x _ _) = x
+getSlot (VT-Role-Action x) = x
+getSlot (No-IB-Role-Action x) = x
+getSlot (No-EB-Role-Action x) = x
+getSlot (No-VT-Role-Action x) = x
+getSlot (Ftch-Action x) = x
+getSlot (Slot-Action x) = x
+getSlot (Base₁-Action x) = x
+getSlot (Base₂a-Action x _) = x
+getSlot (Base₂b-Action x) = x
+
 data Err-verifyAction (α : Action) (i : FFDT Out) (s : LeiosState) : Type where
---  E-Err : ¬ ValidAction α s i → Err-verifyAction α i s
+  E-Err-Slot : getSlot α ≢ slot s → Err-verifyAction α i s
+  E-Err-CanProduceIB : (∀ π → ¬ canProduceIB (slot s) sk-IB (stake s) π) → Err-verifyAction α i s
 
 -- NOTE: this goes backwards, from the current state to the initial state
 data _—→_ : LeiosState → LeiosState → Type where
@@ -110,18 +124,20 @@ verifyTrace ((IB-Role-Action n , FFDT.SLOT) ∷ αs) _
   with verifyTrace αs _
 ... | Err e = mapErr Err-StepOk (Err e)
 ... | Ok (Valid {s′} tr eq)
-  with n ≟ slot s′ | ¿ canProduceIB (slot s′) sk-IB (stake s′) tt ¿
-... | yes p | yes q rewrite p =
+  with n ≟ slot s′
+  | Dec-canProduceIB {slot s′} {sk-IB} {stake s′}
+... | yes p | inj₁ (_ , q) rewrite p =
   let
     st = IB-Role {s = s′} q
     b  = ibBody (record { txs = (ToPropose s′) })
     h  = ibHeader (mkIBHeader (slot s′) id tt sk-IB (ToPropose s′))
-    ex = _ —→⟨ ActionStep (Roles₁ {i = FFD.Send h (just b)} st ) ⟩ tr
+    ex = _ —→⟨ ActionStep (Roles₁ {i = FFD.Send h (just b)} st) ⟩ tr
     ac = FromAction FFDT.SLOT eq (Roles₁ st)
   in Ok (Valid ex ac)
-... | no ¬p | _ = {!!}
-... | _ | no ¬q = {!!}
-verifyTrace ((IB-Role-Action n , _) ∷ αs) _ = {!!}
+... | no ¬p | _ = Err (Err-Action {s′ = s′} (E-Err-Slot λ p → ⊥-elim (¬p p)))
+... | _ | inj₂ q = Err (Err-Action {s′ = s′} (E-Err-CanProduceIB q))
+verifyTrace ((IB-Role-Action n , FFDT.FTCH) ∷ αs) _ = Err {!!}
+verifyTrace ((IB-Role-Action n , FFDT.FFD-OUT _) ∷ αs) _ = Err {!!}
 
 verifyTrace ((EB-Role-Action n ibs ebs , FFDT.SLOT) ∷ αs) _
   with verifyTrace αs _
@@ -143,6 +159,7 @@ verifyTrace ((EB-Role-Action n ibs ebs , FFDT.SLOT) ∷ αs) _
     ex = _ —→⟨ ActionStep (Roles₁ {i = FFD.Send (ebHeader h) nothing} st ) ⟩ tr
     ac = FromAction FFDT.SLOT eq (Roles₁ st)
   in Ok (Valid ex ac)
+... | _ | _ | _ | _ | _ | _ = {!!}
 
 verifyTrace ((EB-Role-Action n ibs ebs , _) ∷ αs) _ = {!!}
 
