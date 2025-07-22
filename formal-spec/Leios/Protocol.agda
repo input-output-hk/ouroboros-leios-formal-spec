@@ -298,7 +298,7 @@ module Types (params : Params) where
   Participant = Fin numberOfParties
 
   NetworkMessage : Type
-  NetworkMessage = InputBlock ⊎ EndorserBlock ⊎ List Vote
+  NetworkMessage = InputBlock ⊎ EndorserBlock ⊎ List Vote ⊎ RankingBlock
 
   -- addToInbox : NetworkMessage → FFDBuffers → FFDBuffers
   -- addToInbox       (inj₁ ib)  b = record b { inIBs = ib ∷ FFDBuffers.inIBs b }
