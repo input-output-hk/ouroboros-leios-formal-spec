@@ -132,45 +132,48 @@ data Err-verifyTrace : TestTrace → LeiosState → Type where
   Err-StepOk   : Err-verifyTrace αs s → Err-verifyTrace ((α , i) ∷ αs) s
   Err-Action   : Err-verifyAction α i s′ → Err-verifyTrace ((α , i) ∷ αs) s
 
+Ok' : ∀ {s i o s′} → (α : s -⟦ honestOutputI (rcvˡ (-, i)) / o ⟧⇀ s′)
+    → Result (Err-verifyAction (getLabel α) i s) (ValidStep (getLabel α , i) s)
+Ok' a = Ok (Valid _ (FromAction¹ _ a))
 
 verifyStep' : (a : Action) → (i : FFDT Out) → (s : LeiosState) → getSlot a ≡ slot s
             → Result (Err-verifyAction a i s) (ValidStep (a , i) s)
 
 verifyStep' (IB-Role-Action n) FFDT.SLOT s refl with Dec-canProduceIB
-... | inj₁ (_ , q) = Ok (Valid _ (FromAction¹ _ (Roles₁ (IB-Role q))))
+... | inj₁ (_ , q) = Ok' (Roles₁ (IB-Role q))
 ... | inj₂ q = Err (E-Err-CanProduceIB q)
 verifyStep' (IB-Role-Action _) FFDT.FTCH _ _ = Err dummyErr
 verifyStep' (IB-Role-Action _) (FFDT.FFD-OUT _) _ _ = Err dummyErr
 
 verifyStep' (EB-Role-Action n ibs ebs) FFDT.SLOT s refl with ¿ EB-Role-premises {s = s} .proj₁ ¿
     | ibs ≟  map getIBRef (L.filter (IBSelection? s Late-IB-Inclusion) (IBs s))
-... | yes h | yes q rewrite q = Ok (Valid _ (FromAction¹ _ (Roles₁ (EB-Role h))))
+... | yes h | yes q rewrite q = Ok' (Roles₁ (EB-Role h))
 ... | _ | _ = Err dummyErr
 verifyStep' (EB-Role-Action _ _ _) FFDT.FTCH _ _ = Err dummyErr
 verifyStep' (EB-Role-Action _ _ _) (FFDT.FFD-OUT _) _ _ = Err dummyErr
 
 verifyStep' (VT-Role-Action n) FFDT.SLOT s refl with ¿ VT-Role-premises {s = s} .proj₁ ¿
-... | yes h = Ok (Valid _ (FromAction¹ _ (Roles₁ (VT-Role h))))
+... | yes h = Ok' (Roles₁ (VT-Role h))
 ... | no ¬h = Err dummyErr
 verifyStep' (VT-Role-Action _) FFDT.FTCH _ _ = Err dummyErr
 verifyStep' (VT-Role-Action _) (FFDT.FFD-OUT _) _ _ = Err dummyErr
 
 verifyStep' (No-IB-Role-Action n) FFDT.SLOT s refl
   with ¿ No-IB-Role-premises {s = s} .proj₁ × (∀ π → ¬ canProduceIB (slot s) (IB , tt) (stake s) π) ¿
-... | yes (p , p₁) = Ok (Valid _ (FromAction¹ _ (Roles₂ (No-IB-Role (p , p₁)))))
+... | yes (p , p₁) = Ok' (Roles₂ (No-IB-Role (p , p₁)))
 ... | no ¬p = Err dummyErr
 verifyStep' (No-IB-Role-Action _) FFDT.FTCH _ _ = Err dummyErr
 verifyStep' (No-IB-Role-Action _) (FFDT.FFD-OUT _) _ _ = Err dummyErr
 
 verifyStep' (No-EB-Role-Action n) FFDT.SLOT s refl
   with ¿ No-EB-Role-premises {s = s} .proj₁ × (∀ π → ¬ canProduceEB (slot s) (EB , tt) (stake s) π) ¿
-... | yes (p , p₁) = Ok (Valid _ (FromAction¹ _ (Roles₂ (No-EB-Role (p , p₁)))))
+... | yes (p , p₁) = Ok' (Roles₂ (No-EB-Role (p , p₁)))
 ... | no ¬p = Err dummyErr
 verifyStep' (No-EB-Role-Action _) FFDT.FTCH _ _ = Err dummyErr
 verifyStep' (No-EB-Role-Action _) (FFDT.FFD-OUT _) _ _ = Err dummyErr
 
 verifyStep' (No-VT-Role-Action n) FFDT.SLOT s refl with ¿ No-VT-Role-premises {s = s} .proj₁ ¿
-... | yes p = Ok (Valid _ (FromAction¹ _ (Roles₂ (No-VT-Role p))))
+... | yes p = Ok' (Roles₂ (No-VT-Role p))
 ... | no ¬p = Err dummyErr
 verifyStep' (No-VT-Role-Action _) FFDT.FTCH _ _ = Err dummyErr
 verifyStep' (No-VT-Role-Action _) (FFDT.FFD-OUT _) _ _ = Err dummyErr
@@ -180,7 +183,7 @@ verifyStep' (No-VT-Role-Action _) (FFDT.FFD-OUT _) _ _ = Err dummyErr
 verifyStep' (Ftch-Action n) _ _ _ = Err dummyErr
 
 verifyStep' (Slot-Action n) FFDT.SLOT s refl with ¿ Slot₁-premises {s = s} .proj₁ ¿
-... | yes p = Ok (Valid _ (FromAction¹ _ (Slot₁ {msgs = []} p))) -- FIXME:
+... | yes p = Ok' (Slot₁ {msgs = []} p) -- FIXME:
   -- this isn't where we get messages from FFD anymore, so we need to change the spec
 ... | no _ = Err dummyErr
 verifyStep' (Slot-Action n) FFDT.FTCH _ _ = Err dummyErr
