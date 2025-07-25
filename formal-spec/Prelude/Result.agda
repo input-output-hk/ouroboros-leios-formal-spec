@@ -2,7 +2,7 @@
 module Prelude.Result where
 
 open import Prelude.Init
-open import Prelude.Monad
+--open import Prelude.Monad
 open import Class.Decidable
 
 private variable
@@ -12,11 +12,14 @@ data Result (E A : Type) : Type where
   Ok  : A → Result E A
   Err : E → Result E A
 
-instance
-  Monad-Result : Monad (Result E)
-  Monad-Result ._>>=_  (Ok  x) f = f x
-  Monad-Result ._>>=_  (Err e) _ = Err e
-  Monad-Result .return = Ok
+module Monad-Result where
+  -- annoyingly, this currently cannot instantiate Class.Monad (https://github.com/agda/agda-stdlib-classes/issues/2)
+  _>>=_ : Result E A → (A → Result E B) → Result E B
+  _>>=_ (Ok  x) f = f x
+  _>>=_ (Err e) _ = Err e
+
+  return : A → Result E A
+  return = Ok
 
 IsOk : Result E A → Type
 IsOk (Ok _)  = ⊤

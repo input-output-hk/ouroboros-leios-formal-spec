@@ -13,24 +13,26 @@ record Channel : Type₁ where
   field P                : Type
         rcvType sndType  : P → Type
 
-infixr 9 _⊗_
-
 I : Channel
 I .Channel.P = ⊥
 
 _ᵀ : Channel → Channel
 _ᵀ c = let open Channel c in λ where .P → P ; .rcvType → sndType ; .sndType → rcvType
 
-_⊗_ : Channel → Channel → Channel
-c₁ ⊗ c₂ = let open Channel c₁ renaming (P to P₁; rcvType to rcvType₁; sndType to sndType₁)
-              open Channel c₂ renaming (P to P₂; rcvType to rcvType₂; sndType to sndType₂)
-              open Channel
-  in λ where
-    .P → P₁ ⊎ P₂
-    .rcvType (inj₁ a) → rcvType₁ a
-    .rcvType (inj₂ b) → rcvType₂ b
-    .sndType (inj₁ a) → sndType₁ a
-    .sndType (inj₂ b) → sndType₂ b
+module _ (c₁ c₂ : Channel) where
+
+  infixr 9 _⊗_
+
+  open Channel c₁ renaming (P to P₁; rcvType to rcvType₁; sndType to sndType₁)
+  open Channel c₂ renaming (P to P₂; rcvType to rcvType₂; sndType to sndType₂)
+  open Channel
+
+  _⊗_ : Channel
+  _⊗_ .P = P₁ ⊎ P₂
+  _⊗_ .rcvType (inj₁ a) = rcvType₁ a
+  _⊗_ .rcvType (inj₂ b) = rcvType₂ b
+  _⊗_ .sndType (inj₁ a) = sndType₁ a
+  _⊗_ .sndType (inj₂ b) = sndType₂ b
 
 rcvˡ : ∀ {A B} → ∃ (Channel.rcvType A) → ∃ (Channel.rcvType (A ⊗ B))
 rcvˡ (p , x) = inj₁ p , x

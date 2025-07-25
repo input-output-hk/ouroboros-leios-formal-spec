@@ -273,5 +273,21 @@ Note: Submitted data to the base chain is only taken into account
 ShortLeios : Machine (FFD ⊗ BaseC) (IO ⊗ Adv)
 ShortLeios .Machine.State = LeiosState
 ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
+
+open import GenPremises
+
+unquoteDecl IB-Role-premises = genPremises IB-Role-premises (quote _↝_.IB-Role)
+unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
+unquoteDecl VT-Role-premises = genPremises VT-Role-premises (quote _↝_.VT-Role)
+
+unquoteDecl No-IB-Role-premises = genPremises No-IB-Role-premises (quote No-IB-Role)
+unquoteDecl No-EB-Role-premises = genPremises No-EB-Role-premises (quote No-EB-Role)
+unquoteDecl No-VT-Role-premises = genPremises No-VT-Role-premises (quote No-VT-Role)
+
+unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
+unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
+unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
+unquoteDecl Base₂a-premises = genPremises Base₂a-premises (quote Base₂a)
+unquoteDecl Base₂b-premises = genPremises Base₂b-premises (quote Base₂b)
 ```
 --!>
