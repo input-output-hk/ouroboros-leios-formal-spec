@@ -139,9 +139,9 @@ Ok' a = Ok (Valid _ (FromAction¹ _ a))
 verifyStep' : (a : Action) → (i : FFDT Out) → (s : LeiosState) → getSlot a ≡ slot s
             → Result (Err-verifyAction a i s) (ValidStep (a , i) s)
 
-verifyStep' (IB-Role-Action n) FFDT.SLOT s refl with Dec-canProduceIB
-... | inj₁ (_ , q) = Ok' (Roles₁ (IB-Role q))
-... | inj₂ q = Err (E-Err-CanProduceIB q)
+verifyStep' (IB-Role-Action n) FFDT.SLOT s refl with ¿ IB-Role-premises {s = s} .proj₁ ¿
+... | yes p = Ok' (Roles₁ (IB-Role p))
+... | no ¬p = Err (E-Err-CanProduceIB λ _ → ¬p)
 verifyStep' (IB-Role-Action _) FFDT.FTCH _ _ = Err dummyErr
 verifyStep' (IB-Role-Action _) (FFDT.FFD-OUT _) _ _ = Err dummyErr
 
