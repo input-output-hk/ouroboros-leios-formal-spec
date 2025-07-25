@@ -1,3 +1,4 @@
+{-# OPTIONS --safe #-}
 {- Module: Leios.Defaults
    
    This module provides simple default implementations for the core components
@@ -281,4 +282,4 @@ d-SpecStructure-2 = record
       ; va                        = d-VotingAbstract-2
       }
 
-open import Leios.Short d-SpecStructure public
+-- open import Leios.Short d-SpecStructure public
