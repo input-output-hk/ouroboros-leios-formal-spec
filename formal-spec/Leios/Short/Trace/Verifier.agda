@@ -19,11 +19,6 @@ open GenFFD
 
 open Types params
 
-data FFDUpdate : Type where
-  IB-Recv-Update : InputBlock → FFDUpdate
-  EB-Recv-Update : EndorserBlock → FFDUpdate
-  VT-Recv-Update : List Vote → FFDUpdate
-
 data Action : Type where
   IB-Role-Action    : ℕ → Action
   EB-Role-Action    : ℕ → List IBRef → List EndorserBlock → Action
@@ -43,8 +38,6 @@ private variable
   s s′ : LeiosState
   α    : Action
   αs   : TestTrace
-  μ    : FFDUpdate
-  μs   : List FFDUpdate
   ib   : InputBlock
   eb   : EndorserBlock
   ebs  : List EndorserBlock
@@ -182,16 +175,21 @@ verifyStep' (No-VT-Role-Action _) (FFDT.FFD-OUT _) _ _ = Err dummyErr
 -- For now we'll just fail
 verifyStep' (Ftch-Action n) _ _ _ = Err dummyErr
 
-verifyStep' (Slot-Action n) FFDT.SLOT s refl with ¿ Slot₁-premises {s = s} .proj₁ ¿
-... | yes p = Ok' (Slot₁ {msgs = []} p) -- FIXME:
-  -- this isn't where we get messages from FFD anymore, so we need to change the spec
-... | no _ = Err dummyErr
+verifyStep' (Slot-Action n) FFDT.SLOT _ _ = Err dummyErr
 verifyStep' (Slot-Action n) FFDT.FTCH _ _ = Err dummyErr
-verifyStep' (Slot-Action n) (FFDT.FFD-OUT _) _ _ = Err dummyErr
+verifyStep' (Slot-Action n) (FFDT.FFD-OUT msgs) s refl with ¿ Slot₁-premises {s = s} .proj₁ ¿
+... | yes p = Ok' (Slot₁ {msgs = msgs} p)
+... | no _ = Err dummyErr
 
 -- Different IO pattern again
 verifyStep' (Base₁-Action n) _ s refl = Err dummyErr
+verifyStep' (Base₂a-Action n _) FFDT.SLOT s refl with ¿ Base₂a-premises {s = s} .proj₁ ¿
+... | yes p = Ok' (Base₂a p)
+... | no _ = Err dummyErr
 verifyStep' (Base₂a-Action n _) _ s refl = Err dummyErr
+verifyStep' (Base₂b-Action n) FFDT.SLOT s refl with ¿ Base₂b-premises {s = s} .proj₁ ¿
+... | yes p = Ok' (Base₂b p)
+... | no _ = Err dummyErr
 verifyStep' (Base₂b-Action n) _ s refl = Err dummyErr
 
 verifyStep : (a : Action) → (i : FFDT Out) → (s : LeiosState) → Result (Err-verifyAction a i s) (ValidStep (a , i) s)

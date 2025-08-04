@@ -214,8 +214,8 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```agda
   Slot₁ : let open LeiosState s in
         ∙ allDone s
-        ────────────────────────────────────────────────────────────────────────────────────
-        s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
+        ────────────────────────────────────────────────────────────────────────────────────────────
+        s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
             { slot         = suc slot
             ; Upkeep       = ∅
             ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
