@@ -1,6 +1,6 @@
 {-# OPTIONS --safe #-}
 
-open import Leios.Prelude hiding (id)
+open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.FFD
 open import Leios.SpecStructure
 
@@ -33,17 +33,18 @@ open GenFFD
 data LeiosInput : Type where
   INIT     : VTy → LeiosInput
   SUBMIT   : EndorserBlock ⊎ List Tx → LeiosInput
+  FFD-OUT  : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract) → LeiosInput
   SLOT     : LeiosInput
   FTCH-LDG : LeiosInput
 
 data LeiosOutput : Type where
   FTCH-LDG : List Tx → LeiosOutput
+  FFD-IN   : FFDAbstract.Input ffdAbstract → LeiosOutput
   EMPTY    : LeiosOutput
 
 record LeiosState : Type where
   field V            : VTy
         SD           : StakeDistr
-        FFDState     : FFD.State
         Ledger       : List Tx
         ToPropose    : List Tx
         IBs          : List InputBlock
@@ -54,7 +55,6 @@ record LeiosState : Type where
         IBBodies     : List IBBody
         Upkeep       : ℙ SlotUpkeep
         Upkeep-Stage : ℙ StageUpkeep
-        BaseState    : B.State
         votingState  : VotingState
         PubKeys      : List PubKey
 
@@ -95,11 +95,10 @@ addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u �
 addUpkeep-Stage : LeiosState → StageUpkeep → LeiosState
 addUpkeep-Stage s u = let open LeiosState s in record s { Upkeep-Stage = Upkeep-Stage ∪ ❴ u ❵ }
 
-initLeiosState : VTy → StakeDistr → B.State → List PubKey → LeiosState
-initLeiosState V SD bs pks = record
+initLeiosState : VTy → StakeDistr → List PubKey → LeiosState
+initLeiosState V SD pks = record
   { V            = V
   ; SD           = SD
-  ; FFDState     = FFD.initFFDState
   ; Ledger       = []
   ; ToPropose    = []
   ; IBs          = []
@@ -110,7 +109,6 @@ initLeiosState V SD bs pks = record
   ; IBBodies     = []
   ; Upkeep       = ∅
   ; Upkeep-Stage = ∅
-  ; BaseState    = bs
   ; votingState  = initVotingState
   ; PubKeys      = pks
   }
@@ -279,3 +277,67 @@ _↑_ = foldr (flip upd)
 ↑-preserves-Upkeep {x = []} = refl
 ↑-preserves-Upkeep {s = s} {x = x ∷ x₁} =
   upd-preserves-Upkeep {s = s} {x = x} (↑-preserves-Upkeep {x = x₁})
+
+open import Leios.Abstract
+
+open import CategoricalCrypto hiding (_∘_)
+open import Leios.Config
+
+open import Network.BasicBroadcast using (NetworkT; RcvMessage; SndMessage; Activate)
+
+module Types (params : Params) where
+
+  open Params params
+  open import Leios.Defaults params using (d-Abstract; d-SpecStructure; FFDBuffers)
+  -- open import Leios.Blocks d-Abstract
+  -- open LeiosAbstract d-Abstract
+
+  Participant : Type
+  Participant = Fin numberOfParties
+
+  NetworkMessage : Type
+  NetworkMessage = InputBlock ⊎ EndorserBlock ⊎ List Vote ⊎ RankingBlock
+
+  -- addToInbox : NetworkMessage → FFDBuffers → FFDBuffers
+  -- addToInbox       (inj₁ ib)  b = record b { inIBs = ib ∷ FFDBuffers.inIBs b }
+  -- addToInbox (inj₂ (inj₁ eb)) b = record b { inEBs = eb ∷ FFDBuffers.inEBs b }
+  -- addToInbox (inj₂ (inj₂ vt)) b = record b { inVTs = vt ∷ FFDBuffers.inVTs b }
+
+  -- collectOutbox : FFDBuffers → FFDBuffers × List NetworkMessage
+  -- collectOutbox b = let open FFDBuffers b in
+  --     record b { outIBs = [] ; outEBs = [] ; outVTs = [] }
+  --   , map inj₁ outIBs ++ map (inj₂ ∘ inj₁) outEBs ++ map (inj₂ ∘ inj₂) outVTs
+
+  Network : Channel
+  Network = simpleChannel' (NetworkT numberOfParties NetworkMessage)
+
+  data IOT : ChannelDir → Type where
+    SubmitTxs : List Tx → IOT In
+    FetchLdgI : IOT In
+    FetchLdgO : List Tx → IOT Out
+
+  -- mempool
+  IO : Channel
+  IO = simpleChannel' IOT ᵀ
+
+  Adv : Channel
+  Adv = I
+
+  module FFDA = FFDAbstract ffdAbstract
+
+  data FFDT : ChannelDir → Type where
+    FFD-OUT : List (FFDA.Header ⊎ FFDA.Body) → FFDT Out
+    FFD-IN  : FFDA.Input → FFDT In
+    SLOT    : FFDT Out
+    FTCH    : FFDT Out
+
+  FFD : Channel
+  FFD = simpleChannel' FFDT ᵀ
+
+  data BaseT : ChannelDir → Type where
+    FTCH-LDG : BaseT In
+    SUBMIT   : RankingBlock → BaseT In
+    BASE-LDG : List RankingBlock → BaseT Out
+
+  BaseC : Channel
+  BaseC = simpleChannel' BaseT ᵀ

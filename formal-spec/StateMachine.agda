@@ -22,14 +22,14 @@ module _ (_-⟦_/_⟧⇀_ : S → I → O → S → Type) where
   data _-⟦_/_⟧*⇀_ : S → List I → List O → S → Type where
 
     BS-base :
-        ─────────────────
+        ------------------
         s -⟦ [] / [] ⟧*⇀ s
 
     BS-ind :
-      ∙ s  -⟦ i      / o      ⟧⇀  s'
-      ∙ s' -⟦ is     / os     ⟧*⇀ s''
-        ───────────────────────────────────────
-        s  -⟦ i ∷ is / o ∷ os ⟧*⇀ s''
+        s  -⟦ i      / o      ⟧⇀  s'
+      → s' -⟦ is     / os     ⟧*⇀ s''
+        -----------------------------
+      → s  -⟦ i ∷ is / o ∷ os ⟧*⇀ s''
 
 ReflexiveTransitiveClosure = _-⟦_/_⟧*⇀_
 
