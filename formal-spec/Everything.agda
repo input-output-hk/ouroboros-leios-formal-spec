@@ -60,7 +60,7 @@ open import Leios.SpecStructure
 open import Leios.Traces
 open import Leios.Voting
 open import Leios.VRF
--- open import StateMachine
+open import StateMachine
 
 -- Networking
 -- open import Network.BasicBroadcast
