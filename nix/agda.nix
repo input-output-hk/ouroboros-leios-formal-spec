@@ -15,6 +15,8 @@ let
 
   agdaStdlib = customAgda.agdaPackages.standard-library;
 
+  agdaCategories = customAgda.agdaPackages.agda-categories;
+
   agdaStdlibClasses = customAgda.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
     pname = "agda-stdlib-classes";
@@ -79,7 +81,7 @@ let
     buildInputs = [ agdaStdlib agdaStdlibClasses agdaStdlibMeta ];
   };
 
-  deps = [ agdaStdlib agdaStdlibClasses agdaStdlibMeta agdaSets agdaIOGPrelude ];
+  deps = [ agdaStdlib agdaCategories agdaStdlibClasses agdaStdlibMeta agdaSets agdaIOGPrelude ];
 
   leiosSpec = customAgda.agdaPackages.mkDerivation {
     inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
