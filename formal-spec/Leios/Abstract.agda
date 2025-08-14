@@ -17,7 +17,7 @@ record LeiosAbstract : Type₁ where
         ⦃ DecEq-Tx ⦄ : DecEq Tx
         PoolID : Type
         ⦃ DecEq-PoolID ⦄ : DecEq PoolID
-        BodyHash VrfPf PrivKey Sig Hash : Type -- these could have been byte strings, but this is safer
+        BodyHash VrfPf PrivKey Sig Hash EBCert : Type -- these could have been byte strings, but this is safer
         ⦃ DecEq-Hash ⦄ : DecEq Hash
         ⦃ DecEq-VrfPf ⦄ : DecEq VrfPf
         ⦃ DecEq-Sig ⦄ : DecEq Sig
@@ -26,6 +26,7 @@ record LeiosAbstract : Type₁ where
         vote : PrivKey → Hash → Vote
         sign : PrivKey → Hash → Sig
         ⦃ Hashable-Txs ⦄ : Hashable (List Tx) Hash
+        getEBHash : EBCert → Hash
         L : ℕ
         ⦃ NonZero-L ⦄ : NonZero L
         η : ℕ
