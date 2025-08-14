@@ -285,28 +285,13 @@ open import Leios.Config
 
 open import Network.BasicBroadcast using (NetworkT; RcvMessage; SndMessage; Activate)
 
-module Types (params : Params) where
-
-  open Params params
-  open import Leios.Defaults params using (d-Abstract; d-SpecStructure; FFDBuffers)
-  -- open import Leios.Blocks d-Abstract
-  -- open LeiosAbstract d-Abstract
+module Types (params : Params) (let open Params params) where
 
   Participant : Type
   Participant = Fin numberOfParties
 
   NetworkMessage : Type
   NetworkMessage = InputBlock ⊎ EndorserBlock ⊎ List Vote ⊎ RankingBlock
-
-  -- addToInbox : NetworkMessage → FFDBuffers → FFDBuffers
-  -- addToInbox       (inj₁ ib)  b = record b { inIBs = ib ∷ FFDBuffers.inIBs b }
-  -- addToInbox (inj₂ (inj₁ eb)) b = record b { inEBs = eb ∷ FFDBuffers.inEBs b }
-  -- addToInbox (inj₂ (inj₂ vt)) b = record b { inVTs = vt ∷ FFDBuffers.inVTs b }
-
-  -- collectOutbox : FFDBuffers → FFDBuffers × List NetworkMessage
-  -- collectOutbox b = let open FFDBuffers b in
-  --     record b { outIBs = [] ; outEBs = [] ; outVTs = [] }
-  --   , map inj₁ outIBs ++ map (inj₂ ∘ inj₁) outEBs ++ map (inj₂ ∘ inj₂) outVTs
 
   Network : Channel
   Network = simpleChannel' (NetworkT numberOfParties NetworkMessage)

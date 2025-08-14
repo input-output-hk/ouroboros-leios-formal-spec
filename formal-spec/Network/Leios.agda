@@ -1,89 +1,51 @@
 open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.Abstract
 
-open import CategoricalCrypto hiding (_∘_)
+open import CategoricalCrypto renaming (_∘_ to _∘'_)
 open import Leios.Config
 
 open import Network.BasicBroadcast using (NetworkT; RcvMessage; SndMessage; Activate)
 
 module Network.Leios where
 
-module Types (params : Params) where
+module SingleNode (params : Params) (let open Params params) where
 
-  open Params params
-  open import Leios.Defaults params using (d-Abstract; d-SpecStructure; FFDBuffers)
+  open import Leios.Defaults params using (d-Abstract; d-SpecStructure; FFDBuffers; SimpleFFD)
   open import Leios.Blocks d-Abstract
+  open import Leios.Short d-SpecStructure params
+  open import Leios.FFD
+
+  open Types params
   open LeiosAbstract d-Abstract
 
-  Participant : Type
-  Participant = Fin numberOfParties
-
-  NetworkMessage : Type
-  NetworkMessage = InputBlock ⊎ EndorserBlock ⊎ List Vote
-
   addToInbox : NetworkMessage → FFDBuffers → FFDBuffers
-  addToInbox       (inj₁ ib)  b = record b { inIBs = ib ∷ FFDBuffers.inIBs b }
-  addToInbox (inj₂ (inj₁ eb)) b = record b { inEBs = eb ∷ FFDBuffers.inEBs b }
-  addToInbox (inj₂ (inj₂ vt)) b = record b { inVTs = vt ∷ FFDBuffers.inVTs b }
+  addToInbox (inj₁ ib)  b              = record b { inIBs = ib ∷ FFDBuffers.inIBs b }
+  addToInbox (inj₂ (inj₁ eb)) b        = record b { inEBs = eb ∷ FFDBuffers.inEBs b }
+  addToInbox (inj₂ (inj₂ (inj₁ vt))) b = record b { inVTs = vt ∷ FFDBuffers.inVTs b }
+  addToInbox (inj₂ (inj₂ (inj₂ rb))) b = b
 
   collectOutbox : FFDBuffers → FFDBuffers × List NetworkMessage
   collectOutbox b = let open FFDBuffers b in
       record b { outIBs = [] ; outEBs = [] ; outVTs = [] }
-    , map inj₁ outIBs ++ map (inj₂ ∘ inj₁) outEBs ++ map (inj₂ ∘ inj₂) outVTs
+    , map inj₁ outIBs ++ map (inj₂ ∘ inj₁) outEBs ++ map (inj₂ ∘ inj₂ ∘ inj₁) outVTs
 
-  Network : Channel
-  Network = simpleChannel' (NetworkT numberOfParties NetworkMessage)
+  data WithState_receive_return_newState_ : MachineType Network (FFD ⊗ BaseC) FFDBuffers where
 
-  data IOT : ChannelDir → Type where
-    SubmitTxs : List Tx → IOT In
-    FetchLdgI : IOT In
-    FetchLdgO : List Tx → IOT Out
+      ReceiveNetwork : ∀ {m s}
+        → WithState s
+          receive (rcvˡ (-, RcvMessage m))
+          return nothing
+          newState (addToInbox m s)
 
-  -- mempool
-  IO : Channel
-  IO = simpleChannel' IOT ᵀ
-
-  Adv : Channel
-  Adv = I
-
-module SingleNode (params : Params) where
-
-  open Params params
-  open import Leios.Defaults params using (d-Abstract; d-SpecStructure; FFDBuffers)
-  open import Leios.Blocks d-Abstract
-  open import Leios.Short d-SpecStructure
-  open LeiosAbstract d-Abstract
-  open Types params
-  open LeiosState
-
-  data Receive_withState_return_ : MachineType Network (IO ⊗ Adv) LeiosState where
-    ReceiveNetwork : ∀ {m s}
-      → Receive honestOutputI (-, RcvMessage m)
-        withState s
-        return ( record s { FFDState = addToInbox m (FFDState s) }
-               , nothing )
-
-    LeiosStep : ∀ {s s'} → let b , outbox = collectOutbox (FFDState s')
-      in just s -⟦ SLOT / EMPTY ⟧⇀ s'
-      → Receive (honestOutputI (-, Activate))
-        withState s
-        return ( record s' { FFDState = b }
-               , just (honestInputO (-, SndMessage outbox)))
-
-    InputTxs : ∀ {s s' txs}
-      → just s -⟦ SUBMIT (inj₂ txs) / EMPTY ⟧⇀ s'
-      → Receive honestInputI (-, SubmitTxs txs)
-        withState s
-        return (s' , nothing)
-
-    FetchLedger : ∀ {s s' txs}
-      → just s -⟦ FTCH-LDG / FTCH-LDG txs ⟧⇀ s'
-      → Receive honestInputI (-, FetchLdgI)
-        withState s
-        return (s' , just (honestOutputO (-, FetchLdgO txs)))
+      LeiosStep : ∀ {s i o s'}
+        → let b , outbox = collectOutbox s' in SimpleFFD s i o s'
+        → WithState s
+          receive rcvˡ (-, Activate)
+          return just (sndˡ (-, SndMessage outbox))
+          newState b
 
   Node : Machine Network (IO ⊗ Adv)
-  Node = MkMachine LeiosState Receive_withState_return_
+  Node = ShortLeios ∘' MkMachine FFDBuffers WithState_receive_return_newState_
 
 module MultiNode (networkParams : NetworkParams) (let open NetworkParams networkParams)
   (winning-slotsF : Fin numberOfParties → ℙ (BlockType × ℕ))
@@ -100,30 +62,38 @@ module MultiNode (networkParams : NetworkParams) (let open NetworkParams network
   zeroParams : Params
   zeroParams = paramsF (fromℕ< (>-nonZero⁻¹ numberOfParties))
 
-  open Types zeroParams
-
   -- Technically, all these channel families are identical. Maybe this can be refactored?
+
+  module _ (k : Fin numberOfParties) where
+
+    open import Leios.Defaults (paramsF k) using (d-SpecStructure)
+    open import Leios.Short d-SpecStructure (paramsF k)
+    open Types (paramsF k)
+
+    NetworkF : Channel
+    NetworkF = Network
+
+    IOF : Channel
+    IOF = IO
+
+    AdvF : Channel
+    AdvF = Adv
+
+    NodeF : Machine NetworkF (IOF ⊗ AdvF)
+    NodeF = SingleNode.Node (paramsF k)
+
+  open import Leios.Defaults zeroParams using (d-SpecStructure)
+  open import Leios.Short d-SpecStructure zeroParams
+  open Types zeroParams
 
   constNetworkF : Fin numberOfParties → Channel
   constNetworkF _ = Network
-
-  NetworkF : Fin numberOfParties → Channel
-  NetworkF k = Types.Network (paramsF k)
 
   NetworkF≡constNetworkF : ∀ {k} → NetworkF k ≡ constNetworkF k
   NetworkF≡constNetworkF = refl
 
   NetworkMessage-const : ∀ {k₁ k₂} → NetworkF k₁ ≡ NetworkF k₂
   NetworkMessage-const = refl
-
-  IOF : Fin numberOfParties → Channel
-  IOF k = Types.IO (paramsF k)
-
-  AdvF : Fin numberOfParties → Channel
-  AdvF k = Types.Adv (paramsF k)
-
-  NodeF : (k : Fin numberOfParties) → Machine (NetworkF k) (IOF k ⊗ AdvF k)
-  NodeF k = SingleNode.Node (paramsF k)
 
   -- network consisting only of honest nodes
 
