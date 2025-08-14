@@ -45,10 +45,12 @@ data LeiosOutput : Type where
 record LeiosState : Type where
   field V            : VTy
         SD           : StakeDistr
-        Ledger       : List Tx
+        RBs          : List RankingBlock
         ToPropose    : List Tx
         IBs          : List InputBlock
-        EBs          : List EndorserBlock
+        {- EBs': EBs together with the slot in which we received them
+        -}
+        EBs'         : List (ℕ × EndorserBlock)
         Vs           : List (List Vote)
         slot         : ℕ
         IBHeaders    : List IBHeader
@@ -57,6 +59,13 @@ record LeiosState : Type where
         Upkeep-Stage : ℙ StageUpkeep
         votingState  : VotingState
         PubKeys      : List PubKey
+
+  -- ideally we'd require a non-empty list, but this also works for now
+  currentRB : RankingBlock
+  currentRB = maybe (λ x → x) (record { txs = [] ; announcedEB = nothing ; ebCert = nothing }) (head RBs)
+
+  EBs : List EndorserBlock
+  EBs = map proj₂ EBs'
 
   lookupEB : EBRef → Maybe EndorserBlock
   lookupEB r = find (λ b → getEBRef b ≟ r) EBs
@@ -69,12 +78,15 @@ record LeiosState : Type where
     eb′ ← mapMaybe lookupEB $ ebRefs eb
     ib  ← mapMaybe lookupIB $ ibRefs eb′
     txs $ body ib
-    where open EndorserBlockOSig
+    where open EndorserBlockOSig hiding (txs)
           open IBBody
           open InputBlock
 
-  constructLedger : List RankingBlock → List Tx
-  constructLedger = L.concat ∘ L.map (T.mergeThese L._++_ ∘ T.map₁ lookupTxs)
+  lookupTxsC : Hash → List Tx
+  lookupTxsC c = maybe lookupTxs [] $ lookupEB c
+
+  Ledger : List Tx
+  Ledger = L.concatMap (λ rb → RankingBlock.txs rb L.++ maybe lookupTxsC [] (getEBHash <$> (RankingBlock.ebCert rb))) RBs
 
   needsUpkeep : SlotUpkeep → Set
   needsUpkeep = _∉ Upkeep
@@ -88,6 +100,15 @@ record LeiosState : Type where
   Dec-needsUpkeep-Stage : ∀ {u : StageUpkeep} → ⦃ DecEq StageUpkeep ⦄ → needsUpkeep-Stage u ⁇
   Dec-needsUpkeep-Stage {u} .dec = ¬? (u ∈? Upkeep-Stage)
 
+  -- Produces a Vote-k certified block
+  ebsWithCert : Fin n → List (EndorserBlock × EBCert)
+  ebsWithCert k = mapMaybe getCert EBs
+    where
+      getCert : EndorserBlock → Maybe (EndorserBlock × EBCert)
+      getCert eb = case ¿ isVoteCertified votingState (k , eb) ¿ of λ where
+        (yes p) → just (eb , getEBCert p)
+        (no ¬p) → nothing
+
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
 addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u ❵ }
 {-# INJECTIVE_FOR_INFERENCE addUpkeep #-}
@@ -99,10 +120,10 @@ initLeiosState : VTy → StakeDistr → List PubKey → LeiosState
 initLeiosState V SD pks = record
   { V            = V
   ; SD           = SD
-  ; Ledger       = []
+  ; RBs          = []
   ; ToPropose    = []
   ; IBs          = []
-  ; EBs          = []
+  ; EBs'         = []
   ; Vs           = []
   ; slot         = initSlot V
   ; IBHeaders    = []
@@ -232,7 +253,7 @@ module _ (s : LeiosState) where
 
   {- Update the LeiosState upon receiving a message (a header or body) -}
   upd : Header ⊎ Body → LeiosState
-  upd (inj₁ (ebHeader eb)) = record s { EBs = eb ∷ EBs }
+  upd (inj₁ (ebHeader eb)) = record s { EBs' = (slot , eb) ∷ EBs' }
   upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs }
   upd (inj₁ (ibHeader h)) with Any.any? (matchIB? h) IBBodies
   ... | yes p =
