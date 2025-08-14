@@ -5,5 +5,6 @@ depend:
   standard-library-meta
   abstract-set-theory
   iog-prelude
+  agda-categories
 include:
   .
