@@ -3,15 +3,19 @@
 <!--
 ```agda
 {-# OPTIONS --safe #-}
-open import Leios.Prelude hiding (id)
+open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.FFD
 open import Leios.SpecStructure
+open import Leios.Config
 
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
+open import CategoricalCrypto hiding (id; _∘_)
+
 module Leios.Short (⋯ : SpecStructure 1)
-  (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified')) where
+  (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified'))
+  (params : Params) where
 ```
 -->
 
@@ -65,6 +69,7 @@ private variable s s'   : LeiosState
                  bs'    : B.State
                  ks ks' : K.State
                  msgs   : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract)
+                 i      : FFDAbstract.Input ffdAbstract
                  eb     : EndorserBlock
                  ebs    : List EndorserBlock
                  rbs    : List RankingBlock
@@ -99,23 +104,22 @@ Note that `_↝_`, starting with an empty upkeep can always make exactly
 three steps corresponding to the three types of Leios specific blocks.
 
 ```agda
-data _↝_ : LeiosState → LeiosState → Type where
+data _↝_ : LeiosState → LeiosState × Maybe (FFDAbstract.Input ffdAbstract) → Type where
 ```
 #### Positive rules
 ```agda
-  IB-Role : let open LeiosState s renaming (FFDState to ffds)
+  IB-Role : let open LeiosState s
                 b = ibBody (record { txs = ToPropose })
                 h = ibHeader (mkIBHeader slot id π sk-IB ToPropose)
           in
           ∙ canProduceIB slot sk-IB (stake s) π
-          ∙ ffds FFD.-⟦ Send h (just b) / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ addUpkeep record s { FFDState = ffds' } IB-Role
+          s ↝ (addUpkeep s IB-Role , just (Send h (just b)))
 ```
 When η = 0 there is no indirect ledger inclusion; in case η > 0 earlier EBs might
 be referenced (Full-Short Leios).
 ```agda
-  EB-Role : let open LeiosState s renaming (FFDState to ffds)
+  EB-Role : let open LeiosState s
                 ibs = L.filter (IBSelection? s Late-IB-Inclusion) IBs
                 LI  = map getIBRef ibs
                 LE  = map getEBRef ebs
@@ -129,20 +133,18 @@ be referenced (Full-Short Leios).
           ∙ canProduceEB slot sk-EB (stake s) π
           ∙ All.All P ebs
           ∙ Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
-          ∙ ffds FFD.-⟦ Send (ebHeader h) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ addUpkeep record s { FFDState = ffds' } EB-Role
+          s ↝ (addUpkeep s EB-Role , just (Send (ebHeader h) nothing))
 ```
 ```agda
-  VT-Role : let open LeiosState s renaming (FFDState to ffds)
+  VT-Role : let open LeiosState s
                 EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
                 votes = map (vote sk-VT ∘ hash) EBs'
           in
           ∙ needsUpkeep-Stage VT-Role
           ∙ canProduceV slot sk-VT (stake s)
-          ∙ ffds FFD.-⟦ Send (vtHeader votes) nothing / SendRes ⟧⇀ ffds'
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ addUpkeep-Stage record s { FFDState = ffds' } VT-Role
+          s ↝ (addUpkeep-Stage s VT-Role , just (Send (vtHeader votes) nothing))
 ```
 #### Negative rules
 ```agda
@@ -150,21 +152,21 @@ be referenced (Full-Short Leios).
              ∙ needsUpkeep IB-Role
              ∙ (∀ π → ¬ canProduceIB slot sk-IB (stake s) π)
              ─────────────────────────────────────────────
-             s ↝ addUpkeep s IB-Role
+             s ↝ (addUpkeep s IB-Role , nothing)
 ```
 ```agda
   No-EB-Role : let open LeiosState s in
              ∙ needsUpkeep EB-Role
              ∙ (∀ π → ¬ canProduceEB slot sk-EB (stake s) π)
              ─────────────────────────────────────────────
-             s ↝ addUpkeep s EB-Role
+             s ↝ (addUpkeep s EB-Role , nothing)
 ```
 ```agda
   No-VT-Role : let open LeiosState s in
              ∙ needsUpkeep-Stage VT-Role
              ∙ ¬ canProduceV slot sk-VT (stake s)
              ─────────────────────────────────────────────
-             s ↝ addUpkeep-Stage s VT-Role
+             s ↝ (addUpkeep-Stage s VT-Role , nothing)
 ```
 ### Uniform short-pipeline
 ```agda
@@ -194,37 +196,40 @@ allDone record { slot = s ; Upkeep = u ; Upkeep-Stage = v } =
 ```
 ### (Full-)Short Leios transitions
 The relation describing the transition given input and state
-```agda
-data _-⟦_/_⟧⇀_ : Maybe LeiosState → LeiosInput → LeiosOutput → LeiosState → Type where
-```
 #### Initialization
 ```agda
+open Types params
+
+data _⊢_ : VTy → LeiosState → Type where
   Init :
        ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
-       ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
+       ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs' -- TODO: replace this line
        ────────────────────────────────────────────────────────────────
-       nothing -⟦ INIT V / EMPTY ⟧⇀ initLeiosState V SD bs' pks
+       V ⊢ initLeiosState V SD pks
+```
+```agda
+data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```
 #### Network and Ledger
 ```agda
-  Slot : let open LeiosState s renaming (FFDState to ffds; BaseState to bs) in
-       ∙ allDone s
-       ∙ bs B.-⟦ B.FTCH-LDG / B.BASE-LDG rbs ⟧⇀ bs'
-       ∙ ffds FFD.-⟦ Fetch / FetchRes msgs ⟧⇀ ffds'
-       ───────────────────────────────────────────────────────────────────────
-       just s -⟦ SLOT / EMPTY ⟧⇀ record s
-           { FFDState     = ffds'
-           ; BaseState    = bs'
-           ; Ledger       = constructLedger rbs
-           ; slot         = suc slot
-           ; Upkeep       = ∅
-           ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
-           } ↑ L.filter (isValid? s) msgs
+  Slot₁ : let open LeiosState s in
+        ∙ allDone s
+        ────────────────────────────────────────────────────────────────────────────────────────────
+        s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
+            { slot         = suc slot
+            ; Upkeep       = ∅
+            ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
+            } ↑ L.filter (isValid? s) msgs
+
+  Slot₂ : let open LeiosState s in
+        ────────────────────────────────────────────────────────
+        s -⟦ honestOutputI (rcvʳ (-, BASE-LDG rbs)) / nothing ⟧⇀
+          record s { Ledger = constructLedger rbs }
 ```
 ```agda
   Ftch :
-       ────────────────────────────────────────────────────────
-       just s -⟦ FTCH-LDG / FTCH-LDG (LeiosState.Ledger s) ⟧⇀ s
+       ───────────────────────────────────────────────────────────────────────────────────────────
+       s -⟦ honestInputI (-, FetchLdgI) / honestOutputO' (-, FetchLdgO (LeiosState.Ledger s)) ⟧⇀ s
 ```
 #### Base chain
 
@@ -233,28 +238,56 @@ Note: Submitted data to the base chain is only taken into account
       for the given slot
 ```agda
   Base₁   :
-          ───────────────────────────────────────────────────────────────────
-          just s -⟦ SUBMIT (inj₂ txs) / EMPTY ⟧⇀ record s { ToPropose = txs }
+          ──────────────────────────────────────────────────────────────────────────────
+          s -⟦ honestInputI (-, SubmitTxs txs) / nothing ⟧⇀ record s { ToPropose = txs }
 ```
 ```agda
-  Base₂a  : let open LeiosState s renaming (BaseState to bs) in
+  Base₂a  : let open LeiosState s in
           ∙ needsUpkeep Base
           ∙ eb ∈ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
-          ∙ bs B.-⟦ B.SUBMIT (this eb) / B.EMPTY ⟧⇀ bs'
-          ───────────────────────────────────────────────────────────────────────
-          just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base
+          ───────────────────────────────────────────────────────────────────────────────────
+          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT (this eb))) ⟧⇀
+            addUpkeep s Base
 
-  Base₂b  : let open LeiosState s renaming (BaseState to bs) in
+  Base₂b  : let open LeiosState s in
           ∙ needsUpkeep Base
           ∙ [] ≡ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
-          ∙ bs B.-⟦ B.SUBMIT (that ToPropose) / B.EMPTY ⟧⇀ bs'
-          ───────────────────────────────────────────────────────────────────────
-          just s -⟦ SLOT / EMPTY ⟧⇀ addUpkeep record s { BaseState = bs' } Base
+          ──────────────────────────────────────────────────────────────────────────────────────────
+          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT (that ToPropose))) ⟧⇀
+            addUpkeep s Base
 ```
 #### Protocol rules
 ```agda
-  Roles :
-        ∙ s ↝ s'
-        ─────────────────────────────
-        just s -⟦ SLOT / EMPTY ⟧⇀ s'
+  Roles₁ :
+         ∙ s ↝ (s' , just i)
+         ──────────────────────────────────────────────────────────────────────────────
+         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
+
+  Roles₂ :
+         ∙ s ↝ (s' , nothing)
+         ───────────────────────────────────────────────────
+         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ s'
 ```
+<!--
+```agda
+ShortLeios : Machine (FFD ⊗ BaseC) (IO ⊗ Adv)
+ShortLeios .Machine.State = LeiosState
+ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
+
+open import GenPremises
+
+unquoteDecl IB-Role-premises = genPremises IB-Role-premises (quote _↝_.IB-Role)
+unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
+unquoteDecl VT-Role-premises = genPremises VT-Role-premises (quote _↝_.VT-Role)
+
+unquoteDecl No-IB-Role-premises = genPremises No-IB-Role-premises (quote No-IB-Role)
+unquoteDecl No-EB-Role-premises = genPremises No-EB-Role-premises (quote No-EB-Role)
+unquoteDecl No-VT-Role-premises = genPremises No-VT-Role-premises (quote No-VT-Role)
+
+unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
+unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
+unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
+unquoteDecl Base₂a-premises = genPremises Base₂a-premises (quote Base₂a)
+unquoteDecl Base₂b-premises = genPremises Base₂b-premises (quote Base₂b)
+```
+--!>

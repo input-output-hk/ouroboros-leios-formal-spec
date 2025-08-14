@@ -45,7 +45,7 @@ open import Leios.Foreign.HsTypes
 open import Leios.Foreign.Types
 open import Leios.Foreign.Util
 open import Leios.KeyRegistration
-open import Leios.Network
+-- open import Leios.Network
 open import Leios.Prelude
 open import Leios.Protocol
 open import Leios.Short
@@ -53,8 +53,8 @@ open import Leios.Short
 -- open import Leios.Short.Deterministic
 open import Leios.Short.Trace.Verifier
 open import Leios.Short.Trace.Verifier.Test
-open import Leios.Simplified
-open import Leios.Simplified.Deterministic
+-- open import Leios.Simplified
+-- open import Leios.Simplified.Deterministic
 -- open import Leios.Simplified.Deterministic.Test
 open import Leios.SpecStructure
 open import Leios.Traces
