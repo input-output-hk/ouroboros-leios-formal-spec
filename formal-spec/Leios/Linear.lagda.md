@@ -77,17 +77,6 @@ private variable s s'   : LeiosState
 -->
 ### Block/Vote production
 
-IBs from the last 3 pipelines are directly included in the EB, when the late IB inclusion
-flag is set
-```agda
-IBSelection : LeiosState → Bool → InputBlock → Type
-IBSelection s false = _∈ᴮ slice L (LeiosState.slot s) 3
-IBSelection s true  = _∈ᴮ slices L (LeiosState.slot s) 3 6
-
-IBSelection? : (s : LeiosState) → (b : Bool) → (ib : InputBlock) → Dec (IBSelection s b ib)
-IBSelection? s false ib = slotNumber ib ∈? slice L (LeiosState.slot s) 3
-IBSelection? s true ib  = slotNumber ib ∈? slices L (LeiosState.slot s) 3 6
-```
 We now define the rules for block production given by the relation `_↝_`. These are split in two:
 
 1. Positive rules, when we do need to create a block.
@@ -132,7 +121,7 @@ mempool.
           in
           ∙ getCurrentEBHash s ≡ just ebHash
           ∙ find (λ (s , eb) → hash eb ≟ ebHash) EBs' ≡ just (slot' , eb)
-          ∙ isValid s (inj₁ (ebHeader eb))
+--          ∙ isValid s (inj₁ (ebHeader eb))
           ∙ slot' ≤ slotNumber eb + Lvote
           ∙ needsUpkeep-Stage VT-Role
           ∙ canProduceV slot sk-VT (stake s)
@@ -185,7 +174,7 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
   Slot₁ : let open LeiosState s in
         ∙ allDone s
         ────────────────────────────────────────────────────────────────────────────────────
-        s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
+        s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
             { slot         = suc slot
             ; Upkeep       = ∅
             ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
@@ -230,10 +219,12 @@ Note: Submitted data to the base chain is only taken into account
          ──────────────────────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
 
+{-
   Roles₂ :
          ∙ s ↝ (s' , nothing)
          ───────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ s'
+-}
 
   Roles₃ : ∀ {x u} → let open LeiosState s in
          ∙ ¬ (s ↝ (s' , x))

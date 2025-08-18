@@ -239,6 +239,10 @@ module _ (s : LeiosState)  where
   isValid? (inj₁ h) = headerValid? h
   isValid? (inj₂ b) = bodyValid? b
 
+  instance
+    Dec-isValid : ∀ {x : Header ⊎ Body} → Dec (isValid x)
+    Dec-isValid {x} = isValid? x
+
 -- some predicates about EBs
 module _ (s : LeiosState) (eb : EndorserBlock) where
   open EndorserBlockOSig eb
