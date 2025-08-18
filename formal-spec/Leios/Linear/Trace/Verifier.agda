@@ -27,7 +27,6 @@ data Action : Type where
   Base₁-Action      : ℕ → Action
   Base₂-Action      : ℕ → Action
   No-EB-Role-Action : ℕ → Action
-  No-VT-Role-Action : ℕ → Action
 
 TestTrace = List (Action × FFDT Out)
 
@@ -46,30 +45,20 @@ open LeiosState
 open FFDBuffers
 
 getAction : ∀ {i o} → s -⟦ i / o ⟧⇀ s′ → Action
-getAction (Slot₁ {s} _)                        = Slot-Action (slot s)
-getAction (Slot₂ {s})                          = Slot-Action (slot s)
-getAction (Ftch {s})                           = Ftch-Action (slot s)
-getAction (Base₁ {s})                          = Base₁-Action (slot s)
--- getAction (Base₂a {s} {eb} (_ , _))            = Base₂a-Action (slot s) eb
-getAction (Base₂ {s} _)                 = Base₂-Action (slot s)
--- getAction (Roles₁ (IB-Role {s} _))             = IB-Role-Action (slot s)
-{-
-getAction (Roles₁ (EB-Role {s} {ebs} (_ , _ , _ , _))) =
-  let ibs = L.filter (IBSelection? s Late-IB-Inclusion) (IBs s)
-      LI  = map getIBRef ibs
-  in EB-Role-Action (slot s) LI ebs
--}
-getAction (Roles₁ (VT-Role {s} {eb = eb} (_ , _ , _ , _ , _))) = VT-Role-Action (slot s) eb
-getAction (Roles₁ (EB-Role {s} {eb = eb} (_ , _)))   = EB-Role-Action (slot s) eb
--- getAction (Roles₂ ())
-getAction (Roles₃ {s} {_} {_} {Base} (_ , _ , x)) = ⊥-elim (x refl)
-getAction (Roles₃ {s} {_} {_} {EB-Role} (_ , _ , _)) = No-EB-Role-Action (slot s)
+getAction (Slot₁ {s} _)                      = Slot-Action (slot s)
+getAction (Slot₂ {s})                        = Slot-Action (slot s)
+getAction (Ftch {s})                         = Ftch-Action (slot s)
+getAction (Base₁ {s})                        = Base₁-Action (slot s)
+getAction (Base₂ {s} _)                      = Base₂-Action (slot s)
+getAction (Roles₁ (VT-Role {s} {eb = eb} _)) = VT-Role-Action (slot s) eb
+getAction (Roles₁ (EB-Role {s} {eb = eb} _)) = EB-Role-Action (slot s) eb
+getAction (Roles₃ {u = Base} (_ , _ , x))    = ⊥-elim (x refl)
+getAction (Roles₃ {s} {u = EB-Role} _)       = No-EB-Role-Action (slot s)
 
 getSlot : Action → ℕ
 getSlot (EB-Role-Action x _) = x
 getSlot (VT-Role-Action x _) = x
 getSlot (No-EB-Role-Action x) = x
-getSlot (No-VT-Role-Action x) = x
 getSlot (Ftch-Action x) = x
 getSlot (Slot-Action x) = x
 getSlot (Base₁-Action x) = x
@@ -165,7 +154,6 @@ verifyStep' (Base₂b-Action n) _ s refl = Err dummyErr
 -}
 
 verifyStep' (No-EB-Role-Action n) _ s refl = Err dummyErr
-verifyStep' (No-VT-Role-Action n) _ s refl = Err dummyErr
 
 verifyStep : (a : Action) → (i : FFDT Out) → (s : LeiosState) → Result (Err-verifyAction a i s) (ValidStep (a , i) s)
 verifyStep a i s = case getSlot a ≟ slot s of λ where
