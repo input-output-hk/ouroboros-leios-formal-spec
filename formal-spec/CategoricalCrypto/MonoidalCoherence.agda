@@ -33,6 +33,9 @@ open import Categories.Category.Construction.Functors using () renaming (curry t
 open import Categories.Category.Product
 open import CategoricalCrypto.Properties
 
+import Data.Vec as V
+open import Data.Fin using (Fin)
+
 module CoherenceThm (X : Set) where
   open FreeMonoidal X
 
@@ -55,6 +58,7 @@ module CoherenceThm (X : Set) where
   module FMReasoning where
     open import Categories.Category.Monoidal.Reasoning Monoidal-FreeMonoidal public
 
+  import Relation.Binary.Reasoning.Setoid as SetoidR
 
   ⟦_⟧ : ObjTerm → List X → List X
   ⟦ unit ⟧ n = n
@@ -106,101 +110,53 @@ module CoherenceThm (X : Set) where
   Nf : Functor FreeMonoidal Discrete
   Nf = appʳ ⟦_⟧F []
 
-  open Monoidal Monoidal-FreeMonoidal using (unitorˡ; unitorʳ; associator)
-
   module C where
     open import Categories.Category.Construction.Core FreeMonoidal public
     open Category Core public
 
   F1 F2 : Bifunctor FreeMonoidal Discrete FreeMonoidal
-  F1 = ι ∘F ⟦_⟧F
-  F2 = FM.⊗ ∘F (F.id ⁂ ι)
+  F1 = FM.⊗ ∘F (F.id ⁂ ι)
+  F2 = ι ∘F ⟦_⟧F
 
   opaque
     unfolding ⟦_⟧F
-    iso : (X : Category.Obj FreeMonoidal) → (Y : Category.Obj Discrete)
-        → C.Core [ Functor.₀ (FM.⊗ ∘F (F.id ⁂ ι)) (X , Y) , (Functor.₀ (ι ∘F ⟦_⟧F) (X , Y)) ]
-    iso unit n = unitorˡ
-    iso (a ⊗₀ b) n = iso a (⟦ b ⟧ n) C.∘ (≅.refl _ FM.⊗ᵢ iso b n) C.∘ associator
-    iso (Var x) [] = unitorʳ
-    iso (Var x) (x₁ ∷ n) = ≅.refl _
+    -- making the termination checker happy
+    iso' : (x : ObjTerm) → (y : List X) → C.Core [ Functor.₀ F1 (x , y) , Functor.₀ F2 (x , y) ]
+    iso' unit n = FM.unitorˡ
+    iso' (a ⊗₀ b) n = iso' a (⟦ b ⟧ n) C.∘ (≅.refl _ FM.⊗ᵢ iso' b n) C.∘ FM.associator
+    iso' (Var x) [] = FM.unitorʳ
+    iso' (Var x) (x₁ ∷ n) = ≅.refl _
 
-    iso' : (X : ObjTerm × List X)
-         → C.Core [ (Functor.₀ (ι ∘F ⟦_⟧F) X) , Functor.₀ (FM.⊗ ∘F (F.id ⁂ ι)) X ]
-    iso' (X , Y) = ≅.sym _ (iso X Y)
+    iso : (X : ObjTerm × List X) → C.Core [ Functor.₀ F1 X , Functor.₀ F2 X ]
+    iso = uncurry iso'
 
-    iso'₁ : (X : ObjTerm × List X)
-          → FreeMonoidal [ (Functor.₀ F1 X) , Functor.₀ F2 X ]
-    iso'₁ X = _≅_.from (iso' X)
+    iso₁ : (X : ObjTerm × List X) → FreeMonoidal [ Functor.₀ F1 X , Functor.₀ F2 X ]
+    iso₁ X = _≅_.from (iso X)
 
-    iso'₁-assoc-ty : Set
-    iso'₁-assoc-ty = ∀ {A B d} → iso'₁ (A ⊗₀ B , d) ≈Term FM.α⇐ ∘ (id ⊗₁ iso'₁ (B , d)) ∘ iso'₁ (A , ⟦ B ⟧ d)
+    iso₁-assoc-ty : Set
+    iso₁-assoc-ty = ∀ {A B d} → iso₁ (A ⊗₀ B , d) ≈Term iso₁ (A , ⟦ B ⟧ d) ∘ (id ⊗₁ iso₁ (B , d)) ∘ FM.α⇒
 
     -- It's necessary to hide this type behind a definition, otherwise it won't type check in an opaque block
-    iso'₁-assoc : iso'₁-assoc-ty
-    iso'₁-assoc = assoc
+    iso₁-assoc : iso₁-assoc-ty
+    iso₁-assoc = ≈-Term-refl
 
   P = Product FreeMonoidal Discrete
 
   module _ where opaque
-    unfolding ⟦_⟧F ι iso iso'₁-assoc iso'₁-assoc-ty
+    unfolding ⟦_⟧F ι iso iso₁-assoc iso₁-assoc-ty
     open FMReasoning
-    open Mon FreeMonoidal Monoidal-FreeMonoidal
     open import Categories.Morphism.Reasoning FreeMonoidal
 
-    natural-id : ∀ X → iso'₁ X ∘ Functor.F₁ F1 (id , refl) ≈Term Functor.F₁ F2 (id , refl) ∘ iso'₁ X
-    natural-id X = begin
-      iso'₁ X ∘ id
-        ≈⟨ FM.identityʳ ○ ⟺ FM.identityˡ ⟩
-      id ∘ iso'₁ X
-        ≈⟨ FM.⊗.identity ⟩∘⟨refl ⟨
-      id ⊗₁ id ∘ iso'₁ X ∎
-
-    natural-∘ : ∀ {A B C} d (g : HomTerm B C) (f : HomTerm A B)
-      → iso'₁ (C , d) ∘ Functor.F₁ F1 (g , refl) FM.≈ Functor.F₁ F2 (g , refl) ∘ iso'₁ (B , d)
-      → iso'₁ (B , d) ∘ Functor.F₁ F1 (f , refl) FM.≈ Functor.F₁ F2 (f , refl) ∘ iso'₁ (A , d)
-      → iso'₁ (C , d) ∘ Functor.F₁ F1 (g ∘ f , refl) FM.≈ Functor.F₁ F2 (g ∘ f , refl) ∘ iso'₁ (A , d)
-    natural-∘ {A} {B} {C} d g f Hg Hf = begin
-      iso'₁ (C , d) ∘ Functor.F₁ F1 (g ∘ f , refl)
-        ≈⟨ refl⟩∘⟨ Functor.homomorphism F1 {f = f , refl} {g , refl} ⟩
-      iso'₁ (C , d) ∘ Functor.F₁ F1 (g , refl) ∘ Functor.F₁ F1 (f , refl)
-        ≈⟨ FM.assoc ⟨
-      (iso'₁ (C , d) ∘ Functor.F₁ F1 (g , refl)) ∘ Functor.F₁ F1 (f , refl)
-        ≈⟨ Hg ⟩∘⟨refl ⟩
-      (Functor.F₁ F2 (g , refl) ∘ iso'₁ (B , d)) ∘ Functor.F₁ F1 (f , refl)
-        ≈⟨ FM.assoc ⟩
-      Functor.F₁ F2 (g , refl) ∘ iso'₁ (B , d) ∘ Functor.F₁ F1 (f , refl)
-        ≈⟨ refl⟩∘⟨ Hf ⟩
-      Functor.F₁ F2 (g , refl) ∘ Functor.F₁ F2 (f , refl) ∘ iso'₁ (A , d)
-        ≈⟨ FM.assoc ⟨
-      (Functor.F₁ F2 (g , refl) ∘ Functor.F₁ F2 (f , refl)) ∘ iso'₁ (A , d)
-        ≈⟨ Functor.homomorphism F2 ⟩∘⟨refl ⟨
-      Functor.F₁ F2 (g ∘ f , refl) ∘ iso'₁ (A , d) ∎
-
-    F1-lemma₁ : ∀ {A B d} (f : HomTerm A B) → Functor.F₀ F1 (A , d) ≡ Functor.F₀ F1 (A , d)
-    F1-lemma₁ = λ _ → refl
-
-    open import Categories.Category.Discrete
-
-    ι-lemma₂ : ∀ {A} (f : A ≡ A) → Functor.F₁ ι f ≈Term id
-    ι-lemma₂ refl = FM.Equiv.refl
-
-    F1-lemma₂ : ∀ {A d} (f : HomTerm A A) → Functor.F₁ F1 (f , refl {x = d}) ≈Term id
-    F1-lemma₂ _ = ι-lemma₂ _
-
     iso-comm-ty : Set
-    iso-comm-ty = ∀ {A d₁ d₂} {f : d₁ ≡ d₂}
-      → iso'₁ (A , d₂) ∘ ι₁ (⟦ id {A = A} , f ⟧₁) FM.≈ id ⊗₁ ι₁ f ∘ iso'₁ (A , d₁)
+    iso-comm-ty = ∀ {A} {d₁} {d₂} {g : d₁ ≡ d₂}
+           → iso₁ (A , d₂) ∘ id ⊗₁ ι₁ g
+        FM.≈ ι₁ (hom⇒≡⟦⟧' (id {A}) g) ∘ iso₁ (A , d₁)
 
     iso-comm : iso-comm-ty
-    iso-comm {A} {d} {_} {refl} = begin
-      iso'₁ (A , d) ∘ id
-        ≈⟨ FM.identityʳ ⟩
-      iso'₁ (A , d)
-        ≈⟨ FM.identityˡ ⟨
-      id ∘ iso'₁ (A , d)
-        ≈⟨ FM.⊗.identity ⟩∘⟨refl ⟨
-      id ⊗₁ id ∘ iso'₁ (A , d) ∎
+    iso-comm {A} {d} {d} {refl} = begin
+      iso₁ (A , d) ∘ id ⊗₁ id
+        ≈⟨ refl⟩∘⟨ FM.⊗.identity ○ id-comm ⟩
+      id ∘ iso₁ (A , d) ∎
 
     ι-∘ : ∀ {A B C D} d (f : HomTerm A B) (g : HomTerm C D)
         → ι₁ ⟦ f , ⟦ g , refl {x = d} ⟧₁ ⟧₁
@@ -214,165 +170,176 @@ module CoherenceThm (X : Set) where
       where module ι = Functor ι
             module D = Category Discrete
 
-    natural-⊗ : ∀ {A B C D} d (f : HomTerm A B) (g : HomTerm C D)
-      → iso'₁ (B , ⟦ C ⟧ d) ∘ Functor.F₁ F1 (f , refl) FM.≈ Functor.F₁ F2 (f , refl) ∘ iso'₁ (A , ⟦ C ⟧ d)
-      → iso'₁ (D , d) ∘ Functor.F₁ F1 (g , refl) FM.≈ Functor.F₁ F2 (g , refl) ∘ iso'₁ (C , d)
-      → iso'₁ (B ⊗₀ D , d) ∘ Functor.F₁ F1 (f ⊗₁ g , refl) FM.≈ Functor.F₁ F2 (f ⊗₁ g , refl) ∘ iso'₁ (A ⊗₀ C , d)
-    natural-⊗ {A} {B} {C} {D} d f g Hf Hg = begin
-      iso'₁ (B ⊗₀ D , d) ∘ ι₁ (⟦ f , ⟦ g , refl ⟧₁ ⟧₁)
-        ≈⟨ iso'₁-assoc {A = B} {D} ⟩∘⟨refl ⟩
-      (FM.α⇐ ∘ id ⊗₁ iso'₁ (D , d) ∘ iso'₁ (B , ⟦ D ⟧ d)) ∘ ι₁ (⟦ f , ⟦ g , refl ⟧₁ ⟧₁)
-        ≈⟨ refl⟩∘⟨ ι-∘ d f g ⟩
-      (FM.α⇐ ∘ (id ⊗₁ iso'₁ (D , d) ∘ iso'₁ (B , ⟦ D ⟧ d))) ∘ (ι₁ (⟦ id {A = B} , ⟦ g , refl ⟧₁ ⟧₁) ∘ ι₁ (⟦ f , refl ⟧₁))
-        ≈⟨ ⟺ FM.assoc ⟩
-      ((FM.α⇐ ∘ (id ⊗₁ iso'₁ (D , d) ∘ iso'₁ (B , ⟦ D ⟧ d))) ∘ ι₁ (⟦ id {A = B} , ⟦ g , refl ⟧₁ ⟧₁)) ∘ ι₁ (⟦ f , refl ⟧₁)
-        ≈⟨ FM.assoc ⟩∘⟨refl ⟩
-      (FM.α⇐ ∘ (id ⊗₁ iso'₁ (D , d) ∘ iso'₁ (B , ⟦ D ⟧ d)) ∘ ι₁ (⟦ id {A = B} , ⟦ g , refl ⟧₁ ⟧₁)) ∘ ι₁ (⟦ f , refl ⟧₁)
-        ≈⟨ (refl⟩∘⟨ FM.assoc) ⟩∘⟨refl ⟩
-      (FM.α⇐ ∘ id ⊗₁ iso'₁ (D , d) ∘ (iso'₁ (B , ⟦ D ⟧ d) ∘ ι₁ (⟦ id {A = B} , ⟦ g , refl ⟧₁ ⟧₁))) ∘ ι₁ (⟦ f , refl ⟧₁)
-        ≈⟨ ⟺ FM.assoc ⟩∘⟨refl ⟩
-      ((FM.α⇐ ∘ id ⊗₁ iso'₁ (D , d)) ∘ (iso'₁ (B , ⟦ D ⟧ d) ∘ ι₁ (⟦ id {A = B} , ⟦ g , refl ⟧₁ ⟧₁))) ∘ ι₁ (⟦ f , refl ⟧₁)
+    natural-id : ∀ {X} → iso₁ X ∘ Functor.F₁ F1 (id , refl) FM.≈ Functor.F₁ F2 (id , refl) ∘ iso₁ X
+    natural-id {X} = begin
+      iso₁ X ∘ id ⊗₁ id
+        ≈⟨ refl⟩∘⟨ FM.⊗.identity ○ ⟺ id-comm-sym ⟩
+      id ∘ iso₁ X ∎
+
+    natural-∘ : ∀ {A B C} d (g : HomTerm B C) (f : HomTerm A B)
+      → iso₁ (C , d) ∘ Functor.F₁ F1 (g , refl) FM.≈ Functor.F₁ F2 (g , refl) ∘ iso₁ (B , d)
+      → iso₁ (B , d) ∘ Functor.F₁ F1 (f , refl) FM.≈ Functor.F₁ F2 (f , refl) ∘ iso₁ (A , d)
+      → iso₁ (C , d) ∘ Functor.F₁ F1 (g ∘ f , refl) FM.≈ Functor.F₁ F2 (g ∘ f , refl) ∘ iso₁ (A , d)
+    natural-∘ {A} {B} {C} d g f Hg Hf = begin
+      iso₁ (C , d) ∘ Functor.F₁ F1 (g ∘ f , refl)
+        ≈⟨ refl⟩∘⟨ Functor.homomorphism F1 {f = f , refl} {g , refl} ⟩
+      iso₁ (C , d) ∘ Functor.F₁ F1 (g , refl) ∘ Functor.F₁ F1 (f , refl)
+        ≈⟨ FM.assoc ⟨
+      (iso₁ (C , d) ∘ Functor.F₁ F1 (g , refl)) ∘ Functor.F₁ F1 (f , refl)
+        ≈⟨ Hg ⟩∘⟨refl ⟩
+      (Functor.F₁ F2 (g , refl) ∘ iso₁ (B , d)) ∘ Functor.F₁ F1 (f , refl)
         ≈⟨ FM.assoc ⟩
-      (FM.α⇐ ∘ id ⊗₁ iso'₁ (D , d)) ∘ (iso'₁ (B , ⟦ D ⟧ d) ∘ ι₁ (⟦ id {A = B} , ⟦ g , refl ⟧₁ ⟧₁)) ∘ ι₁ (⟦ f , refl ⟧₁)
-        ≈⟨ refl⟩∘⟨ iso-comm ⟩∘⟨refl ⟩
-      (FM.α⇐ ∘ id ⊗₁ iso'₁ (D , d)) ∘ ((id ⊗₁ ι₁ (⟦ g , refl ⟧₁) ∘ iso'₁ (B , ⟦ C ⟧ d)) ∘ ι₁ (⟦ f , refl ⟧₁))
-        ≈⟨ refl⟩∘⟨ FM.assoc ⟩
-      (FM.α⇐ ∘ id ⊗₁ iso'₁ (D , d)) ∘ (id ⊗₁ ι₁ (⟦ g , refl ⟧₁) ∘ (iso'₁ (B , ⟦ C ⟧ d) ∘ ι₁ (⟦ f , refl ⟧₁)))
-        ≈⟨ ⟺ FM.assoc ⟩
-      ((FM.α⇐ ∘ id ⊗₁ iso'₁ (D , d)) ∘ id ⊗₁ ι₁ (⟦ g , refl ⟧₁)) ∘ (iso'₁ (B , ⟦ C ⟧ d) ∘ ι₁ (⟦ f , refl ⟧₁))
-        ≈⟨ FM.assoc ⟩∘⟨refl ⟩
-      (FM.α⇐ ∘ id ⊗₁ iso'₁ (D , d) ∘ id ⊗₁ ι₁ (⟦ g , refl ⟧₁)) ∘ (iso'₁ (B , ⟦ C ⟧ d) ∘ ι₁ (⟦ f , refl ⟧₁))
+      Functor.F₁ F2 (g , refl) ∘ iso₁ (B , d) ∘ Functor.F₁ F1 (f , refl)
         ≈⟨ refl⟩∘⟨ Hf ⟩
-      (FM.α⇐ ∘ id ⊗₁ iso'₁ (D , d) ∘ id ⊗₁ ι₁ (⟦ g , refl ⟧₁)) ∘ (f ⊗₁ id ∘ iso'₁ (A , ⟦ C ⟧ d))
-        ≈⟨ FM.assoc ⟩
-      FM.α⇐ ∘ (id ⊗₁ iso'₁ (D , d) ∘ id ⊗₁ ι₁ (⟦ g , refl ⟧₁)) ∘ (f ⊗₁ id ∘ iso'₁ (A , ⟦ C ⟧ d))
-        ≈⟨ refl⟩∘⟨ merge₂ʳ ⟩∘⟨refl ⟩
-      FM.α⇐ ∘ (id ⊗₁ (iso'₁ (D , d) ∘ ι₁ (⟦ g , refl ⟧₁))) ∘ (f ⊗₁ id ∘ iso'₁ (A , ⟦ C ⟧ d))
+      Functor.F₁ F2 (g , refl) ∘ Functor.F₁ F2 (f , refl) ∘ iso₁ (A , d)
+        ≈⟨ FM.assoc ⟨
+      (Functor.F₁ F2 (g , refl) ∘ Functor.F₁ F2 (f , refl)) ∘ iso₁ (A , d)
+        ≈⟨ Functor.homomorphism F2 {f = f , refl} {g = g , refl} ⟩∘⟨refl ⟨
+      Functor.F₁ F2 (g ∘ f , refl) ∘ iso₁ (A , d) ∎
+
+    natural-⊗ : ∀ {A B C D} d (f : HomTerm A B) (g : HomTerm C D)
+      → iso₁ (B , ⟦ C ⟧ d) ∘ Functor.F₁ F1 (f , refl) FM.≈ Functor.F₁ F2 (f , refl) ∘ iso₁ (A , ⟦ C ⟧ d)
+      → iso₁ (D , d) ∘ Functor.F₁ F1 (g , refl) FM.≈ Functor.F₁ F2 (g , refl) ∘ iso₁ (C , d)
+      → iso₁ (B ⊗₀ D , d) ∘ Functor.F₁ F1 (f ⊗₁ g , refl) FM.≈ Functor.F₁ F2 (f ⊗₁ g , refl) ∘ iso₁ (A ⊗₀ C , d)
+    natural-⊗ {A} {B} {C} {D} d f g Hf Hg = begin
+      (iso₁ (B , ⟦ D ⟧ d) ∘ id ⊗₁ iso₁ (D , d) ∘ α⇒) ∘ (f ⊗₁ g) ⊗₁ id
+        ≈⟨ assoc²' ○ refl⟩∘⟨ refl⟩∘⟨ FM.assoc-commute-from ○ refl⟩∘⟨ ⟺ assoc ⟩
+      iso₁ (B , ⟦ D ⟧ d) ∘ (id ⊗₁ iso₁ (D , d) ∘ f ⊗₁ g ⊗₁ id) ∘ α⇒
+        ≈⟨ refl⟩∘⟨ ⟺ FM.⊗.homomorphism ⟩∘⟨refl ⟩
+      iso₁ (B , ⟦ D ⟧ d) ∘ (id ∘ f) ⊗₁ (iso₁ (D , d) ∘ g ⊗₁ id) ∘ α⇒
         ≈⟨ refl⟩∘⟨ refl⟩⊗⟨ Hg ⟩∘⟨refl ⟩
-      FM.α⇐ ∘ (id ⊗₁ (g ⊗₁ id ∘ iso'₁ (C , d))) ∘ (f ⊗₁ id ∘ iso'₁ (A , ⟦ C ⟧ d))
-        ≈⟨ refl⟩∘⟨ ⟺ FM.assoc ⟩
-      FM.α⇐ ∘ (id ⊗₁ (g ⊗₁ id ∘ iso'₁ (C , d)) ∘ f ⊗₁ id) ∘ iso'₁ (A , ⟦ C ⟧ d)
-        ≈⟨ refl⟩∘⟨ serialize₂₁ ⟩∘⟨refl ⟨
-      FM.α⇐ ∘ f ⊗₁ (g ⊗₁ id ∘ iso'₁ (C , d)) ∘ iso'₁ (A , ⟦ C ⟧ d)
-        ≈⟨ refl⟩∘⟨ split₂ʳ ⟩∘⟨refl ⟩
-      FM.α⇐ ∘ ((f ⊗₁ (g ⊗₁ id) ∘ id ⊗₁ iso'₁ (C , d)) ∘ iso'₁ (A , ⟦ C ⟧ d))
-        ≈⟨ refl⟩∘⟨ FM.assoc ⟩
-      FM.α⇐ ∘ (f ⊗₁ (g ⊗₁ id) ∘ (id ⊗₁ iso'₁ (C , d) ∘ iso'₁ (A , ⟦ C ⟧ d)))
-        ≈⟨ ⟺ FM.assoc ⟩
-      (FM.α⇐ ∘ f ⊗₁ (g ⊗₁ id)) ∘ (id ⊗₁ iso'₁ (C , d) ∘ iso'₁ (A , ⟦ C ⟧ d))
-        ≈⟨ FM.assoc-commute-to ⟩∘⟨refl ⟩
-      ((f ⊗₁ g) ⊗₁ id ∘ FM.α⇐) ∘ id ⊗₁ iso'₁ (C , d) ∘ iso'₁ (A , ⟦ C ⟧ d)
-        ≈⟨ FM.assoc ⟩
-      (f ⊗₁ g) ⊗₁ id ∘ (FM.α⇐ ∘ id ⊗₁ iso'₁ (C , d) ∘ iso'₁ (A , ⟦ C ⟧ d))
-        ≈⟨ refl⟩∘⟨ iso'₁-assoc {A = A} {C} ⟨
-      (f ⊗₁ g) ⊗₁ id ∘ iso'₁ (A ⊗₀ C , d) ∎
+      iso₁ (B , ⟦ D ⟧ d) ∘ (id ∘ f) ⊗₁ (ι₁ ⟦ (g , refl) ⟧₁ ∘ iso₁ (C , d)) ∘ α⇒
+        ≈⟨ refl⟩∘⟨ FM.⊗.homomorphism ⟩∘⟨refl ⟩
+      iso₁ (B , ⟦ D ⟧ d) ∘ (id ⊗₁ ι₁ ⟦ (g , refl) ⟧₁ ∘ f ⊗₁ iso₁ (C , d)) ∘ α⇒
+        ≈⟨ assoc²'' ⟩
+      (iso₁ (B , ⟦ D ⟧ d) ∘ id ⊗₁ ι₁ ⟦ (g , refl) ⟧₁) ∘ f ⊗₁ iso₁ (C , d) ∘ α⇒
+        ≈⟨ iso-comm ⟩∘⟨refl ⟩
+      (ι₁ ⟦ (id {B} ⊗₁ g , refl {x = d}) ⟧₁ ∘ iso₁ (B , ⟦ C ⟧ d)) ∘ f ⊗₁ iso₁ (C , d) ∘ α⇒
+        ≈⟨ refl⟩∘⟨ ⟺ idʳ ⟩⊗⟨ ⟺ idˡ ⟩∘⟨refl ⟩
+      (ι₁ ⟦ (id {B} ⊗₁ g , refl {x = d}) ⟧₁ ∘ iso₁ (B , ⟦ C ⟧ d)) ∘ (f ∘ id) ⊗₁ (id ∘ iso₁ (C , d)) ∘ α⇒
+        ≈⟨ refl⟩∘⟨ FM.⊗.homomorphism ⟩∘⟨refl ⟩
+      (ι₁ ⟦ (id {B} ⊗₁ g , refl {x = d}) ⟧₁ ∘ iso₁ (B , ⟦ C ⟧ d)) ∘ (f ⊗₁ id ∘ id ⊗₁ iso₁ (C , d)) ∘ α⇒
+        ≈⟨ refl⟩∘⟨ assoc ⟩
+      (ι₁ ⟦ (id {B} ⊗₁ g , refl {x = d}) ⟧₁ ∘ iso₁ (B , ⟦ C ⟧ d)) ∘ f ⊗₁ id ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒
+        ≈⟨ assoc ○ refl⟩∘⟨ ⟺ assoc ⟩
+      ι₁ ⟦ (id {B} ⊗₁ g , refl {x = d}) ⟧₁ ∘ (iso₁ (B , ⟦ C ⟧ d) ∘ f ⊗₁ id) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒
+        ≈⟨ refl⟩∘⟨ Hf ⟩∘⟨refl ⟩
+      ι₁ ⟦ (id {B} ⊗₁ g , refl {x = d}) ⟧₁ ∘ (ι₁ ⟦ (f , refl) ⟧₁ ∘ iso₁ (A , ⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒
+        ≈⟨ assoc²'' ⟩
+      (ι₁ ⟦ (id {B} ⊗₁ g , refl {x = d}) ⟧₁ ∘ ι₁ ⟦ (f , refl) ⟧₁) ∘ iso₁ (A , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒
+        ≈⟨ ⟺ (ι-∘ d f g) ⟩∘⟨refl ⟩
+      ι₁ ⟦ (f ⊗₁ g , refl) ⟧₁ ∘ iso₁ (A , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒ ∎
 
     natural-λ⇒ : ∀ {A d}
-               → iso'₁ (A , d) ∘ Functor.F₁ ι (Functor.F₁ ⟦_⟧F (λ⇒ , refl))
-            FM.≈ λ⇒ ⊗₁ Functor.F₁ ι refl ∘ iso'₁ (unit ⊗₀ A , d)
+               → iso₁ (A , d) ∘ Functor.F₁ F1 (λ⇒ , refl)
+            FM.≈ Functor.F₁ F2 (λ⇒ , refl) ∘ iso₁ (unit ⊗₀ A , d)
     natural-λ⇒ {A} {d} = begin
-      iso'₁ (A , d) ∘ id
-        ≈⟨ id-comm ⟩
-      id ∘ iso'₁ (A , d)
-        ≈⟨ FM.⊗.identity ⟩∘⟨refl ⟨
-      id ⊗₁ id ∘ iso'₁ (A , d)
-        ≈⟨ ⟺ λ⇒∘λ⇐≈id ⟩⊗⟨ ⟺ idˡ ⟩∘⟨refl ⟩
-      (λ⇒ ∘ λ⇐) ⊗₁ (id ∘ id) ∘ iso'₁ (A , d)
-        ≈⟨ FM.⊗.homomorphism ⟩∘⟨refl ⟩
-      (λ⇒ ⊗₁ id ∘ λ⇐ ⊗₁ id) ∘ iso'₁ (A , d)
-        ≈⟨ assoc ⟩
-      λ⇒ ⊗₁ id ∘ λ⇐ ⊗₁ id ∘ iso'₁ (A , d)
-        ≈⟨ refl⟩∘⟨ λ-lemma ⟨
-      λ⇒ ⊗₁ id ∘ α⇐ ∘ id ⊗₁ iso'₁ (A , d) ∘ λ⇐
-        ≈⟨ refl⟩∘⟨ ⟺ assoc ⟩
-      λ⇒ ⊗₁ id ∘ (α⇐ ∘ id ⊗₁ iso'₁ (A , d)) ∘ λ⇐ ∎
+      iso₁ (A , d) ∘ λ⇒ ⊗₁ id
+        ≈⟨ refl⟩∘⟨ ⟺ FM.coherence₁ ⟩
+      iso₁ (A , d) ∘ λ⇒ ∘ α⇒
+        ≈⟨ ⟺ assoc ⟩
+      (iso₁ (A , d) ∘ λ⇒) ∘ α⇒
+        ≈⟨ ⟺ FM.unitorˡ-commute-from ⟩∘⟨refl ⟩
+      (λ⇒ ∘ id ⊗₁ iso₁ (A , d)) ∘ α⇒
+        ≈⟨ assoc ○ (⟺ idˡ) ⟩
+      id ∘ λ⇒ ∘ id ⊗₁ iso₁ (A , d) ∘ α⇒ ∎
 
     natural-λ⇐ : ∀ {A d}
-               → iso'₁ (unit ⊗₀ A , d) ∘ Functor.F₁ ι (Functor.F₁ ⟦_⟧F (λ⇐ , refl))
-            FM.≈ λ⇐ ⊗₁ Functor.F₁ ι refl ∘ iso'₁ (A , d)
+               → iso₁ (unit ⊗₀ A , d) ∘ Functor.F₁ F1 (λ⇐ , refl)
+            FM.≈ Functor.F₁ F2 (λ⇐ , refl) ∘ iso₁ (A , d)
     natural-λ⇐ {A} {d} = begin
-      ((α⇐ ∘ id ⊗₁ iso'₁ (A , d)) ∘ λ⇐) ∘ id
-        ≈⟨ idʳ ○ assoc ⟩
-      α⇐ ∘ id ⊗₁ iso'₁ (A , d) ∘ λ⇐
-        ≈⟨ λ-lemma ⟩
-      λ⇐ ⊗₁ id ∘ iso'₁ (A , d) ∎
+      (λ⇒ ∘ id ⊗₁ iso₁ (A , d) ∘ α⇒) ∘ λ⇐ ⊗₁ id
+        ≈⟨ ⟺ idˡ ⟩∘⟨refl ⟩
+      (id ∘ λ⇒ ∘ id ⊗₁ iso₁ (A , d) ∘ α⇒) ∘ λ⇐ ⊗₁ id
+        ≈⟨ ⟺ natural-λ⇒ ⟩∘⟨refl ⟩
+      (iso₁ (A , d) ∘ λ⇒ ⊗₁ id) ∘ λ⇐ ⊗₁ id
+        ≈⟨ assoc ⟩
+      iso₁ (A , d) ∘ λ⇒ ⊗₁ id ∘ λ⇐ ⊗₁ id
+        ≈⟨ refl⟩∘⟨ ⟺ FM.⊗.homomorphism ⟩
+      iso₁ (A , d) ∘ (λ⇒ ∘ λ⇐) ⊗₁ (id ∘ id)
+        ≈⟨ refl⟩∘⟨ λ⇒∘λ⇐≈id ⟩⊗⟨ idˡ ⟩
+      iso₁ (A , d) ∘ id ⊗₁ id
+        ≈⟨ refl⟩∘⟨ FM.⊗.identity ⟩
+      iso₁ (A , d) ∘ id
+        ≈⟨ id-comm ⟩
+      id ∘ iso₁ (A , d) ∎
 
     natural-ρ⇒ : ∀ {A d}
-               → iso'₁ (A , d) ∘ Functor.F₁ ι (Functor.F₁ ⟦_⟧F (ρ⇒ , refl))
-            FM.≈ ρ⇒ ⊗₁ Functor.F₁ ι refl ∘ iso'₁ (A ⊗₀ unit , d)
+               → iso₁ (A , d) ∘ Functor.F₁ F1 (ρ⇒ , refl)
+            FM.≈ Functor.F₁ F2 (ρ⇒ , refl) ∘ iso₁ (A ⊗₀ unit , d)
     natural-ρ⇒ {A} {d} = begin
-      iso'₁ (A , d) ∘ id
-        ≈⟨ id-comm ⟩
-      id ∘ iso'₁ (A , d)
-        ≈⟨ FM.⊗.identity ⟩∘⟨refl ⟨
-      id ⊗₁ id ∘ iso'₁ (A , d)
-        ≈⟨ ⟺ ρ⇒∘ρ⇐≈id ⟩⊗⟨ ⟺ idˡ ⟩∘⟨refl ⟩
-      (ρ⇒ ∘ ρ⇐) ⊗₁ (id ∘ id) ∘ iso'₁ (A , d)
-        ≈⟨ FM.⊗.homomorphism ⟩∘⟨refl ⟩
-      (ρ⇒ ⊗₁ id ∘ ρ⇐ ⊗₁ id) ∘ iso'₁ (A , d)
-        ≈⟨ (refl⟩∘⟨ ⟺ FM.triangle-inv) ⟩∘⟨refl ⟩
-      (ρ⇒ ⊗₁ id ∘ (α⇐ ∘ id ⊗₁ λ⇐)) ∘ iso'₁ (A , d)
-        ≈⟨ assoc ⟩
-      ρ⇒ ⊗₁ id ∘ (α⇐ ∘ id ⊗₁ λ⇐) ∘ iso'₁ (A , d) ∎
+      iso₁ (A , d) ∘ ρ⇒ ⊗₁ id
+        ≈⟨ refl⟩∘⟨ ⟺ FM.triangle ⟩
+      iso₁ (A , d) ∘ id ⊗₁ λ⇒ ∘ α⇒
+        ≈⟨ ⟺ idˡ ⟩
+      id ∘ iso₁ (A , d) ∘ id ⊗₁ λ⇒ ∘ α⇒ ∎
 
     natural-ρ⇐ : ∀ {A d}
-               → iso'₁ (A ⊗₀ unit , d) ∘ Functor.F₁ ι (Functor.F₁ ⟦_⟧F (ρ⇐ , refl))
-            FM.≈ ρ⇐ ⊗₁ Functor.F₁ ι refl ∘ iso'₁ (A , d)
+               → iso₁ (A ⊗₀ unit , d) ∘ Functor.F₁ F1 (ρ⇐ , refl)
+            FM.≈ Functor.F₁ F2 (ρ⇐ , refl) ∘ iso₁ (A , d)
     natural-ρ⇐ {A} {d} = begin
-      ((α⇐ ∘ id ⊗₁ λ⇐) ∘ iso'₁ (A , d)) ∘ id
-        ≈⟨ idʳ ⟩
-      (α⇐ ∘ id ⊗₁ λ⇐) ∘ iso'₁ (A , d)
-        ≈⟨ FM.triangle-inv ⟩∘⟨refl ⟩
-      ρ⇐ ⊗₁ id ∘ iso'₁ (A , d) ∎
+      (iso₁ (A , d) ∘ id ⊗₁ λ⇒ ∘ α⇒) ∘ ρ⇐ ⊗₁ id
+        ≈⟨ (refl⟩∘⟨ FM.triangle) ⟩∘⟨refl ⟩
+      (iso₁ (A , d) ∘ ρ⇒ ⊗₁ id) ∘ ρ⇐ ⊗₁ id
+        ≈⟨ assoc ⟩
+      iso₁ (A , d) ∘ ρ⇒ ⊗₁ id ∘ ρ⇐ ⊗₁ id
+        ≈⟨ refl⟩∘⟨ ⟺ FM.⊗.homomorphism ⟩
+      iso₁ (A , d) ∘ (ρ⇒ ∘ ρ⇐) ⊗₁ (id ∘ id)
+        ≈⟨ refl⟩∘⟨ FM.unitorʳ.isoʳ ⟩⊗⟨ idˡ ⟩
+      iso₁ (A , d) ∘ id ⊗₁ id
+        ≈⟨ refl⟩∘⟨ FM.⊗.identity ⟩
+      iso₁ (A , d) ∘ id
+        ≈⟨ id-comm ⟩
+      id ∘ iso₁ (A , d) ∎
 
     natural-α⇒ : ∀ {A B C d}
-               → iso'₁ (A ⊗₀ B ⊗₀ C , d) ∘ Functor.F₁ ι (Functor.F₁ ⟦_⟧F (α⇒ , refl))
-            FM.≈ α⇒ ⊗₁ Functor.F₁ ι refl ∘ iso'₁ ((A ⊗₀ B) ⊗₀ C , d)
+               → iso₁ (A ⊗₀ B ⊗₀ C , d) ∘ Functor.F₁ F1 (α⇒ , refl)
+            FM.≈ Functor.F₁ F2 (α⇒ , refl) ∘ iso₁ ((A ⊗₀ B) ⊗₀ C , d)
     natural-α⇒ {A} {B} {C} {d} = begin
-      ((α⇐ ∘ id ⊗₁ ((α⇐ ∘ id ⊗₁ iso'₁ (C , d)) ∘ iso'₁ (B , ⟦ C ⟧ d))) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))) ∘ id
-        ≈⟨ idʳ ⟩
-      (α⇐ ∘ id ⊗₁ ((α⇐ ∘ id ⊗₁ iso'₁ (C , d)) ∘ iso'₁ (B , ⟦ C ⟧ d))) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ α-lemma ⟩∘⟨refl ⟩
-      (α⇒ ⊗₁ id ∘ (α⇐ ∘ id ⊗₁ iso'₁ (C , d)) ∘ (α⇐ ∘ id ⊗₁ iso'₁ (B , ⟦ C ⟧ d))) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ assoc ○ refl⟩∘⟨ assoc ⟩
-      α⇒ ⊗₁ id ∘ (α⇐ ∘ id ⊗₁ iso'₁ (C , d)) ∘ (α⇐ ∘ id ⊗₁ iso'₁ (B , ⟦ C ⟧ d)) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∎
+      (iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ (iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒) ∘ α⇒ ⊗₁ id
+        ≈⟨ assoc²' ⟩
+      iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ (iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒ ∘ α⇒ ⊗₁ id
+        ≈⟨ refl⟩∘⟨ Functor.homomorphism (A FM.⊗-) ⟩∘⟨refl ⟩
+      iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ (id ⊗₁ iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ (id ⊗₁ iso₁ (C , d) ∘ α⇒)) ∘ α⇒ ∘ α⇒ ⊗₁ id
+        ≈⟨ (refl⟩∘⟨ (refl⟩∘⟨ Functor.homomorphism (A FM.⊗-)) ⟩∘⟨refl) ⟩
+      iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ (id ⊗₁ iso₁ (B , ⟦ C ⟧ d) ∘ (id ⊗₁ id ⊗₁ iso₁ (C , d) ∘ id ⊗₁ α⇒)) ∘ α⇒ ∘ α⇒ ⊗₁ id
+        ≈⟨ refl⟩∘⟨ assoc²' ○ ⟺ assoc ⟩
+      (iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d)) ∘ id ⊗₁ id ⊗₁ iso₁ (C , d) ∘ id ⊗₁ α⇒ ∘ α⇒ ∘ α⇒ ⊗₁ id
+        ≈⟨ refl⟩∘⟨ refl⟩∘⟨ FM.pentagon ⟩
+      (iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d)) ∘ id ⊗₁ id ⊗₁ iso₁ (C , d) ∘ α⇒ ∘ α⇒
+        ≈⟨ refl⟩∘⟨ ⟺ assoc ⟩
+      (iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d)) ∘ (id ⊗₁ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒
+        ≈⟨ refl⟩∘⟨ ⟺ FM.assoc-commute-from ⟩∘⟨refl ⟩
+      (iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d)) ∘ (α⇒ ∘ (id ⊗₁ id) ⊗₁ iso₁ (C , d)) ∘ α⇒
+        ≈⟨ refl⟩∘⟨ (refl⟩∘⟨ FM.⊗.identity ⟩⊗⟨refl) ⟩∘⟨refl ⟩
+      (iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d)) ∘ (α⇒ ∘ id ⊗₁ iso₁ (C , d)) ∘ α⇒
+        ≈⟨ refl⟩∘⟨ assoc ○ assoc ○ ⟺ assoc²' ○ ⟺ idˡ ⟩
+      id ∘ (iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d) ∘ α⇒) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒ ∎
 
     natural-α⇐ : ∀ {A B C d}
-               → iso'₁ ((A ⊗₀ B) ⊗₀ C , d) ∘ Functor.F₁ ι (Functor.F₁ ⟦_⟧F (α⇐ , refl))
-            FM.≈ α⇐ ⊗₁ Functor.F₁ ι refl ∘ iso'₁ (A ⊗₀ B ⊗₀ C , d)
+               → iso₁ ((A ⊗₀ B) ⊗₀ C , d) ∘ Functor.F₁ F1 (α⇐ , refl)
+            FM.≈ Functor.F₁ F2 (α⇐ , refl) ∘ iso₁ (A ⊗₀ B ⊗₀ C , d)
     natural-α⇐ {A} {B} {C} {d} = begin
-      ((α⇐ ∘ id ⊗₁ iso'₁ (C , d)) ∘ (α⇐ ∘ id ⊗₁ iso'₁ (B , ⟦ C ⟧ d)) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))) ∘ id
-        ≈⟨ idʳ ⟩
-      (α⇐ ∘ id ⊗₁ iso'₁ (C , d)) ∘ (α⇐ ∘ id ⊗₁ iso'₁ (B , ⟦ C ⟧ d)) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ ⟺ assoc ⟩
-      ((α⇐ ∘ id ⊗₁ iso'₁ (C , d)) ∘ α⇐ ∘ id ⊗₁ iso'₁ (B , ⟦ C ⟧ d)) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ ⟺ assoc²'' ⟩∘⟨refl ⟩
-      (α⇐ ∘ (id ⊗₁ iso'₁ (C , d) ∘ α⇐) ∘ id ⊗₁ iso'₁ (B , ⟦ C ⟧ d)) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ (refl⟩∘⟨ (⟺ M.⊗.identity ⟩⊗⟨refl ⟩∘⟨refl) ⟩∘⟨refl) ⟩∘⟨refl ⟩
-      (α⇐ ∘ ((id ⊗₁ id) ⊗₁ iso'₁ (C , d) ∘ α⇐) ∘ id ⊗₁ iso'₁ (B , ⟦ C ⟧ d)) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ (refl⟩∘⟨ ⟺ M.assoc-commute-to ⟩∘⟨refl) ⟩∘⟨refl ⟩
-      (α⇐ ∘ (α⇐ ∘ id ⊗₁ id ⊗₁ iso'₁ (C , d)) ∘ id ⊗₁ iso'₁ (B , ⟦ C ⟧ d)) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ assoc²'' ⟩∘⟨refl ⟩
-      ((α⇐ ∘ α⇐) ∘ id ⊗₁ id ⊗₁ iso'₁ (C , d) ∘ id ⊗₁ iso'₁ (B , ⟦ C ⟧ d)) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ (refl⟩∘⟨ ⟺ ((_ M.⊗-) .Functor.homomorphism)) ⟩∘⟨refl ⟩
-      ((α⇐ ∘ α⇐) ∘ id ⊗₁ (id ⊗₁ iso'₁ (C , d) ∘ iso'₁ (B , ⟦ C ⟧ d))) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ ⟺ pentagon' ⟩∘⟨refl ⟩∘⟨refl ⟩
-      ((α⇐ ⊗₁ id ∘ α⇐ ∘ id ⊗₁ α⇐) ∘ id ⊗₁ (id ⊗₁ iso'₁ (C , d) ∘ iso'₁ (B , ⟦ C ⟧ d))) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ assoc²' ⟩∘⟨refl ⟩
-      (α⇐ ⊗₁ id ∘ α⇐ ∘ id ⊗₁ α⇐ ∘ id ⊗₁ (id ⊗₁ iso'₁ (C , d) ∘ iso'₁ (B , ⟦ C ⟧ d))) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ (refl⟩∘⟨ refl⟩∘⟨ ⟺ ((_ M.⊗-) .Functor.homomorphism)) ⟩∘⟨refl ⟩
-      (α⇐ ⊗₁ id ∘ α⇐ ∘ id ⊗₁ (α⇐ ∘ id ⊗₁ iso'₁ (C , d) ∘ iso'₁ (B , ⟦ C ⟧ d))) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ assoc²' ⟩
-      α⇐ ⊗₁ id ∘ α⇐ ∘ id ⊗₁ (α⇐ ∘ id ⊗₁ iso'₁ (C , d) ∘ iso'₁ (B , ⟦ C ⟧ d)) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ refl⟩∘⟨ ⟺ assoc ⟩
-      α⇐ ⊗₁ id ∘ (α⇐ ∘ id ⊗₁ (α⇐ ∘ id ⊗₁ iso'₁ (C , d) ∘ iso'₁ (B , ⟦ C ⟧ d))) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d))
-        ≈⟨ refl⟩∘⟨ (refl⟩∘⟨ refl⟩⊗⟨ ⟺ assoc) ⟩∘⟨refl ⟩
-      α⇐ ⊗₁ id ∘ (α⇐ ∘ id ⊗₁ ((α⇐ ∘ id ⊗₁ iso'₁ (C , d)) ∘ iso'₁ (B , ⟦ C ⟧ d))) ∘ iso'₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∎
+      ((iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d) ∘ α⇒) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇐ ⊗₁ id
+        ≈⟨ ⟺ idˡ ⟩∘⟨refl ⟩
+      (id ∘ ((iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d) ∘ α⇒) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒)) ∘ α⇐ ⊗₁ id
+        ≈⟨ ⟺ natural-α⇒ ⟩∘⟨refl ⟩
+      ((iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ (iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒) ∘ α⇒ ⊗₁ id) ∘ α⇐ ⊗₁ id
+        ≈⟨ assoc ○ assoc²' ⟩
+      iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ (iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒ ∘ α⇒ ⊗₁ id ∘ α⇐ ⊗₁ id
+        ≈⟨ refl⟩∘⟨ refl⟩∘⟨ refl⟩∘⟨ ⟺ (Functor.homomorphism (FM.-⊗ _)) ⟩
+      iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ (iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒ ∘ (α⇒ ∘ α⇐) ⊗₁ id
+        ≈⟨ refl⟩∘⟨ refl⟩∘⟨ refl⟩∘⟨ (FM.associator.isoʳ ⟩⊗⟨refl ○ FM.⊗.identity) ⟩
+      iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ (iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒ ∘ id
+        ≈⟨ refl⟩∘⟨ refl⟩∘⟨ idʳ ⟩
+      iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ (iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒
+        ≈⟨ ⟺ idˡ ⟩
+      id ∘ iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ (iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒ ∎
 
-  natural₁ : ∀ d → Natural (appʳ F1 d) (appʳ F2 d) (λ c → iso'₁ (c , d))
-  natural₁ d id = natural-id _
-  natural₁ d (g ∘ f) = natural-∘ _ g f (natural₁ d g) (natural₁ d f)
-  natural₁ d (_⊗₁_ {A} {B} {C} {D} f g) = natural-⊗ d f g (natural₁ (⟦ C ⟧ d) f) (natural₁ d g)
+  natural₁ : ∀ d → Natural (appʳ F1 d) (appʳ F2 d) (λ c → iso₁ (c , d))
+  natural₁ d id = natural-id
+  natural₁ d (g ∘ f) = natural-∘ _ g f (natural₁ _ g) (natural₁ _ f)
+  natural₁ d (_⊗₁_ {A} {B} {C} {D} f g) = natural-⊗ _ f g (natural₁ _ f) (natural₁ _ g)
   natural₁ d λ⇒ = natural-λ⇒
   natural₁ d λ⇐ = natural-λ⇐
   natural₁ d ρ⇒ = natural-ρ⇒
@@ -381,34 +348,14 @@ module CoherenceThm (X : Set) where
   natural₁ d α⇐ = natural-α⇐
 
   opaque
-    unfolding iso'₁
-    ⟦⟧≅⊗ : NaturalIsomorphism (ι ∘F ⟦_⟧F) (FM.⊗ ∘F (F.id ⁂ ι))
-    ⟦⟧≅⊗ = pointwise-iso iso' natural
+    unfolding iso₁
+    ⟦⟧≅⊗ : NaturalIsomorphism F2 F1
+    ⟦⟧≅⊗ = NI.sym (pointwise-iso iso natural)
       where
         natural : ∀ {X Y} → (f : P [ X , Y ])
-                → FreeMonoidal [ iso'₁ Y ∘ Functor.₁ (ι ∘F ⟦_⟧F) f ≈ Functor.₁ (FM.⊗ ∘F (F.id ⁂ ι)) f ∘ iso'₁ X ]
-        natural = natural-components (ι ∘F ⟦_⟧F) (FM.⊗ ∘F (F.id ⁂ ι)) iso'₁ natural₁
-          (λ c → Discrete-NaturalD {F = appˡ (ι ∘F ⟦_⟧F) c} {appˡ (FM.⊗ ∘F (F.id ⁂ ι)) c} (λ d → iso'₁ (c , d)))
-
-  open import Categories.Functor.Construction.Constant
-  open import Categories.Morphism.Properties
-  open import Categories.Category.Product.Properties
-
-  import Categories.Morphism.Reasoning as MR
-  import Relation.Binary.Reasoning.Setoid as SetoidR
-
-  -×_ : {C D : Category 0ℓ 0ℓ 0ℓ} → D .Category.Obj → Functor C (Product C D)
-  -×_ {C} {D} d = F.id ※ const d
-
-  ⁂-× : {C D E : Category 0ℓ 0ℓ 0ℓ} → (G : Functor D E) → (d : D .Category.Obj)
-      → NaturalIsomorphism ((F.id {C = C} ⁂ G) ∘F -× d) (-× Functor.F₀ G d)
-  ⁂-× G d = begin
-    (F.id ⁂ G) ∘F -× d ≈⟨ ⁂-※ _ _ F.id G ⟩
-    ((F.id ∘F F.id) ※ (G ∘F const d)) ≈⟨ NI.unitorˡ ※ⁿⁱ NI.refl ⟩
-    (F.id ※ (G ∘F const d)) ≈⟨ NI.refl ※ⁿⁱ ∘F-const d G ⟩
-    (F.id ※ (const (Functor.F₀ G d))) ≈⟨ NI.refl ⟩
-    -× Functor.F₀ G d ∎
-    where open SetoidR (Functor-NI-setoid _ _)
+                → FreeMonoidal [ iso₁ Y ∘ Functor.₁ F1 f ≈ Functor.₁ F2 f ∘ iso₁ X ]
+        natural = natural-components F1 F2 iso₁ natural₁
+          (λ c → Discrete-NaturalD {F = appˡ F1 c} {appˡ F2 c} (λ d → iso₁ (c , d)))
 
   opaque
     unfolding ι
@@ -426,9 +373,6 @@ module CoherenceThm (X : Set) where
   all-Comm : ∀ {A B} f g → [ A ⇒ B ]⟨ f ≈ g ⟩
   all-Comm f g = push-eq Nf≅id (ι.F-resp-≈ _)
     where module ι = Functor ι
-
-import Data.Vec as V
-open import Data.Fin using (Fin)
 
 module Solver (C : MonoidalCategory 0ℓ 0ℓ 0ℓ)
               {n} (vars : V.Vec (C .MonoidalCategory.Obj) n) where
