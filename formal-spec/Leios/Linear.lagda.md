@@ -35,19 +35,13 @@ resetting this field to the empty set.
 
 ```agda
 data SlotUpkeep : Type where
-  Base EB-Role : SlotUpkeep
+  Base EB-Role VT-Role : SlotUpkeep
 
 unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
 ```
 <!--
 ```agda
-data StageUpkeep : Type where
-  VT-Role : StageUpkeep
-
-unquoteDecl DecEq-StageUpkeep = derive-DecEq ((quote StageUpkeep , DecEq-StageUpkeep) ∷ [])
-```
-```agda
-open import Leios.Protocol (⋯) SlotUpkeep StageUpkeep public
+open import Leios.Protocol (⋯) SlotUpkeep ⊥ public
 
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
@@ -123,35 +117,15 @@ mempool.
           ∙ find (λ (s , eb) → hash eb ≟ ebHash) EBs' ≡ just (slot' , eb)
 --          ∙ isValid s (inj₁ (ebHeader eb))
           ∙ slot' ≤ slotNumber eb + Lvote
-          ∙ needsUpkeep-Stage VT-Role
+          ∙ needsUpkeep VT-Role
           ∙ canProduceV slot sk-VT (stake s)
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ (addUpkeep-Stage s VT-Role , just (Send (vtHeader [ vote sk-VT (hash eb) ]) nothing))
+          s ↝ (addUpkeep s VT-Role , just (Send (vtHeader [ vote sk-VT (hash eb) ]) nothing))
 ```
-```agda
-stage : ℕ → ⦃ _ : NonZero L ⦄ → ℕ
-stage s = s / L
-
-beginningOfStage : ℕ → Type
-beginningOfStage s = stage s * L ≡ s
-
-endOfStage : ℕ → Type
-endOfStage s = suc (stage s) ≡ stage (suc s)
-```
-Predicate needed for slot transition. Special care needs to be taken when starting from
-genesis.
+Predicate needed for slot transition.
 ```agda
 allDone : LeiosState → Type
-allDone record { slot = s ; Upkeep = u ; Upkeep-Stage = v } =
-  -- bootstrapping
-    (stage s < 3 ×                        u ≡ᵉ fromList (EB-Role ∷ Base ∷ []))
-  ⊎ (stage s ≡ 3 ×   beginningOfStage s × u ≡ᵉ fromList (EB-Role ∷ Base ∷ []))
-  ⊎ (stage s ≡ 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (EB-Role ∷ Base ∷ []))
-  -- done
-  ⊎ (stage s > 3 ×   beginningOfStage s × u ≡ᵉ fromList (EB-Role ∷ Base ∷ []))
-  ⊎ (stage s > 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (EB-Role ∷ Base ∷ []) ×
-       (((  endOfStage s × v ≡ᵉ fromList (VT-Role ∷ []))
-       ⊎ (¬ endOfStage s))))
+allDone record { Upkeep = u } = u ≡ᵉ fromList (EB-Role ∷ Base ∷ [])
 ```
 ### Linear Leios transitions
 The relation describing the transition given input and state
@@ -177,7 +151,6 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
         s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
             { slot         = suc slot
             ; Upkeep       = ∅
-            ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
             } ↑ L.filter (isValid? s) msgs
 
   Slot₂ : let open LeiosState s in

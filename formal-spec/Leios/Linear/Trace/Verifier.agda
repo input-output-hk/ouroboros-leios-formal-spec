@@ -27,6 +27,7 @@ data Action : Type where
   Base₁-Action      : ℕ → Action
   Base₂-Action      : ℕ → Action
   No-EB-Role-Action : ℕ → Action
+  No-VT-Role-Action : ℕ → Action
 
 TestTrace = List (Action × FFDT Out)
 
@@ -54,11 +55,13 @@ getAction (Roles₁ (VT-Role {s} {eb = eb} _)) = VT-Role-Action (slot s) eb
 getAction (Roles₁ (EB-Role {s} {eb = eb} _)) = EB-Role-Action (slot s) eb
 getAction (Roles₃ {u = Base} (_ , _ , x))    = ⊥-elim (x refl)
 getAction (Roles₃ {s} {u = EB-Role} _)       = No-EB-Role-Action (slot s)
+getAction (Roles₃ {s} {u = VT-Role} _)       = No-VT-Role-Action (slot s)
 
 getSlot : Action → ℕ
 getSlot (EB-Role-Action x _) = x
 getSlot (VT-Role-Action x _) = x
 getSlot (No-EB-Role-Action x) = x
+getSlot (No-VT-Role-Action x) = x
 getSlot (Ftch-Action x) = x
 getSlot (Slot-Action x) = x
 getSlot (Base₁-Action x) = x
@@ -140,20 +143,17 @@ verifyStep' (Slot-Action n) (FFDT.FFD-OUT msgs) s refl with ¿ Slot₁-premises 
 ... | no _ = Err dummyErr
 
 -- Different IO pattern again
+-- verifyStep' (Base₁-Action n) FFDT.SLOT s refl = Ok' Base₁
 verifyStep' (Base₁-Action n) _ s refl = Err dummyErr
+verifyStep' (Base₂-Action n) FFDT.SLOT s refl with ¿ Base₂-premises {s = s} .proj₁ ¿
+... | yes p = Ok' (Base₂ p)
+... | no _ = Err dummyErr
 verifyStep' (Base₂-Action n) _ s refl = Err dummyErr
-{-
-verifyStep' (Base₂a-Action n _) FFDT.SLOT s refl with ¿ Base₂a-premises {s = s} .proj₁ ¿
-... | yes p = Ok' (Base₂a p)
-... | no _ = Err dummyErr
-verifyStep' (Base₂a-Action n _) _ s refl = Err dummyErr
-verifyStep' (Base₂b-Action n) FFDT.SLOT s refl with ¿ Base₂b-premises {s = s} .proj₁ ¿
-... | yes p = Ok' (Base₂b p)
-... | no _ = Err dummyErr
-verifyStep' (Base₂b-Action n) _ s refl = Err dummyErr
--}
 
+verifyStep' (No-EB-Role-Action n) FFDT.SLOT s refl -- TODO: with ¿ Roles₃-premises {s = s} .proj₁ ¿
+  = Err dummyErr
 verifyStep' (No-EB-Role-Action n) _ s refl = Err dummyErr
+verifyStep' (No-VT-Role-Action n) _ s refl = Err dummyErr
 
 verifyStep : (a : Action) → (i : FFDT Out) → (s : LeiosState) → Result (Err-verifyAction a i s) (ValidStep (a , i) s)
 verifyStep a i s = case getSlot a ≟ slot s of λ where
