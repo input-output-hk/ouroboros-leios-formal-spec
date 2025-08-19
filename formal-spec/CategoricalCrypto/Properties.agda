@@ -14,6 +14,7 @@ open import Categories.NaturalTransformation.NaturalIsomorphism.Properties
 open import Categories.Category.Monoidal
 
 import Relation.Binary.Reasoning.Setoid as SetoidR
+import Categories.Functor as F
 
 module _ {a} {b} {c} where
   ※-distrib₃ : {C D E : Category a b c} → (F : Functor C D) → (G : Functor C E)
@@ -64,84 +65,15 @@ module _ {a} {b} {c} where
     where module E = Category E
           open E.HomReasoning
 
-module Mon {a} {b} {c} (C : Category a b c) (Mon-C : Monoidal C) where
+  -×_ : {C D : Category a b c} → D .Category.Obj → Functor C (Product C D)
+  -×_ {C} {D} d = F.id ※ const d
 
-  module M where
-    open Category C public
-    open Monoidal Mon-C public
-    open import Categories.Category.Monoidal.Utilities Mon-C public
-    open Shorthands public
-    open import Categories.Category.Monoidal.Properties Mon-C public
-
-  module FMReasoning where
-    open import Categories.Category.Monoidal.Reasoning Mon-C public
-
-  open M
-  open FMReasoning
-
-  open import Categories.Morphism.Reasoning C
-  import Categories.Category.Construction.Core as Core
-  open Core.Shorthands C
-  open Commutation C
-
-  pentagon-helper : ∀ {X Y Z W}
-                  → [ X ⊗₀ (Y ⊗₀ (Z ⊗₀ W)) ⇒ (X ⊗₀ (Y ⊗₀ Z)) ⊗₀ W ]⟨
-                      α⇐ ∘ M.id ⊗₁ α⇐ ≈ α⇒ ⊗₁ M.id ∘ α⇐ ∘ α⇐ ⟩
-  pentagon-helper = begin
-    α⇐ ∘ M.id ⊗₁ α⇐
-      ≈⟨ switch-fromtoʳ M.associator (switch-fromtoʳ M.associator (pentagon-helper')) ⟩
-    (α⇒ ⊗₁ M.id ∘ α⇐) ∘ α⇐
-      ≈⟨ assoc ⟩
-    α⇒ ⊗₁ M.id ∘ α⇐ ∘ α⇐ ∎
-    where
-      pentagon-helper' : ((α⇐ ∘ M.id ⊗₁ α⇐) ∘ α⇒) ∘ α⇒ ≈ α⇒ ⊗₁ M.id
-      pentagon-helper' = begin
-        ((α⇐ ∘ M.id ⊗₁ α⇐) ∘ α⇒) ∘ α⇒
-          ≈⟨ assoc ○ assoc ⟩
-        α⇐ ∘ M.id ⊗₁ α⇐ ∘ α⇒ ∘ α⇒
-          ≈⟨ switch-fromtoˡ M.associator (switch-fromtoˡ (idᵢ ⊗ᵢ M.associator) pentagon) ⟨
-        α⇒ ⊗₁ M.id ∎
-
-  pentagon' : ∀ {X Y Z W}
-            → [ X ⊗₀ Y ⊗₀ Z ⊗₀ W ⇒ ((X ⊗₀ Y) ⊗₀ Z) ⊗₀ W ]⟨
-                α⇐ ⊗₁ M.id ∘ α⇐ ∘ M.id ⊗₁ α⇐ ≈ α⇐ ∘ α⇐ ⟩
-  pentagon' = ⟺ (switch-fromtoˡ (M.associator ⊗ᵢ idᵢ) (⟺ pentagon-helper))
-
-  λ-lemma : ∀ {A B C} {f : A ⇒ (B ⊗₀ C)} → α⇐ ∘ M.id ⊗₁ f ∘ λ⇐ ≈ λ⇐ ⊗₁ M.id ∘ f
-  λ-lemma {A} {B} {C} {f} = begin
-    α⇐ ∘ M.id ⊗₁ f ∘ λ⇐
-      ≈⟨ refl⟩∘⟨ unitorˡ-commute-to ⟨
-    α⇐ ∘ λ⇐ ∘ f
-      ≈⟨ assoc ⟨
-    (α⇐ ∘ λ⇐) ∘ f
-      ≈⟨ coherence-inv₁ ⟩∘⟨refl ⟩
-    λ⇐ ⊗₁ M.id ∘ f ∎
-
-  α-lemma : ∀ {A B C D E F} {f : A ⇒ B ⊗₀ C} {g : C ⇒ D ⊗₀ E}
-          → α⇐ ∘ M.id ⊗₁ ((α⇐ ∘ M.id ⊗₁ g) ∘ f) ≈ α⇒ ⊗₁ M.id ∘ (α⇐ ∘ M.id ⊗₁ g) ∘ (α⇐ ∘ M.id {A = F} ⊗₁ f)
-  α-lemma {f = f} {g} = begin
-    α⇐ ∘ M.id ⊗₁ ((α⇐ ∘ M.id ⊗₁ g) ∘ f)
-      ≈⟨ refl⟩∘⟨ refl⟩⊗⟨ assoc ⟩
-    α⇐ ∘ M.id ⊗₁ (α⇐ ∘ (M.id ⊗₁ g ∘ f))
-      ≈⟨ refl⟩∘⟨ identityˡ ⟩⊗⟨refl ⟨
-    α⇐ ∘ (M.id ∘ M.id) ⊗₁ (α⇐ ∘ (M.id ⊗₁ g ∘ f))
-      ≈⟨ refl⟩∘⟨ ⊗.homomorphism ⟩
-    α⇐ ∘ M.id ⊗₁ α⇐ ∘ M.id ⊗₁ (M.id ⊗₁ g ∘ f)
-      ≈⟨ assoc ⟨
-    (α⇐ ∘ M.id ⊗₁ α⇐) ∘ M.id ⊗₁ (M.id ⊗₁ g ∘ f)
-      ≈⟨ pentagon-helper ⟩∘⟨refl ⟩
-    (α⇒ ⊗₁ M.id ∘ α⇐ ∘ α⇐) ∘ M.id ⊗₁ (M.id ⊗₁ g ∘ f)
-      ≈⟨ refl⟩∘⟨ identityˡ ⟩⊗⟨refl ⟨
-    (α⇒ ⊗₁ M.id ∘ α⇐ ∘ α⇐) ∘ (M.id ∘ M.id) ⊗₁ (M.id ⊗₁ g ∘ f)
-      ≈⟨ refl⟩∘⟨ ⊗.homomorphism ⟩
-    (α⇒ ⊗₁ M.id ∘ α⇐ ∘ α⇐) ∘ M.id ⊗₁ M.id ⊗₁ g ∘ M.id ⊗₁ f
-      ≈⟨ assoc ○ refl⟩∘⟨ assoc ⟩
-    α⇒ ⊗₁ M.id ∘ α⇐ ∘ α⇐ ∘ M.id ⊗₁ M.id ⊗₁ g ∘ M.id ⊗₁ f
-      ≈⟨ refl⟩∘⟨ refl⟩∘⟨ assoc ⟨
-    α⇒ ⊗₁ M.id ∘ α⇐ ∘ (α⇐ ∘ M.id ⊗₁ M.id ⊗₁ g) ∘ M.id ⊗₁ f
-      ≈⟨ refl⟩∘⟨ refl⟩∘⟨ assoc-commute-to ⟩∘⟨refl ⟩
-    α⇒ ⊗₁ M.id ∘ α⇐ ∘ ((M.id ⊗₁ M.id) ⊗₁ g ∘ α⇐) ∘ M.id ⊗₁ f
-      ≈⟨ refl⟩∘⟨ refl⟩∘⟨ ⊗.identity ⟩⊗⟨refl ⟩∘⟨refl ⟩∘⟨refl ⟩
-    α⇒ ⊗₁ M.id ∘ α⇐ ∘ (M.id ⊗₁ g ∘ α⇐) ∘ M.id ⊗₁ f
-      ≈⟨ refl⟩∘⟨ refl⟩∘⟨ assoc ○ refl⟩∘⟨ ⟺ assoc ⟩
-    α⇒ ⊗₁ M.id ∘ (α⇐ ∘ M.id ⊗₁ g) ∘ α⇐ ∘ M.id ⊗₁ f ∎
+  ⁂-× : {C D E : Category a b c} → (G : Functor D E) → (d : D .Category.Obj)
+      → NaturalIsomorphism ((F.id {C = C} ⁂ G) ∘F -× d) (-× Functor.F₀ G d)
+  ⁂-× G d = begin
+    (F.id ⁂ G) ∘F -× d ≈⟨ ⁂-※ _ _ F.id G ⟩
+    ((F.id ∘F F.id) ※ (G ∘F const d)) ≈⟨ NI.unitorˡ ※ⁿⁱ NI.refl ⟩
+    (F.id ※ (G ∘F const d)) ≈⟨ NI.refl ※ⁿⁱ ∘F-const d G ⟩
+    (F.id ※ (const (Functor.F₀ G d))) ≈⟨ NI.refl ⟩
+    -× Functor.F₀ G d ∎
+    where open SetoidR (Functor-NI-setoid _ _)
