@@ -2,7 +2,7 @@
 
 <!--
 ```agda
-{-# OPTIONS --safe #-}
+-- {-# OPTIONS --safe #-}
 open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.FFD
 open import Leios.SpecStructure
@@ -85,14 +85,14 @@ three steps corresponding to the three types of Leios specific blocks.
 ```agda
 toProposeEB : LeiosState → VrfPf → Maybe EndorserBlock
 toProposeEB s π = let open LeiosState s in case ToPropose of λ where
-  [] → nothing
-  _ → just $ mkEB slot id π sk-IB ToPropose [] []
+  []      → nothing
+  (_ ∷ _) → just $ mkEB slot id π sk-IB ToPropose [] []
 
 getCurrentEBHash : LeiosState → Maybe EBRef
 getCurrentEBHash s = let open LeiosState s in
   RankingBlock.announcedEB currentRB
 
-data _↝_ : LeiosState → LeiosState × Maybe (FFDAbstract.Input ffdAbstract) → Type where
+data _↝_ : LeiosState → LeiosState × FFDAbstract.Input ffdAbstract → Type where
 ```
 #### Positive rules
 
@@ -104,23 +104,21 @@ mempool.
 
 ```agda
   EB-Role : let open LeiosState s in
-          ∙ toProposeEB s π ≡ just eb
-          ∙ canProduceEB slot sk-EB (stake s) π
+          ∙ toProposeEB s (lotteryPf eb) ≡ just eb
+          ∙ canProduceEB slot sk-EB (stake s) (lotteryPf eb)
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ (addUpkeep s EB-Role , just (Send (ebHeader eb) nothing))
+          s ↝ (addUpkeep s EB-Role , Send (ebHeader eb) nothing)
 ```
 ```agda
-  VT-Role : ∀ {ebHash slot'}
-          → let open LeiosState s
-          in
-          ∙ getCurrentEBHash s ≡ just ebHash
-          ∙ find (λ (s , eb) → hash eb ≟ ebHash) EBs' ≡ just (slot' , eb)
+  VT-Role : ∀ {slot'} → let open LeiosState s in
+          ∙ getCurrentEBHash s ≡ just (hash eb)
+          ∙ find (λ (_ , eb') → hash eb' ≟ hash eb) EBs' ≡ just (slot' , eb)
 --          ∙ isValid s (inj₁ (ebHeader eb))
           ∙ slot' ≤ slotNumber eb + Lvote
           ∙ needsUpkeep VT-Role
           ∙ canProduceV slot sk-VT (stake s)
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ (addUpkeep s VT-Role , just (Send (vtHeader [ vote sk-VT (hash eb) ]) nothing))
+          s ↝ (addUpkeep s VT-Role , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing)
 ```
 Predicate needed for slot transition.
 ```agda
@@ -188,7 +186,7 @@ Note: Submitted data to the base chain is only taken into account
 #### Protocol rules
 ```agda
   Roles₁ :
-         ∙ s ↝ (s' , just i)
+         ∙ s ↝ (s' , i)
          ──────────────────────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
 
@@ -200,11 +198,11 @@ Note: Submitted data to the base chain is only taken into account
 -}
 
   Roles₃ : ∀ {x u} → let open LeiosState s in
-         ∙ ¬ (s ↝ (s' , x))
+         ∙ ¬ (s ↝ (addUpkeep s u , x))
          ∙ needsUpkeep u
          ∙ u ≢ Base
          ───────────────────────────────────────────────────
-         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ addUpkeep s' u
+         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ addUpkeep s u
 ```
 <!--
 ```agda
@@ -221,5 +219,34 @@ unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
 unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
 unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
 unquoteDecl Base₂-premises = genPremises Base₂-premises (quote Base₂)
+
+instance
+  postulate
+    Dec-↝ : ∀ {s u o} → (s ↝ (addUpkeep s u , o)) ⁇
+{-
+  Dec-↝ {s} {u} {Send (ibHeader _) nothing} .dec = no λ ()
+  Dec-↝ {s} {EB-Role} {Send (ebHeader _) nothing} .dec
+    with ¿ EB-Role-premises .proj₁ ¿
+  ... | yes p = yes (EB-Role p)
+  ... | no ¬p = no λ where
+    (EB-Role p) → ¬p p
+  Dec-↝ {s} {u} {Send (vtHeader []) nothing} .dec = no λ ()
+  Dec-↝ {s} {VT-Role} {Send (vtHeader (vt ∷ [])) nothing} .dec
+--    with getCurrentEBHash s
+--  ... | nothing = {!!}
+--  ... | just h
+   with ¿ VT-Role-premises {s = s} .proj₁ ¿
+  ... | no ¬p = no λ where
+    (VT-Role {s} {eb} p) → ¬p {!p!}
+  ... | yes p
+    with vt ≟ vote sk-VT _
+  ... | yes q rewrite q = yes (VT-Role p)
+  ... | no ¬q = no λ where
+    (VT-Role p) → {!!}
+  Dec-↝ {s} {u} {Send x (just y)} .dec = no λ ()
+  Dec-↝ {s} {u} {Fetch} .dec = no λ ()
+-}
+
+unquoteDecl Roles₃-premises = genPremises Roles₃-premises (quote Roles₃)
 ```
 --!>

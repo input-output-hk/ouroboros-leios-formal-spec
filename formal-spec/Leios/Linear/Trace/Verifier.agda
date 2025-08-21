@@ -127,7 +127,7 @@ verifyStep' (EB-Role-Action n ebs) FFDT.SLOT s refl with ¿ EB-Role-premises {s 
 verifyStep' (EB-Role-Action _ _) FFDT.FTCH _ _ = Err dummyErr
 verifyStep' (EB-Role-Action _ _) (FFDT.FFD-OUT _) _ _ = Err dummyErr
 verifyStep' (VT-Role-Action n eb) SLOT s refl with ¿ VT-Role-premises {s = s} .proj₁ ¿
-... | yes h = Ok' (Roles₁ (VT-Role {ebHash = hash eb} {slot' = n} h))
+... | yes h = Ok' (Roles₁ (VT-Role {slot' = n} h))
 ... | no ¬h = Err dummyErr
 verifyStep' (VT-Role-Action _ _) FFDT.FTCH _ _ = Err dummyErr
 verifyStep' (VT-Role-Action _ _) (FFDT.FFD-OUT eb) _ _ = Err dummyErr
@@ -150,9 +150,18 @@ verifyStep' (Base₂-Action n) FFDT.SLOT s refl with ¿ Base₂-premises {s = s}
 ... | no _ = Err dummyErr
 verifyStep' (Base₂-Action n) _ s refl = Err dummyErr
 
-verifyStep' (No-EB-Role-Action n) FFDT.SLOT s refl -- TODO: with ¿ Roles₃-premises {s = s} .proj₁ ¿
-  = Err dummyErr
+verifyStep' (No-EB-Role-Action n) FFDT.SLOT s refl with ¿ Roles₃-premises {s = s} {x = (FFD.Send (ebHeader (mkEB (LeiosState.slot s) id _ sk-IB (LeiosState.ToPropose s) [] [])) nothing)} {u = EB-Role} .proj₁ ¿
+... | yes p = Ok' (Roles₃ p)
+... | no _ = Err dummyErr
 verifyStep' (No-EB-Role-Action n) _ s refl = Err dummyErr
+verifyStep' (No-VT-Role-Action n) FFDT.SLOT s refl
+  with getCurrentEBHash s
+... | nothing = Err dummyErr
+... | just h
+  with ¿ Roles₃-premises {s = s} {x = (FFD.Send (vtHeader [ vote sk-VT h ]) nothing)} {u = VT-Role} .proj₁ ¿
+... | yes p = Ok' (Roles₃ p)
+... | no _ = Err dummyErr
+
 verifyStep' (No-VT-Role-Action n) _ s refl = Err dummyErr
 
 verifyStep : (a : Action) → (i : FFDT Out) → (s : LeiosState) → Result (Err-verifyAction a i s) (ValidStep (a , i) s)
