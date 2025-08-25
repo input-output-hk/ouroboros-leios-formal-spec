@@ -13,6 +13,9 @@ open import Tactic.Derive.DecEq
 
 open import CategoricalCrypto hiding (id; _∘_)
 
+open import Data.Maybe.Properties
+open import Data.Product.Properties
+
 module Leios.Linear (⋯ : SpecStructure 1)
   (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified'))
   (params : Params)
@@ -110,15 +113,15 @@ mempool.
           s ↝ (addUpkeep s EB-Role , Send (ebHeader eb) nothing)
 ```
 ```agda
-  VT-Role : ∀ {slot'} → let open LeiosState s in
-          ∙ getCurrentEBHash s ≡ just (hash eb)
-          ∙ find (λ (_ , eb') → hash eb' ≟ hash eb) EBs' ≡ just (slot' , eb)
+  VT-Role : ∀ {ebHash slot'} → let open LeiosState s in
+          ∙ getCurrentEBHash s ≡ just ebHash
+          ∙ find (λ (_ , eb') → hash eb' ≟ ebHash) EBs' ≡ just (slot' , eb)
 --          ∙ isValid s (inj₁ (ebHeader eb))
           ∙ slot' ≤ slotNumber eb + Lvote
           ∙ needsUpkeep VT-Role
           ∙ canProduceV slot sk-VT (stake s)
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ (addUpkeep s VT-Role , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing)
+          s ↝ (addUpkeep s VT-Role , Send (vtHeader [ vote sk-VT ebHash ]) nothing)
 ```
 Predicate needed for slot transition.
 ```agda
@@ -212,6 +215,12 @@ ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 
 open import GenPremises
 
+{-
+instance
+  Dec-isValid : ∀ {s x} → isValid s x ⁇
+  Dec-isValid {s} {x} .dec = isValid? s x
+-}
+
 unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
 unquoteDecl VT-Role-premises = genPremises VT-Role-premises (quote _↝_.VT-Role)
 
@@ -220,10 +229,74 @@ unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
 unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
 unquoteDecl Base₂-premises = genPremises Base₂-premises (quote Base₂)
 
+just≢nothing : ∀ {ℓ} {A : Type ℓ} {x} → (Maybe A ∋ just x) ≡ nothing → ⊥
+just≢nothing = λ ()
+
+P : EBRef → ℕ × EndorserBlock → Type
+P h (_ , eb) = hash eb ≡ h
+
+P? : (h : EBRef) → ((s , eb) : ℕ × EndorserBlock) → Dec (P h (s , eb))
+P? h (_ , eb) = hash eb ≟ h
+
+found : LeiosState → EndorserBlock → ℕ → EBRef → Type
+found s eb slot' k = find (P? k) (LeiosState.EBs' s) ≡ just (slot' , eb)
+
+not-found : LeiosState → EBRef → Type
+not-found s k = find (P? k) (LeiosState.EBs' s) ≡ nothing
+
+open import Data.List.Properties
+
+open Equivalence
+open import Axiom.Set.Properties th
+
+singleton-injective : ∀ {X : Type} {u₁ u₂ : X} → ❴ u₁ ❵ ≡ ❴ u₂ ❵ → u₁ ≡ u₂
+singleton-injective {X} {u₁} {u₂} eq =
+  let s = subst (u₁ ∈ˢ_) eq $ to ∈-singleton refl
+  in from ∈-singleton s
+  where
+    open import Axiom.Set using (Theory)
+    open Theory th renaming (_∈_ to _∈ˢ_) using ()
+
+≡→≡ᵉ : ∀ {X : Type} → {A B : ℙ X} → A ≡ B → A ≡ᵉ B
+≡→≡ᵉ refl = (λ z → z) , (λ z → z)
+
+postulate
+  ∪-injective'' : ∀ {X : Type} {l : ℙ X} {u₁ u₂ : X} → l ∪ ❴ u₁ ❵ ≡ᵉ l ∪ ❴ u₂ ❵ → u₁ ≡ u₂
+-- ∪-injective'' {X} {l} {u₁} {u₂} x = {!!}
+
+addUpkeep-injective' : ∀ {u₁ u₂}
+  → addUpkeep s u₁ ≡ addUpkeep s u₂
+  → (LeiosState.Upkeep s) ∪ ❴ u₁ ❵ ≡ᵉ (LeiosState.Upkeep s) ∪ ❴ u₂ ❵
+addUpkeep-injective' = ≡→≡ᵉ ∘ cong LeiosState.Upkeep
+
+addUpkeep-injective : ∀ {u₁ u₂} → addUpkeep s u₁ ≡ addUpkeep s u₂ → u₁ ≡ u₂
+addUpkeep-injective = ∪-injective'' ∘ addUpkeep-injective'
+
+s'≢addUpkeep-Base : ∀ {o} → s ↝ (s' , o) → s' ≢ addUpkeep s Base
+s'≢addUpkeep-Base (EB-Role (_ , _)) = EB-Role≢Base ∘ addUpkeep-injective
+  where
+    EB-Role≢Base : EB-Role ≢ Base
+    EB-Role≢Base = λ ()
+s'≢addUpkeep-Base (VT-Role (_ , _)) = VT-Role≢Base ∘ addUpkeep-injective
+  where
+    VT-Role≢Base : VT-Role ≢ Base
+    VT-Role≢Base = λ ()
+
+VT-Role≢EB-Role : SlotUpkeep.VT-Role ≢ SlotUpkeep.EB-Role
+VT-Role≢EB-Role = λ ()
+
+vtHeader→s'≢addUpkeep-EB-Role : ∀ {s} {s'} {vts}
+  → s ↝ (s' , Send (vtHeader vts) nothing)
+  → s' ≢ addUpkeep s EB-Role
+vtHeader→s'≢addUpkeep-EB-Role (VT-Role (_ , _)) = VT-Role≢EB-Role ∘ addUpkeep-injective
+
+ebHeader→s'≡addUpkeep-EB-Role :
+    s ↝ (s' , Send (ebHeader eb) nothing)
+  → s' ≡ addUpkeep s EB-Role
+ebHeader→s'≡addUpkeep-EB-Role (EB-Role (_ , _)) = refl
+
 instance
-  postulate
-    Dec-↝ : ∀ {s u o} → (s ↝ (addUpkeep s u , o)) ⁇
-{-
+  Dec-↝ : ∀ {s u o} → (s ↝ (addUpkeep s u , o)) ⁇
   Dec-↝ {s} {u} {Send (ibHeader _) nothing} .dec = no λ ()
   Dec-↝ {s} {EB-Role} {Send (ebHeader _) nothing} .dec
     with ¿ EB-Role-premises .proj₁ ¿
@@ -232,20 +305,46 @@ instance
     (EB-Role p) → ¬p p
   Dec-↝ {s} {u} {Send (vtHeader []) nothing} .dec = no λ ()
   Dec-↝ {s} {VT-Role} {Send (vtHeader (vt ∷ [])) nothing} .dec
---    with getCurrentEBHash s
---  ... | nothing = {!!}
---  ... | just h
-   with ¿ VT-Role-premises {s = s} .proj₁ ¿
+    with getCurrentEBHash s in eq₁
+  ... | nothing = no λ where
+    (VT-Role (x , _ , _ , _ , _)) → just≢nothing $ trans (sym x) eq₁
+  ... | just h
+    with find (λ (_ , eb') → hash eb' ≟ h) (LeiosState.EBs' s) in eq₂
+  ... | nothing = no λ where
+    (VT-Role (x , y , _ , _ , _)) →
+      let ji = just-injective (trans (sym x) eq₁)
+      in just≢nothing $ trans (sym y) (subst (not-found s) (sym ji) eq₂)
+  ... | just (slot' , eb)
+    with ¿ slot' ≤ slotNumber eb + Lvote ¿
+  ... | no ¬p
+      = no λ where
+           (VT-Role {s} {ebHash = ebHash} (x , y , z , _ , _)) →
+              let ji = just-injective (trans (sym x) eq₁)
+                  js = subst (found s eb slot') (sym ji) eq₂
+                  (x₁ , x₂) = ,-injective (just-injective (trans (sym y) js))
+              in ¬p $ subst₂ (λ a b → a ≤ slotNumber b + Lvote) x₁ x₂ z
+  ... | yes a
+    with ¿ LeiosState.needsUpkeep s VT-Role ¿
   ... | no ¬p = no λ where
-    (VT-Role {s} {eb} p) → ¬p {!p!}
-  ... | yes p
-    with vt ≟ vote sk-VT _
-  ... | yes q rewrite q = yes (VT-Role p)
+    (VT-Role (_ , _ , _ , p , _)) → ¬p p
+  ... | yes b
+    with ¿ canProduceV (LeiosState.slot s) sk-VT (stake s) ¿
+  ... | no ¬p = no λ where
+    (VT-Role (a , b , _ , _ , p)) → ¬p p
+  ... | yes c
+    with vt ≟ vote sk-VT h
   ... | no ¬q = no λ where
-    (VT-Role p) → {!!}
+    (VT-Role {s} {ebHash} (x , _ , _ , _ , _)) →
+      let ji = just-injective (trans (sym x) eq₁)
+      in ¬q $ cong (vote sk-VT) ji
+  ... | yes q rewrite q = yes (VT-Role (eq₁ , eq₂ , a , b , c))
+  Dec-↝ {s} {Base} {Send (ebHeader _) nothing} .dec = no (flip s'≢addUpkeep-Base refl)
+  Dec-↝ {s} {Base} {Send (vtHeader (_ ∷ _)) nothing} .dec = no (flip s'≢addUpkeep-Base refl)
+  Dec-↝ {s} {EB-Role} {Send (vtHeader _) nothing} .dec = no (flip vtHeader→s'≢addUpkeep-EB-Role refl)
+  Dec-↝ {s} {VT-Role} {Send (ebHeader _) nothing} .dec = no (VT-Role≢EB-Role ∘ addUpkeep-injective ∘ ebHeader→s'≡addUpkeep-EB-Role)
+  Dec-↝ {s} {VT-Role} {Send (vtHeader (_ ∷ _ ∷ _)) nothing} .dec = no λ ()
   Dec-↝ {s} {u} {Send x (just y)} .dec = no λ ()
   Dec-↝ {s} {u} {Fetch} .dec = no λ ()
--}
 
 unquoteDecl Roles₃-premises = genPremises Roles₃-premises (quote Roles₃)
 ```

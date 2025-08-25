@@ -126,7 +126,7 @@ verifyStep' (EB-Role-Action n ebs) FFDT.SLOT s refl with ¿ EB-Role-premises {s 
 ... | _ = Err dummyErr
 verifyStep' (EB-Role-Action _ _) FFDT.FTCH _ _ = Err dummyErr
 verifyStep' (EB-Role-Action _ _) (FFDT.FFD-OUT _) _ _ = Err dummyErr
-verifyStep' (VT-Role-Action n eb) SLOT s refl with ¿ VT-Role-premises {s = s} .proj₁ ¿
+verifyStep' (VT-Role-Action n eb) SLOT s refl with ¿ VT-Role-premises {s = s} {ebHash = hash eb} .proj₁ ¿
 ... | yes h = Ok' (Roles₁ (VT-Role {slot' = n} h))
 ... | no ¬h = Err dummyErr
 verifyStep' (VT-Role-Action _ _) FFDT.FTCH _ _ = Err dummyErr
