@@ -28,6 +28,11 @@ record IsBlock (B : Type) : Type where
   _∈ᴮ_ : B → ℙ ℕ → Type
   b ∈ᴮ X = slotNumber b ∈ X
 
+  areEquivocated : B → B → Type
+  areEquivocated b b' = b ≢ b'
+                      × slotNumber b ≡ slotNumber b'
+                      × producerID b ≡ producerID b'
+
 open IsBlock ⦃...⦄ public
 
 IBRef = Hash
@@ -98,6 +103,7 @@ record EndorserBlockOSig (sig : Type) : Type where
   field slotNumber : ℕ
         producerID : PoolID
         lotteryPf  : VrfPf
+        txs        : List Tx
         ibRefs     : List IBRef
         ebRefs     : List EBRef
         signature  : sig
@@ -115,13 +121,14 @@ instance
 
 unquoteDecl DecEq-EndorserBlockOSig = derive-DecEq ((quote EndorserBlockOSig , DecEq-EndorserBlockOSig) ∷ [])
 
-mkEB : ⦃ Hashable PreEndorserBlock Hash ⦄ → ℕ → PoolID → VrfPf → PrivKey → List IBRef → List EBRef → EndorserBlock
-mkEB slot id π pKey LI LE = record { signature = sign pKey (hash b) ; EndorserBlockOSig b }
+mkEB : ⦃ Hashable PreEndorserBlock Hash ⦄ → ℕ → PoolID → VrfPf → PrivKey → List Tx → List IBRef → List EBRef → EndorserBlock
+mkEB slot id π pKey txs LI LE = record { signature = sign pKey (hash b) ; EndorserBlockOSig b }
   where
     b : PreEndorserBlock
     b = record { slotNumber = slot
                ; producerID = id
                ; lotteryPf  = π
+               ; txs        = txs
                ; ibRefs     = LI
                ; ebRefs     = LE
                ; signature  = _
@@ -129,11 +136,6 @@ mkEB slot id π pKey LI LE = record { signature = sign pKey (hash b) ; EndorserB
 
 getEBRef : ⦃ Hashable PreEndorserBlock Hash ⦄ → EndorserBlock → EBRef
 getEBRef = hash
-
---------------------------------------------------------------------------------
--- Votes
---------------------------------------------------------------------------------
-
 
 
 --------------------------------------------------------------------------------

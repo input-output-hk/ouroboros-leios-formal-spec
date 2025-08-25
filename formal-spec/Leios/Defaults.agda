@@ -44,6 +44,8 @@ d-Abstract =
     ; PrivKey           = BlockType × ⊤
     ; Sig               = ⊤
     ; Hash              = List ℕ
+    ; EBCert            = List ℕ
+    ; getEBHash         = id
     ; Vote              = ⊤
     ; vote              = λ _ _ → tt
     ; sign              = λ _ _ → tt
@@ -258,6 +260,7 @@ d-SpecStructure = record
       ; K'                        = d-KeyRegistration
       ; KF                        = d-KeyRegistrationFunctionality
       ; va                        = d-VotingAbstract
+      ; getEBCert                 = λ _ → []
       }
 
 d-SpecStructure-2 : SpecStructure 2
@@ -280,6 +283,7 @@ d-SpecStructure-2 = record
       ; K'                        = d-KeyRegistration
       ; KF                        = d-KeyRegistrationFunctionality
       ; va                        = d-VotingAbstract-2
+      ; getEBCert                 = λ _ → []
       }
 
 -- open import Leios.Short d-SpecStructure public
