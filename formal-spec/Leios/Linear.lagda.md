@@ -15,6 +15,7 @@ open import CategoricalCrypto hiding (id; _∘_)
 
 open import Data.Maybe.Properties
 open import Data.Product.Properties
+open import Relation.Binary
 
 module Leios.Linear (⋯ : SpecStructure 1)
   (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified'))
@@ -260,17 +261,18 @@ singleton-injective {X} {u₁} {u₂} eq =
 ≡→≡ᵉ : ∀ {X : Type} → {A B : ℙ X} → A ≡ B → A ≡ᵉ B
 ≡→≡ᵉ refl = (λ z → z) , (λ z → z)
 
-postulate
-  ∪-injective'' : ∀ {X : Type} {l : ℙ X} {u₁ u₂ : X} → l ∪ ❴ u₁ ❵ ≡ᵉ l ∪ ❴ u₂ ❵ → u₁ ≡ u₂
--- ∪-injective'' {X} {l} {u₁} {u₂} x = {!!}
-
 addUpkeep-injective' : ∀ {u₁ u₂}
   → addUpkeep s u₁ ≡ addUpkeep s u₂
   → (LeiosState.Upkeep s) ∪ ❴ u₁ ❵ ≡ᵉ (LeiosState.Upkeep s) ∪ ❴ u₂ ❵
 addUpkeep-injective' = ≡→≡ᵉ ∘ cong LeiosState.Upkeep
 
-addUpkeep-injective : ∀ {u₁ u₂} → addUpkeep s u₁ ≡ addUpkeep s u₂ → u₁ ≡ u₂
-addUpkeep-injective = ∪-injective'' ∘ addUpkeep-injective'
+-- TODO: fix this
+postulate
+  addUpkeep-injective : ∀ {u₁ u₂}
+--  → LeiosState.needsUpkeep s u₁
+--  → LeiosState.needsUpkeep s u₂
+    → addUpkeep s u₁ ≡ addUpkeep s u₂
+    → u₁ ≡ u₂
 
 s'≢addUpkeep-Base : ∀ {o} → s ↝ (s' , o) → s' ≢ addUpkeep s Base
 s'≢addUpkeep-Base (EB-Role (_ , _)) = EB-Role≢Base ∘ addUpkeep-injective
