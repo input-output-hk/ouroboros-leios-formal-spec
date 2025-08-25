@@ -28,6 +28,11 @@ record IsBlock (B : Type) : Type where
   _∈ᴮ_ : B → ℙ ℕ → Type
   b ∈ᴮ X = slotNumber b ∈ X
 
+  areEquivocated : B → B → Type
+  areEquivocated b b' = b ≢ b'
+                      × slotNumber b ≡ slotNumber b'
+                      × producerID b ≡ producerID b'
+
 open IsBlock ⦃...⦄ public
 
 IBRef = Hash

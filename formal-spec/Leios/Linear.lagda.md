@@ -109,6 +109,12 @@ getCurrentEBHash : LeiosState → Maybe EBRef
 getCurrentEBHash s = let open LeiosState s in
   RankingBlock.announcedEB currentRB
 
+isEquivocated : LeiosState → EndorserBlock → Type
+isEquivocated s eb = Any (areEquivocated eb) (toSet (LeiosState.EBs s))
+
+rememberVote : LeiosState → EndorserBlock → LeiosState
+rememberVote s@(record { VotedEBs = VotedEBs }) eb = record s { VotedEBs = hash eb ∷ VotedEBs }
+
 data _↝_ : LeiosState → LeiosState × Maybe (FFDAbstract.Input ffdAbstract) → Type where
 ```
 #### Positive rules
@@ -132,12 +138,15 @@ mempool.
           in
           ∙ getCurrentEBHash s ≡ just ebHash
           ∙ find (λ (s , eb) → hash eb ≟ ebHash) EBs' ≡ just (slot' , eb)
-          ∙ isValid s (inj₁ (ebHeader eb))
+          ∙ hash eb ∉ VotedEBs
+          ∙ ¬ isEquivocated s eb
+          ∙ isValid s (inj₁ (ebHeader eb)) -- TODO: make sure this can change just by waiting (i.e. computing)
           ∙ slot' ≤ slotNumber eb + Lvote
           ∙ needsUpkeep-Stage VT-Role
           ∙ canProduceV slot sk-VT (stake s)
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ (addUpkeep-Stage s VT-Role , just (Send (vtHeader [ vote sk-VT (hash eb) ]) nothing))
+          s ↝ ( rememberVote (addUpkeep-Stage s VT-Role) eb
+              , just (Send (vtHeader [ vote sk-VT (hash eb) ]) nothing))
 ```
 ```agda
 stage : ℕ → ⦃ _ : NonZero L ⦄ → ℕ
