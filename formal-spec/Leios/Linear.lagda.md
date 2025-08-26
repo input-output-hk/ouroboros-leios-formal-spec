@@ -200,14 +200,7 @@ Note: Submitted data to the base chain is only taken into account
          ──────────────────────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
 
-{-
-  Roles₂ :
-         ∙ s ↝ (s' , nothing)
-         ───────────────────────────────────────────────────
-         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ s'
--}
-
-  Roles₃ : ∀ {x u} → let open LeiosState s in
+  Roles₂ : ∀ {x u} → let open LeiosState s in
          ∙ ¬ (s ↝ (addUpkeep s u , x))
          ∙ needsUpkeep u
          ∙ u ≢ Base
@@ -304,6 +297,6 @@ instance
   Dec-↝ {s} {u} {Send x (just y)} .dec = no λ ()
   Dec-↝ {s} {u} {Fetch} .dec = no λ ()
 
-unquoteDecl Roles₃-premises = genPremises Roles₃-premises (quote Roles₃)
+unquoteDecl Roles₂-premises = genPremises Roles₂-premises (quote Roles₂)
 ```
 --!>

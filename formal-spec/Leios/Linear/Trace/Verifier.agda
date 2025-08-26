@@ -54,9 +54,9 @@ getAction (Base₁ {s})                        = Base₁-Action (slot s)
 getAction (Base₂ {s} _)                      = Base₂-Action (slot s)
 getAction (Roles₁ (VT-Role {s} {eb = eb} _)) = VT-Role-Action (slot s) eb
 getAction (Roles₁ (EB-Role {s} {eb = eb} _)) = EB-Role-Action (slot s) eb
-getAction (Roles₃ {u = Base} (_ , _ , x))    = ⊥-elim (x refl)
-getAction (Roles₃ {s} {u = EB-Role} _)       = No-EB-Role-Action (slot s)
-getAction (Roles₃ {s} {u = VT-Role} _)       = No-VT-Role-Action (slot s)
+getAction (Roles₂ {u = Base} (_ , _ , x))    = ⊥-elim (x refl)
+getAction (Roles₂ {s} {u = EB-Role} _)       = No-EB-Role-Action (slot s)
+getAction (Roles₂ {s} {u = VT-Role} _)       = No-VT-Role-Action (slot s)
 
 getSlot : Action → ℕ
 getSlot (EB-Role-Action x _) = x
@@ -172,19 +172,19 @@ verifyStep' (Base₂-Action n) (inj₁ SLOT) s refl with ¿ Base₂-premises {s 
 ... | no _ = Err dummyErr
 verifyStep' (Base₂-Action n) _ s refl = Err dummyErr
 
-verifyStep' (No-EB-Role-Action n) (inj₁ SLOT) s refl with ¿ Roles₃-premises {s = s} {x = FFD.Send (ebHeader (mkEB (LeiosState.slot s) id _ sk-IB (LeiosState.ToPropose s) [] [])) nothing} {u = EB-Role} .proj₁ ¿
-... | yes p = Ok' (Roles₃ p)
+verifyStep' (No-EB-Role-Action n) (inj₁ SLOT) s refl with ¿ Roles₂-premises {s = s} {x = FFD.Send (ebHeader (mkEB (LeiosState.slot s) id _ sk-IB (LeiosState.ToPropose s) [] [])) nothing} {u = EB-Role} .proj₁ ¿
+... | yes p = Ok' (Roles₂ p)
 ... | no _ = Err dummyErr
 verifyStep' (No-EB-Role-Action n) _ s refl = Err dummyErr
 verifyStep' (No-VT-Role-Action n) (inj₁ SLOT) s refl
   with getCurrentEBHash s
 verifyStep' (No-VT-Role-Action n) (inj₁ SLOT) s refl | nothing
-  with ¿ Roles₃-premises {s = s} {x = FFD.Send (vtHeader []) nothing} {u = VT-Role} .proj₁ ¿
-... | yes p = Ok' (Roles₃ p)
+  with ¿ Roles₂-premises {s = s} {x = FFD.Send (vtHeader []) nothing} {u = VT-Role} .proj₁ ¿
+... | yes p = Ok' (Roles₂ p)
 ... | no _ = Err dummyErr
 verifyStep' (No-VT-Role-Action n) (inj₁ SLOT) s refl | just h
-  with ¿ Roles₃-premises {s = s} {x = FFD.Send (vtHeader [ vote sk-VT h ]) nothing} {u = VT-Role} .proj₁ ¿
-... | yes p = Ok' (Roles₃ p)
+  with ¿ Roles₂-premises {s = s} {x = FFD.Send (vtHeader [ vote sk-VT h ]) nothing} {u = VT-Role} .proj₁ ¿
+... | yes p = Ok' (Roles₂ p)
 ... | no _ = Err dummyErr
 verifyStep' (No-VT-Role-Action n) _ s refl = Err dummyErr
 
