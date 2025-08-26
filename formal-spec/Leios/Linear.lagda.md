@@ -16,13 +16,22 @@ open import CategoricalCrypto hiding (id; _∘_)
 module Leios.Linear (⋯ : SpecStructure 1)
   (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified'))
   (params : Params)
-  (Lvote Ldiff : ℕ) where
+  (Lhdr Lvote Ldiff : ℕ)
+  (splitTxs : List Tx → List Tx × List Tx)
+  (validityCheckTime : EndorserBlock → ℕ) where
 ```
 -->
 
 This document is a specification of Linear Leios. It removes
 concurrency at the transaction level by producing one (large) EB for
 every Praos block.
+
+In addition to the expected paramaters, we assume a two functions:
+
+- `splitTxs`: produces a pair of a list of transactions that can be
+  included in an RB and a list of transactions that can be included in
+  an EB
+- `validityCheckTime`: the time it takes to validate a given EB (in slots)
 
 ### Upkeep
 
@@ -101,7 +110,7 @@ three steps corresponding to the three types of Leios specific blocks.
 
 ```agda
 toProposeEB : LeiosState → VrfPf → Maybe EndorserBlock
-toProposeEB s π = let open LeiosState s in case ToPropose of λ where
+toProposeEB s π = let open LeiosState s in case proj₂ (splitTxs ToPropose) of λ where
   [] → nothing
   _ → just $ mkEB slot id π sk-IB ToPropose [] []
 
@@ -140,10 +149,14 @@ mempool.
           ∙ find (λ (s , eb) → hash eb ≟ ebHash) EBs' ≡ just (slot' , eb)
           ∙ hash eb ∉ VotedEBs
           ∙ ¬ isEquivocated s eb
-          ∙ isValid s (inj₁ (ebHeader eb)) -- TODO: make sure this can change just by waiting (i.e. computing)
-          ∙ slot' ≤ slotNumber eb + Lvote
+          ∙ isValid s (inj₁ (ebHeader eb))
+          ∙ slot' ≤ slotNumber eb + Lhdr
+          ∙ slotNumber eb + 3 * Lhdr ≤ slot
+          ∙ slot ≡ slotNumber eb + validityCheckTime eb
+          ∙ validityCheckTime eb ≤ 3 * Lhdr + Lvote
+          ∙ EndorserBlockOSig.txs eb ≢ []
           ∙ needsUpkeep-Stage VT-Role
-          ∙ canProduceV slot sk-VT (stake s)
+          ∙ canProduceV (slotNumber eb) sk-VT (stake s)
           ─────────────────────────────────────────────────────────────────────────
           s ↝ ( rememberVote (addUpkeep-Stage s VT-Role) eb
               , just (Send (vtHeader [ vote sk-VT (hash eb) ]) nothing))
@@ -221,9 +234,12 @@ Note: Submitted data to the base chain is only taken into account
 ```
 ```agda
   Base₂   : let open LeiosState s
-                currentCertEB = find (λ (eb , _) → ¿ just (hash eb) ≡ getCurrentEBHash s × slotNumber eb + Lvote + Ldiff ≤ slot ¿) (ebsWithCert fzero)
+                currentCertEB = find (λ (eb , _) →
+                  ¿ just (hash eb) ≡ getCurrentEBHash s
+                  × slotNumber eb + 3 * Lhdr + Lvote + Ldiff ≤ slot ¿)
+                  (ebsWithCert fzero)
                 rb = record
-                       { txs = [] -- TODO: we don't have block sizes ATM, so for the moment we put all transactions here
+                       { txs = proj₁ (splitTxs ToPropose)
                        ; announcedEB = hash <$> toProposeEB s π
                        ; ebCert = proj₂ <$> currentCertEB }
           in
