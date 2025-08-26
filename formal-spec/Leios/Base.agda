@@ -13,13 +13,15 @@ open import Leios.VRF
 module Leios.Base (a : LeiosAbstract) (open LeiosAbstract a) (vrf' : LeiosVRF a)
   (let open LeiosVRF vrf') where
 
-open import Leios.Blocks a using (EndorserBlock)
+open import Leios.Blocks a using (EndorserBlock; EBRef)
 
 StakeDistr : Type
 StakeDistr = TotalMap PoolID ℕ
 
-RankingBlock : Type
-RankingBlock = These EndorserBlock (List Tx)
+record RankingBlock : Type where
+  field txs : List Tx
+        announcedEB : Maybe Hash
+        ebCert : Maybe EBCert
 
 record BaseAbstract : Type₁ where
   field Cert : Type
@@ -98,6 +100,7 @@ record BaseAbstract : Type₁ where
           _-⟦_/_⟧⇀_ : State → Input → Output → State → Type
           SUBMIT-total : ∀ {s b} → ∃[ s' ] s -⟦ SUBMIT b / EMPTY ⟧⇀ s'
           FTCH-total : ∀ {s} → ∃[ r ] (∃[ s' ] (s -⟦ FTCH-LDG / BASE-LDG r ⟧⇀ s'))
+          -- FTCH-unique : ∀ {s s' o} → s -⟦ FTCH-LDG / o ⟧⇀ s' → ∃[ r ] o ≡ BASE-LDG r
 
     open Input public
     open Output public

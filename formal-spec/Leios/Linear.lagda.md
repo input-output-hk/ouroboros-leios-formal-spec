@@ -1,4 +1,4 @@
-## Short-Pipeline Leios
+## Linear Leios
 
 <!--
 ```agda
@@ -13,21 +13,25 @@ open import Tactic.Derive.DecEq
 
 open import CategoricalCrypto hiding (id; _∘_)
 
-module Leios.Short (⋯ : SpecStructure 1)
+module Leios.Linear (⋯ : SpecStructure 1)
   (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified'))
-  (params : Params) where
+  (params : Params)
+  (Lhdr Lvote Ldiff : ℕ)
+  (splitTxs : List Tx → List Tx × List Tx)
+  (validityCheckTime : EndorserBlock → ℕ) where
 ```
 -->
 
-This document is a specification of Short-Pipeline Leios, usually
-abbreviated as Short Leios. On a high level, the pipeline looks like this:
+This document is a specification of Linear Leios. It removes
+concurrency at the transaction level by producing one (large) EB for
+every Praos block.
 
-1. If elected, propose IB
-2. Wait
-3. Wait
-4. If elected, propose EB
-5. If elected, vote
-   If elected, propose RB
+In addition to the expected paramaters, we assume a two functions:
+
+- `splitTxs`: produces a pair of a list of transactions that can be
+  included in an RB and a list of transactions that can be included in
+  an EB
+- `validityCheckTime`: the time it takes to validate a given EB (in slots)
 
 ### Upkeep
 
@@ -40,7 +44,7 @@ resetting this field to the empty set.
 
 ```agda
 data SlotUpkeep : Type where
-  Base IB-Role EB-Role : SlotUpkeep
+  Base EB-Role : SlotUpkeep
 
 unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
 ```
@@ -105,71 +109,58 @@ Note that `_↝_`, starting with an empty upkeep can always make exactly
 three steps corresponding to the three types of Leios specific blocks.
 
 ```agda
+toProposeEB : LeiosState → VrfPf → Maybe EndorserBlock
+toProposeEB s π = let open LeiosState s in case proj₂ (splitTxs ToPropose) of λ where
+  [] → nothing
+  _ → just $ mkEB slot id π sk-IB ToPropose [] []
+
+getCurrentEBHash : LeiosState → Maybe EBRef
+getCurrentEBHash s = let open LeiosState s in
+  RankingBlock.announcedEB currentRB
+
+isEquivocated : LeiosState → EndorserBlock → Type
+isEquivocated s eb = Any (areEquivocated eb) (toSet (LeiosState.EBs s))
+
+rememberVote : LeiosState → EndorserBlock → LeiosState
+rememberVote s@(record { VotedEBs = VotedEBs }) eb = record s { VotedEBs = hash eb ∷ VotedEBs }
+
 data _↝_ : LeiosState → LeiosState × Maybe (FFDAbstract.Input ffdAbstract) → Type where
 ```
 #### Positive rules
+
+In this specification, we don't want to peek behind the base chain
+abstraction. This means that we assume instead that the `canProduceEB`
+predicate is satisfied if and only if we can make an RB. In that case,
+we send out an EB with the transactions currently stored in the
+mempool.
+
 ```agda
-  IB-Role : let open LeiosState s
-                b = ibBody (record { txs = ToPropose })
-                h = ibHeader (mkIBHeader slot id π sk-IB ToPropose)
-          in
-          ∙ canProduceIB slot sk-IB (stake s) π
-          ─────────────────────────────────────────────────────────────────────────
-          s ↝ (addUpkeep s IB-Role , just (Send h (just b)))
-```
-When η = 0 there is no indirect ledger inclusion; in case η > 0 earlier EBs might
-be referenced (Full-Short Leios).
-```agda
-  EB-Role : let open LeiosState s
-                ibs = L.filter (IBSelection? s Late-IB-Inclusion) IBs
-                LI  = map getIBRef ibs
-                LE  = map getEBRef ebs
-                h   = mkEB slot id π sk-EB [] LI LE
-                P   = λ x → isVoteCertified s x
-                         × x ∈ˡ EBs
-                         × x ∈ᴮ slices L slot 2 (3 * η / L)
-                slots = map slotNumber
-          in
-          ∙ needsUpkeep EB-Role
+  EB-Role : let open LeiosState s in
+          ∙ toProposeEB s π ≡ just eb
           ∙ canProduceEB slot sk-EB (stake s) π
-          ∙ All.All P ebs
-          ∙ Unique (slots ebs) × fromList (slots ebs) ≡ᵉ fromList (slots (filter P EBs))
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ (addUpkeep s EB-Role , just (Send (ebHeader h) nothing))
+          s ↝ (addUpkeep s EB-Role , just (Send (ebHeader eb) nothing))
 ```
 ```agda
-  VT-Role : let open LeiosState s
-                EBs' = filter (allIBRefsKnown s) $ filter (_∈ᴮ slice L slot 1) EBs
-                votes = map (vote sk-VT ∘ hash) EBs'
+  VT-Role : ∀ {ebHash slot'}
+          → let open LeiosState s
           in
+          ∙ getCurrentEBHash s ≡ just ebHash
+          ∙ find (λ (s , eb) → hash eb ≟ ebHash) EBs' ≡ just (slot' , eb)
+          ∙ hash eb ∉ VotedEBs
+          ∙ ¬ isEquivocated s eb
+          ∙ isValid s (inj₁ (ebHeader eb))
+          ∙ slot' ≤ slotNumber eb + Lhdr
+          ∙ slotNumber eb + 3 * Lhdr ≤ slot
+          ∙ slot ≡ slotNumber eb + validityCheckTime eb
+          ∙ validityCheckTime eb ≤ 3 * Lhdr + Lvote
+          ∙ EndorserBlockOSig.txs eb ≢ []
           ∙ needsUpkeep-Stage VT-Role
-          ∙ canProduceV slot sk-VT (stake s)
+          ∙ canProduceV (slotNumber eb) sk-VT (stake s)
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ (addUpkeep-Stage s VT-Role , just (Send (vtHeader votes) nothing))
+          s ↝ ( rememberVote (addUpkeep-Stage s VT-Role) eb
+              , just (Send (vtHeader [ vote sk-VT (hash eb) ]) nothing))
 ```
-#### Negative rules
-```agda
-  No-IB-Role : let open LeiosState s in
-             ∙ needsUpkeep IB-Role
-             ∙ (∀ π → ¬ canProduceIB slot sk-IB (stake s) π)
-             ─────────────────────────────────────────────
-             s ↝ (addUpkeep s IB-Role , nothing)
-```
-```agda
-  No-EB-Role : let open LeiosState s in
-             ∙ needsUpkeep EB-Role
-             ∙ (∀ π → ¬ canProduceEB slot sk-EB (stake s) π)
-             ─────────────────────────────────────────────
-             s ↝ (addUpkeep s EB-Role , nothing)
-```
-```agda
-  No-VT-Role : let open LeiosState s in
-             ∙ needsUpkeep-Stage VT-Role
-             ∙ ¬ canProduceV slot sk-VT (stake s)
-             ─────────────────────────────────────────────
-             s ↝ (addUpkeep-Stage s VT-Role , nothing)
-```
-### Uniform short-pipeline
 ```agda
 stage : ℕ → ⦃ _ : NonZero L ⦄ → ℕ
 stage s = s / L
@@ -186,16 +177,16 @@ genesis.
 allDone : LeiosState → Type
 allDone record { slot = s ; Upkeep = u ; Upkeep-Stage = v } =
   -- bootstrapping
-    (stage s < 3 ×                        u ≡ᵉ fromList (IB-Role           ∷ Base ∷ []))
-  ⊎ (stage s ≡ 3 ×   beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
-  ⊎ (stage s ≡ 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role           ∷ Base ∷ []))
+    (stage s < 3 ×                        u ≡ᵉ fromList (EB-Role ∷ Base ∷ []))
+  ⊎ (stage s ≡ 3 ×   beginningOfStage s × u ≡ᵉ fromList (EB-Role ∷ Base ∷ []))
+  ⊎ (stage s ≡ 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (EB-Role ∷ Base ∷ []))
   -- done
-  ⊎ (stage s > 3 ×   beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
-  ⊎ (stage s > 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role           ∷ Base ∷ []) ×
+  ⊎ (stage s > 3 ×   beginningOfStage s × u ≡ᵉ fromList (EB-Role ∷ Base ∷ []))
+  ⊎ (stage s > 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (EB-Role ∷ Base ∷ []) ×
        (((  endOfStage s × v ≡ᵉ fromList (VT-Role ∷ []))
        ⊎ (¬ endOfStage s))))
 ```
-### (Full-)Short Leios transitions
+### Linear Leios transitions
 The relation describing the transition given input and state
 #### Initialization
 ```agda
@@ -215,22 +206,21 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```agda
   Slot₁ : let open LeiosState s in
         ∙ allDone s
-        ────────────────────────────────────────────────────────────────────────────────────────────
-        s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
+        ────────────────────────────────────────────────────────────────────────────────────
+        s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
             { slot         = suc slot
             ; Upkeep       = ∅
             ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
             } ↑ L.filter (isValid? s) msgs
 
   Slot₂ : let open LeiosState s in
-        ────────────────────────────────────────────────────────
-        s -⟦ honestOutputI (rcvʳ (-, BASE-LDG rbs)) / nothing ⟧⇀
-          record s { RBs = rbs }
+        ──────────────────────────────────────────────────────────────────────────────
+        s -⟦ honestOutputI (rcvʳ (-, BASE-LDG rbs)) / nothing ⟧⇀ record s { RBs = rbs }
 ```
 ```agda
-  Ftch :
-       ───────────────────────────────────────────────────────────────────────────────────────────
-       s -⟦ honestInputI (-, FetchLdgI) / honestOutputO' (-, FetchLdgO (LeiosState.Ledger s)) ⟧⇀ s
+  Ftch : let open LeiosState s in
+       ─────────────────────────────────────────────────────────────────────────────────────
+       s -⟦ honestInputI (-, FetchLdgI) / honestOutputO' (-, FetchLdgO Ledger) ⟧⇀ s
 ```
 #### Base chain
 
@@ -243,18 +233,19 @@ Note: Submitted data to the base chain is only taken into account
           s -⟦ honestInputI (-, SubmitTxs txs) / nothing ⟧⇀ record s { ToPropose = txs }
 ```
 ```agda
-  Base₂a  : let open LeiosState s in
+  Base₂   : let open LeiosState s
+                currentCertEB = find (λ (eb , _) →
+                  ¿ just (hash eb) ≡ getCurrentEBHash s
+                  × slotNumber eb + 3 * Lhdr + Lvote + Ldiff ≤ slot ¿)
+                  (ebsWithCert fzero)
+                rb = record
+                       { txs = proj₁ (splitTxs ToPropose)
+                       ; announcedEB = hash <$> toProposeEB s π
+                       ; ebCert = proj₂ <$> currentCertEB }
+          in
           ∙ needsUpkeep Base
-          ∙ (eb , cert) ∈ filter (λ (x , _) → x ∈ᴮ slice L slot 2) (ebsWithCert fzero)
           ───────────────────────────────────────────────────────────────────────────────────
-          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT record { txs = [] ; announcedEB = nothing ; ebCert = just cert })) ⟧⇀
-            addUpkeep s Base
-
-  Base₂b  : let open LeiosState s in
-          ∙ needsUpkeep Base
-          ∙ [] ≡ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
-          ──────────────────────────────────────────────────────────────────────────────────────────
-          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT record { txs = ToPropose ; announcedEB = nothing ; ebCert = nothing })) ⟧⇀
+          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT rb)) ⟧⇀
             addUpkeep s Base
 ```
 #### Protocol rules
@@ -268,6 +259,13 @@ Note: Submitted data to the base chain is only taken into account
          ∙ s ↝ (s' , nothing)
          ───────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ s'
+
+  Roles₃ : ∀ {x u} → let open LeiosState s in
+         ∙ ¬ (s ↝ (s' , x))
+         ∙ needsUpkeep u
+         ∙ u ≢ Base
+         ───────────────────────────────────────────────────
+         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ addUpkeep s' u
 ```
 <!--
 ```agda
@@ -277,18 +275,12 @@ ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 
 open import GenPremises
 
-unquoteDecl IB-Role-premises = genPremises IB-Role-premises (quote _↝_.IB-Role)
 unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
 unquoteDecl VT-Role-premises = genPremises VT-Role-premises (quote _↝_.VT-Role)
-
-unquoteDecl No-IB-Role-premises = genPremises No-IB-Role-premises (quote No-IB-Role)
-unquoteDecl No-EB-Role-premises = genPremises No-EB-Role-premises (quote No-EB-Role)
-unquoteDecl No-VT-Role-premises = genPremises No-VT-Role-premises (quote No-VT-Role)
 
 unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
 unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
 unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
-unquoteDecl Base₂a-premises = genPremises Base₂a-premises (quote Base₂a)
-unquoteDecl Base₂b-premises = genPremises Base₂b-premises (quote Base₂b)
+unquoteDecl Base₂-premises = genPremises Base₂-premises (quote Base₂)
 ```
 --!>

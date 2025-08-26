@@ -51,8 +51,8 @@ open import Leios.Protocol
 open import Leios.Short
 -- TODO: drop Deterministic
 -- open import Leios.Short.Deterministic
-open import Leios.Short.Trace.Verifier
-open import Leios.Short.Trace.Verifier.Test
+-- open import Leios.Short.Trace.Verifier
+-- open import Leios.Short.Trace.Verifier.Test
 -- open import Leios.Simplified
 -- open import Leios.Simplified.Deterministic
 -- open import Leios.Simplified.Deterministic.Test
@@ -64,4 +64,4 @@ open import StateMachine
 
 -- Networking
 open import Network.BasicBroadcast
-open import Network.Leios
+-- open import Network.Leios
