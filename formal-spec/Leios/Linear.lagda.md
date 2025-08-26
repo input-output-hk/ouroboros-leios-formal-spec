@@ -127,7 +127,13 @@ mempool.
 Predicate needed for slot transition.
 ```agda
 allDone : LeiosState → Type
-allDone record { Upkeep = u } = u ≡ (EB-Role ∷ Base ∷ []) ⊎ u ≡ (Base ∷ EB-Role ∷ [])
+allDone record { Upkeep = u } = 
+    u ≡ (VT-Role ∷ EB-Role ∷ Base ∷ []) 
+  ⊎ u ≡ (VT-Role ∷ Base ∷ EB-Role ∷ [])
+  ⊎ u ≡ (EB-Role ∷ VT-Role ∷ Base ∷ []) 
+  ⊎ u ≡ (EB-Role ∷ Base ∷ VT-Role ∷ [])
+  ⊎ u ≡ (Base ∷ EB-Role ∷ VT-Role ∷ []) 
+  ⊎ u ≡ (Base ∷ VT-Role ∷ EB-Role ∷ [])
 ```
 ### Linear Leios transitions
 The relation describing the transition given input and state

@@ -57,17 +57,6 @@ Initial state
       s₀ : LeiosState
       s₀ = initLeiosState tt stakeDistribution ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
 ```
-Check a simple trace
-```agda
-{-
-      test₁ : IsOk $ verifyTrace (
-                     (Slot-Action 0 , FFDT.FFD-OUT [])
-                   ∷ (Base₁-Action 0 , FFDT.SLOT)
-               --    ∷ (No-EB-Role-Action 0 , FFDT.SLOT)
-                   ∷ []) s₀
-      test₁ = _
--}      
-```
 ### Linear Leios
 ```agda
 module _ where
@@ -89,8 +78,8 @@ module _ where
               }
         ; sutId = fzero
         ; winning-slots = fromList $
-          (EB , 100) ∷ (VT , 100) ∷        
-          (EB , 101) ∷ (VT , 101) ∷
+          (EB , 100) ∷
+
           (EB , 102) ∷ (VT , 102) ∷
           (EB , 103) ∷ (VT , 103) ∷
           (EB , 104) ∷ (VT , 104) ∷
@@ -113,8 +102,22 @@ module _ where
 ```
 Starting at slot 100
 ```agda
+      eb : EndorserBlock
+      eb = mkEB 100 id tt (EB , tt) (0 ∷ 1 ∷ 2 ∷ []) [] []
+
+      mkRB : LeiosState → RankingBlock
+      mkRB s = record
+                 { txs = []
+                 ; announcedEB = hash <$> toProposeEB s tt
+                 ; ebCert = nothing
+                 }
+
       s₁₀₀ : LeiosState
-      s₁₀₀ = record s₀ { slot = 100 }
+      s₁₀₀ = record s₀
+               { slot = 100
+               ; ToPropose = 0 ∷ 1 ∷ 2 ∷ []
+               ; EBs' = (90 , eb) ∷ []
+               }
         where
           s₀ : LeiosState
           s₀ = initLeiosState tt stakeDistribution ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
@@ -123,17 +126,20 @@ Checking trace
 ```agda
       test₂ : IsOk (verifyTrace (L.reverse $
 ```
-#### Slot 100, Stage 50
+#### Slot 100
 ```agda
-              --  (EB-Role-Action 100 {!!} , FFDT.SLOT)
-              -- ∷ (VT-Role-Action 100 {!!} , FFDT.SLOT)
-               (Base₂-Action    100 , FFDT.SLOT)
-              -- ∷ (Slot-Action    100 , FFDT.FFD-OUT [])
+                     (EB-Role-Action    100 eb , inj₁ SLOT)
+                   ∷ (Base₂-Action      100    , inj₁ SLOT)
+                   ∷ (No-VT-Role-Action 100    , inj₁ SLOT)
+                   ∷ (Slot₂-Action      100    , inj₂ (BASE-LDG [ mkRB s₁₀₀ ]))
+                   ∷ (Slot₁-Action      100    , inj₁ (FFD-OUT []))
 ```
-#### Slot 101, Stage 50
+#### Slot 101
 ```agda
---              ∷ (Base₂-Action  101    , FFDT.SLOT)
---              ∷ (Slot-Action    101    , FFDT.FFD-OUT [])
-              ∷ []) s₁₀₀)
-      test₂ = tt
+                   ∷ (Base₂-Action      101    , inj₁ SLOT)
+                   ∷ (No-EB-Role-Action 101    , inj₁ SLOT)
+                   ∷ (No-VT-Role-Action 101    , inj₁ SLOT)
+                   ∷ (Slot₁-Action      101    , inj₁ (FFD-OUT []))
+                   ∷ []) s₁₀₀)
+      test₂ = _
 ```
