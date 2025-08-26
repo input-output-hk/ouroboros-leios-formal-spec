@@ -2,7 +2,7 @@
 
 <!--
 ```agda
--- {-# OPTIONS --safe #-}
+{-# OPTIONS --safe #-}
 open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.FFD
 open import Leios.SpecStructure
@@ -127,7 +127,13 @@ mempool.
 Predicate needed for slot transition.
 ```agda
 allDone : LeiosState → Type
-allDone record { Upkeep = u } = u ≡ᵉ fromList (VT-Role ∷ EB-Role ∷ Base ∷ [])
+allDone record { Upkeep = u } = 
+    u ≡ (VT-Role ∷ EB-Role ∷ Base ∷ []) 
+  ⊎ u ≡ (VT-Role ∷ Base ∷ EB-Role ∷ [])
+  ⊎ u ≡ (EB-Role ∷ VT-Role ∷ Base ∷ []) 
+  ⊎ u ≡ (EB-Role ∷ Base ∷ VT-Role ∷ [])
+  ⊎ u ≡ (Base ∷ EB-Role ∷ VT-Role ∷ []) 
+  ⊎ u ≡ (Base ∷ VT-Role ∷ EB-Role ∷ [])
 ```
 ### Linear Leios transitions
 The relation describing the transition given input and state
@@ -152,7 +158,7 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
         ────────────────────────────────────────────────────────────────────────────────────
         s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
             { slot         = suc slot
-            ; Upkeep       = ∅
+            ; Upkeep       = []
             } ↑ L.filter (isValid? s) msgs
 
   Slot₂ : let open LeiosState s in
@@ -247,56 +253,6 @@ not-found s k = find (P? k) (LeiosState.EBs' s) ≡ nothing
 
 open import Data.List.Properties
 
-open Equivalence
-open import Axiom.Set.Properties th
-
-singleton-injective : ∀ {X : Type} {u₁ u₂ : X} → ❴ u₁ ❵ ≡ ❴ u₂ ❵ → u₁ ≡ u₂
-singleton-injective {X} {u₁} {u₂} eq =
-  let s = subst (u₁ ∈ˢ_) eq $ to ∈-singleton refl
-  in from ∈-singleton s
-  where
-    open import Axiom.Set using (Theory)
-    open Theory th renaming (_∈_ to _∈ˢ_) using ()
-
-≡→≡ᵉ : ∀ {X : Type} → {A B : ℙ X} → A ≡ B → A ≡ᵉ B
-≡→≡ᵉ refl = (λ z → z) , (λ z → z)
-
-addUpkeep-injective' : ∀ {u₁ u₂}
-  → addUpkeep s u₁ ≡ addUpkeep s u₂
-  → (LeiosState.Upkeep s) ∪ ❴ u₁ ❵ ≡ᵉ (LeiosState.Upkeep s) ∪ ❴ u₂ ❵
-addUpkeep-injective' = ≡→≡ᵉ ∘ cong LeiosState.Upkeep
-
--- TODO: fix this
-postulate
-  addUpkeep-injective : ∀ {u₁ u₂}
---  → LeiosState.needsUpkeep s u₁
---  → LeiosState.needsUpkeep s u₂
-    → addUpkeep s u₁ ≡ addUpkeep s u₂
-    → u₁ ≡ u₂
-
-s'≢addUpkeep-Base : ∀ {o} → s ↝ (s' , o) → s' ≢ addUpkeep s Base
-s'≢addUpkeep-Base (EB-Role (_ , _)) = EB-Role≢Base ∘ addUpkeep-injective
-  where
-    EB-Role≢Base : EB-Role ≢ Base
-    EB-Role≢Base = λ ()
-s'≢addUpkeep-Base (VT-Role (_ , _)) = VT-Role≢Base ∘ addUpkeep-injective
-  where
-    VT-Role≢Base : VT-Role ≢ Base
-    VT-Role≢Base = λ ()
-
-VT-Role≢EB-Role : SlotUpkeep.VT-Role ≢ SlotUpkeep.EB-Role
-VT-Role≢EB-Role = λ ()
-
-vtHeader→s'≢addUpkeep-EB-Role : ∀ {s} {s'} {vts}
-  → s ↝ (s' , Send (vtHeader vts) nothing)
-  → s' ≢ addUpkeep s EB-Role
-vtHeader→s'≢addUpkeep-EB-Role (VT-Role (_ , _)) = VT-Role≢EB-Role ∘ addUpkeep-injective
-
-ebHeader→s'≡addUpkeep-EB-Role :
-    s ↝ (s' , Send (ebHeader eb) nothing)
-  → s' ≡ addUpkeep s EB-Role
-ebHeader→s'≡addUpkeep-EB-Role (EB-Role (_ , _)) = refl
-
 instance
   Dec-↝ : ∀ {s u o} → (s ↝ (addUpkeep s u , o)) ⁇
   Dec-↝ {s} {u} {Send (ibHeader _) nothing} .dec = no λ ()
@@ -340,10 +296,10 @@ instance
       let ji = just-injective (trans (sym x) eq₁)
       in ¬q $ cong (vote sk-VT) ji
   ... | yes q rewrite q = yes (VT-Role (eq₁ , eq₂ , a , b , c))
-  Dec-↝ {s} {Base} {Send (ebHeader _) nothing} .dec = no (flip s'≢addUpkeep-Base refl)
-  Dec-↝ {s} {Base} {Send (vtHeader (_ ∷ _)) nothing} .dec = no (flip s'≢addUpkeep-Base refl)
-  Dec-↝ {s} {EB-Role} {Send (vtHeader _) nothing} .dec = no (flip vtHeader→s'≢addUpkeep-EB-Role refl)
-  Dec-↝ {s} {VT-Role} {Send (ebHeader _) nothing} .dec = no (VT-Role≢EB-Role ∘ addUpkeep-injective ∘ ebHeader→s'≡addUpkeep-EB-Role)
+  Dec-↝ {s} {Base} {Send (ebHeader _) nothing} .dec = no λ ()
+  Dec-↝ {s} {Base} {Send (vtHeader (_ ∷ _)) nothing} .dec = no λ ()
+  Dec-↝ {s} {EB-Role} {Send (vtHeader _) nothing} .dec = no λ ()
+  Dec-↝ {s} {VT-Role} {Send (ebHeader _) nothing} .dec = no λ ()
   Dec-↝ {s} {VT-Role} {Send (vtHeader (_ ∷ _ ∷ _)) nothing} .dec = no λ ()
   Dec-↝ {s} {u} {Send x (just y)} .dec = no λ ()
   Dec-↝ {s} {u} {Fetch} .dec = no λ ()
