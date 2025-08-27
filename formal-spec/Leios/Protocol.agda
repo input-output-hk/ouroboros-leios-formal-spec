@@ -7,7 +7,7 @@ open import Leios.SpecStructure
 module Leios.Protocol {n} (⋯ : SpecStructure n) (let open SpecStructure ⋯) (SlotUpkeep : Type) (StageUpkeep : Type) where
 
 {- Module: Leios.Protocol
-   
+
    This module defines the core Leios protocol state machine, including:
    - Input/output message types
    - Protocol state representation and operations
@@ -56,7 +56,7 @@ record LeiosState : Type where
         slot         : ℕ
         IBHeaders    : List IBHeader
         IBBodies     : List IBBody
-        Upkeep       : ℙ SlotUpkeep
+        Upkeep       : List SlotUpkeep
         Upkeep-Stage : ℙ StageUpkeep
         votingState  : VotingState
         PubKeys      : List PubKey
@@ -89,14 +89,11 @@ record LeiosState : Type where
   Ledger : List Tx
   Ledger = L.concatMap (λ rb → RankingBlock.txs rb L.++ maybe lookupTxsC [] (getEBHash <$> (RankingBlock.ebCert rb))) RBs
 
-  needsUpkeep : SlotUpkeep → Set
-  needsUpkeep = _∉ Upkeep
+  needsUpkeep : SlotUpkeep → Type
+  needsUpkeep = _∉ˡ Upkeep
 
   needsUpkeep-Stage : StageUpkeep → Set
   needsUpkeep-Stage = _∉ Upkeep-Stage
-
-  Dec-needsUpkeep : ∀ {u : SlotUpkeep} → ⦃ DecEq SlotUpkeep ⦄ → needsUpkeep u ⁇
-  Dec-needsUpkeep {u} .dec = ¬? (u ∈? Upkeep)
 
   Dec-needsUpkeep-Stage : ∀ {u : StageUpkeep} → ⦃ DecEq StageUpkeep ⦄ → needsUpkeep-Stage u ⁇
   Dec-needsUpkeep-Stage {u} .dec = ¬? (u ∈? Upkeep-Stage)
@@ -111,7 +108,7 @@ record LeiosState : Type where
         (no ¬p) → nothing
 
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
-addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u ❵ }
+addUpkeep s u = let open LeiosState s in record s { Upkeep = u ∷ Upkeep }
 {-# INJECTIVE_FOR_INFERENCE addUpkeep #-}
 
 addUpkeep-Stage : LeiosState → StageUpkeep → LeiosState
@@ -130,7 +127,7 @@ initLeiosState V SD pks = record
   ; slot         = initSlot V
   ; IBHeaders    = []
   ; IBBodies     = []
-  ; Upkeep       = ∅
+  ; Upkeep       = []
   ; Upkeep-Stage = ∅
   ; votingState  = initVotingState
   ; PubKeys      = pks
