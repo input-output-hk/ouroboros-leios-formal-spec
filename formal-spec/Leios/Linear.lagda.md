@@ -266,6 +266,7 @@ unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
 unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
 unquoteDecl Base₂-premises = genPremises Base₂-premises (quote Base₂)
 
+{-
 just≢nothing : ∀ {ℓ} {A : Type ℓ} {x} → (Maybe A ∋ just x) ≡ nothing → ⊥
 just≢nothing = λ ()
 
@@ -333,7 +334,7 @@ instance
   Dec-↝ {s} {VT-Role} {Send (vtHeader (_ ∷ _ ∷ _)) nothing} .dec = no λ ()
   Dec-↝ {s} {u} {Send x (just y)} .dec = no λ ()
   Dec-↝ {s} {u} {Fetch} .dec = no λ ()
-
+-}
 unquoteDecl Roles₂-premises = genPremises Roles₂-premises (quote Roles₂)
 ```
 --!>
