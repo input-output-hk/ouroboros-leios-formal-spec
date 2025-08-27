@@ -178,7 +178,7 @@ open Types params
 data _⊢_ : VTy → LeiosState → Type where
   Init :
        ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
-       ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs' -- TODO: replace this line
+       ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
        ────────────────────────────────────────────────────────────────
        V ⊢ initLeiosState V SD pks
 ```
@@ -189,7 +189,7 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```agda
   Slot₁ : let open LeiosState s in
         ∙ allDone s
-        ────────────────────────────────────────────────────────────────────────────────────
+        ────────────────────────────────────────────────────────────────────────────────────────────
         s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
             { slot         = suc slot
             ; Upkeep       = []
@@ -201,7 +201,7 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```
 ```agda
   Ftch : let open LeiosState s in
-       ─────────────────────────────────────────────────────────────────────────────────────
+       ────────────────────────────────────────────────────────────────────────────
        s -⟦ honestInputI (-, FetchLdgI) / honestOutputO' (-, FetchLdgO Ledger) ⟧⇀ s
 ```
 #### Base chain
@@ -226,7 +226,7 @@ Note: Submitted data to the base chain is only taken into account
                        ; ebCert = proj₂ <$> currentCertEB }
           in
           ∙ needsUpkeep Base
-          ───────────────────────────────────────────────────────────────────────────────────
+          ────────────────────────────────────────────────────────────────────────────
           s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT rb)) ⟧⇀
             addUpkeep s Base
 ```
@@ -237,11 +237,11 @@ Note: Submitted data to the base chain is only taken into account
          ──────────────────────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
 
-  Roles₂ : ∀ {x u} → let open LeiosState s in
-         ∙ ¬ (s ↝ (addUpkeep s u , x))
+  Roles₂ : ∀ {x u s'} → let open LeiosState s in
+         ∙ ¬ (s ↝ (s' , x))
          ∙ needsUpkeep u
          ∙ u ≢ Base
-         ───────────────────────────────────────────────────
+         ──────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ addUpkeep s u
 ```
 <!--
@@ -250,7 +250,7 @@ ShortLeios : Machine (FFD ⊗ BaseC) (IO ⊗ Adv)
 ShortLeios .Machine.State = LeiosState
 ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 
-open import GenPremises
+open import Prelude.STS.GenPremises
 
 {-
 instance
