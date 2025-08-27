@@ -51,6 +51,7 @@ record LeiosState : Type where
         {- EBs': EBs together with the slot in which we received them
         -}
         EBs'         : List (ℕ × EndorserBlock)
+        VotedEBs     : List Hash
         Vs           : List (List Vote)
         slot         : ℕ
         IBHeaders    : List IBHeader
@@ -121,6 +122,7 @@ initLeiosState V SD pks = record
   ; ToPropose    = []
   ; IBs          = []
   ; EBs'         = []
+  ; VotedEBs     = []
   ; Vs           = []
   ; slot         = initSlot V
   ; IBHeaders    = []
