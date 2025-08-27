@@ -45,21 +45,16 @@ resetting this field to the empty set.
 ```agda
 data SlotUpkeep : Type where
   Base EB-Role VT-Role : SlotUpkeep
-
-unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
 ```
 <!--
 ```agda
+unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
+
 open import Leios.Protocol (⋯) SlotUpkeep ⊥ public
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
-```
-```agda
-isVoteCertified : LeiosState → EndorserBlock → Type
-isVoteCertified s eb = isVoteCertified' (LeiosState.votingState s) (0F , eb)
-```
-```agda
+
 private variable s s'   : LeiosState
                  ffds'  : FFD.State
                  π      : VrfPf
@@ -77,6 +72,7 @@ private variable s s'   : LeiosState
                  cert   : EBCert
 ```
 -->
+
 ### Block/Vote production
 
 We now define the rules for block production given by the relation `_↝_`. These are split in two:
@@ -142,16 +138,6 @@ mempool.
           ─────────────────────────────────────────────────────────────────────────
           s ↝ ( rememberVote (addUpkeep s VT-Role) eb
               , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing)
-```
-```agda
-stage : ℕ → ⦃ _ : NonZero L ⦄ → ℕ
-stage s = s / L
-
-beginningOfStage : ℕ → Type
-beginningOfStage s = stage s * L ≡ s
-
-endOfStage : ℕ → Type
-endOfStage s = suc (stage s) ≡ stage (suc s)
 ```
 Predicate needed for slot transition. Special care needs to be taken when starting from
 genesis.
@@ -250,4 +236,4 @@ unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
 unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
 unquoteDecl Base₂-premises = genPremises Base₂-premises (quote Base₂)
 ```
---!>
+-->
