@@ -100,7 +100,7 @@ isEquivocated : LeiosState → EndorserBlock → Type
 isEquivocated s eb = Any (areEquivocated eb) (toSet (LeiosState.EBs s))
 
 rememberVote : LeiosState → EndorserBlock → LeiosState
-rememberVote s@(record { VotedEBs = VotedEBs }) eb = record s { VotedEBs = hash eb ∷ VotedEBs }
+rememberVote s@(record { VotedEBs = vebs }) eb = record s { VotedEBs = hash eb ∷ vebs }
 
 data _↝_ : LeiosState → LeiosState × FFDAbstract.Input ffdAbstract → Type where
 ```
@@ -116,7 +116,7 @@ mempool.
   EB-Role : let open LeiosState s in
           ∙ toProposeEB s π ≡ just eb
           ∙ canProduceEB slot sk-EB (stake s) π
-          ─────────────────────────────────────────────────────────────────────────
+          ──────────────────────────────────────────────────────
           s ↝ (addUpkeep s EB-Role , Send (ebHeader eb) nothing)
 ```
 ```agda
@@ -135,7 +135,7 @@ mempool.
           ∙ EndorserBlockOSig.txs eb ≢ []
           ∙ needsUpkeep VT-Role
           ∙ canProduceV (slotNumber eb) sk-VT (stake s)
-          ─────────────────────────────────────────────────────────────────────────
+          ───────────────────────────────────────────────────────
           s ↝ ( rememberVote (addUpkeep s VT-Role) eb
               , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing)
 ```
@@ -165,11 +165,11 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```agda
   Slot₁ : let open LeiosState s in
         ∙ allDone s
-        ────────────────────────────────────────────────────────────────────────────────────────────
-        s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
-            { slot         = suc slot
-            ; Upkeep       = []
-            } ↑ L.filter (isValid? s) msgs
+        ───────────────────────────────────────────────────────────────────────────────────
+        s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀
+          record s { slot         = suc slot
+                   ; Upkeep       = []
+                   } ↑ L.filter (isValid? s) msgs
 
   Slot₂ : let open LeiosState s in
         ──────────────────────────────────────────────────────────────────────────────
