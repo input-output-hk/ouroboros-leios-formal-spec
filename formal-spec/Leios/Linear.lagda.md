@@ -44,20 +44,13 @@ resetting this field to the empty set.
 
 ```agda
 data SlotUpkeep : Type where
-  Base EB-Role : SlotUpkeep
+  Base EB-Role VT-Role : SlotUpkeep
 
 unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
 ```
 <!--
 ```agda
-data StageUpkeep : Type where
-  VT-Role : StageUpkeep
-
-unquoteDecl DecEq-StageUpkeep = derive-DecEq ((quote StageUpkeep , DecEq-StageUpkeep) ∷ [])
-```
-```agda
-open import Leios.Protocol (⋯) SlotUpkeep StageUpkeep public
-
+open import Leios.Protocol (⋯) SlotUpkeep ⊥ public
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
@@ -86,17 +79,6 @@ private variable s s'   : LeiosState
 -->
 ### Block/Vote production
 
-IBs from the last 3 pipelines are directly included in the EB, when the late IB inclusion
-flag is set
-```agda
-IBSelection : LeiosState → Bool → InputBlock → Type
-IBSelection s false = _∈ᴮ slice L (LeiosState.slot s) 3
-IBSelection s true  = _∈ᴮ slices L (LeiosState.slot s) 3 6
-
-IBSelection? : (s : LeiosState) → (b : Bool) → (ib : InputBlock) → Dec (IBSelection s b ib)
-IBSelection? s false ib = slotNumber ib ∈? slice L (LeiosState.slot s) 3
-IBSelection? s true ib  = slotNumber ib ∈? slices L (LeiosState.slot s) 3 6
-```
 We now define the rules for block production given by the relation `_↝_`. These are split in two:
 
 1. Positive rules, when we do need to create a block.
@@ -124,7 +106,7 @@ isEquivocated s eb = Any (areEquivocated eb) (toSet (LeiosState.EBs s))
 rememberVote : LeiosState → EndorserBlock → LeiosState
 rememberVote s@(record { VotedEBs = VotedEBs }) eb = record s { VotedEBs = hash eb ∷ VotedEBs }
 
-data _↝_ : LeiosState → LeiosState × Maybe (FFDAbstract.Input ffdAbstract) → Type where
+data _↝_ : LeiosState → LeiosState × FFDAbstract.Input ffdAbstract → Type where
 ```
 #### Positive rules
 
@@ -139,7 +121,7 @@ mempool.
           ∙ toProposeEB s π ≡ just eb
           ∙ canProduceEB slot sk-EB (stake s) π
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ (addUpkeep s EB-Role , just (Send (ebHeader eb) nothing))
+          s ↝ (addUpkeep s EB-Role , Send (ebHeader eb) nothing)
 ```
 ```agda
   VT-Role : ∀ {ebHash slot'}
@@ -155,11 +137,11 @@ mempool.
           ∙ slot ≡ slotNumber eb + validityCheckTime eb
           ∙ validityCheckTime eb ≤ 3 * Lhdr + Lvote
           ∙ EndorserBlockOSig.txs eb ≢ []
-          ∙ needsUpkeep-Stage VT-Role
+          ∙ needsUpkeep VT-Role
           ∙ canProduceV (slotNumber eb) sk-VT (stake s)
           ─────────────────────────────────────────────────────────────────────────
-          s ↝ ( rememberVote (addUpkeep-Stage s VT-Role) eb
-              , just (Send (vtHeader [ vote sk-VT (hash eb) ]) nothing))
+          s ↝ ( rememberVote (addUpkeep s VT-Role) eb
+              , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing)
 ```
 ```agda
 stage : ℕ → ⦃ _ : NonZero L ⦄ → ℕ
@@ -175,16 +157,7 @@ Predicate needed for slot transition. Special care needs to be taken when starti
 genesis.
 ```agda
 allDone : LeiosState → Type
-allDone record { slot = s ; Upkeep = u ; Upkeep-Stage = v } =
-  -- bootstrapping
-    (stage s < 3 ×                        u ≡ᵉ fromList (EB-Role ∷ Base ∷ []))
-  ⊎ (stage s ≡ 3 ×   beginningOfStage s × u ≡ᵉ fromList (EB-Role ∷ Base ∷ []))
-  ⊎ (stage s ≡ 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (EB-Role ∷ Base ∷ []))
-  -- done
-  ⊎ (stage s > 3 ×   beginningOfStage s × u ≡ᵉ fromList (EB-Role ∷ Base ∷ []))
-  ⊎ (stage s > 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (EB-Role ∷ Base ∷ []) ×
-       (((  endOfStage s × v ≡ᵉ fromList (VT-Role ∷ []))
-       ⊎ (¬ endOfStage s))))
+allDone record { Upkeep = u } = fromList u ≡ᵉ fromList (EB-Role ∷ VT-Role ∷ Base ∷ [])
 ```
 ### Linear Leios transitions
 The relation describing the transition given input and state
@@ -195,7 +168,7 @@ open Types params
 data _⊢_ : VTy → LeiosState → Type where
   Init :
        ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
-       ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs' -- TODO: replace this line
+       ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
        ────────────────────────────────────────────────────────────────
        V ⊢ initLeiosState V SD pks
 ```
@@ -206,11 +179,10 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```agda
   Slot₁ : let open LeiosState s in
         ∙ allDone s
-        ────────────────────────────────────────────────────────────────────────────────────
-        s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
+        ────────────────────────────────────────────────────────────────────────────────────────────
+        s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
             { slot         = suc slot
-            ; Upkeep       = ∅
-            ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
+            ; Upkeep       = []
             } ↑ L.filter (isValid? s) msgs
 
   Slot₂ : let open LeiosState s in
@@ -219,7 +191,7 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```
 ```agda
   Ftch : let open LeiosState s in
-       ─────────────────────────────────────────────────────────────────────────────────────
+       ────────────────────────────────────────────────────────────────────────────
        s -⟦ honestInputI (-, FetchLdgI) / honestOutputO' (-, FetchLdgO Ledger) ⟧⇀ s
 ```
 #### Base chain
@@ -244,28 +216,23 @@ Note: Submitted data to the base chain is only taken into account
                        ; ebCert = proj₂ <$> currentCertEB }
           in
           ∙ needsUpkeep Base
-          ───────────────────────────────────────────────────────────────────────────────────
+          ────────────────────────────────────────────────────────────────────────────
           s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT rb)) ⟧⇀
             addUpkeep s Base
 ```
 #### Protocol rules
 ```agda
   Roles₁ :
-         ∙ s ↝ (s' , just i)
+         ∙ s ↝ (s' , i)
          ──────────────────────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
 
-  Roles₂ :
-         ∙ s ↝ (s' , nothing)
-         ───────────────────────────────────────────────────
-         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ s'
-
-  Roles₃ : ∀ {x u} → let open LeiosState s in
+  Roles₂ : ∀ {x u s'} → let open LeiosState s in
          ∙ ¬ (s ↝ (s' , x))
          ∙ needsUpkeep u
          ∙ u ≢ Base
-         ───────────────────────────────────────────────────
-         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ addUpkeep s' u
+         ──────────────────────────────────────────────────────────────
+         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ addUpkeep s u
 ```
 <!--
 ```agda
