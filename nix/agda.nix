@@ -106,7 +106,7 @@ let
     buildInputs = [ (agdaWithPkgs deps) pandoc ];
     buildPhase = ''
       agda --html --html-highlight=auto Everything.agda
-      pandoc -s -c Agda.css html/Leios.Short.md -o html/Leios.Short.html
+      pandoc -s -c Agda.css html/Leios.Linear.md -o html/Leios.Linear.html
     '';
     installPhase = ''
       mkdir "$out"
