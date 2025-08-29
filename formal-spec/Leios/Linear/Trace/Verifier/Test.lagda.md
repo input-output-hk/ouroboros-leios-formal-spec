@@ -67,6 +67,7 @@ Starting at slot 100
                { slot = 100
                ; ToPropose = 0 ∷ 1 ∷ 2 ∷ []
                ; EBs' = []
+               ; PubKeys = (fzero , tt) ∷ (fsuc fzero , tt) ∷ []
                }
         where
           s₀ : LeiosState
