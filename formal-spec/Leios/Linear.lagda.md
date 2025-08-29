@@ -13,10 +13,6 @@ open import Tactic.Derive.DecEq
 
 open import CategoricalCrypto hiding (id; _∘_)
 
-open import Data.Maybe.Properties
-open import Data.Product.Properties
-open import Relation.Binary
-
 module Leios.Linear (⋯ : SpecStructure 1)
   (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified'))
   (params : Params)
