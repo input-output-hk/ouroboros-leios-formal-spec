@@ -45,21 +45,16 @@ resetting this field to the empty set.
 ```agda
 data SlotUpkeep : Type where
   Base EB-Role VT-Role : SlotUpkeep
-
-unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
 ```
 <!--
 ```agda
+unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
+
 open import Leios.Protocol (⋯) SlotUpkeep ⊥ public
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
-```
-```agda
-isVoteCertified : LeiosState → EndorserBlock → Type
-isVoteCertified s eb = isVoteCertified' (LeiosState.votingState s) (0F , eb)
-```
-```agda
+
 private variable s s'   : LeiosState
                  ffds'  : FFD.State
                  π      : VrfPf
@@ -77,6 +72,7 @@ private variable s s'   : LeiosState
                  cert   : EBCert
 ```
 -->
+
 ### Block/Vote production
 
 We now define the rules for block production given by the relation `_↝_`. These are split in two:
@@ -104,7 +100,7 @@ isEquivocated : LeiosState → EndorserBlock → Type
 isEquivocated s eb = Any (areEquivocated eb) (toSet (LeiosState.EBs s))
 
 rememberVote : LeiosState → EndorserBlock → LeiosState
-rememberVote s@(record { VotedEBs = VotedEBs }) eb = record s { VotedEBs = hash eb ∷ VotedEBs }
+rememberVote s@(record { VotedEBs = vebs }) eb = record s { VotedEBs = hash eb ∷ vebs }
 
 data _↝_ : LeiosState → LeiosState × FFDAbstract.Input ffdAbstract → Type where
 ```
@@ -120,7 +116,7 @@ mempool.
   EB-Role : let open LeiosState s in
           ∙ toProposeEB s π ≡ just eb
           ∙ canProduceEB slot sk-EB (stake s) π
-          ─────────────────────────────────────────────────────────────────────────
+          ──────────────────────────────────────────────────────
           s ↝ (addUpkeep s EB-Role , Send (ebHeader eb) nothing)
 ```
 ```agda
@@ -139,19 +135,9 @@ mempool.
           ∙ EndorserBlockOSig.txs eb ≢ []
           ∙ needsUpkeep VT-Role
           ∙ canProduceV (slotNumber eb) sk-VT (stake s)
-          ─────────────────────────────────────────────────────────────────────────
+          ───────────────────────────────────────────────────────
           s ↝ ( rememberVote (addUpkeep s VT-Role) eb
               , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing)
-```
-```agda
-stage : ℕ → ⦃ _ : NonZero L ⦄ → ℕ
-stage s = s / L
-
-beginningOfStage : ℕ → Type
-beginningOfStage s = stage s * L ≡ s
-
-endOfStage : ℕ → Type
-endOfStage s = suc (stage s) ≡ stage (suc s)
 ```
 Predicate needed for slot transition. Special care needs to be taken when starting from
 genesis.
@@ -179,11 +165,11 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```agda
   Slot₁ : let open LeiosState s in
         ∙ allDone s
-        ────────────────────────────────────────────────────────────────────────────────────────────
-        s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
-            { slot         = suc slot
-            ; Upkeep       = ∅
-            } ↑ L.filter (isValid? s) msgs
+        ───────────────────────────────────────────────────────────────────────────────────
+        s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀
+          record s { slot         = suc slot
+                   ; Upkeep       = ∅
+                   } ↑ L.filter (isValid? s) msgs
 
   Slot₂ : let open LeiosState s in
         ──────────────────────────────────────────────────────────────────────────────
@@ -256,4 +242,4 @@ unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
 unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
 unquoteDecl Base₂-premises = genPremises Base₂-premises (quote Base₂)
 ```
---!>
+-->
