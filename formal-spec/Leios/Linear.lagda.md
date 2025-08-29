@@ -135,7 +135,7 @@ mempool.
           ∙ find (λ (s , eb) → hash eb ≟ ebHash) EBs' ≡ just (slot' , eb)
           ∙ hash eb ∉ VotedEBs
           ∙ ¬ isEquivocated s eb
-          ∙ isValid s (inj₁ (ebHeader eb))
+--          ∙ isValid s (inj₁ (ebHeader eb))
           ∙ slot' ≤ slotNumber eb + Lhdr
           ∙ slotNumber eb + 3 * Lhdr ≤ slot
           ∙ slot ≡ slotNumber eb + validityCheckTime eb
@@ -161,13 +161,7 @@ Predicate needed for slot transition. Special care needs to be taken when starti
 genesis.
 ```agda
 allDone : LeiosState → Type
-allDone record { Upkeep = u } = 
-    u ≡ (VT-Role ∷ EB-Role ∷ Base ∷ []) 
-  ⊎ u ≡ (VT-Role ∷ Base ∷ EB-Role ∷ [])
-  ⊎ u ≡ (EB-Role ∷ VT-Role ∷ Base ∷ []) 
-  ⊎ u ≡ (EB-Role ∷ Base ∷ VT-Role ∷ [])
-  ⊎ u ≡ (Base ∷ EB-Role ∷ VT-Role ∷ []) 
-  ⊎ u ≡ (Base ∷ VT-Role ∷ EB-Role ∷ [])
+allDone record { Upkeep = u } = u ≡ᵉ fromList (VT-Role ∷ EB-Role ∷ Base ∷ [])
 ```
 ### Linear Leios transitions
 The relation describing the transition given input and state
@@ -192,7 +186,7 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
         ────────────────────────────────────────────────────────────────────────────────────────────
         s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
             { slot         = suc slot
-            ; Upkeep       = []
+            ; Upkeep       = ∅
             } ↑ L.filter (isValid? s) msgs
 
   Slot₂ : let open LeiosState s in
@@ -237,8 +231,8 @@ Note: Submitted data to the base chain is only taken into account
          ──────────────────────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
 
-  Roles₂ : ∀ {x u s'} → let open LeiosState s in
-         ∙ ¬ (s ↝ (s' , x))
+  Roles₂ : ∀ {i u s'} → let open LeiosState s in
+         ∙ ¬ (s ↝ (s' , i))
          ∙ needsUpkeep u
          ∙ u ≢ Base
          ──────────────────────────────────────────────────────────────
@@ -265,76 +259,5 @@ unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
 unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
 unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
 unquoteDecl Base₂-premises = genPremises Base₂-premises (quote Base₂)
-
-{-
-just≢nothing : ∀ {ℓ} {A : Type ℓ} {x} → (Maybe A ∋ just x) ≡ nothing → ⊥
-just≢nothing = λ ()
-
-P : EBRef → ℕ × EndorserBlock → Type
-P h (_ , eb) = hash eb ≡ h
-
-P? : (h : EBRef) → ((s , eb) : ℕ × EndorserBlock) → Dec (P h (s , eb))
-P? h (_ , eb) = hash eb ≟ h
-
-found : LeiosState → EndorserBlock → ℕ → EBRef → Type
-found s eb slot' k = find (P? k) (LeiosState.EBs' s) ≡ just (slot' , eb)
-
-not-found : LeiosState → EBRef → Type
-not-found s k = find (P? k) (LeiosState.EBs' s) ≡ nothing
-
-open import Data.List.Properties
-
-instance
-  Dec-↝ : ∀ {s u o} → (s ↝ (addUpkeep s u , o)) ⁇
-  Dec-↝ {s} {u} {Send (ibHeader _) nothing} .dec = no λ ()
-  Dec-↝ {s} {EB-Role} {Send (ebHeader _) nothing} .dec
-    with ¿ EB-Role-premises .proj₁ ¿
-  ... | yes p = yes (EB-Role p)
-  ... | no ¬p = no λ where
-    (EB-Role p) → ¬p p
-  Dec-↝ {s} {u} {Send (vtHeader []) nothing} .dec = no λ ()
-  Dec-↝ {s} {VT-Role} {Send (vtHeader (vt ∷ [])) nothing} .dec
-    with getCurrentEBHash s in eq₁
-  ... | nothing = no λ where
-    (VT-Role (x , _ , _ , _ , _)) → just≢nothing $ trans (sym x) eq₁
-  ... | just h
-    with find (λ (_ , eb') → hash eb' ≟ h) (LeiosState.EBs' s) in eq₂
-  ... | nothing = no λ where
-    (VT-Role (x , y , _ , _ , _)) →
-      let ji = just-injective (trans (sym x) eq₁)
-      in just≢nothing $ trans (sym y) (subst (not-found s) (sym ji) eq₂)
-  ... | just (slot' , eb)
-    with ¿ slot' ≤ slotNumber eb + Lvote ¿
-  ... | no ¬p
-      = no λ where
-           (VT-Role {s} {ebHash = ebHash} (x , y , z , _ , _)) →
-              let ji = just-injective (trans (sym x) eq₁)
-                  js = subst (found s eb slot') (sym ji) eq₂
-                  (x₁ , x₂) = ,-injective (just-injective (trans (sym y) js))
-              in ¬p $ subst₂ (λ a b → a ≤ slotNumber b + Lvote) x₁ x₂ z
-  ... | yes a
-    with ¿ LeiosState.needsUpkeep s VT-Role ¿
-  ... | no ¬p = no λ where
-    (VT-Role (_ , _ , _ , p , _)) → ¬p p
-  ... | yes b
-    with ¿ canProduceV (LeiosState.slot s) sk-VT (stake s) ¿
-  ... | no ¬p = no λ where
-    (VT-Role (a , b , _ , _ , p)) → ¬p p
-  ... | yes c
-    with vt ≟ vote sk-VT h
-  ... | no ¬q = no λ where
-    (VT-Role {s} {ebHash} (x , _ , _ , _ , _)) →
-      let ji = just-injective (trans (sym x) eq₁)
-      in ¬q $ cong (vote sk-VT) ji
-  ... | yes q rewrite q = yes (VT-Role (eq₁ , eq₂ , a , b , c))
-  Dec-↝ {s} {Base} {Send (ebHeader _) nothing} .dec = no λ ()
-  Dec-↝ {s} {Base} {Send (vtHeader (_ ∷ _)) nothing} .dec = no λ ()
-  Dec-↝ {s} {EB-Role} {Send (vtHeader _) nothing} .dec = no λ ()
-  Dec-↝ {s} {VT-Role} {Send (ebHeader _) nothing} .dec = no λ ()
-  Dec-↝ {s} {VT-Role} {Send (vtHeader (_ ∷ _ ∷ _)) nothing} .dec = no λ ()
-  Dec-↝ {s} {u} {Send x (just y)} .dec = no λ ()
-  Dec-↝ {s} {u} {Fetch} .dec = no λ ()
--}
-unquoteDecl Roles₂-premises = genPremises Roles₂-premises (quote Roles₂)
 ```
 --!>

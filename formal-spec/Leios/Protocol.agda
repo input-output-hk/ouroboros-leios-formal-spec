@@ -56,7 +56,7 @@ record LeiosState : Type where
         slot         : ℕ
         IBHeaders    : List IBHeader
         IBBodies     : List IBBody
-        Upkeep       : List SlotUpkeep
+        Upkeep       : ℙ SlotUpkeep
         Upkeep-Stage : ℙ StageUpkeep
         votingState  : VotingState
         PubKeys      : List PubKey
@@ -89,8 +89,8 @@ record LeiosState : Type where
   Ledger : List Tx
   Ledger = L.concatMap (λ rb → RankingBlock.txs rb L.++ maybe lookupTxsC [] (getEBHash <$> (RankingBlock.ebCert rb))) RBs
 
-  needsUpkeep : SlotUpkeep → Type
-  needsUpkeep = _∉ˡ Upkeep
+  needsUpkeep : SlotUpkeep → Set
+  needsUpkeep = _∉ Upkeep
 
   needsUpkeep-Stage : StageUpkeep → Set
   needsUpkeep-Stage = _∉ Upkeep-Stage
@@ -108,7 +108,7 @@ record LeiosState : Type where
         (no ¬p) → nothing
 
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
-addUpkeep s u = let open LeiosState s in record s { Upkeep = u ∷ Upkeep }
+addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u ❵ }
 {-# INJECTIVE_FOR_INFERENCE addUpkeep #-}
 
 addUpkeep-Stage : LeiosState → StageUpkeep → LeiosState
@@ -127,7 +127,7 @@ initLeiosState V SD pks = record
   ; slot         = initSlot V
   ; IBHeaders    = []
   ; IBBodies     = []
-  ; Upkeep       = []
+  ; Upkeep       = ∅
   ; Upkeep-Stage = ∅
   ; votingState  = initVotingState
   ; PubKeys      = pks
