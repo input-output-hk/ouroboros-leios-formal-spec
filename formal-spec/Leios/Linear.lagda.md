@@ -102,7 +102,7 @@ isEquivocated s eb = Any (areEquivocated eb) (toSet (LeiosState.EBs s))
 rememberVote : LeiosState → EndorserBlock → LeiosState
 rememberVote s@(record { VotedEBs = vebs }) eb = record s { VotedEBs = hash eb ∷ vebs }
 
-data _↝_ : LeiosState → LeiosState × FFDAbstract.Input ffdAbstract → Type where
+data _↝_ : LeiosState → LeiosState × Maybe (FFDAbstract.Input ffdAbstract) → Type where
 ```
 #### Positive rules
 
@@ -117,7 +117,13 @@ mempool.
           ∙ toProposeEB s π ≡ just eb
           ∙ canProduceEB slot sk-EB (stake s) π
           ──────────────────────────────────────────────────────
-          s ↝ (addUpkeep s EB-Role , Send (ebHeader eb) nothing)
+          s ↝ (addUpkeep s EB-Role , just (Send (ebHeader eb) nothing))
+
+  No-EB-Role : let open LeiosState s in
+             ∙ needsUpkeep EB-Role
+             ∙ (∀ π → ¬ canProduceEB slot sk-EB (stake s) π)
+             ─────────────────────────────────────────────
+             s ↝ (addUpkeep s EB-Role , nothing)
 ```
 ```agda
   VT-Role : ∀ {ebHash slot'}
@@ -137,7 +143,13 @@ mempool.
           ∙ canProduceV (slotNumber eb) sk-VT (stake s)
           ───────────────────────────────────────────────────────
           s ↝ ( rememberVote (addUpkeep s VT-Role) eb
-              , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing)
+              , just (Send (vtHeader [ vote sk-VT (hash eb) ]) nothing))
+
+  No-VT-Role : let open LeiosState s in
+             ∙ needsUpkeep VT-Role
+             ∙ ¬ canProduceV slot sk-VT (stake s)
+             ─────────────────────────────────────────────
+             s ↝ (addUpkeep s VT-Role , nothing)
 ```
 Predicate needed for slot transition. Special care needs to be taken when starting from
 genesis.
@@ -209,13 +221,12 @@ Note: Submitted data to the base chain is only taken into account
 #### Protocol rules
 ```agda
   Roles₁ :
-         ∙ s ↝ (s' , i)
+         ∙ s ↝ (s' , just i)
          ──────────────────────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
 
-  Roles₂ : ∀ {i u s'} → let open LeiosState s in
-         ∙ ¬ (s ↝ (s' , i))
-         ∙ needsUpkeep u
+  Roles₂ : ∀ {u} → let open LeiosState s in
+         ∙ s ↝ (s' , nothing)
          ∙ u ≢ Base
          ──────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ addUpkeep s u
@@ -236,6 +247,7 @@ instance
 
 unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
 unquoteDecl VT-Role-premises = genPremises VT-Role-premises (quote _↝_.VT-Role)
+unquoteDecl No-VT-Role-premises = genPremises No-VT-Role-premises (quote _↝_.No-VT-Role)
 
 unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
 unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)

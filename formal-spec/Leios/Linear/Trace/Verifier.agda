@@ -21,10 +21,6 @@ module Defaults
   open GenFFD
   open Types params
 
-  -- Postulating law of excluded middle
-  postulate
-    em : ∀ {A : Set} → A ⊎ ¬ A
-
   data Action : Type where
     EB-Role-Action    : ℕ → EndorserBlock → Action
     VT-Role-Action    : ℕ → EndorserBlock → Action
@@ -59,7 +55,7 @@ module Defaults
   getAction (Base₂ {s} _)                      = Base₂-Action (slot s)
   getAction (Roles₁ (VT-Role {s} {eb = eb} _)) = VT-Role-Action (slot s) eb
   getAction (Roles₁ (EB-Role {s} {eb = eb} _)) = EB-Role-Action (slot s) eb
-  getAction (Roles₂ {u = Base} (_ , _ , x))    = ⊥-elim (x refl)
+  getAction (Roles₂ {u = Base} (_ , x))        = ⊥-elim (x refl)
   getAction (Roles₂ {s} {u = EB-Role} _)       = No-EB-Role-Action (slot s)
   getAction (Roles₂ {s} {u = VT-Role} _)       = No-VT-Role-Action (slot s)
 
@@ -180,7 +176,6 @@ module Defaults
   verifyStep' (Slot₁-Action n) (inj₁ (FFD-OUT msgs)) s refl with ¿ Slot₁-premises {s = s} .proj₁ ¿
   ... | yes p = Ok' (Slot₁ p)
   ... | no _ = Err dummyErr
-
   verifyStep' (Slot₂-Action n) (inj₁ _) _ _ = Err dummyErr
   verifyStep' (Slot₂-Action n) (inj₂ (inj₁ (BASE-LDG rbs))) s refl = Ok'' Slot₂
 
@@ -191,31 +186,14 @@ module Defaults
   ... | no _ = Err dummyErr
   verifyStep' (Base₂-Action n) _ s refl = Err dummyErr
   verifyStep' (No-EB-Role-Action n) (inj₁ SLOT) s refl
-    with ¿ needsUpkeep s EB-Role ¿
-       | Dec-canProduceEB {slot s} {sk-EB} {stake s}
-  ... | no ¬p | _ = Err dummyErr
-  ... | yes p | inj₂ _ = Err dummyErr
-  ... | yes p | inj₁ x
-    with
-      toProposeEB s (proj₁ x) in eq
-  ... | nothing = Err dummyErr
-  ... | just eb
-    with em {A = s ↝ (addUpkeep s EB-Role , FFD.Send (ebHeader eb) nothing)}
-  ... | inj₁ _ = Err dummyErr
-  ... | inj₂ σ = Ok' (Roles₂ (σ , p , λ ()))
+    with ¿ needsUpkeep s EB-Role × (∀ π → ¬ canProduceEB (slot s) (EB , tt) (stake s) π) ¿
+  ... | yes p = Ok' (Roles₂ {s' = addUpkeep s EB-Role} {u = EB-Role} ((No-EB-Role p , λ () )))
+  ... | no ¬p = Err dummyErr
   verifyStep' (No-EB-Role-Action n) _ s refl = Err dummyErr
   verifyStep' (No-VT-Role-Action n) (inj₁ SLOT) s refl
-    with ¿ needsUpkeep s VT-Role ¿
-       | getCurrentEBHash s in eq
-  ... | no ¬p | _ = Err dummyErr
-  ... | yes p | nothing = Err dummyErr -- FIXME: Ok
-  ... | yes p | just h
-    with (find (λ (_ , eb') → hash eb' ≟ h) (EBs' s)) in eq₁
-  ... | nothing = Err dummyErr
-  ... | just (_ , eb)
-    with em {A = s ↝ (rememberVote (addUpkeep s VT-Role) eb , FFD.Send (vtHeader [ vote sk-VT h ]) nothing)}
-  ... | inj₁ _ = Err dummyErr
-  ... | inj₂ σ = Ok' (Roles₂ (σ , p , λ()))
+    with ¿ No-VT-Role-premises {s = s} .proj₁ ¿
+  ... | yes p = Ok' (Roles₂ {s' = addUpkeep s VT-Role} {u = VT-Role} (No-VT-Role p , λ ()))
+  ... | no ¬p = Err dummyErr
   verifyStep' (No-VT-Role-Action n) _ s refl = Err dummyErr
   verifyStep' (EB-Role-Action .(slot s) x) (inj₂ y) s refl = Err dummyErr
   verifyStep' (VT-Role-Action .(slot s) x) (inj₂ y) s refl = Err dummyErr
