@@ -28,7 +28,7 @@ module Defaults
 
   data Action : Type where
     EB-Role-Action    : ℕ → EndorserBlock → Action
-    VT-Role-Action    : ℕ → EndorserBlock → Action
+    VT-Role-Action    : ℕ → EndorserBlock → ℕ → Action
     Ftch-Action       : ℕ → Action
     Slot₁-Action      : ℕ → Action
     Slot₂-Action      : ℕ → Action
@@ -58,7 +58,7 @@ module Defaults
   getAction (Ftch {s})                         = Ftch-Action (slot s)
   getAction (Base₁ {s})                        = Base₁-Action (slot s)
   getAction (Base₂ {s} _)                      = Base₂-Action (slot s)
-  getAction (Roles₁ (VT-Role {s} {eb = eb} _)) = VT-Role-Action (slot s) eb
+  getAction (Roles₁ (VT-Role {s} {eb = eb} {slot' = slot'} _)) = VT-Role-Action (slot s) eb slot'
   getAction (Roles₁ (EB-Role {s} {eb = eb} _)) = EB-Role-Action (slot s) eb
   getAction (Roles₂ {u = Base} (_ , x))        = ⊥-elim (x refl)
   getAction (Roles₂ {s} {u = EB-Role} _)       = No-EB-Role-Action (slot s)
@@ -66,7 +66,7 @@ module Defaults
 
   getSlot : Action → ℕ
   getSlot (EB-Role-Action x _) = x
-  getSlot (VT-Role-Action x _) = x
+  getSlot (VT-Role-Action x _ _) = x
   getSlot (No-EB-Role-Action x) = x
   getSlot (No-VT-Role-Action x) = x
   getSlot (Ftch-Action x) = x
@@ -166,11 +166,12 @@ module Defaults
   ... | _ = Err dummyErr
   verifyStep' (EB-Role-Action _ _) (inj₁ FTCH) _ _ = Err dummyErr
   verifyStep' (EB-Role-Action _ _) (inj₁ (FFD-OUT _)) _ _ = Err dummyErr
-  verifyStep' (VT-Role-Action n eb) (inj₁ SLOT) s refl with ¿ VT-Role-premises {s = s} {ebHash = hash eb} .proj₁ ¿
-  ... | yes h = Ok' (Roles₁ (VT-Role {slot' = n} h))
+  verifyStep' (VT-Role-Action .(slot s) eb slot') (inj₁ SLOT) s refl with ¿ VT-Role-premises {s = s} {eb = eb} {ebHash = hash eb} {slot' = slot'} .proj₁ ¿
+  ... | yes h = Ok' (Roles₁ (VT-Role {ebHash = hash eb} {slot' = slot'} h))
   ... | no ¬h = Err dummyErr
-  verifyStep' (VT-Role-Action _ _) (inj₁ FTCH) _ _ = Err dummyErr
-  verifyStep' (VT-Role-Action _ _) (inj₁ (FFD-OUT eb)) _ _ = Err dummyErr
+  verifyStep' (VT-Role-Action _ _ _) (inj₁ FTCH) _ _ = Err dummyErr
+  verifyStep' (VT-Role-Action _ _ _) (inj₁ (FFD-OUT _)) _ _ = Err dummyErr
+  verifyStep' (VT-Role-Action _ _ _) (inj₂ _) _ refl = Err dummyErr
 
   -- This has a different IO pattern, not sure if we want to model that here
   -- For now we'll just fail
@@ -179,10 +180,11 @@ module Defaults
   verifyStep' (Slot₁-Action n) (inj₁ SLOT) _ _ = Err dummyErr
   verifyStep' (Slot₁-Action n) (inj₁ FTCH) _ _ = Err dummyErr
   verifyStep' (Slot₁-Action n) (inj₁ (FFD-OUT msgs)) s refl with ¿ Slot₁-premises {s = s} .proj₁ ¿
-  ... | yes p = Ok' (Slot₁ p)
+  ... | yes p = Ok' (Slot₁ {s = s} {msgs = msgs} p)
   ... | no _ = Err dummyErr
   verifyStep' (Slot₂-Action n) (inj₁ _) _ _ = Err dummyErr
-  verifyStep' (Slot₂-Action n) (inj₂ (inj₁ (BASE-LDG rbs))) s refl = Ok'' Slot₂
+  verifyStep' (Slot₂-Action n) (inj₂ (inj₁ (BASE-LDG rbs))) s refl = Ok'' (Slot₂ {s = s} {rbs = rbs})
+  verifyStep' (Slot₂-Action n) (inj₂ (inj₂ y)) s refl = Err dummyErr
 
   -- Different IO pattern again
   verifyStep' (Base₁-Action n) (inj₂ (inj₂ (SubmitTxs txs))) s refl = Ok''' Base₁
@@ -201,11 +203,9 @@ module Defaults
   ... | no ¬p = Err dummyErr
   verifyStep' (No-VT-Role-Action n) _ s refl = Err dummyErr
   verifyStep' (EB-Role-Action .(slot s) x) (inj₂ y) s refl = Err dummyErr
-  verifyStep' (VT-Role-Action .(slot s) x) (inj₂ y) s refl = Err dummyErr
   verifyStep' (Slot₁-Action x₁) (inj₂ y) s x = Err dummyErr
   verifyStep' (Base₁-Action .(slot s)) (inj₁ x) s refl = Err dummyErr
   verifyStep' (Base₁-Action .(slot s)) (inj₂ y) s refl = Err dummyErr
-  verifyStep' (Slot₂-Action .(slot s)) (inj₂ (inj₂ y)) s refl = Err dummyErr
 
   verifyStep : (a : Action) → (i : FFDT Out ⊎ BaseT Out ⊎ IOT In) → (s : LeiosState) → Result (Err-verifyAction a i s) (ValidStep (a , i) s)
   verifyStep a i s = case getSlot a ≟ slot s of λ where

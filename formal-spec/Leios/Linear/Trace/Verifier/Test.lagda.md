@@ -30,17 +30,14 @@ module _ where
         ; winning-slots = fromList $
           (EB , 100) ∷
 
-          (EB , 102) ∷ (VT , 102) ∷
-          (EB , 103) ∷ (VT , 103) ∷
-          (EB , 104) ∷ (VT , 104) ∷
-          (EB , 105) ∷ (VT , 105) ∷
+          (EB , 102) ∷
                        (VT , 106) ∷
           (EB , 107) ∷ (VT , 107) ∷
           (EB , 108) ∷ (VT , 108) ∷
           []
       }
 
-    Lhdr = 0
+    Lhdr = 2
     Lvote = 2
     Ldiff = 0
 
@@ -52,7 +49,7 @@ module _ where
     splitTxs l = [] , l
 
     validityCheckTime : EndorserBlock → ℕ
-    validityCheckTime eb = 0
+    validityCheckTime eb = 6
 
     open Defaults Lhdr Lvote Ldiff splitTxs validityCheckTime
     open Types params
@@ -62,23 +59,31 @@ module _ where
 ```
 Starting at slot 100
 ```agda
+      eb₀ eb₁ eb₂ : EndorserBlock
+      eb₀ = mkEB 102 id tt (EB , tt) (3 ∷ 4 ∷ 5 ∷ []) [] []
+      eb₁ = mkEB 100 (fsuc fzero) tt (EB , tt) (6 ∷ []) [] []
+      eb₂ = mkEB 100 id tt (EB , tt) (0 ∷ 1 ∷ 2 ∷ []) [] []
+
+      rb₀ rb₁ : RankingBlock
+      rb₀ = record { txs = 3 ∷ 4 ∷ 5 ∷ [] ; announcedEB = nothing ; ebCert = nothing }
+      rb₁ = record { txs = [] ; announcedEB = just (hash eb₁) ; ebCert = nothing }
+
+      verify-eb₀-hash : hash eb₀ ≡ 3 ∷ 4 ∷ 5 ∷ []
+      verify-eb₀-hash = refl
+
+      verify-eb₁-hash : hash eb₁ ≡ 6 ∷ []
+      verify-eb₁-hash = refl
+
       s₁₀₀ : LeiosState
       s₁₀₀ = record s₀
                { slot = 100
                ; ToPropose = 0 ∷ 1 ∷ 2 ∷ []
-               ; EBs' = []
                ; PubKeys = (fzero , tt) ∷ (fsuc fzero , tt) ∷ []
                }
         where
           s₀ : LeiosState
           s₀ = initLeiosState tt stakeDistribution ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
 
-      mkRB : LeiosState → RankingBlock
-      mkRB s = record
-                 { txs = []
-                 ; announcedEB = hash <$> toProposeEB s tt
-                 ; ebCert = nothing
-                 }
 ```
 Checking a simple trace
 ```agda
@@ -86,10 +91,10 @@ Checking a simple trace
 ```
 #### Slot 100
 ```agda
-                     (EB-Role-Action    100 (mkEB 100 id tt (EB , tt) (0 ∷ 1 ∷ 2 ∷ []) [] []) , inj₁ SLOT)
+                     (EB-Role-Action    100 eb₂ , inj₁ SLOT)
                    ∷ (Base₁-Action      100 , inj₂ (inj₂ (SubmitTxs (3 ∷ 4 ∷ 5 ∷ []))))
                    ∷ (Base₂-Action      100 , inj₁ SLOT)
-                   ∷ (Slot₂-Action      100 , inj₂ (inj₁ (BASE-LDG [ mkRB s₁₀₀ ])))
+                   ∷ (Slot₂-Action      100 , inj₂ (inj₁ (BASE-LDG [ rb₀ ])))
                    ∷ (No-VT-Role-Action 100 , inj₁ SLOT)
                    ∷ (Slot₁-Action      100 , inj₁ (FFD-OUT []))
 ```
@@ -98,15 +103,43 @@ Checking a simple trace
                    ∷ (Base₂-Action      101 , inj₁ SLOT)
                    ∷ (No-EB-Role-Action 101 , inj₁ SLOT)
                    ∷ (No-VT-Role-Action 101 , inj₁ SLOT)
-                   ∷ (Slot₂-Action      101 , inj₂ (inj₁ (BASE-LDG [ record { txs = [] ; announcedEB = just (hash $ mkEB 100 (fsuc fzero) tt (EB , tt) (0 ∷ []) [] []) ; ebCert = nothing } ])))
-                   ∷ (Slot₁-Action      101 , inj₁ (FFD-OUT (inj₁ (ebHeader (mkEB 100 (fsuc fzero) tt (EB , tt) (0 ∷ []) [] [])) ∷ [])))
+                   ∷ (Slot₂-Action      101 , inj₂ (inj₁ (BASE-LDG [ rb₁ ])))
+                   ∷ (Slot₁-Action      101 , inj₁ (FFD-OUT (inj₁ (ebHeader eb₁) ∷ [])))
 ```
 #### Slot 102
 ```agda
                    ∷ (Base₂-Action      102 , inj₁ SLOT)
-                   ∷ (EB-Role-Action    102 (mkEB 102 id tt (EB , tt) (3 ∷ 4 ∷ 5 ∷ []) [] []) , inj₁ SLOT)
-              --     ∷ (VT-Role-Action    102 (mkEB 100 (fsuc fzero) tt (EB , tt) (0 ∷ []) [] []) , inj₁ SLOT) -- 101 < 100 + 2
-              --     ∷ (Slot₁-Action      102 , inj₁ (FFD-OUT []))
+                   ∷ (EB-Role-Action    102 eb₀ , inj₁ SLOT)
+                   ∷ (No-VT-Role-Action 102 , inj₁ SLOT)
+                   ∷ (Slot₁-Action      102 , inj₁ (FFD-OUT []))
+```
+#### Slot 103
+```agda
+                   ∷ (Base₂-Action      103 , inj₁ SLOT)
+                   ∷ (No-EB-Role-Action 103 , inj₁ SLOT)
+                   ∷ (No-VT-Role-Action 103 , inj₁ SLOT)
+                   ∷ (Slot₁-Action      103 , inj₁ (FFD-OUT []))
+```
+#### Slot 104
+```agda
+                   ∷ (Base₂-Action      104 , inj₁ SLOT)
+                   ∷ (No-EB-Role-Action 104 , inj₁ SLOT)
+                   ∷ (No-VT-Role-Action 104 , inj₁ SLOT)
+                   ∷ (Slot₁-Action      104 , inj₁ (FFD-OUT []))
+```
+#### Slot 105
+```agda
+                   ∷ (Base₂-Action      105 , inj₁ SLOT)
+                   ∷ (No-EB-Role-Action 105 , inj₁ SLOT)
+                   ∷ (No-VT-Role-Action 105 , inj₁ SLOT)
+                   ∷ (Slot₁-Action      105 , inj₁ (FFD-OUT []))
+```
+#### Slot 106
+```agda
+                   ∷ (Base₂-Action      106 , inj₁ SLOT)
+                   ∷ (No-EB-Role-Action 106 , inj₁ SLOT)
+                   ∷ (VT-Role-Action    106 eb₁ 102 , inj₁ SLOT)
+                   ∷ (Slot₁-Action      106 , inj₁ (FFD-OUT []))
                    ∷ []) s₁₀₀)
       test₁ = _
 ```

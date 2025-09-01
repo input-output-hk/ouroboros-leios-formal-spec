@@ -130,7 +130,7 @@ mempool.
           → let open LeiosState s
           in
           ∙ getCurrentEBHash s ≡ just ebHash
-          ∙ find (λ (s , eb) → hash eb ≟ ebHash) EBs' ≡ just (slot' , eb)
+          ∙ find (λ (_ , eb') → hash eb' ≟ ebHash) EBs' ≡ just (slot' , eb)
           ∙ hash eb ∉ VotedEBs
           ∙ ¬ isEquivocated s eb
 --          ∙ isValid s (inj₁ (ebHeader eb))
@@ -140,7 +140,7 @@ mempool.
           ∙ validityCheckTime eb ≤ 3 * Lhdr + Lvote
           ∙ EndorserBlockOSig.txs eb ≢ []
           ∙ needsUpkeep VT-Role
-          ∙ canProduceV (slotNumber eb) sk-VT (stake s)
+          ∙ canProduceV slot sk-VT (stake s)
           ───────────────────────────────────────────────────────
           s ↝ ( rememberVote (addUpkeep s VT-Role) eb
               , just (Send (vtHeader [ vote sk-VT (hash eb) ]) nothing))
