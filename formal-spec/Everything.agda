@@ -46,6 +46,7 @@ open import Leios.Foreign.Types
 open import Leios.Foreign.Util
 open import Leios.KeyRegistration
 open import Leios.Linear
+open import Leios.Linear.Trace.Verifier
 -- open import Leios.Network
 open import Leios.Prelude
 open import Leios.Protocol
