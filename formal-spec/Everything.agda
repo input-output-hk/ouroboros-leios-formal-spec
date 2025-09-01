@@ -65,3 +65,5 @@ open import StateMachine
 -- Networking
 open import Network.BasicBroadcast
 -- open import Network.Leios
+
+open import Prelude.Result
