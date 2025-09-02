@@ -133,7 +133,7 @@ mempool.
           ∙ find (λ (_ , eb') → hash eb' ≟ ebHash) EBs' ≡ just (slot' , eb)
           ∙ hash eb ∉ VotedEBs
           ∙ ¬ isEquivocated s eb
---          ∙ isValid s (inj₁ (ebHeader eb))
+          ∙ isValid s (inj₁ (ebHeader eb))
           ∙ slot' ≤ slotNumber eb + Lhdr
           ∙ slotNumber eb + 3 * Lhdr ≤ slot
           ∙ slot ≡ slotNumber eb + validityCheckTime eb

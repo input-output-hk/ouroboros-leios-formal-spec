@@ -8,7 +8,7 @@ open import CategoricalCrypto hiding (id; _∘_)
 module Leios.Linear.Trace.Verifier (params : Params) where
 
 -- SpecStructure is not a module parameter, as the type for VrfPf needs to be known
-open import Leios.Defaults params using (d-SpecStructure) public
+open import Leios.Defaults params using (d-SpecStructure; isb) public
 open SpecStructure d-SpecStructure hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified) public
 
 instance
@@ -166,9 +166,12 @@ module Defaults
   ... | _ = Err dummyErr
   verifyStep' (EB-Role-Action _ _) (inj₁ FTCH) _ _ = Err dummyErr
   verifyStep' (EB-Role-Action _ _) (inj₁ (FFD-OUT _)) _ _ = Err dummyErr
-  verifyStep' (VT-Role-Action .(slot s) eb slot') (inj₁ SLOT) s refl with ¿ VT-Role-premises {s = s} {eb = eb} {ebHash = hash eb} {slot' = slot'} .proj₁ ¿
-  ... | yes h = Ok' (Roles₁ (VT-Role {ebHash = hash eb} {slot' = slot'} h))
-  ... | no ¬h = Err dummyErr
+  verifyStep' (VT-Role-Action .(slot s) eb slot') (inj₁ SLOT) s refl
+    with ¿ VT-Role-premises {s = s} {eb = eb} {ebHash = hash eb} {slot' = slot'} .proj₁ ¿
+       | isValid? s (inj₁ (ebHeader eb)) -- TODO:  why not covered above?
+  ... | yes (x , x₁ , x₂ , x₃ , x₄ , x₅ , x₆ , x₇ , x₈ , x₉ , x₁₀) | yes h = Ok' (Roles₁ (VT-Role {ebHash = hash eb} {slot' = slot'} ((x , x₁ , x₂ , x₃ , h , x₄ , x₅ , x₆ , x₇ , x₈ , x₉ , x₁₀))))
+  ... | yes (x , x₁ , x₂ , x₃ , x₄ , x₅ , x₆ , x₇ , x₈ , x₉ , x₁₀) | no _ = Err dummyErr
+  ... | no ¬h | _ = Err dummyErr
   verifyStep' (VT-Role-Action _ _ _) (inj₁ FTCH) _ _ = Err dummyErr
   verifyStep' (VT-Role-Action _ _ _) (inj₁ (FFD-OUT _)) _ _ = Err dummyErr
   verifyStep' (VT-Role-Action _ _ _) (inj₂ _) _ refl = Err dummyErr
