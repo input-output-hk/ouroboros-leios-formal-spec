@@ -8,13 +8,8 @@ open import CategoricalCrypto hiding (id; _∘_)
 module Leios.Linear.Trace.Verifier (params : Params) where
 
 -- SpecStructure is not a module parameter, as the type for VrfPf needs to be known
-open import Leios.Defaults params using (d-SpecStructure; isb) public
+open import Leios.Defaults params using (d-SpecStructure; isb; hpe) public
 open SpecStructure d-SpecStructure hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified) public
-
-instance
-  hpe : Hashable PreEndorserBlock (List ℕ)
-  hpe .hash = EndorserBlockOSig.txs
-
 
 module Defaults
   (Lhdr Lvote Ldiff : ℕ)
