@@ -1,4 +1,5 @@
-{-# OPTIONS --safe #-}
+{-# OPTIONS --safe --no-require-unique-meta-solutions #-}
+
 module CategoricalCrypto.Base where
 
 open import abstract-set-theory.Prelude hiding (id; _∘_; _⊗_; lookup; Dec; [_])
@@ -34,21 +35,25 @@ infixr 9 _⊗_
 _⊗_ : Fun₂ Channel
 (receive₁ ⇿ send₁) ⊗ (receive₂ ⇿ send₂) = (receive₁ ⊎ receive₂) ⇿ (send₁ ⊎ send₂)
 
-Fun' : ∀ {a b : Level} {A : Type a} → (A → Type b) → (A → Type b) → A → A → Type b
-Fun' F G a a' = F a → G a'
-
 data Mode : Type where
   S : Mode
   R : Mode
+
+¬ₘ_ : Mode → Mode
+¬ₘ S = R
+¬ₘ R = S
 
 modeType : Mode → Channel → Type
 modeType S = sndType
 modeType R = rcvType
 
-infix 4 _[_]⇒[_]_
+infix 4 _[_]⇒[_]_ _[_]⇔[_]_
 
-_[_]⇒[_]_ : Channel → Mode → Mode → Channel → Type
-c₁ [ m₁ ]⇒[ m₂ ] c₂ = Fun' (modeType m₁) (modeType m₂) c₁ c₂
+_[_]⇒[_]_ _[_]⇔[_]_ : Channel → Mode → Mode → Channel → Type
+c₁ [ m₁ ]⇒[ m₂ ] c₂ = modeType m₁ c₁ → modeType m₂ c₂
+c₁ [ m₁ ]⇔[ m₂ ] c₂ = c₁ [ m₁ ]⇒[ m₂ ] c₂ × c₂ [ m₂ ]⇒[ m₁ ] c₁
+
+{-# INJECTIVE_FOR_INFERENCE _[_]⇒[_]_ #-}
 
 mode-assoc : ∀ {c₁ c₂ c₃ m₁ m₂ m₃} → c₁ [ m₁ ]⇒[ m₂ ] c₂ → c₂ [ m₂ ]⇒[ m₃ ] c₃ → c₁ [ m₁ ]⇒[ m₃ ] c₃
 mode-assoc p q r = q (p r)
@@ -68,18 +73,19 @@ _ₛ⇒ᵣ_ = _[ S ]⇒[ R ]_
 
 module _ {A : Channel} where
 
-  rcvI : A ⊗ I ᵣ⇒ᵣ A 
-  rcvI (inj₁ a) = a
+  bothI : ∀ {m} → A ⊗ I [ m ]⇔[ m ] A
+  bothI {S} = (λ {(inj₁ x) → x}) , inj₁
+  bothI {R} = (λ {(inj₁ x) → x}) , inj₁
+  
+  rcvI = bothI {R}
+  sndI = bothI {S}
+  
+  bothᵀ : ∀ {m} → A ᵀ [ m ]⇔[ ¬ₘ m ] A
+  bothᵀ {S} = (id , id)
+  bothᵀ {R} = (id , id)
 
-  sndI : A ⊗ I ₛ⇒ₛ A
-  sndI (inj₁ a) = a
-
-  rcvᵀ : A ᵀ ₛ⇒ᵣ A
-  rcvᵀ = id
-
-  sndᵀ : A ᵀ ᵣ⇒ₛ A
-  sndᵀ = id
-
+  rcvᵀ = bothᵀ {S}
+  sndᵀ = bothᵀ {R}
 
 module _ {A B : Channel} where
 
@@ -113,6 +119,8 @@ module _ {A B : Channel} where
   snd⊗ᵀ : (A ⊗ B) ᵀ ₛ⇒ₛ A ᵀ ⊗ B ᵀ
   snd⊗ᵀ = [ inj₁ , inj₂ ]
 
+-- Transpose idendity = identity
+
 module _ {A B C : Channel} where
 
   rcvMapˡ : A ᵣ⇒ᵣ B → A ⊗ C ᵣ⇒ᵣ B ⊗ C
@@ -130,7 +138,7 @@ module _ {A B C : Channel} where
 module _ {A B Adv : Channel} where
 
   honestInputI : B ₛ⇒ᵣ A ⊗ (B ⊗ Adv) ᵀ
-  honestInputI = rcvʳ {A} {(B ⊗ Adv) ᵀ} P.∘ sndˡ {B} {Adv}
+  honestInputI = rcvʳ {A} {(B ⊗ Adv) ᵀ} P.∘ sndˡ {_} {Adv}
 
   honestOutputO : B ᵣ⇒ₛ (A ⊗ (B ⊗ Adv) ᵀ)
   honestOutputO = sndʳ {A} {(B ⊗ Adv) ᵀ} P.∘ rcvˡ {B} {Adv}
