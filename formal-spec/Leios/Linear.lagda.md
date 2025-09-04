@@ -102,7 +102,7 @@ isEquivocated s eb = Any (areEquivocated eb) (toSet (LeiosState.EBs s))
 rememberVote : LeiosState → EndorserBlock → LeiosState
 rememberVote s@(record { VotedEBs = vebs }) eb = record s { VotedEBs = hash eb ∷ vebs }
 
-data _↝_ : LeiosState → LeiosState × (FFDAbstract.Input ffdAbstract) → Type where
+data _↝_ : LeiosState → LeiosState × FFDAbstract.Input ffdAbstract → Type where
 ```
 #### Positive rules
 
