@@ -222,31 +222,31 @@ module Defaults
     ... | yes p
       with ¿ ¬ isEquivocated s eb ¿
     ... | no ¬a = no λ where
-      (_ , VT-Role (x , y , _ , z , _) , _) → ¬a $ subst (λ b → ¬ isEquivocated s b) (proj₂ $ subst' {s} x y eq₂ eq₃) z
+      (_ , VT-Role (x , y , _ , p , _) , _) → ¬a $ subst (λ b → ¬ isEquivocated s b) (proj₂ $ subst' {s} x y eq₂ eq₃) p
     ... | yes a
       with isValid? s (inj₁ (ebHeader eb))
     ... | no ¬b = no λ where
-      (_ , VT-Role (x , y , _ , _ , z , _) , _) → ¬b $ subst (λ b → isValid s (inj₁ (ebHeader b))) (proj₂ $ subst' {s} x y eq₂ eq₃) z
+      (_ , VT-Role (x , y , _ , _ , p , _) , _) → ¬b $ subst (λ b → isValid s (inj₁ (ebHeader b))) (proj₂ $ subst' {s} x y eq₂ eq₃) p
     ... | yes b
       with ¿ slot' ≤ slotNumber eb + Lhdr ¿
     ... | no ¬c = no λ where
-      (_ , VT-Role (x , y , _ , _ , _ , z , _ , _) , _) → let (x₁ , x₂) = subst' {s} x y eq₂ eq₃ in ¬c $ subst₂ (λ a b → a ≤ slotNumber b + Lhdr) x₁ x₂ z
+      (_ , VT-Role (x , y , _ , _ , _ , p , _ ) , _) → let (x₁ , x₂) = subst' {s} x y eq₂ eq₃ in ¬c $ subst₂ (λ a b → a ≤ slotNumber b + Lhdr) x₁ x₂ p
     ... | yes c
       with ¿ slotNumber eb + 3 * Lhdr ≤ LeiosState.slot s ¿
     ... | no ¬d = no λ where
-      (_ , VT-Role (x , y , _ , _ , _ , _ , z , _) , _) → ¬d $ subst (λ b → slotNumber b + 3 * Lhdr ≤ LeiosState.slot s) (proj₂ $ subst' {s} x y eq₂ eq₃) z
+      (_ , VT-Role (x , y , _ , _ , _ , _ , p , _) , _) → ¬d $ subst (λ b → slotNumber b + 3 * Lhdr ≤ LeiosState.slot s) (proj₂ $ subst' {s} x y eq₂ eq₃) p
     ... | yes d
       with ¿ LeiosState.slot s ≡ slotNumber eb + validityCheckTime eb ¿
     ... | no ¬e = no λ where
-      (_ , VT-Role (x , y , _ , _ , _ , _ , _ , z , _) , _) → ¬e $ subst (λ b → LeiosState.slot s ≡ slotNumber b + validityCheckTime b) (proj₂ $ subst' {s} x y eq₂ eq₃) z
+      (_ , VT-Role (x , y , _ , _ , _ , _ , _ , p , _) , _) → ¬e $ subst (λ b → LeiosState.slot s ≡ slotNumber b + validityCheckTime b) (proj₂ $ subst' {s} x y eq₂ eq₃) p
     ... | yes e
       with ¿ validityCheckTime eb ≤ 3 * Lhdr + Lvote ¿
     ... | no ¬f = no λ where
-      (_ , VT-Role (x , y , _ , _ , _ , _ , _ , _ , z , _) , _) → ¬f $ subst (λ b → validityCheckTime b ≤ 3 * Lhdr + Lvote) (proj₂ $ subst' {s} x y eq₂ eq₃) z
+      (_ , VT-Role (x , y , _ , _ , _ , _ , _ , _ , p , _) , _) → ¬f $ subst (λ b → validityCheckTime b ≤ 3 * Lhdr + Lvote) (proj₂ $ subst' {s} x y eq₂ eq₃) p
     ... | yes f
       with ¿ EndorserBlockOSig.txs eb ≢ [] ¿
     ... | no ¬g = no λ where
-      (_ , VT-Role (x , y , _ , _ , _ , _ , _ , _ , _ , p , _ , _) , _) → ¬g $ subst (λ b → EndorserBlockOSig.txs b ≢ []) (proj₂ $ subst' {s} x y eq₂ eq₃) p
+      (_ , VT-Role (x , y , _ , _ , _ , _ , _ , _ , _ , p , _ ) , _) → ¬g $ subst (λ b → EndorserBlockOSig.txs b ≢ []) (proj₂ $ subst' {s} x y eq₂ eq₃) p
     ... | yes g
       with ¿ needsUpkeep s VT-Role ¿
     ... | no ¬h = no λ where
