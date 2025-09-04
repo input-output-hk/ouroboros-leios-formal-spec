@@ -213,11 +213,11 @@ Note: Submitted data to the base chain is only taken into account
          ──────────────────────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
 
-  Roles₂ : ∀ {u} → let open LeiosState s in
-         ∙ ¬ (∃[ s'×i ] (s ↝ s'×i × u ∷ Upkeep ≡ LeiosState.Upkeep (proj₁ s'×i)))
-         ∙ needsUpkeep u
+  Roles₂ : ∀ {u} → let open LeiosState in
+         ∙ ¬ (∃[ s'×i ] (s ↝ s'×i × Upkeep (addUpkeep s u) ≡ Upkeep (proj₁ s'×i)))
+         ∙ needsUpkeep s u
          ∙ u ≢ Base
-         ──────────────────────────────────────────────────────────────
+         ─────────────────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ addUpkeep s u
 ```
 <!--
