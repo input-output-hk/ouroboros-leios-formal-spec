@@ -157,8 +157,6 @@ module Defaults
     → Result (Err-verifyAction (getAction σ) (inj₂ (inj₂ i)) s) (ValidStep (getAction σ , inj₂ (inj₂ i)) s)
   Ok''' a = Ok (Valid _ (FromAction³ _ a))
 
-  open import Relation.Nullary.Negation
-
   just≢nothing : ∀ {ℓ} {A : Type ℓ} {x} → (Maybe A ∋ just x) ≡ nothing → ⊥
   just≢nothing = λ ()
 
