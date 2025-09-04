@@ -143,13 +143,7 @@ Predicate needed for slot transition. Special care needs to be taken when starti
 genesis.
 ```agda
 allDone : LeiosState → Type
-allDone record { Upkeep = u } =
-    u ≡ (VT-Role ∷ EB-Role ∷ Base ∷ [])
-  ⊎ u ≡ (VT-Role ∷ Base ∷ EB-Role ∷ [])
-  ⊎ u ≡ (EB-Role ∷ VT-Role ∷ Base ∷ [])
-  ⊎ u ≡ (EB-Role ∷ Base ∷ VT-Role ∷ [])
-  ⊎ u ≡ (Base ∷ EB-Role ∷ VT-Role ∷ [])
-  ⊎ u ≡ (Base ∷ VT-Role ∷ EB-Role ∷ [])
+allDone record { Upkeep = u } = VT-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ u
 ```
 ### Linear Leios transitions
 The relation describing the transition given input and state
