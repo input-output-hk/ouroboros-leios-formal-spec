@@ -28,7 +28,7 @@ module _ where
               }
         ; sutId = fzero
         ; winning-slots = fromList $
-          (EB , 100) ∷
+          (EB , 100) ∷ (VT , 100) ∷
 
           (EB , 102) ∷ (VT , 102) ∷
                        (VT , 106) ∷
@@ -138,10 +138,8 @@ Checking a simple trace
 ```agda
                    ∷ (Base₂-Action      106 , inj₁ SLOT)
                    ∷ (No-EB-Role-Action 106 , inj₁ SLOT)
-{-
                    ∷ (VT-Role-Action    106 eb₁ 102 , inj₁ SLOT)
                    ∷ (Slot₁-Action      106 , inj₁ (FFD-OUT []))
--}
                    ∷ []) s₁₀₀)
       test₁ = _
 ```
