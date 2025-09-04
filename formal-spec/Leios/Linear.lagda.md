@@ -2,7 +2,7 @@
 
 <!--
 ```agda
--- {-# OPTIONS --safe #-}
+{-# OPTIONS --safe #-}
 open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.FFD
 open import Leios.SpecStructure
@@ -213,8 +213,8 @@ Note: Submitted data to the base chain is only taken into account
          ──────────────────────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
 
-  Roles₂ : ∀ {x u s'} → let open LeiosState s in
-         ∙ ¬ (s ↝ (s' , x))
+  Roles₂ : ∀ {u} → let open LeiosState s in
+         ∙ ¬ (∃[ s'×i ] s ↝ s'×i)
          ∙ needsUpkeep u
          ∙ u ≢ Base
          ──────────────────────────────────────────────────────────────
@@ -241,13 +241,5 @@ unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
 unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
 unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
 unquoteDecl Base₂-premises = genPremises Base₂-premises (quote Base₂)
-
-{-
-instance
-  postulate
-    Dec-↝ : ∀ {s s' x} → (s ↝ (s' , x)) ⁇
-
-unquoteDecl Roles₂-premises = genPremises Roles₂-premises (quote Roles₂)
--}
 ```
 -->
