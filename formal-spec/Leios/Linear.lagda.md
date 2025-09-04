@@ -143,7 +143,13 @@ Predicate needed for slot transition. Special care needs to be taken when starti
 genesis.
 ```agda
 allDone : LeiosState → Type
-allDone record { Upkeep = u } = u ≡ᵉ fromList (VT-Role ∷ EB-Role ∷ Base ∷ [])
+allDone record { Upkeep = u } =
+    u ≡ (VT-Role ∷ EB-Role ∷ Base ∷ [])
+  ⊎ u ≡ (VT-Role ∷ Base ∷ EB-Role ∷ [])
+  ⊎ u ≡ (EB-Role ∷ VT-Role ∷ Base ∷ [])
+  ⊎ u ≡ (EB-Role ∷ Base ∷ VT-Role ∷ [])
+  ⊎ u ≡ (Base ∷ EB-Role ∷ VT-Role ∷ [])
+  ⊎ u ≡ (Base ∷ VT-Role ∷ EB-Role ∷ [])
 ```
 ### Linear Leios transitions
 The relation describing the transition given input and state
@@ -168,7 +174,7 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
         ───────────────────────────────────────────────────────────────────────────────────
         s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀
           record s { slot         = suc slot
-                   ; Upkeep       = ∅
+                   ; Upkeep       = []
                    } ↑ L.filter (isValid? s) msgs
 
   Slot₂ : let open LeiosState s in
@@ -214,7 +220,7 @@ Note: Submitted data to the base chain is only taken into account
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
 
   Roles₂ : ∀ {u} → let open LeiosState s in
-         ∙ ¬ (∃[ s'×i ] s ↝ s'×i)
+         ∙ ¬ (∃[ s'×i ] (s ↝ s'×i × u ∷ Upkeep ≡ LeiosState.Upkeep (proj₁ s'×i)))
          ∙ needsUpkeep u
          ∙ u ≢ Base
          ──────────────────────────────────────────────────────────────

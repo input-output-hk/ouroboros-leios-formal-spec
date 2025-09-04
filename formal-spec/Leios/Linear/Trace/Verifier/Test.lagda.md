@@ -30,7 +30,7 @@ module _ where
         ; winning-slots = fromList $
           (EB , 100) ∷
 
-          (EB , 102) ∷
+          (EB , 102) ∷ (VT , 102) ∷
                        (VT , 106) ∷
           (EB , 107) ∷ (VT , 107) ∷
           (EB , 108) ∷ (VT , 108) ∷
@@ -92,65 +92,53 @@ Checking a simple trace
 #### Slot 100
 ```agda
                      (EB-Role-Action    100 eb₂ , inj₁ SLOT)
-{-
                    ∷ (Base₁-Action      100 , inj₂ (inj₂ (SubmitTxs (3 ∷ 4 ∷ 5 ∷ []))))
                    ∷ (Base₂-Action      100 , inj₁ SLOT)
                    ∷ (Slot₂-Action      100 , inj₂ (inj₁ (BASE-LDG [ rb₀ ])))
                    ∷ (No-VT-Role-Action 100 , inj₁ SLOT)
                    ∷ (Slot₁-Action      100 , inj₁ (FFD-OUT []))
--}
 ```
 #### Slot 101
 ```agda
-{-
                    ∷ (Base₂-Action      101 , inj₁ SLOT)
                    ∷ (No-EB-Role-Action 101 , inj₁ SLOT)
                    ∷ (No-VT-Role-Action 101 , inj₁ SLOT)
                    ∷ (Slot₂-Action      101 , inj₂ (inj₁ (BASE-LDG [ rb₁ ])))
                    ∷ (Slot₁-Action      101 , inj₁ (FFD-OUT (inj₁ (ebHeader eb₁) ∷ [])))
--}
 ```
 #### Slot 102
 ```agda
-{-
                    ∷ (Base₂-Action      102 , inj₁ SLOT)
                    ∷ (EB-Role-Action    102 eb₀ , inj₁ SLOT)
                    ∷ (No-VT-Role-Action 102 , inj₁ SLOT)
                    ∷ (Slot₁-Action      102 , inj₁ (FFD-OUT []))
--}
 ```
 #### Slot 103
 ```agda
-{-
                    ∷ (Base₂-Action      103 , inj₁ SLOT)
                    ∷ (No-EB-Role-Action 103 , inj₁ SLOT)
                    ∷ (No-VT-Role-Action 103 , inj₁ SLOT)
                    ∷ (Slot₁-Action      103 , inj₁ (FFD-OUT []))
--}
 ```
 #### Slot 104
 ```agda
-{-
                    ∷ (Base₂-Action      104 , inj₁ SLOT)
                    ∷ (No-EB-Role-Action 104 , inj₁ SLOT)
                    ∷ (No-VT-Role-Action 104 , inj₁ SLOT)
                    ∷ (Slot₁-Action      104 , inj₁ (FFD-OUT []))
--}
 ```
 #### Slot 105
 ```agda
-{-
                    ∷ (Base₂-Action      105 , inj₁ SLOT)
                    ∷ (No-EB-Role-Action 105 , inj₁ SLOT)
                    ∷ (No-VT-Role-Action 105 , inj₁ SLOT)
                    ∷ (Slot₁-Action      105 , inj₁ (FFD-OUT []))
--}
 ```
 #### Slot 106
 ```agda
-{-
                    ∷ (Base₂-Action      106 , inj₁ SLOT)
                    ∷ (No-EB-Role-Action 106 , inj₁ SLOT)
+{-
                    ∷ (VT-Role-Action    106 eb₁ 102 , inj₁ SLOT)
                    ∷ (Slot₁-Action      106 , inj₁ (FFD-OUT []))
 -}

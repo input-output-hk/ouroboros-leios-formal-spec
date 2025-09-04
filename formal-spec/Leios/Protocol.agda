@@ -56,7 +56,7 @@ record LeiosState : Type where
         slot         : ℕ
         IBHeaders    : List IBHeader
         IBBodies     : List IBBody
-        Upkeep       : ℙ SlotUpkeep
+        Upkeep       : List SlotUpkeep
         Upkeep-Stage : ℙ StageUpkeep
         votingState  : VotingState
         PubKeys      : List PubKey
@@ -110,7 +110,7 @@ record LeiosState : Type where
         (no ¬p) → nothing
 
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
-addUpkeep s u = let open LeiosState s in record s { Upkeep = Upkeep ∪ ❴ u ❵ }
+addUpkeep s u = let open LeiosState s in record s { Upkeep = u ∷ Upkeep }
 {-# INJECTIVE_FOR_INFERENCE addUpkeep #-}
 
 addUpkeep-Stage : LeiosState → StageUpkeep → LeiosState
@@ -129,7 +129,7 @@ initLeiosState V SD pks = record
   ; slot         = initSlot V
   ; IBHeaders    = []
   ; IBBodies     = []
-  ; Upkeep       = ∅
+  ; Upkeep       = []
   ; Upkeep-Stage = ∅
   ; votingState  = initVotingState
   ; PubKeys      = pks
