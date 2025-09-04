@@ -30,118 +30,100 @@ _ᵀ : Fun₁ Channel
 ᵀ-idempotent : ∀ {A} → A ᵀ ᵀ ≡ A
 ᵀ-idempotent = refl
 
+ᵀ-identity : I ᵀ ≡ I
+ᵀ-identity = refl
+
 infixr 9 _⊗_
 
 _⊗_ : Fun₂ Channel
 (receive₁ ⇿ send₁) ⊗ (receive₂ ⇿ send₂) = (receive₁ ⊎ receive₂) ⇿ (send₁ ⊎ send₂)
 
 data Mode : Type where
-  S : Mode
-  R : Mode
+  Out : Mode
+  In : Mode
 
-¬ₘ_ : Mode → Mode
-¬ₘ S = R
-¬ₘ R = S
+¬ₘ_ : Fun₁ Mode
+¬ₘ Out = In
+¬ₘ In = Out
+
+¬ₘ-idempotent : ∀ {m} → ¬ₘ (¬ₘ m) ≡ m
+¬ₘ-idempotent {Out} = refl
+¬ₘ-idempotent {In} = refl
 
 modeType : Mode → Channel → Type
-modeType S = sndType
-modeType R = rcvType
+modeType Out = sndType
+modeType In = rcvType
 
-infix 4 _[_]⇒[_]_ _[_]⇔[_]_
+{-# INJECTIVE_FOR_INFERENCE modeType #-}
 
-_[_]⇒[_]_ _[_]⇔[_]_ : Channel → Mode → Mode → Channel → Type
+infix 4 _[_]⇒[_]_
+
+_[_]⇒[_]_ : Channel → Mode → Mode → Channel → Type
 c₁ [ m₁ ]⇒[ m₂ ] c₂ = modeType m₁ c₁ → modeType m₂ c₂
-c₁ [ m₁ ]⇔[ m₂ ] c₂ = c₁ [ m₁ ]⇒[ m₂ ] c₂ × c₂ [ m₂ ]⇒[ m₁ ] c₁
 
-{-# INJECTIVE_FOR_INFERENCE _[_]⇒[_]_ #-}
+⇒-trans : ∀ {c₁ c₂ c₃ m₁ m₂ m₃} → c₁ [ m₁ ]⇒[ m₂ ] c₂ → c₂ [ m₂ ]⇒[ m₃ ] c₃ → c₁ [ m₁ ]⇒[ m₃ ] c₃
+⇒-trans p q = q P.∘ p
 
-mode-assoc : ∀ {c₁ c₂ c₃ m₁ m₂ m₃} → c₁ [ m₁ ]⇒[ m₂ ] c₂ → c₂ [ m₂ ]⇒[ m₃ ] c₃ → c₁ [ m₁ ]⇒[ m₃ ] c₃
-mode-assoc p q r = q (p r)
+infixr 10 _⇒ₜ_
 
--- A set of operator essentially saying: "If we send/receive on Channel X then we send/receive on Channel Y"
-infixr 4 _ᵣ⇒ᵣ_ _ₛ⇒ₛ_ _ᵣ⇒ₛ_ _ₛ⇒ᵣ_
+_⇒ₜ_ = ⇒-trans 
 
-_ᵣ⇒ᵣ_ _ₛ⇒ₛ_ _ᵣ⇒ₛ_ _ₛ⇒ᵣ_ : Channel → Channel → Type
+⇒-refl : ∀ {m A} → A [ m ]⇒[ m ] A
+⇒-refl = id
 
-_ᵣ⇒ᵣ_ = _[ R ]⇒[ R ]_
+⊗-commut : ∀ {m A B} → A ⊗ B [ m ]⇒[ m ] B ⊗ A
+⊗-commut {Out} = swap
+⊗-commut {In} = swap
 
-_ₛ⇒ₛ_ = _[ S ]⇒[ S ]_
+⊗-right-intro : ∀ {m A B} → A [ m ]⇒[ m ] A ⊗ B
+⊗-right-intro {Out} = inj₁
+⊗-right-intro {In} = inj₁
 
-_ᵣ⇒ₛ_ = _[ R ]⇒[ S ]_
+⊗-left-intro : ∀ {m A B} → B [ m ]⇒[ m ] A ⊗ B
+⊗-left-intro = ⊗-right-intro ⇒ₜ ⊗-commut
 
-_ₛ⇒ᵣ_ = _[ S ]⇒[ R ]_
+⊗-ᵀ-distrib : ∀ {m A B} → (A ⊗ B) ᵀ [ m ]⇒[ m ] A ᵀ ⊗ B ᵀ
+⊗-ᵀ-distrib {Out} = id
+⊗-ᵀ-distrib {In} = id
 
-module _ {A : Channel} where
+⊗-ᵀ-factor : ∀ {m A B} → A ᵀ ⊗ B ᵀ [ m ]⇒[ m ] (A ⊗ B) ᵀ
+⊗-ᵀ-factor {Out} = id
+⊗-ᵀ-factor {In} = id
 
-  bothI : ∀ {m} → A ⊗ I [ m ]⇔[ m ] A
-  bothI {S} = (λ {(inj₁ x) → x}) , inj₁
-  bothI {R} = (λ {(inj₁ x) → x}) , inj₁
-  
-  rcvI = bothI {R}
-  sndI = bothI {S}
-  
-  bothᵀ : ∀ {m} → A ᵀ [ m ]⇔[ ¬ₘ m ] A
-  bothᵀ {S} = (id , id)
-  bothᵀ {R} = (id , id)
+⊗-right-neutral : ∀ {m A} → A ⊗ I [ m ]⇒[ m ] A
+⊗-right-neutral {Out} (inj₁ x) = x
+⊗-right-neutral {In} (inj₁ x) = x
 
-  rcvᵀ = bothᵀ {S}
-  sndᵀ = bothᵀ {R}
+⊗-left-neutral : ∀ {m A} → I ⊗ A [ m ]⇒[ m ] A
+⊗-left-neutral = ⊗-commut ⇒ₜ ⊗-right-neutral
 
-module _ {A B : Channel} where
+⇒-double-negate : ∀ {m A} → A [ ¬ₘ (¬ₘ m) ]⇒[ m ] A
+⇒-double-negate {m} rewrite (¬ₘ-idempotent {m}) = ⇒-refl
 
-  rcvId : A ⊗ A ᵣ⇒ᵣ A
-  rcvId = [ id , id ]
+⇒-transpose : ∀ {m A} → A [ m ]⇒[ ¬ₘ m ] A ᵀ
+⇒-transpose {Out} = id
+⇒-transpose {In} = id
 
-  sndId : A ⊗ A ₛ⇒ₛ A
-  sndId = [ id , id ]
+⇒-reduce : ∀ {m A} → A ᵀ [ ¬ₘ m ]⇒[ m ] A
+⇒-reduce = ⇒-transpose ⇒ₜ ⇒-double-negate
 
-  rcvSwap : A ⊗ B ᵣ⇒ᵣ B ⊗ A
-  rcvSwap = swap
+⊗-fusion : ∀ {m A} → A ⊗ A [ m ]⇒[ m ] A
+⊗-fusion {Out} = [ id , id ]
+⊗-fusion {In} = [ id , id ]
 
-  sndSwap : A ⊗ B ₛ⇒ₛ B ⊗ A
-  sndSwap = swap
+⊗-duplicate : ∀ {m A} → A [ m ]⇒[ m ] A ⊗ A
+⊗-duplicate {Out} = inj₁
+⊗-duplicate {In} = inj₁
 
-  rcvˡ : A ᵣ⇒ᵣ A ⊗ B
-  rcvˡ = inj₁
+⊗-right-double-intro : ∀ {m A B C} → A [ m ]⇒[ m ] B → A ⊗ C [ m ]⇒[ m ] B ⊗ C
+⊗-right-double-intro {Out} = map₁
+⊗-right-double-intro {In} = map₁
 
-  rcvʳ : B ᵣ⇒ᵣ A ⊗ B
-  rcvʳ = inj₂
+⊗-left-double-intro : ∀ {m A B C} → B [ m ]⇒[ m ] C → A ⊗ B [ m ]⇒[ m ] A ⊗ C
+⊗-left-double-intro p = ⊗-commut ⇒ₜ ⊗-right-double-intro p ⇒ₜ ⊗-commut
 
-  sndˡ : A ₛ⇒ₛ A ⊗ B
-  sndˡ = inj₁
-
-  sndʳ : B ₛ⇒ₛ A ⊗ B
-  sndʳ = inj₂
-
-  rcv⊗ᵀ : (A ⊗ B) ᵀ ᵣ⇒ᵣ A ᵀ ⊗ B ᵀ
-  rcv⊗ᵀ = [ inj₁ , inj₂ ]
-
-  snd⊗ᵀ : (A ⊗ B) ᵀ ₛ⇒ₛ A ᵀ ⊗ B ᵀ
-  snd⊗ᵀ = [ inj₁ , inj₂ ]
-
--- Transpose idendity = identity
-
-module _ {A B C : Channel} where
-
-  rcvMapˡ : A ᵣ⇒ᵣ B → A ⊗ C ᵣ⇒ᵣ B ⊗ C
-  rcvMapˡ = map₁
-
-  rcvMapʳ : B ᵣ⇒ᵣ C → A ⊗ B ᵣ⇒ᵣ A ⊗ C
-  rcvMapʳ = map₂
-
-  sndMapˡ : A ₛ⇒ₛ B → A ⊗ C ₛ⇒ₛ B ⊗ C
-  sndMapˡ = map₁
-
-  sndMapʳ : B ₛ⇒ₛ C → A ⊗ B ₛ⇒ₛ A ⊗ C
-  sndMapʳ = map₂
-
-module _ {A B Adv : Channel} where
-
-  honestInputI : B ₛ⇒ᵣ A ⊗ (B ⊗ Adv) ᵀ
-  honestInputI = rcvʳ {A} {(B ⊗ Adv) ᵀ} P.∘ sndˡ {_} {Adv}
-
-  honestOutputO : B ᵣ⇒ₛ (A ⊗ (B ⊗ Adv) ᵀ)
-  honestOutputO = sndʳ {A} {(B ⊗ Adv) ᵀ} P.∘ rcvˡ {B} {Adv}
+honestChannelI : ∀ {m A B Adv} → B [ m ]⇒[ ¬ₘ m ] A ⊗ (B ⊗ Adv) ᵀ
+honestChannelI = ⇒-transpose ⇒ₜ ⊗-right-intro ⇒ₜ ⊗-ᵀ-factor ⇒ₜ ⊗-left-intro
 
 -- honestOutputO' : ∀ {Adv} → ∃ (Channel.rcvType B) → Maybe (∃ (Channel.sndType (A ⊗ (B ⊗ Adv) ᵀ)))
 -- honestOutputO' = just P.∘ honestOutputO
