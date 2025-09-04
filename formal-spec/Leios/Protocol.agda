@@ -91,8 +91,8 @@ record LeiosState : Type where
   Ledger = flip L.concatMap RBs
     (λ rb → RankingBlock.txs rb L.++ maybe lookupTxsC [] (getEBHash <$> (RankingBlock.ebCert rb)))
 
-  needsUpkeep : SlotUpkeep → Set
-  needsUpkeep = _∉ Upkeep
+  needsUpkeep : SlotUpkeep → Type
+  needsUpkeep = _∉ˡ Upkeep
 
   needsUpkeep-Stage : StageUpkeep → Set
   needsUpkeep-Stage = _∉ Upkeep-Stage
