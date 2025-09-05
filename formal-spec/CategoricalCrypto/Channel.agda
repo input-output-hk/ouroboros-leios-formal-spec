@@ -30,7 +30,7 @@ infix 10 _⇿_
 record Channel : Type₁ where
   constructor _⇿_
   field
-    rcvType sndType : Type
+    inType outType : Type
 
 open Channel
 
@@ -47,8 +47,8 @@ _ᵀ : Fun₁ Channel
 ᵀ-identity = refl
 
 modeType : Mode → Channel → Type
-modeType Out = sndType
-modeType In = rcvType
+modeType Out = outType
+modeType In = inType
 
 simpleChannel : (Mode → Type) → Channel
 simpleChannel T = T In ⇿ T Out
@@ -131,9 +131,9 @@ _⊗_ : Fun₂ Channel
 ⊗-fusion {Out} = [ id , id ]
 ⊗-fusion {In} = [ id , id ]
 
-⊗-duplicate : ∀ {m A} → A [ m ]⇒[ m ] A ⊗ A
-⊗-duplicate {Out} = inj₁
-⊗-duplicate {In} = inj₁
+⊗-copy : ∀ {m A} → A [ m ]⇒[ m ] A ⊗ A
+⊗-copy {Out} = inj₁
+⊗-copy {In} = inj₁
 
 ⊗-right-double-intro : ∀ {m A B C} → A [ m ]⇒[ m ] B → A ⊗ C [ m ]⇒[ m ] B ⊗ C
 ⊗-right-double-intro {Out} = map₁

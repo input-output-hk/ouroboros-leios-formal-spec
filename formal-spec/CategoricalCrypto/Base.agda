@@ -5,43 +5,42 @@ module CategoricalCrypto.Base where
 open import abstract-set-theory.Prelude hiding (id; _∘_; _⊗_; lookup; Dec; [_])
 import abstract-set-theory.Prelude as P
 
-open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
+open import CategoricalCrypto.Channel 
 
 -- --------------------------------------------------------------------------------
 -- -- Machines, which form the morphisms
 
--- MachineType : Channel → Channel → Type → Type₁
--- MachineType A B S = let open Channel (A ⊗ B ᵀ) in
---   S → ∃ rcvType → Maybe (∃ sndType) → S → Type
+MachineType : Channel → Channel → Type → Type₁
+MachineType A B S = let open Channel (A ⊗ B ᵀ) in S → inType → Maybe outType → S → Type
 
--- record Machine (A B : Channel) : Type₁ where
---   constructor MkMachine
---   field State    : Type
---         stepRel  : MachineType A B State
+record Machine (A B : Channel) : Type₁ where
+  constructor MkMachine
+  field
+    State   : Type
+    stepRel : MachineType A B State
 
--- module _ {A B} (let open Channel (A ⊗ B ᵀ)) where
---   MkMachine' : ∀ {State} → MachineType A B State → Machine A B
---   MkMachine' = MkMachine _
+module _ {A B} (let open Channel (A ⊗ B ᵀ)) where
+  MkMachine' : ∀ {State} → MachineType A B State → Machine A B
+  MkMachine' = MkMachine _
 
---   -- TODO: all of these are functors from the appropriate categories
---   StatelessMachine : (∃ rcvType → Maybe (∃ sndType) → Type) → Machine A B
---   StatelessMachine R = MkMachine ⊤ (λ _ i o _ → R i o)
+  -- TODO: all of these are functors from the appropriate categories
+  StatelessMachine : (inType → Maybe outType → Type) → Machine A B
+  StatelessMachine R = MkMachine ⊤ (λ _ i o _ → R i o)
 
---   FunctionMachine : (∃ rcvType → Maybe (∃ sndType)) → Machine A B
---   FunctionMachine f = StatelessMachine (λ i o → f i ≡ o)
+  FunctionMachine : (inType → Maybe outType) → Machine A B
+  FunctionMachine f = StatelessMachine (λ i o → f i ≡ o)
 
---   TotalFunctionMachine : (∃ rcvType → ∃ sndType) → Machine A B
---   TotalFunctionMachine f = FunctionMachine (just P.∘ f)
+  TotalFunctionMachine : (inType → outType) → Machine A B
+  TotalFunctionMachine f = FunctionMachine (just P.∘ f)
 
--- -- this forces all messages to go 'through' the machine, i.e.
--- -- messages on the domain become messages on the codomain and vice versa
--- -- if e.g. A ≡ B then it's easy to accidentally send a message the wrong way
--- -- which is prevented here
--- TotalFunctionMachine' : (let open Channel)
---   → (∃ (rcvType A) → ∃ (rcvType B)) → (∃ (sndType B) → ∃ (sndType A)) → Machine A B
--- TotalFunctionMachine' f g = TotalFunctionMachine λ where
---   (inj₁ p , m) → sndʳ (f (p , m))
---   (inj₂ p , m) → sndˡ (g (p , m))
+-- this forces all messages to go 'through' the machine, i.e.
+-- messages on the domain become messages on the codomain and vice versa
+-- if e.g. A ≡ B then it's easy to accidentally send a message the wrong way
+-- which is prevented here
+TotalFunctionMachine' : ∀  {A B} → A [ In ]⇒[ In ] B → B [ Out ]⇒[ Out ] A → Machine A B
+TotalFunctionMachine' {A} {B} f g = TotalFunctionMachine λ where
+  (inj₁ p) → {!!} -- ⇒-transpose ⇒ₜ ⊗-left-intro $ f p -- {!⇒-transpose {In} {B} $ f p!} -- (⊗-left-intro ⇒ₜ ⇒-transpose) (f p)
+  (inj₂ p) → {!!}
 
 -- id : Machine A A
 -- id = TotalFunctionMachine λ where
@@ -52,8 +51,8 @@ open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 --   open Machine M
 
 --   -- given transformation on the channels, transform the machine
---   modifyStepRel : (∃ (Channel.rcvType (C ⊗ D ᵀ)) → ∃ (Channel.rcvType (A ⊗ B ᵀ)))
---                 → (∃ (Channel.sndType (C ⊗ D ᵀ)) → ∃ (Channel.sndType (A ⊗ B ᵀ)))
+--   modifyStepRel : (∃ (Channel.inType (C ⊗ D ᵀ)) → ∃ (Channel.inType (A ⊗ B ᵀ)))
+--                 → (∃ (Channel.outType (C ⊗ D ᵀ)) → ∃ (Channel.outType (A ⊗ B ᵀ)))
 --                 → Machine C D
 --   modifyStepRel _ _ .State   = State
 --   modifyStepRel f g .stepRel s m m' s' = stepRel s (f m) (g <$> m') s'
@@ -66,7 +65,7 @@ open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 
 --   AllCs = (A ⊗ B ᵀ) ⊗ (C ⊗ D ᵀ)
 
---   data CompRel : State → ∃ (Channel.rcvType AllCs) → Maybe (∃ (Channel.sndType AllCs)) → State → Type where
+--   data CompRel : State → ∃ (Channel.inType AllCs) → Maybe (∃ (Channel.outType AllCs)) → State → Type where
 --     Step₁ : ∀ {p m m' s s' s₂} → stepRel₁ s (p , m) m' s'
 --           → CompRel (s , s₂) (inj₁ p , m) (sndˡ <$> m') (s' , s₂)
 
@@ -232,8 +231,8 @@ open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 
 -- ℰ-Out : Channel
 -- ℰ-Out .Channel.P = ⊤
--- ℰ-Out .Channel.sndType _ = Bool
--- ℰ-Out .Channel.rcvType _ = ⊥
+-- ℰ-Out .Channel.outType _ = Bool
+-- ℰ-Out .Channel.inType _ = ⊥
 
 -- -- Presheaf on the category of channels & machines
 -- -- we just take machines that output a boolean
