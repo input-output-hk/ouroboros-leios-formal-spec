@@ -129,6 +129,10 @@ Ok' : ∀ {s i o s′} → (α : s -⟦ honestOutputI (rcvˡ (-, i)) / o ⟧⇀ 
     → Result (Err-verifyAction (getLabel α) i s) (ValidStep (getLabel α , i) s)
 Ok' a = Ok (Valid _ (FromAction¹ _ a))
 
+-- We need the SpecStructure in context when generating Base₂a-premises
+open import Prelude.STS.GenPremises
+unquoteDecl Base₂a-premises = genPremises Base₂a-premises (quote Base₂a)
+
 verifyStep' : (a : Action) → (i : FFDT Out) → (s : LeiosState) → getSlot a ≡ slot s
             → Result (Err-verifyAction a i s) (ValidStep (a , i) s)
 
@@ -183,7 +187,11 @@ verifyStep' (Slot-Action n) (FFDT.FFD-OUT msgs) s refl with ¿ Slot₁-premises 
 
 -- Different IO pattern again
 verifyStep' (Base₁-Action n) _ s refl = Err dummyErr
-verifyStep' (Base₂a-Action n _) FFDT.SLOT s refl with ¿ Base₂a-premises {s = s} .proj₁ ¿
+verifyStep' (Base₂a-Action n _) FFDT.SLOT s refl
+  with (RankingBlock.ebCert (currentRB s))
+... | nothing = Err dummyErr
+... | just cert
+  with ¿ Base₂a-premises {s = s} {cert = cert} .proj₁ ¿
 ... | yes p = Ok' (Base₂a p)
 ... | no _ = Err dummyErr
 verifyStep' (Base₂a-Action n _) _ s refl = Err dummyErr
