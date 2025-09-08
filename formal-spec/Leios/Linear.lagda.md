@@ -147,6 +147,7 @@ allDone record { Upkeep = u } = fromList u ≡ᵉ fromList (EB-Role ∷ VT-Role 
 ```
 ### Linear Leios transitions
 The relation describing the transition given input and state
+
 #### Initialization
 ```agda
 open Types params
