@@ -1,6 +1,6 @@
 {-# OPTIONS --safe --no-require-unique-meta-solutions #-}
 
-module CategoricalCrypto.Base where
+module CategoricalCrypto.Machine where
 
 open import abstract-set-theory.Prelude hiding (id; _∘_; _⊗_; lookup; Dec; [_])
 import abstract-set-theory.Prelude as P
