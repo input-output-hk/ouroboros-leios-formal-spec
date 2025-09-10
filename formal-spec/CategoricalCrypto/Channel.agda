@@ -32,12 +32,6 @@ record Channel : Type₁ where
   field
     inType outType : Type
 
-  inT = inType
-  outT = outType
-  
-  {-# INJECTIVE_FOR_INFERENCE inT #-}
-  {-# INJECTIVE_FOR_INFERENCE outT #-}
-
 open Channel
 
 I : Channel
@@ -100,58 +94,68 @@ _⇒ₜ_ = ⇒-trans
 
 infixr 9 _⊗_
 
-_⊗_ : Fun₂ Channel
-(receive₁ ⇿ send₁) ⊗ (receive₂ ⇿ send₂) = (receive₁ ⊎ receive₂) ⇿ (send₁ ⊎ send₂)
+opaque
+  _⊗_ : Fun₂ Channel
+  (receive₁ ⇿ send₁) ⊗ (receive₂ ⇿ send₂) = (receive₁ ⊎ receive₂) ⇿ (send₁ ⊎ send₂)
 
------------------------------------
--- Forwarding tensorial products --
------------------------------------
+  -----------------------------------
+  -- Forwarding tensorial products --
+  -----------------------------------
 
-⊗-sym : ∀ {m A B} → A ⊗ B [ m ]⇒[ m ] B ⊗ A
-⊗-sym {Out} = swap
-⊗-sym {In} = swap
+  ⊗-sym : ∀ {m A B} → A ⊗ B [ m ]⇒[ m ] B ⊗ A
+  ⊗-sym {Out} = swap
+  ⊗-sym {In} = swap
 
-⊗-right-assoc : ∀ {m A B C} → (A ⊗ B) ⊗ C [ m ]⇒[ m ] A ⊗ B ⊗ C
-⊗-right-assoc {Out} = assocʳ
-⊗-right-assoc {In} = assocʳ
+  ⊗-right-assoc : ∀ {m A B C} → (A ⊗ B) ⊗ C [ m ]⇒[ m ] A ⊗ B ⊗ C
+  ⊗-right-assoc {Out} = assocʳ
+  ⊗-right-assoc {In} = assocʳ
 
-⊗-left-assoc : ∀ {m A B C} → A ⊗ B ⊗ C [ m ]⇒[ m ] (A ⊗ B) ⊗ C
-⊗-left-assoc {Out} = assocˡ
-⊗-left-assoc {In} = assocˡ
+  ⊗-left-assoc : ∀ {m A B C} → A ⊗ B ⊗ C [ m ]⇒[ m ] (A ⊗ B) ⊗ C
+  ⊗-left-assoc {Out} = assocˡ
+  ⊗-left-assoc {In} = assocˡ
 
-⊗-right-intro : ∀ {m A B} → A [ m ]⇒[ m ] A ⊗ B
-⊗-right-intro {Out} = inj₁
-⊗-right-intro {In} = inj₁
+  ⊗-right-intro : ∀ {m A B} → A [ m ]⇒[ m ] A ⊗ B
+  ⊗-right-intro {Out} = inj₁
+  ⊗-right-intro {In} = inj₁
+
+  ⊗-ᵀ-distrib : ∀ {m A B} → (A ⊗ B) ᵀ [ m ]⇒[ m ] A ᵀ ⊗ B ᵀ
+  ⊗-ᵀ-distrib {Out} = id
+  ⊗-ᵀ-distrib {In} = id
+
+  ⊗-ᵀ-factor : ∀ {m A B} → A ᵀ ⊗ B ᵀ [ m ]⇒[ m ] (A ⊗ B) ᵀ
+  ⊗-ᵀ-factor {Out} = id
+  ⊗-ᵀ-factor {In} = id
+
+  ⊗-right-neutral : ∀ {m A} → A ⊗ I [ m ]⇒[ m ] A
+  ⊗-right-neutral {Out} (inj₁ x) = x
+  ⊗-right-neutral {In} (inj₁ x) = x
+
+  ⊗-fusion : ∀ {m A} → A ⊗ A [ m ]⇒[ m ] A
+  ⊗-fusion {Out} = [ id , id ]
+  ⊗-fusion {In} = [ id , id ]
+
+  ⊗-duplicate : ∀ {m A} → A [ m ]⇒[ m ] A ⊗ A
+  ⊗-duplicate {Out} = inj₁
+  ⊗-duplicate {In} = inj₁
+
+  ⊗-combine : ∀ {m m₁ A B C D} → A [ m ]⇒[ m₁ ] B → C [ m ]⇒[ m₁ ] D → A ⊗ C [ m ]⇒[ m₁ ] B ⊗ D
+  ⊗-combine {Out} {Out} p q (inj₁ x) = inj₁ (p x)
+  ⊗-combine {Out} {Out} p q (inj₂ y) = inj₂ (q y)
+  ⊗-combine {Out} {In} p q (inj₁ x) = inj₁ (p x)
+  ⊗-combine {Out} {In} p q (inj₂ y) = inj₂ (q y)
+  ⊗-combine {In} {Out} p q (inj₁ x) = inj₁ (p x)
+  ⊗-combine {In} {Out} p q (inj₂ y) = inj₂ (q y)
+  ⊗-combine {In} {In} p q (inj₁ x) = inj₁ (p x)
+  ⊗-combine {In} {In} p q (inj₂ y) = inj₂ (q y)
 
 ⊗-left-intro : ∀ {m A B} → B [ m ]⇒[ m ] A ⊗ B
 ⊗-left-intro = ⊗-right-intro ⇒ₜ ⊗-sym
 
-⊗-ᵀ-distrib : ∀ {m A B} → (A ⊗ B) ᵀ [ m ]⇒[ m ] A ᵀ ⊗ B ᵀ
-⊗-ᵀ-distrib {Out} = id
-⊗-ᵀ-distrib {In} = id
-
-⊗-ᵀ-factor : ∀ {m A B} → A ᵀ ⊗ B ᵀ [ m ]⇒[ m ] (A ⊗ B) ᵀ
-⊗-ᵀ-factor {Out} = id
-⊗-ᵀ-factor {In} = id
-
-⊗-right-neutral : ∀ {m A} → A ⊗ I [ m ]⇒[ m ] A
-⊗-right-neutral {Out} (inj₁ x) = x
-⊗-right-neutral {In} (inj₁ x) = x
-
 ⊗-left-neutral : ∀ {m A} → I ⊗ A [ m ]⇒[ m ] A
 ⊗-left-neutral = ⊗-sym ⇒ₜ ⊗-right-neutral
 
-⊗-fusion : ∀ {m A} → A ⊗ A [ m ]⇒[ m ] A
-⊗-fusion {Out} = [ id , id ]
-⊗-fusion {In} = [ id , id ]
-
-⊗-copy : ∀ {m A} → A [ m ]⇒[ m ] A ⊗ A
-⊗-copy {Out} = inj₁
-⊗-copy {In} = inj₁
-
 ⊗-right-double-intro : ∀ {m A B C} → A [ m ]⇒[ m ] B → A ⊗ C [ m ]⇒[ m ] B ⊗ C
-⊗-right-double-intro {Out} = map₁
-⊗-right-double-intro {In} = map₁
+⊗-right-double-intro p = ⊗-combine p ⇒-refl
 
 ⊗-left-double-intro : ∀ {m A B C} → B [ m ]⇒[ m ] C → A ⊗ B [ m ]⇒[ m ] A ⊗ C
 ⊗-left-double-intro p = ⊗-sym ⇒ₜ ⊗-right-double-intro p ⇒ₜ ⊗-sym

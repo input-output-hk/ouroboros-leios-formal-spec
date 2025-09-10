@@ -1,4 +1,4 @@
-{-# OPTIONS --safe --lossy-unification #-}
+{-# OPTIONS --safe --no-require-unique-meta-solutions #-}
 open import Leios.Prelude hiding (_⊗_; module Any)
 open import CategoricalCrypto
 
@@ -29,19 +29,19 @@ Ms = ⨂ const {B = Participant} M
 data WithState_receive_return_newState_ : MachineType I (Ms ⊗ A) (List (Message × Participant)) where
 
   Send : WithState buffer
-         receive   honestChannelB {Out} {I} $ ⨂⇒ p $ SndMessage ms -- p wants to send messages ms
-         return    just $ honestChannelB {In} {I} $ ⨂⇒ p Activate -- return control to p
-         newState  (concatMap (λ m → tabulate (m ,_)) ms ++ buffer) -- buffer a copy of every message for every participant
+         receive honestChannelB {Out} $ ⨂⇒ p $ SndMessage ms -- p wants to send messages ms
+         return just $ honestChannelB {In} $ ⨂⇒ p Activate -- return control to p
+         newState (concatMap (λ m → tabulate (m ,_)) ms ++ buffer) -- buffer a copy of every message for every participant
 
   Deliver : WithState buffer₁ ++ (m , p) ∷ buffer₂ -- state decomposes appropriately
-            receive   adversarialChannel {Out} {I} $ inj₁ (length buffer₁) -- adversary wants to deliver k-th message
-            return    just $ honestChannelB {In} {I} $ ⨂⇒ p $ RcvMessage m -- deliver it
-            newState  (buffer₁ ++ buffer₂) -- remove message
+            receive adversarialChannel {Out} $ inj₁ (length buffer₁) -- adversary wants to deliver k-th message
+            return just $ honestChannelB {In} $ ⨂⇒ p $ RcvMessage m -- deliver it
+            newState (buffer₁ ++ buffer₂) -- remove message
 
   Eavesdrop : WithState buffer₁ ++ x ∷ buffer₂ -- state decomposes appropriately
-              receive   adversarialChannel {Out} {I} $ inj₁ (length buffer₁) -- adversary wants to know k-th message
-              return    just $ adversarialChannel {In} {I} x -- deliver it
-              newState  (buffer₁ ++ x ∷ buffer₂) -- state remains unchanged
+              receive adversarialChannel {Out} $ inj₁ (length buffer₁) -- adversary wants to know k-th message
+              return just $ adversarialChannel {In} x -- deliver it
+              newState (buffer₁ ++ x ∷ buffer₂) -- state remains unchanged
 
 Network : Machine I (Ms ⊗ A)
 Network .Machine.State = List (Message × Participant)
