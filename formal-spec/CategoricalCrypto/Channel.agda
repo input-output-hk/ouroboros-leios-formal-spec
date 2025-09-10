@@ -3,13 +3,13 @@
 module CategoricalCrypto.Channel where
 
 open import abstract-set-theory.Prelude hiding (_⊗_ ; [_])
-open import Data.Sum.Base using (swap)
+open import Data.Sum.Base using (swap ; assocʳ ; assocˡ)
 open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 
 ------------------------------------
 -- Modes for messages (In or Out) --
 ------------------------------------
-
+open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 data Mode : Type where
   Out : Mode
   In : Mode
@@ -101,16 +101,24 @@ _⊗_ : Fun₂ Channel
 -- Forwarding tensorial products --
 -----------------------------------
 
-⊗-commut : ∀ {m A B} → A ⊗ B [ m ]⇒[ m ] B ⊗ A
-⊗-commut {Out} = swap
-⊗-commut {In} = swap
+⊗-sym : ∀ {m A B} → A ⊗ B [ m ]⇒[ m ] B ⊗ A
+⊗-sym {Out} = swap
+⊗-sym {In} = swap
+
+⊗-right-assoc : ∀ {m A B C} → (A ⊗ B) ⊗ C [ m ]⇒[ m ] A ⊗ B ⊗ C
+⊗-right-assoc {Out} = assocʳ
+⊗-right-assoc {In} = assocʳ
+
+⊗-left-assoc : ∀ {m A B C} → A ⊗ B ⊗ C [ m ]⇒[ m ] (A ⊗ B) ⊗ C
+⊗-left-assoc {Out} = assocˡ
+⊗-left-assoc {In} = assocˡ
 
 ⊗-right-intro : ∀ {m A B} → A [ m ]⇒[ m ] A ⊗ B
 ⊗-right-intro {Out} = inj₁
 ⊗-right-intro {In} = inj₁
 
 ⊗-left-intro : ∀ {m A B} → B [ m ]⇒[ m ] A ⊗ B
-⊗-left-intro = ⊗-right-intro ⇒ₜ ⊗-commut
+⊗-left-intro = ⊗-right-intro ⇒ₜ ⊗-sym
 
 ⊗-ᵀ-distrib : ∀ {m A B} → (A ⊗ B) ᵀ [ m ]⇒[ m ] A ᵀ ⊗ B ᵀ
 ⊗-ᵀ-distrib {Out} = id
@@ -125,7 +133,7 @@ _⊗_ : Fun₂ Channel
 ⊗-right-neutral {In} (inj₁ x) = x
 
 ⊗-left-neutral : ∀ {m A} → I ⊗ A [ m ]⇒[ m ] A
-⊗-left-neutral = ⊗-commut ⇒ₜ ⊗-right-neutral
+⊗-left-neutral = ⊗-sym ⇒ₜ ⊗-right-neutral
 
 ⊗-fusion : ∀ {m A} → A ⊗ A [ m ]⇒[ m ] A
 ⊗-fusion {Out} = [ id , id ]
@@ -140,11 +148,14 @@ _⊗_ : Fun₂ Channel
 ⊗-right-double-intro {In} = map₁
 
 ⊗-left-double-intro : ∀ {m A B C} → B [ m ]⇒[ m ] C → A ⊗ B [ m ]⇒[ m ] A ⊗ C
-⊗-left-double-intro p = ⊗-commut ⇒ₜ ⊗-right-double-intro p ⇒ₜ ⊗-commut
+⊗-left-double-intro p = ⊗-sym ⇒ₜ ⊗-right-double-intro p ⇒ₜ ⊗-sym
 
 -------------------------
 -- Adversarial pattern --
 -------------------------
+
+honestChannelA : ∀ {m A B Adv} → A [ m ]⇒[ m ] A ⊗ (B ⊗ Adv) ᵀ
+honestChannelA = ⊗-right-intro
 
 honestChannelB : ∀ {m A B Adv} → B [ m ]⇒[ ¬ₘ m ] A ⊗ (B ⊗ Adv) ᵀ
 honestChannelB = ⇒-transpose ⇒ₜ ⊗-right-intro ⇒ₜ ⊗-ᵀ-factor ⇒ₜ ⊗-left-intro
@@ -152,21 +163,18 @@ honestChannelB = ⇒-transpose ⇒ₜ ⊗-right-intro ⇒ₜ ⊗-ᵀ-factor ⇒�
 adversarialChannel : ∀ {m A B Adv} → Adv [ m ]⇒[ ¬ₘ m ] A ⊗ (B ⊗ Adv) ᵀ
 adversarialChannel = ⇒-transpose ⇒ₜ ⊗-left-intro ⇒ₜ ⊗-ᵀ-factor ⇒ₜ ⊗-left-intro
 
-honestChannelA : ∀ {m A B Adv} → A [ m ]⇒[ m ] A ⊗ (B ⊗ Adv) ᵀ
-honestChannelA = ⊗-right-intro
-
 --------------------------------
 -- Additional Channel builder --
 --------------------------------
 
-⊗_ : ∀ {n} → (Fin n → Channel) → Channel
-⊗_ {zero} _ = I
-⊗_ {suc n} f = f fzero ⊗ ⊗ (f ∘ fsuc)
+⨂_ : ∀ {n} → (Fin n → Channel) → Channel
+⨂_ {zero} _ = I
+⨂_ {suc n} f = f fzero ⊗ ⨂ (f ∘ fsuc)
 
-⊗≡ : ∀ {n} → {f g : Fin n → Channel} → (∀ k → f k ≡ g k) → ⊗ f ≡ ⊗ g
-⊗≡ {zero} _ = refl
-⊗≡ {suc _} p = cong₂ _⊗_ (p fzero) (⊗≡ (p ∘ fsuc))
+⨂≡ : ∀ {n} → {f g : Fin n → Channel} → (∀ k → f k ≡ g k) → ⨂ f ≡ ⨂ g
+⨂≡ {zero} _ = refl
+⨂≡ {suc _} p = cong₂ _⊗_ (p fzero) (⨂≡ (p ∘ fsuc))
 
-rcv-⊗ : ∀ {n m} {f : Fin n → Channel} k → f k [ m ]⇒[ m ] ⊗ f
-rcv-⊗ fzero = ⊗-right-intro
-rcv-⊗ (fsuc k) = rcv-⊗ k ⇒ₜ ⊗-left-intro
+rcv-⨂ : ∀ {n m} {f : Fin n → Channel} k → f k [ m ]⇒[ m ] ⨂ f
+rcv-⨂ fzero = ⊗-right-intro
+rcv-⨂ (fsuc k) = rcv-⨂ k ⇒ₜ ⊗-left-intro

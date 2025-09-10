@@ -4,7 +4,7 @@ module CategoricalCrypto.Base where
 
 open import abstract-set-theory.Prelude hiding (id; _∘_; _⊗_; lookup; Dec; [_])
 import abstract-set-theory.Prelude as P
-
+open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 open import CategoricalCrypto.Channel 
 
 -- --------------------------------------------------------------------------------
@@ -39,220 +39,166 @@ module _ {A B} (let open Channel (A ⊗ B ᵀ)) where
 -- which is prevented here
 TotalFunctionMachine' : ∀  {A B} → A [ In ]⇒[ In ] B → B [ Out ]⇒[ Out ] A → Machine A B
 TotalFunctionMachine' {A} {B} f g = TotalFunctionMachine λ where
-  (inj₁ p) → {!!} -- ⇒-transpose ⇒ₜ ⊗-left-intro $ f p -- {!⇒-transpose {In} {B} $ f p!} -- (⊗-left-intro ⇒ₜ ⇒-transpose) (f p)
-  (inj₂ p) → {!!}
+  (inj₁ p) → ⇒-transpose {In} ⇒ₜ ⊗-left-intro {_} {A} {B ᵀ} $ f p
+  (inj₂ p) → ⊗-right-intro {Out} {A} {B ᵀ} $ g p
+  
+id : ∀ {A} → Machine A A
+id = TotalFunctionMachine λ where
+  (inj₁ p) → inj₂ p
+  (inj₂ p) → inj₁ p
 
--- id : Machine A A
--- id = TotalFunctionMachine λ where
---   (inj₁ p , m) → (inj₂ p , m)
---   (inj₂ p , m) → (inj₁ p , m)
+module _ {A B C D} (M : Machine A B) (let open Machine M) where
 
--- module _ (M : Machine A B) where
---   open Machine M
+  -- given transformation on the channels, transform the machine
+  modifyStepRel : (∀ {m} → C ⊗ D ᵀ [ m ]⇒[ m ] A ⊗ B ᵀ) → Machine C D
+  modifyStepRel _ .State = State
+  modifyStepRel f .stepRel s m m' s' = stepRel s (f {In} m) (f {Out} <$> m') s'
 
---   -- given transformation on the channels, transform the machine
---   modifyStepRel : (∃ (Channel.inType (C ⊗ D ᵀ)) → ∃ (Channel.inType (A ⊗ B ᵀ)))
---                 → (∃ (Channel.outType (C ⊗ D ᵀ)) → ∃ (Channel.outType (A ⊗ B ᵀ)))
---                 → Machine C D
---   modifyStepRel _ _ .State   = State
---   modifyStepRel f g .stepRel s m m' s' = stepRel s (f m) (g <$> m') s'
+module Tensor {A B C D} (M₁ : Machine A B) (M₂ : Machine C D) where
+  open Machine M₁ renaming (State to State₁; stepRel to stepRel₁)
+  open Machine M₂ renaming (State to State₂; stepRel to stepRel₂)
 
--- module Tensor (M₁ : Machine A B) (M₂ : Machine C D) where
---   open Machine M₁ renaming (State to State₁; stepRel to stepRel₁)
---   open Machine M₂ renaming (State to State₂; stepRel to stepRel₂)
+  State = State₁ × State₂
 
---   State = State₁ × State₂
+  AllCs = (A ⊗ B ᵀ) ⊗ (C ⊗ D ᵀ)
 
---   AllCs = (A ⊗ B ᵀ) ⊗ (C ⊗ D ᵀ)
+  data CompRel : State → Channel.inType AllCs → Maybe (Channel.outType AllCs) → State → Type where
 
---   data CompRel : State → ∃ (Channel.inType AllCs) → Maybe (∃ (Channel.outType AllCs)) → State → Type where
---     Step₁ : ∀ {p m m' s s' s₂} → stepRel₁ s (p , m) m' s'
---           → CompRel (s , s₂) (inj₁ p , m) (sndˡ <$> m') (s' , s₂)
+    Step₁ : ∀ {m m' s s' s₂} → stepRel₁ s m m' s' → CompRel (s , s₂) (inj₁ m) (inj₁ <$> m') (s' , s₂)
 
---     Step₂ : ∀ {p m m' s s' s₁} → stepRel₂ s (p , m) m' s'
---           → CompRel (s₁ , s) (inj₂ p , m) (sndʳ <$> m') (s₁ , s')
+    Step₂ : ∀ {m m' s s' s₁} → stepRel₂ s m m' s' → CompRel (s₁ , s) (inj₂ m) (inj₂ <$> m') (s₁ , s')
 
---   _⊗'_ : Machine (A ⊗ C) (B ⊗ D)
---   _⊗'_ = modifyStepRel (MkMachine State CompRel)
---     (λ where
---       (inj₁ (inj₁ p) , m) → (inj₁ (inj₁ p) , m)
---       (inj₁ (inj₂ p) , m) → (inj₂ (inj₁ p) , m)
---       (inj₂ (inj₁ p) , m) → (inj₁ (inj₂ p) , m)
---       (inj₂ (inj₂ p) , m) → (inj₂ (inj₂ p) , m))
---     (λ where
---       (inj₁ (inj₁ p) , m) → (inj₁ (inj₁ p) , m)
---       (inj₁ (inj₂ p) , m) → (inj₂ (inj₁ p) , m)
---       (inj₂ (inj₁ p) , m) → (inj₁ (inj₂ p) , m)
---       (inj₂ (inj₂ p) , m) → (inj₂ (inj₂ p) , m))
+  _⊗'_ : Machine (A ⊗ C) (B ⊗ D)
+  _⊗'_ = modifyStepRel (MkMachine State CompRel) $
+           ⊗-left-double-intro ⊗-ᵀ-distrib ⇒ₜ
+           ⊗-left-assoc ⇒ₜ
+           ⊗-right-double-intro (⊗-right-assoc ⇒ₜ ⊗-left-double-intro ⊗-sym ⇒ₜ ⊗-left-assoc) ⇒ₜ
+           ⊗-right-assoc
+    
+open Tensor using (_⊗'_) public
 
--- open Tensor using (_⊗'_) public
+_⊗ˡ_ : ∀ {A B} (C : Channel) → Machine A B → Machine (C ⊗ A) (C ⊗ B)
+C ⊗ˡ M = id ⊗' M
 
--- _⊗ˡ_ : (C : Channel) → Machine A B → Machine (C ⊗ A) (C ⊗ B)
--- C ⊗ˡ M = id ⊗' M
+_⊗ʳ_ : ∀ {A B} → Machine A B → (C : Channel) → Machine (A ⊗ C) (B ⊗ C)
+M ⊗ʳ C = M ⊗' id
 
--- _⊗ʳ_ : Machine A B → (C : Channel) → Machine (A ⊗ C) (B ⊗ C)
--- M ⊗ʳ C = M ⊗' id
+_∣ˡ : ∀ {A B C} → Machine (A ⊗ B) C → Machine A C
+M ∣ˡ = modifyStepRel M $ ⊗-right-double-intro ⊗-right-intro
 
--- _∣ˡ : Machine (A ⊗ B) C → Machine A C
--- M ∣ˡ = modifyStepRel M
---   (λ where (inj₁ x , y) → rcvˡ (rcvˡ (x , y)) ; (inj₂ x , y) → rcvʳ (x , y))
---   (λ where (inj₁ x , y) → sndˡ (sndˡ (x , y)) ; (inj₂ x , y) → sndʳ (x , y))
+_∣ʳ : ∀ {A B C} → Machine (A ⊗ B) C → Machine B C
+M ∣ʳ = modifyStepRel M $ ⊗-right-double-intro ⊗-left-intro
 
--- _∣ʳ : Machine (A ⊗ B) C → Machine B C
--- M ∣ʳ = modifyStepRel M
---   (λ where (inj₁ x , y) → rcvˡ (rcvʳ (x , y)) ; (inj₂ x , y) → rcvʳ (x , y))
---   (λ where (inj₁ x , y) → sndˡ (sndʳ (x , y)) ; (inj₂ x , y) → sndʳ (x , y))
+_∣^ˡ : ∀ {A B C} → Machine A (B ⊗ C) → Machine A B
+M ∣^ˡ = modifyStepRel M $ ⊗-left-double-intro $ ⊗-right-intro ⇒ₜ ⊗-ᵀ-factor
+  
+_∣^ʳ : ∀ {A B C} → Machine A (B ⊗ C) → Machine A C
+M ∣^ʳ = modifyStepRel M $ ⊗-left-double-intro $ ⊗-left-intro ⇒ₜ ⊗-ᵀ-factor
+  
+module _ {A B C} (M : Machine (A ⊗ C) (B ⊗ C)) (let open Machine M) where
 
--- _∣^ˡ : Machine A (B ⊗ C) → Machine A B
--- M ∣^ˡ = modifyStepRel M
---   (λ where (inj₁ x , y) → rcvˡ (x , y) ; (inj₂ x , y) → rcvʳ (sndˡ (x , y)))
---   (λ where (inj₁ x , y) → sndˡ (x , y) ; (inj₂ x , y) → sndʳ (rcvˡ (x , y)))
+  data TraceRel : MachineType (A ⊗ C) (B ⊗ C) State where
+    Trace[_] : ∀ {s m m' s'} → stepRel s m m' s' → TraceRel s m m' s'
+    _Trace∷₁_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (inj₁ (inj₂ m'))) s' → TraceRel s' (inj₂ (inj₂ m')) m'' s'' → TraceRel s m m'' s''
+    _Trace∷₂_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (inj₂ (inj₂ m'))) s' → TraceRel s' (inj₁ (inj₂ m')) m'' s'' → TraceRel s m m'' s''
 
--- _∣^ʳ : Machine A (B ⊗ C) → Machine A C
--- M ∣^ʳ = modifyStepRel M
---   (λ where (inj₁ x , y) → rcvˡ (x , y) ; (inj₂ x , y) → rcvʳ (sndʳ (x , y)))
---   (λ where (inj₁ x , y) → sndˡ (x , y) ; (inj₂ x , y) → sndʳ (rcvʳ (x , y)))
+  tr : Machine A B
+  tr = MkMachine State TraceRel ∣ˡ ∣^ˡ
 
--- module _ (M : Machine (A ⊗ C) (B ⊗ C)) where
---   open Machine M
+infixr 9 _∘_
 
---   data TraceRel : MachineType (A ⊗ C) (B ⊗ C) State where
---     Trace[_] : ∀ {s m m' s'} → stepRel s m m' s' → TraceRel s m m' s'
---     _Trace∷₁_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (sndˡ (sndʳ m'))) s' → TraceRel s' (rcvʳ (sndʳ m')) m'' s'' → TraceRel s m m'' s''
---     _Trace∷₂_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (sndʳ (rcvʳ m'))) s' → TraceRel s' (rcvˡ (rcvʳ m')) m'' s'' → TraceRel s m m'' s''
+_∘_ : ∀ {B C A} → Machine B C → Machine A B → Machine A C
+_∘_ {B} {C} {A} M₁ M₂ = tr $ modifyStepRel (M₂ ⊗' M₁) $ ⊗-left-double-intro $ ⊗-ᵀ-distrib ⇒ₜ ⊗-sym
 
---   tr : Machine A B
---   tr = MkMachine State TraceRel ∣ˡ ∣^ˡ
+⊗-assoc : ∀ {A B C} → Machine ((A ⊗ B) ⊗ C) (A ⊗ (B ⊗ C))
+⊗-assoc = TotalFunctionMachine' ⊗-right-assoc ⊗-left-assoc
+  
+⊗-assoc⃖ : ∀ {A B C} → Machine (A ⊗ (B ⊗ C)) ((A ⊗ B) ⊗ C)
+⊗-assoc⃖ = TotalFunctionMachine' ⊗-left-assoc ⊗-right-assoc
 
--- infixr 9 _∘_
+⊗-symₘ : ∀ {A B} → Machine (A ⊗ B) (B ⊗ A)
+⊗-symₘ = TotalFunctionMachine' ⊗-sym ⊗-sym
 
--- _∘_ : Machine B C → Machine A B → Machine A C
--- _∘_ {B} {C} {A} M₁ M₂ = tr M
---   where
---     M : Machine (A ⊗ B) (C ⊗ B)
---     M = modifyStepRel (M₂ ⊗' M₁)
---       (rcvMapʳ (λ where (inj₁ x , c) → inj₂ x , c ; (inj₂ x , b) → inj₁ x , b))
---       (sndMapʳ (λ where (inj₁ x , b) → inj₂ x , b ; (inj₂ x , c) → inj₁ x , c))
+idᴷ : Machine I (I ⊗ I)
+idᴷ = TotalFunctionMachine λ { (inj₂ (inj₁ ())) ; (inj₂ (inj₂ ())) }
 
--- ⊗-assoc : ∀ {A B C} → Machine ((A ⊗ B) ⊗ C) (A ⊗ (B ⊗ C))
--- ⊗-assoc = TotalFunctionMachine'
---   (λ where (inj₁ (inj₁ p) , m) →       inj₁ p  , m
---            (inj₁ (inj₂ p) , m) → inj₂ (inj₁ p) , m
---            (      inj₂ p  , m) → inj₂ (inj₂ p) , m)
---   (λ where (      inj₁ p  , m) → inj₁ (inj₁ p) , m
---            (inj₂ (inj₁ p) , m) → inj₁ (inj₂ p) , m
---            (inj₂ (inj₂ p) , m) →       inj₂ p  , m)
+transpose : ∀ {A B} → Machine A B → Machine (B ᵀ) (A ᵀ)
+transpose M = modifyStepRel M ⊗-sym
+ 
+-- cup : Machine I (A ⊗ A ᵀ)
+-- cup = StatelessMachine λ x x₁ → {!!}
 
--- ⊗-assoc⃖ : ∀ {A B C} → Machine (A ⊗ (B ⊗ C)) ((A ⊗ B) ⊗ C)
--- ⊗-assoc⃖ = TotalFunctionMachine'
---   (λ where (      inj₁ p  , m) → inj₁ (inj₁ p) , m
---            (inj₂ (inj₁ p) , m) → inj₁ (inj₂ p) , m
---            (inj₂ (inj₂ p) , m) →       inj₂ p  , m)
---   (λ where (inj₁ (inj₁ p) , m) →       inj₁ p  , m
---            (inj₁ (inj₂ p) , m) → inj₂ (inj₁ p) , m
---            (      inj₂ p  , m) → inj₂ (inj₂ p) , m)
+-- cap : Machine (A ᵀ ⊗ A) I
+-- cap {A} = modifyStepRel (transpose (cup {A})) {!!} {!!}
 
--- ⊗-sym : ∀ {A B} → Machine (A ⊗ B) (B ⊗ A)
--- ⊗-sym = TotalFunctionMachine'
---   (λ where (inj₁ p , m) → inj₂ p , m
---            (inj₂ p , m) → inj₁ p , m)
---   (λ where (inj₁ p , m) → inj₂ p , m
---            (inj₂ p , m) → inj₁ p , m)
+module Machine-Reasoning where
+  open import Relation.Binary.Reasoning.Syntax
 
--- idᴷ : Machine I (I ⊗ I)
--- idᴷ = TotalFunctionMachine λ where
---   (inj₂ (inj₁ ()) , _)
---   (inj₂ (inj₂ ()) , _)
+  open begin-syntax Machine P.id public
+  open ⟶-syntax {R = Machine} Machine Machine (λ M₁ M₂ → M₂ ∘ M₁) public
+  open end-syntax Machine id public
 
--- transpose : Machine A B → Machine (B ᵀ) (A ᵀ)
--- transpose M = modifyStepRel M
---   (λ where (inj₁ x , y) → inj₂ x , y ; (inj₂ x , y) → inj₁ x , y)
---   (λ where (inj₁ x , y) → inj₂ x , y ; (inj₂ x , y) → inj₁ x , y)
+_∘ᴷ_ : ∀ {A B C E₁ E₂}
+     → Machine B (C ⊗ E₂) → Machine A (B ⊗ E₁) → Machine A (C ⊗ (E₁ ⊗ E₂))
+_∘ᴷ_ {A} {B} {C} {E₁} {E₂} M₂ M₁ = rew ∘ (M₂ ⊗ʳ E₁ ∘ M₁)
+  where
+    open Machine-Reasoning
+    rew : Machine ((C ⊗ E₂) ⊗ E₁) (C ⊗ (E₁ ⊗ E₂))
+    rew = begin
+      (C ⊗ E₂) ⊗ E₁ ⟶⟨ ⊗-assoc ⟩
+      C ⊗ (E₂ ⊗ E₁) ⟶⟨ C ⊗ˡ ⊗-symₘ ⟩
+      C ⊗ (E₁ ⊗ E₂) ∎
 
--- -- cup : Machine I (A ⊗ A ᵀ)
--- -- cup = StatelessMachine λ x x₁ → {!!}
+_⊗ᴷ_ : ∀ {A₁ B₁ E₁ A₂ B₂ E₂}
+     → Machine A₁ (B₁ ⊗ E₁) → Machine A₂ (B₂ ⊗ E₂) → Machine (A₁ ⊗ A₂) ((B₁ ⊗ B₂) ⊗ (E₁ ⊗ E₂))
+_⊗ᴷ_ {A₁} {B₁} {E₁} {A₂} {B₂} {E₂} M₁ M₂ = rew ∘ M₁ ⊗' M₂
+  where
+    open Machine-Reasoning
+    rew : Machine ((B₁ ⊗ E₁) ⊗ (B₂ ⊗ E₂)) ((B₁ ⊗ B₂) ⊗ (E₁ ⊗ E₂))
+    rew = begin
+      (B₁ ⊗ E₁) ⊗ (B₂ ⊗ E₂) ⟶⟨ ⊗-assoc ⟩
+      B₁ ⊗ (E₁ ⊗ (B₂ ⊗ E₂)) ⟶⟨ B₁ ⊗ˡ ⊗-assoc⃖ ⟩
+      B₁ ⊗ ((E₁ ⊗ B₂) ⊗ E₂) ⟶⟨ B₁ ⊗ˡ (⊗-symₘ ⊗ʳ E₂) ⟩
+      B₁ ⊗ ((B₂ ⊗ E₁) ⊗ E₂) ⟶⟨ B₁ ⊗ˡ ⊗-assoc ⟩
+      B₁ ⊗ (B₂ ⊗ (E₁ ⊗ E₂)) ⟶⟨ ⊗-assoc⃖ ⟩
+      (B₁ ⊗ B₂) ⊗ (E₁ ⊗ E₂) ∎
 
--- -- cap : Machine (A ᵀ ⊗ A) I
--- -- cap {A} = modifyStepRel (transpose (cup {A})) {!!} {!!}
+⨂ᴷ : ∀ {n} → {A B E : Fin n → Channel} → ((k : Fin n) → Machine (A k) (B k ⊗ E k)) → Machine (⨂ A) (⨂ B ⊗ ⨂ E)
+⨂ᴷ {zero} M = idᴷ
+⨂ᴷ {suc n} M = M fzero ⊗ᴷ ⨂ᴷ (M P.∘ fsuc)
 
--- module Machine-Reasoning where
---   open import Relation.Binary.Reasoning.Syntax
+--------------------------------------------------------------------------------
+-- Open adersarial protocols
+record OAP (A E₁ B E₂ : Channel) : Type₁ where
+  field Adv        : Channel
+        Protocol   : Machine A (B ⊗ Adv)
+        Adversary  : Machine (Adv ⊗ E₁) E₂
 
---   open begin-syntax Machine P.id public
---   open ⟶-syntax {R = Machine} Machine Machine (λ M₁ M₂ → M₂ ∘ M₁) public
---   open end-syntax Machine id public
+--------------------------------------------------------------------------------
+-- Environment model
 
--- _∘ᴷ_ : ∀ {A B C E₁ E₂}
---      → Machine B (C ⊗ E₂) → Machine A (B ⊗ E₁) → Machine A (C ⊗ (E₁ ⊗ E₂))
--- _∘ᴷ_ {A} {B} {C} {E₁} {E₂} M₂ M₁ = rew ∘ (M₂ ⊗ʳ E₁ ∘ M₁)
---   where
---     open Machine-Reasoning
---     rew : Machine ((C ⊗ E₂) ⊗ E₁) (C ⊗ (E₁ ⊗ E₂))
---     rew = begin
---       (C ⊗ E₂) ⊗ E₁
---         ⟶⟨ ⊗-assoc ⟩
---       C ⊗ (E₂ ⊗ E₁)
---         ⟶⟨ C ⊗ˡ ⊗-sym ⟩
---       C ⊗ (E₁ ⊗ E₂) ∎
+ℰ-Out : Channel
+ℰ-Out = Bool ⇿ ⊥
 
--- _⊗ᴷ_ : ∀ {A₁ B₁ E₁ A₂ B₂ E₂}
---      → Machine A₁ (B₁ ⊗ E₁) → Machine A₂ (B₂ ⊗ E₂) → Machine (A₁ ⊗ A₂) ((B₁ ⊗ B₂) ⊗ (E₁ ⊗ E₂))
--- _⊗ᴷ_ {A₁} {B₁} {E₁} {A₂} {B₂} {E₂} M₁ M₂ = rew ∘ M₁ ⊗' M₂
---   where
---     open Machine-Reasoning
---     rew : Machine ((B₁ ⊗ E₁) ⊗ (B₂ ⊗ E₂)) ((B₁ ⊗ B₂) ⊗ (E₁ ⊗ E₂))
---     rew = begin
---       (B₁ ⊗ E₁) ⊗ (B₂ ⊗ E₂)
---         ⟶⟨ ⊗-assoc ⟩
---       B₁ ⊗ (E₁ ⊗ (B₂ ⊗ E₂))
---         ⟶⟨ B₁ ⊗ˡ ⊗-assoc⃖ ⟩
---       B₁ ⊗ ((E₁ ⊗ B₂) ⊗ E₂)
---         ⟶⟨ B₁ ⊗ˡ (⊗-sym ⊗ʳ E₂) ⟩
---       B₁ ⊗ ((B₂ ⊗ E₁) ⊗ E₂)
---         ⟶⟨ B₁ ⊗ˡ ⊗-assoc ⟩
---       B₁ ⊗ (B₂ ⊗ (E₁ ⊗ E₂))
---         ⟶⟨ ⊗-assoc⃖ ⟩
---       (B₁ ⊗ B₂) ⊗ (E₁ ⊗ E₂) ∎
+-- Presheaf on the category of channels & machines
+-- we just take machines that output a boolean
+-- for now, not on the Kleisli construction
+ℰ : Channel → Type₁
+ℰ C = Machine C ℰ-Out
 
--- ⨂ᴷ : ∀ {n} → {A B E : Fin n → Channel} → ((k : Fin n) → Machine (A k) (B k ⊗ E k))
---     → Machine (⨂ A) (⨂ B ⊗ ⨂ E)
--- ⨂ᴷ {zero} M = idᴷ
--- ⨂ᴷ {suc n} M = M fzero ⊗ᴷ ⨂ᴷ (M P.∘ fsuc)
+map-ℰ : ∀ {A B} → Machine A B → ℰ B → ℰ A
+map-ℰ M E = E ∘ M
 
--- --------------------------------------------------------------------------------
--- -- Open adersarial protocols
--- record OAP (A E₁ B E₂ : Channel) : Type₁ where
---   field Adv        : Channel
---         Protocol   : Machine A (B ⊗ Adv)
---         Adversary  : Machine (Adv ⊗ E₁) E₂
+--------------------------------------------------------------------------------
+-- UC relations
 
--- --------------------------------------------------------------------------------
--- -- Environment model
+-- perfect equivalence
+_≈ℰ_ : ∀ {A B} → Machine A B → Machine A B → Type₁
+_≈ℰ_ {B = B} M M' = (E : ℰ B) → map-ℰ M E ≡ map-ℰ M' E
 
--- ℰ-Out : Channel
--- ℰ-Out .Channel.P = ⊤
--- ℰ-Out .Channel.outType _ = Bool
--- ℰ-Out .Channel.inType _ = ⊥
+_≤UC_ : ∀ {A B E E''} → Machine A (B ⊗ E) → Machine A (B ⊗ E'') → Type₁
+_≤UC_ {B = B} {E} R I = ∀ E' (A : Machine E E') → ∃[ S ] ((B ⊗ˡ A) ∘ R) ≈ℰ ((B ⊗ˡ S) ∘ I)
 
--- -- Presheaf on the category of channels & machines
--- -- we just take machines that output a boolean
--- -- for now, not on the Kleisli construction
--- ℰ : Channel → Type₁
--- ℰ C = Machine C ℰ-Out
-
--- map-ℰ : ∀ {A B} → Machine A B → ℰ B → ℰ A
--- map-ℰ M E = E ∘ M
-
--- --------------------------------------------------------------------------------
--- -- UC relations
-
--- -- perfect equivalence
--- _≈ℰ_ : ∀ {A B} → Machine A B → Machine A B → Type₁
--- _≈ℰ_ {B = B} M M' = (E : ℰ B) → map-ℰ M E ≡ map-ℰ M' E
-
--- _≤UC_ : ∀ {A B E E''} → Machine A (B ⊗ E) → Machine A (B ⊗ E'') → Type₁
--- _≤UC_ {B = B} {E} R I = ∀ E' (A : Machine E E') → ∃[ S ] ((B ⊗ˡ A) ∘ R) ≈ℰ ((B ⊗ˡ S) ∘ I)
-
--- -- equivalent to _≤UC_ by "completeness of the dummy adversary"
--- _≤'UC_ : ∀ {A B E} → Machine A (B ⊗ E) → Machine A (B ⊗ E) → Type₁
--- _≤'UC_ {B = B} R I = ∃[ S ] R ≈ℰ (B ⊗ˡ S ∘ I)
+-- equivalent to _≤UC_ by "completeness of the dummy adversary"
+_≤'UC_ : ∀ {A B E} → Machine A (B ⊗ E) → Machine A (B ⊗ E) → Type₁
+_≤'UC_ {B = B} R I = ∃[ S ] R ≈ℰ (B ⊗ˡ S ∘ I)
