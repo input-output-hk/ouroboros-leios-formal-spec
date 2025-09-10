@@ -1,4 +1,4 @@
-{-# OPTIONS --safe --lossy-unification #-}
+{-# OPTIONS --safe --no-require-unique-meta-solutions #-}
 
 module CategoricalCrypto.Examples where
 
@@ -33,13 +33,13 @@ module TemplateChannel (M : Type) {M' : Type} (f : M → M') where
   data WithState_receive_return_newState_ : MachineType I ((A ⊗ B) ⊗ E) (List M) where
 
     Send : ∀ {m s} → WithState s
-                     receive honestChannelB {Out} {I} $ ⊗-right-intro m
-                     return just $ honestChannelB {In} {I} $ ⊗-left-intro m
+                     receive ⊗-left-intro {In} $ ⇒-transpose $ ⊗-right-intro $ ⊗-right-intro m
+                     return just $ ⊗-left-intro {Out} $ ⇒-transpose $ ⊗-right-intro $ ⊗-left-intro m
                      newState (s ∷ʳ m)
 
     Req  : ∀ {m s} → WithState m ∷ s
-                     receive adversarialChannel {Out} {I} tt
-                     return just $ adversarialChannel {In} {I} $ f m
+                     receive ⊗-left-intro {In} $ ⇒-transpose $ ⊗-left-intro tt
+                     return just $ ⊗-left-intro {Out} $ ⇒-transpose $ ⊗-left-intro $ f m
                      newState s
 
   Functionality : Machine I ((A ⊗ B) ⊗ E)
@@ -53,8 +53,11 @@ module LeakyChannel (M : Type) = TemplateChannel M P.id
 module SecureChannel (M : Type) = TemplateChannel M {ℕ}
 
 module Encryption (PlainText CipherText PubKey PrivKey : Type)
-                  ⦃ _ : DecEq CipherText ⦄ ⦃ _ : DecEq PubKey ⦄
-                  (genCT : ℕ → CipherText) (getPubKey : PrivKey → PubKey) where
+                  ⦃ _ : DecEq CipherText ⦄
+                  ⦃ _ : DecEq PubKey ⦄
+                  (genCT : ℕ → CipherText)
+                  (getPubKey : PrivKey → PubKey) where
+
   open Channel
   open Machine
 
@@ -69,17 +72,15 @@ module Encryption (PlainText CipherText PubKey PrivKey : Type)
 
   data WithState_receive_return_newState_ : MachineType I C S where
 
-    Enc : ∀ {p k s} → let c = genCT (length s)
-       in WithState s
-          receive inj₂ $ inj₁ (p , k)
-          return just $ inj₂ $ inj₁ c
-          newState ((k , p , c) ∷ s)
+    Enc : ∀ {p k s} → let c = genCT (length s) in WithState s
+                                                  receive ⊗-left-intro {In} $ inj₁ (p , k)
+                                                  return just $ ⊗-left-intro {Out} $ inj₁ c
+                                                  newState ((k , p , c) ∷ s)
 
-    Dec : ∀ {c k s} → let p = lookupPlainText s (c , getPubKey k)
-       in WithState s
-          receive inj₂ $ inj₂ (c , k)
-          return just $ inj₂ $ inj₁ c
-          newState s
+    Dec : ∀ {c k s} → let p = lookupPlainText s (c , getPubKey k) in WithState s
+                                                                     receive ⊗-left-intro {In} $ inj₂ (c , k)
+                                                                     return just $ ⊗-left-intro {Out} $ inj₁ c
+                                                                     newState s
 
   Functionality : Machine I C
   Functionality .State   = S
@@ -99,26 +100,24 @@ module EncryptionShim (PlainText CipherText PubKey PrivKey : Type)
   module E = Encryption PlainText CipherText PubKey PrivKey genCT getPubKey
 
   data WithState_receive_return_newState_ : MachineType ((L.A ⊗ L.B) ⊗ L.E) ((S.A ⊗ S.B) ⊗ S.E) (E.Functionality .State) where
+  
+    EncSend : ∀ {m m' s s'} → E.WithState s
+                              receive ⊗-left-intro {In} $ inj₁ (m , pubKey)
+                              return just $ ⊗-left-intro {Out} $ inj₁ m'
+                              newState s'
+                            → WithState s
+                              receive ⊗-left-intro {In} $ ⇒-transpose $ ⊗-right-intro $ ⊗-right-intro m 
+                              return just $ ⊗-right-intro {Out} $ ⊗-right-intro $ ⊗-right-intro m'
+                              newState s'
 
-    EncSend : ∀ {m m' s s'}
-            → E.WithState s
-                receive inj₂ $ inj₁ (m , pubKey)
-                return just $ inj₂ $ inj₁ m'
-                newState s'
-            → WithState s
-              receive inj₂ $ inj₁ $ inj₁ m
-              return just $ inj₁ $ inj₁ $ inj₁ m'
-              newState s'
-
-    DecRcv  : ∀ {m m' s s'}
-            → E.WithState s
-                receive inj₂ $ inj₂ (m , privKey)
-                return just $ inj₂ $ inj₂ $ just m'
-                newState s'
-            → WithState s
-              receive inj₁ $ inj₁ $ inj₂ m
-              return just $ inj₂ $ inj₁ $ inj₂ m'
-              newState s'
+    DecRcv  : ∀ {m m' s s'} → E.WithState s
+                              receive ⊗-left-intro {In} $ inj₂ (m , privKey)
+                              return just $ ⊗-left-intro {Out} $ inj₂ $ just m'
+                              newState s'
+                            → WithState s
+                              receive ⊗-right-intro {In} $ ⊗-right-intro $ ⊗-left-intro m
+                              return just $ ⊗-left-intro {Out} $ ⇒-transpose $ ⊗-right-intro $ ⊗-left-intro $ m'
+                              newState s'
 
   Functionality : Machine ((L.A ⊗ L.B) ⊗ L.E) ((S.A ⊗ S.B) ⊗ S.E)
   Functionality .State   = E.Functionality .State

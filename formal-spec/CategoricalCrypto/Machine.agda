@@ -38,14 +38,10 @@ module _ {A B} (let open Channel (A ⊗ B ᵀ)) where
 -- if e.g. A ≡ B then it's easy to accidentally send a message the wrong way
 -- which is prevented here
 TotalFunctionMachine' : ∀  {A B} → A [ In ]⇒[ In ] B → B [ Out ]⇒[ Out ] A → Machine A B
-TotalFunctionMachine' {A} {B} f g = TotalFunctionMachine λ where
-  (inj₁ p) → ⇒-transpose {In} ⇒ₜ ⊗-left-intro {_} {A} {B ᵀ} $ f p
-  (inj₂ p) → ⊗-right-intro {Out} {A} {B ᵀ} $ g p
-  
+TotalFunctionMachine' f g = TotalFunctionMachine $ ⊗-combine {In} {Out} (f ⇒ₜ ⇒-transpose) (g ⇒ₜ ⇒-transpose) ⇒ₜ ⊗-sym
+
 id : ∀ {A} → Machine A A
-id = TotalFunctionMachine λ where
-  (inj₁ p) → inj₂ p
-  (inj₂ p) → inj₁ p
+id = TotalFunctionMachine' ⇒-refl ⇒-refl
 
 module _ {A B C D} (M : Machine A B) (let open Machine M) where
 
@@ -64,9 +60,9 @@ module Tensor {A B C D} (M₁ : Machine A B) (M₂ : Machine C D) where
 
   data CompRel : State → Channel.inType AllCs → Maybe (Channel.outType AllCs) → State → Type where
 
-    Step₁ : ∀ {m m' s s' s₂} → stepRel₁ s m m' s' → CompRel (s , s₂) (inj₁ m) (inj₁ <$> m') (s' , s₂)
+    Step₁ : ∀ {m m' s s' s₂} → stepRel₁ s m m' s' → CompRel (s , s₂) (⊗-right-intro {In} m) (⊗-right-intro {Out} <$> m') (s' , s₂)
 
-    Step₂ : ∀ {m m' s s' s₁} → stepRel₂ s m m' s' → CompRel (s₁ , s) (inj₂ m) (inj₂ <$> m') (s₁ , s')
+    Step₂ : ∀ {m m' s s' s₁} → stepRel₂ s m m' s' → CompRel (s₁ , s) (⊗-left-intro {In} m) (⊗-left-intro {Out} <$> m') (s₁ , s')
 
   _⊗'_ : Machine (A ⊗ C) (B ⊗ D)
   _⊗'_ = modifyStepRel (MkMachine State CompRel) $
@@ -98,9 +94,16 @@ M ∣^ʳ = modifyStepRel M $ ⊗-left-double-intro $ ⊗-left-intro ⇒ₜ ⊗-�
 module _ {A B C} (M : Machine (A ⊗ C) (B ⊗ C)) (let open Machine M) where
 
   data TraceRel : MachineType (A ⊗ C) (B ⊗ C) State where
+
     Trace[_] : ∀ {s m m' s'} → stepRel s m m' s' → TraceRel s m m' s'
-    _Trace∷₁_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (inj₁ (inj₂ m'))) s' → TraceRel s' (inj₂ (inj₂ m')) m'' s'' → TraceRel s m m'' s''
-    _Trace∷₂_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (inj₂ (inj₂ m'))) s' → TraceRel s' (inj₁ (inj₂ m')) m'' s'' → TraceRel s m m'' s''
+
+    _Trace∷₁_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (⊗-right-intro {Out} $ ⊗-left-intro {Out} m')) s' →
+                                        TraceRel s' (adversarialChannel {Out} m') m'' s'' →
+                                        TraceRel s m m'' s''
+                                        
+    _Trace∷₂_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (adversarialChannel {In} m')) s' →
+                                        TraceRel s' (⊗-right-intro {In} $ ⊗-left-intro {In} m') m'' s'' →
+                                        TraceRel s m m'' s''
 
   tr : Machine A B
   tr = MkMachine State TraceRel ∣ˡ ∣^ˡ
@@ -108,7 +111,7 @@ module _ {A B C} (M : Machine (A ⊗ C) (B ⊗ C)) (let open Machine M) where
 infixr 9 _∘_
 
 _∘_ : ∀ {B C A} → Machine B C → Machine A B → Machine A C
-_∘_ {B} {C} {A} M₁ M₂ = tr $ modifyStepRel (M₂ ⊗' M₁) $ ⊗-left-double-intro $ ⊗-ᵀ-distrib ⇒ₜ ⊗-sym
+_∘_ M₁ M₂ = tr $ modifyStepRel (M₂ ⊗' M₁) $ ⊗-left-double-intro $ ⊗-ᵀ-distrib ⇒ₜ ⊗-sym ⇒ₜ ⊗-ᵀ-factor
 
 ⊗-assoc : ∀ {A B C} → Machine ((A ⊗ B) ⊗ C) (A ⊗ (B ⊗ C))
 ⊗-assoc = TotalFunctionMachine' ⊗-right-assoc ⊗-left-assoc
@@ -120,7 +123,7 @@ _∘_ {B} {C} {A} M₁ M₂ = tr $ modifyStepRel (M₂ ⊗' M₁) $ ⊗-left-dou
 ⊗-symₘ = TotalFunctionMachine' ⊗-sym ⊗-sym
 
 idᴷ : Machine I (I ⊗ I)
-idᴷ = TotalFunctionMachine λ { (inj₂ (inj₁ ())) ; (inj₂ (inj₂ ())) }
+idᴷ rewrite ᵀ-identity = TotalFunctionMachine $ ⊗-combine {In} ⇒-transpose $ ⊗-ᵀ-distrib ⇒ₜ ⊗-fusion ⇒ₜ ⇒-transpose ⇒ₜ ⊗-duplicate ⇒ₜ ⊗-ᵀ-factor
 
 transpose : ∀ {A B} → Machine A B → Machine (B ᵀ) (A ᵀ)
 transpose M = modifyStepRel M ⊗-sym
