@@ -181,6 +181,6 @@ adversarialChannel = ⇒-transpose ⇒ₜ ⊗-left-intro ⇒ₜ ⊗-ᵀ-factor �
 ⨂≡ {zero} _ = refl
 ⨂≡ {suc _} p = cong₂ _⊗_ (p fzero) (⨂≡ (p ∘ fsuc))
 
-rcv-⨂ : ∀ {n m} {f : Fin n → Channel} k → f k [ m ]⇒[ m ] ⨂ f
-rcv-⨂ fzero = ⊗-right-intro
-rcv-⨂ (fsuc k) = rcv-⨂ k ⇒ₜ ⊗-left-intro
+⨂⇒ : ∀ {n m} {f : Fin n → Channel} k → f k [ m ]⇒[ m ] ⨂ f
+⨂⇒ fzero = ⊗-right-intro
+⨂⇒ (fsuc k) = ⨂⇒ k ⇒ₜ ⊗-left-intro
