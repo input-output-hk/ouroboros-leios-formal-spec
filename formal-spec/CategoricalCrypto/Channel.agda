@@ -32,6 +32,12 @@ record Channel : Type₁ where
   field
     inType outType : Type
 
+  inT = inType
+  outT = outType
+  
+  {-# INJECTIVE_FOR_INFERENCE inT #-}
+  {-# INJECTIVE_FOR_INFERENCE outT #-}
+
 open Channel
 
 I : Channel
