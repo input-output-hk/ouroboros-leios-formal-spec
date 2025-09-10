@@ -2,7 +2,7 @@
 
 <!--
 ```agda
-{-# OPTIONS --safe #-}
+{-# OPTIONS --safe --no-require-unique-meta-solutions #-}
 open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.FFD
 open import Leios.SpecStructure
@@ -166,20 +166,22 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```agda
   Slot₁ : let open LeiosState s in
         ∙ allDone s
-        ───────────────────────────────────────────────────────────────────────────────────
-        s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀
+        ──────────────────────────────────────────────────────────────────
+        s -⟦ honestChannelA {In} $ ⊗-right-intro $ FFD-OUT msgs
+           / just $ honestChannelA {Out} (⊗-left-intro {Out} FTCH-LDG) ⟧⇀
           record s { slot         = suc slot
                    ; Upkeep       = []
                    } ↑ L.filter (isValid? s) msgs
 
   Slot₂ : let open LeiosState s in
-        ──────────────────────────────────────────────────────────────────────────────
-        s -⟦ honestOutputI (rcvʳ (-, BASE-LDG rbs)) / nothing ⟧⇀ record s { RBs = rbs }
+        ────────────────────────────────────────────────────────────────────
+        s -⟦ honestChannelA {In} $ ⊗-left-intro $ BASE-LDG rbs / nothing ⟧⇀
+          record s { RBs = rbs }
 ```
 ```agda
   Ftch : let open LeiosState s in
-       ────────────────────────────────────────────────────────────────────────────
-       s -⟦ honestInputI (-, FetchLdgI) / honestOutputO' (-, FetchLdgO Ledger) ⟧⇀ s
+       ────────────────────────────────────────────────────────────────────────────────────────
+       s -⟦ honestChannelB {Out} FetchLdgI / just $ honestChannelB {In} $ FetchLdgO Ledger ⟧⇀ s
 ```
 #### Base chain
 
@@ -188,8 +190,8 @@ Note: Submitted data to the base chain is only taken into account
       for the given slot
 ```agda
   Base₁   :
-          ──────────────────────────────────────────────────────────────────────────────
-          s -⟦ honestInputI (-, SubmitTxs txs) / nothing ⟧⇀ record s { ToPropose = txs }
+          ───────────────────────────────────────────────────────────────────────────────────
+          s -⟦ honestChannelB {Out} $ SubmitTxs txs / nothing ⟧⇀ record s { ToPropose = txs }
 ```
 ```agda
   Base₂   : let open LeiosState s
@@ -203,23 +205,23 @@ Note: Submitted data to the base chain is only taken into account
                        ; ebCert = proj₂ <$> currentCertEB }
           in
           ∙ needsUpkeep Base
-          ────────────────────────────────────────────────────────────────────────────
-          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT rb)) ⟧⇀
+          ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+          s -⟦ honestChannelA {In} $ ⊗-right-intro SLOT / just $ honestChannelA {Out} $ ⊗-left-intro $ SUBMIT rb ⟧⇀
             addUpkeep s Base
 ```
 #### Protocol rules
 ```agda
   Roles₁ :
          ∙ s ↝ (s' , i)
-         ──────────────────────────────────────────────────────────────────────────────
-         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
+         ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+         s -⟦ honestChannelA {In} $ ⊗-right-intro SLOT / just $ honestChannelA {Out} $ ⊗-right-intro $ FFD-IN i ⟧⇀ s'
 
   Roles₂ : ∀ {u} → let open LeiosState in
          ∙ ¬ (∃[ s'×i ] (s ↝ s'×i × Upkeep (addUpkeep s u) ≡ Upkeep (proj₁ s'×i)))
          ∙ needsUpkeep s u
          ∙ u ≢ Base
          ─────────────────────────────────────────────────────────────────────────
-         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ addUpkeep s u
+         s -⟦ honestChannelA {In} $ ⊗-right-intro SLOT / nothing ⟧⇀ addUpkeep s u
 ```
 <!--
 ```agda
