@@ -64,9 +64,10 @@ Starting at slot 100
       eb₁ = mkEB 100 (fsuc fzero) tt (EB , tt) (6 ∷ []) [] []
       eb₂ = mkEB 100 id tt (EB , tt) (0 ∷ 1 ∷ 2 ∷ []) [] []
 
-      rb₀ rb₁ : RankingBlock
+      rb₀ rb₁ rb₂ : RankingBlock
       rb₀ = record { txs = 3 ∷ 4 ∷ 5 ∷ [] ; announcedEB = nothing ; ebCert = nothing }
       rb₁ = record { txs = [] ; announcedEB = just (hash eb₁) ; ebCert = nothing }
+      rb₂ = record { txs = [] ; announcedEB = nothing ; ebCert = just (6 ∷ []) }
 
       verify-eb₀-hash : hash eb₀ ≡ 3 ∷ 4 ∷ 5 ∷ []
       verify-eb₀-hash = refl
@@ -140,6 +141,11 @@ Checking a simple trace
                    ∷ (No-EB-Role-Action 106 , inj₁ SLOT)
                    ∷ (VT-Role-Action    106 eb₁ 102 , inj₁ SLOT)
                    ∷ (Slot₁-Action      106 , inj₁ (FFD-OUT []))
+```
+#### Slot 107
+```agda
+                   ∷ (Base₂-Action      107 , inj₁ SLOT)
+                   ∷ (Slot₂-Action      107 , inj₂ (inj₁ (BASE-LDG [ rb₂ ])))
                    ∷ []) s₁₀₀)
       test₁ = _
 ```
