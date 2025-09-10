@@ -317,35 +317,35 @@ module Types (params : Params) (let open Params params) where
   NetworkMessage = InputBlock ⊎ EndorserBlock ⊎ List Vote ⊎ RankingBlock
 
   Network : Channel
-  Network = simpleChannel' (NetworkT numberOfParties NetworkMessage)
+  Network = simpleChannel (NetworkT numberOfParties NetworkMessage)
 
-  data IOT : ChannelDir → Type where
+  data IOT : Mode → Type where
     SubmitTxs : List Tx → IOT In
     FetchLdgI : IOT In
     FetchLdgO : List Tx → IOT Out
 
   -- mempool
   IO : Channel
-  IO = simpleChannel' IOT ᵀ
+  IO = simpleChannel IOT ᵀ
 
   Adv : Channel
   Adv = I
 
   module FFDA = FFDAbstract ffdAbstract
 
-  data FFDT : ChannelDir → Type where
+  data FFDT : Mode → Type where
     FFD-OUT : List (FFDA.Header ⊎ FFDA.Body) → FFDT Out
     FFD-IN  : FFDA.Input → FFDT In
     SLOT    : FFDT Out
     FTCH    : FFDT Out
 
   FFD : Channel
-  FFD = simpleChannel' FFDT ᵀ
+  FFD = simpleChannel FFDT ᵀ
 
-  data BaseT : ChannelDir → Type where
+  data BaseT : Mode → Type where
     FTCH-LDG : BaseT In
     SUBMIT   : RankingBlock → BaseT In
     BASE-LDG : List RankingBlock → BaseT Out
 
   BaseC : Channel
-  BaseC = simpleChannel' BaseT ᵀ
+  BaseC = simpleChannel BaseT ᵀ
