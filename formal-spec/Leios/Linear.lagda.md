@@ -12,6 +12,7 @@ open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
 open import CategoricalCrypto hiding (id; _∘_)
+open import CategoricalCrypto.Kleisli
 
 module Leios.Linear (⋯ : SpecStructure 1)
   (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified'))
