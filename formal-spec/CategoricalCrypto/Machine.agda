@@ -98,10 +98,10 @@ module _ {A B C} (M : Machine (A ⊗ C) (B ⊗ C)) (let open Machine M) where
     Trace[_] : ∀ {s m m' s'} → stepRel s m m' s' → TraceRel s m m' s'
 
     _Trace∷₁_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (⊗-right-intro {Out} $ ⊗-left-intro {Out} m')) s' →
-                                        TraceRel s' (adversarialChannel {Out} m') m'' s'' →
+                                        TraceRel s' (⊗-left-intro {In} $ ⊗-ᵀ-factor $ ⊗-left-intro $ ⇒-transpose m') m'' s'' →
                                         TraceRel s m m'' s''
                                         
-    _Trace∷₂_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (adversarialChannel {In} m')) s' →
+    _Trace∷₂_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (⊗-left-intro {Out} $ ⊗-ᵀ-factor $ ⊗-left-intro $ ⇒-transpose m')) s' →
                                         TraceRel s' (⊗-right-intro {In} $ ⊗-left-intro {In} m') m'' s'' →
                                         TraceRel s m m'' s''
 

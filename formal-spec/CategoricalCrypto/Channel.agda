@@ -10,7 +10,6 @@ open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 -- Modes for messages (In or Out) --
 ------------------------------------
 
-open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 data Mode : Type where
   Out : Mode
   In : Mode
@@ -35,26 +34,30 @@ record Channel : Type₁ where
 
 open Channel
 
+modeType : Mode → Channel → Type
+modeType Out = outType
+modeType In = inType
+
+{-# INJECTIVE_FOR_INFERENCE modeType #-}
+
+simpleChannel : (Mode → Type) → Channel
+simpleChannel T = T In ⇿ T Out
+
+----------------------------------------
+-- Channel identity and transposition --
+----------------------------------------
+
 I : Channel
 I = ⊥ ⇿ ⊥
 
 _ᵀ : Fun₁ Channel
 (receive ⇿ send) ᵀ = send ⇿ receive
 
-ᵀ-idempotent : ∀ {A} → A ᵀ ᵀ ≡ A
-ᵀ-idempotent = refl
-
 ᵀ-identity : I ᵀ ≡ I
 ᵀ-identity = refl
 
-modeType : Mode → Channel → Type
-modeType Out = outType
-modeType In = inType
-
-simpleChannel : (Mode → Type) → Channel
-simpleChannel T = T In ⇿ T Out
-
-{-# INJECTIVE_FOR_INFERENCE modeType #-}
+ᵀ-idempotent : ∀ {A} → A ᵀ ᵀ ≡ A
+ᵀ-idempotent = refl
 
 --------------------------------------------------------
 -- Forwarding a message from a given Channel and Mode --
@@ -63,9 +66,9 @@ simpleChannel T = T In ⇿ T Out
 infix 4 _[_]⇒[_]_
 
 _[_]⇒[_]_ : Channel → Mode → Mode → Channel → Type
-c₁ [ m₁ ]⇒[ m₂ ] c₂ = modeType m₁ c₁ → modeType m₂ c₂
+A [ m₁ ]⇒[ m₂ ] B = modeType m₁ A → modeType m₂ B
 
-⇒-trans : ∀ {c₁ c₂ c₃ m₁ m₂ m₃} → c₁ [ m₁ ]⇒[ m₂ ] c₂ → c₂ [ m₂ ]⇒[ m₃ ] c₃ → c₁ [ m₁ ]⇒[ m₃ ] c₃
+⇒-trans : ∀ {A B C m m₁ m₂} → A [ m ]⇒[ m₁ ] B → B [ m₁ ]⇒[ m₂ ] C → A [ m ]⇒[ m₂ ] C
 ⇒-trans p q = q ∘ p
 
 infixr 10 _⇒ₜ_
@@ -160,19 +163,6 @@ opaque
 
 ⊗-left-double-intro : ∀ {m A B C} → B [ m ]⇒[ m ] C → A ⊗ B [ m ]⇒[ m ] A ⊗ C
 ⊗-left-double-intro p = ⊗-sym ⇒ₜ ⊗-right-double-intro p ⇒ₜ ⊗-sym
-
--------------------------
--- Adversarial pattern --
--------------------------
-
-honestChannelA : ∀ {m A B Adv} → A [ m ]⇒[ m ] A ⊗ (B ⊗ Adv) ᵀ
-honestChannelA = ⊗-right-intro
-
-honestChannelB : ∀ {m A B Adv} → B [ m ]⇒[ ¬ₘ m ] A ⊗ (B ⊗ Adv) ᵀ
-honestChannelB = ⇒-transpose ⇒ₜ ⊗-right-intro ⇒ₜ ⊗-ᵀ-factor ⇒ₜ ⊗-left-intro
-
-adversarialChannel : ∀ {m A B Adv} → Adv [ m ]⇒[ ¬ₘ m ] A ⊗ (B ⊗ Adv) ᵀ
-adversarialChannel = ⇒-transpose ⇒ₜ ⊗-left-intro ⇒ₜ ⊗-ᵀ-factor ⇒ₜ ⊗-left-intro
 
 --------------------------------
 -- Additional Channel builder --
