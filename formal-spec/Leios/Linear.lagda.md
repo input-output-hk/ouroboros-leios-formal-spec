@@ -167,7 +167,7 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
         ∙ allDone s
         ──────────────────────────────────────────────────────────────────
         s -⟦ honestChannelA {In} $ ⊗-right-intro $ FFD-OUT msgs
-           / just $ honestChannelA {Out} (⊗-left-intro {Out} FTCH-LDG) ⟧⇀
+           / just $ honestChannelA {Out} $ ⊗-left-intro {Out} FTCH-LDG ⟧⇀
           record s { slot         = suc slot
                    ; Upkeep       = []
                    } ↑ L.filter (isValid? s) msgs
