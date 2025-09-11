@@ -1,12 +1,12 @@
+> [!CAUTION]
+> 
+> **Important Disclaimer & Acceptance of Risk**
+> 
+> This is a proof-of-concept implementation in its very early stage and is mostly experimental and exploratory. This code is provided "as is" for research and educational purposes only.  All contributions and feedbacks are welcome. **By using this code, you acknowledge and accept all associated risks, and our company disclaims any liability for damages or losses.**
+
 # Ouroboros Leios formal specification
 
 This repository is to define a formal specification of the Ouroboros Leios protocol.
-
-> [!CAUTION]
-> This project is in its very early stage and is mostly
-> experimental and exploratory. All contributions and feedbacks are
-> welcome. No warranties of any kind about the current or future
-> features of Cardano are to be expected, implicitly and explicitly.
 
 ## Specification
 
