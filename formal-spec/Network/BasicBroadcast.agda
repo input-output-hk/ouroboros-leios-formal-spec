@@ -1,6 +1,8 @@
 {-# OPTIONS --safe --no-require-unique-meta-solutions #-}
+
 open import Leios.Prelude hiding (_⊗_; module Any)
 open import CategoricalCrypto
+open import CategoricalCrypto.Kleisli
 
 module Network.BasicBroadcast (Participants : ℕ) (Message : Type) where
 
