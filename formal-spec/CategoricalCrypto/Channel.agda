@@ -9,6 +9,7 @@ open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 ------------------------------------
 -- Modes for messages (In or Out) --
 ------------------------------------
+
 open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 data Mode : Type where
   Out : Mode

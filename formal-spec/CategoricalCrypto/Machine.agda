@@ -171,7 +171,8 @@ _⊗ᴷ_ {A₁} {B₁} {E₁} {A₂} {B₂} {E₂} M₁ M₂ = rew ∘ M₁ ⊗'
 ⨂ᴷ {suc n} M = M fzero ⊗ᴷ ⨂ᴷ (M P.∘ fsuc)
 
 --------------------------------------------------------------------------------
--- Open adersarial protocols
+-- Open adversarial protocols
+
 record OAP (A E₁ B E₂ : Channel) : Type₁ where
   field Adv        : Channel
         Protocol   : Machine A (B ⊗ Adv)
