@@ -12,7 +12,7 @@ open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
 open import CategoricalCrypto hiding (id; _∘_)
-open import CategoricalCrypto.Kleisli
+open import CategoricalCrypto.Channel.Selection
 
 module Leios.Linear (⋯ : SpecStructure 1)
   (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified'))
@@ -117,7 +117,7 @@ mempool.
   EB-Role : let open LeiosState s in
           ∙ toProposeEB s π ≡ just eb
           ∙ canProduceEB slot sk-EB (stake s) π
-          ──────────────────────────────────────────────────────
+          ───────────────────────────────────────────────────────
           s ↝ (addUpkeep s EB-Role , Send (ebHeader eb) nothing)
 ```
 ```agda
@@ -174,14 +174,13 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
                    } ↑ L.filter (isValid? s) msgs
 
   Slot₂ : let open LeiosState s in
-        ────────────────────────────────────────────────────────────────────
-        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ BASE-LDG rbs / nothing ⟧⇀
-          record s { RBs = rbs }
+        ───────────────────────────────────────────────────────────────────
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ BASE-LDG rbs / nothing ⟧⇀ record s { RBs = rbs }
 ```
 ```agda
   Ftch : let open LeiosState s in
-       ────────────────────────────────────────────────────────────────────────────────────────
-       s -⟦ honestChannelB {Out} FetchLdgI / just $ honestChannelB {In} $ FetchLdgO Ledger ⟧⇀ s
+       ───────────────────────────────────────────────────────────────────────────
+       s -⟦ L⊗ (ϵ ⊗R) ᵗ ↑ₒ FetchLdgI / just $ L⊗ (ϵ ⊗R) ᵗ ↑ᵢ FetchLdgO Ledger ⟧⇀ s
 ```
 #### Base chain
 
@@ -190,8 +189,8 @@ Note: Submitted data to the base chain is only taken into account
       for the given slot
 ```agda
   Base₁   :
-          ───────────────────────────────────────────────────────────────────────────────────
-          s -⟦ honestChannelB {Out} $ SubmitTxs txs / nothing ⟧⇀ record s { ToPropose = txs }
+          ───────────────────────────────────────────────────────────────────────────
+          s -⟦ L⊗ (ϵ ⊗R) ᵗ ↑ₒ SubmitTxs txs / nothing ⟧⇀ record s { ToPropose = txs }
 ```
 ```agda
   Base₂   : let open LeiosState s
@@ -205,23 +204,22 @@ Note: Submitted data to the base chain is only taken into account
                        ; ebCert = proj₂ <$> currentCertEB }
           in
           ∙ needsUpkeep Base
-          ──────────────────────────────────────────────────────────────────────────────────────────────────────────
-          s -⟦ honestChannelA {In} $ ⊗-right-intro SLOT / just $ honestChannelA {Out} $ ⊗-left-intro $ SUBMIT rb ⟧⇀
-            addUpkeep s Base
+          ───────────────────────────────────────────────────────────────────────────
+          s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ SUBMIT rb ⟧⇀ addUpkeep s Base
 ```
 #### Protocol rules
 ```agda
   Roles₁ :
          ∙ s ↝ (s' , i)
-         ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
-         s -⟦ honestChannelA {In} $ ⊗-right-intro SLOT / just $ honestChannelA {Out} $ ⊗-right-intro $ FFD-IN i ⟧⇀ s'
+         ────────────────────────────────────────────────────────────
+         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (ϵ ⊗R) ⊗R ↑ₒ FFD-IN i ⟧⇀ s'
 
   Roles₂ : ∀ {u} → let open LeiosState in
          ∙ ¬ (∃[ s'×i ] (s ↝ s'×i × Upkeep (addUpkeep s u) ≡ Upkeep (proj₁ s'×i)))
          ∙ needsUpkeep s u
          ∙ u ≢ Base
-         ─────────────────────────────────────────────────────────────────────────
-         s -⟦ honestChannelA {In} $ ⊗-right-intro SLOT / nothing ⟧⇀ addUpkeep s u
+         ──────────────────────────────────────────────────
+         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s u
 ```
 <!--
 ```agda

@@ -2,7 +2,6 @@
 
 open import Leios.Prelude hiding (_⊗_; module Any)
 open import CategoricalCrypto
-open import CategoricalCrypto.Kleisli
 
 module Network.BasicBroadcast (Participants : ℕ) (Message : Type) where
 
@@ -31,18 +30,18 @@ Ms = ⨂ const {B = Participant} M
 data WithState_receive_return_newState_ : MachineType I (Ms ⊗ A) (List (Message × Participant)) where
 
   Send : WithState buffer
-         receive honestChannelB {Out} $ ⨂⇒ p $ SndMessage ms -- p wants to send messages ms
-         return just $ honestChannelB {In} $ ⨂⇒ p Activate -- return control to p
+         receive L⊗ (ϵ ⊗R) ᵗ ↑ₒ ⨂⇒ p (SndMessage ms) -- p wants to send messages ms
+         return just $ L⊗ (ϵ ⊗R) ᵗ ↑ᵢ ⨂⇒ p Activate -- return control to p
          newState (concatMap (λ m → tabulate (m ,_)) ms ++ buffer) -- buffer a copy of every message for every participant
 
   Deliver : WithState buffer₁ ++ (m , p) ∷ buffer₂ -- state decomposes appropriately
-            receive adversarialChannel {Out} $ inj₁ (length buffer₁) -- adversary wants to deliver k-th message
-            return just $ honestChannelB {In} $ ⨂⇒ p $ RcvMessage m -- deliver it
+            receive L⊗ (L⊗ ϵ) ᵗ ↑ₒ inj₁ (length buffer₁) -- adversary wants to deliver k-th message
+            return just $ L⊗ (ϵ ⊗R) ᵗ ↑ᵢ ⨂⇒ p (RcvMessage m) -- deliver it
             newState (buffer₁ ++ buffer₂) -- remove message
 
   Eavesdrop : WithState buffer₁ ++ x ∷ buffer₂ -- state decomposes appropriately
-              receive adversarialChannel {Out} $ inj₁ (length buffer₁) -- adversary wants to know k-th message
-              return just $ adversarialChannel {In} x -- deliver it
+              receive L⊗ (L⊗ ϵ) ᵗ ↑ₒ inj₁ (length buffer₁) -- adversary wants to know k-th message
+              return just $ L⊗ (L⊗ ϵ) ᵗ ↑ᵢ x -- deliver it
               newState (buffer₁ ++ x ∷ buffer₂) -- state remains unchanged
 
 Network : Machine I (Ms ⊗ A)
