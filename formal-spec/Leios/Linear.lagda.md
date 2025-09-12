@@ -124,7 +124,7 @@ mempool.
           → let open LeiosState s
           in
           ∙ getCurrentEBHash s ≡ just ebHash
-          ∙ find (λ (s , eb) → hash eb ≟ ebHash) EBs' ≡ just (slot' , eb)
+          ∙ find (λ (_ , eb') → hash eb' ≟ ebHash) EBs' ≡ just (slot' , eb)
           ∙ hash eb ∉ VotedEBs
           ∙ ¬ isEquivocated s eb
           ∙ isValid s (inj₁ (ebHeader eb))
@@ -143,7 +143,7 @@ Predicate needed for slot transition. Special care needs to be taken when starti
 genesis.
 ```agda
 allDone : LeiosState → Type
-allDone record { Upkeep = u } = fromList u ≡ᵉ fromList (EB-Role ∷ VT-Role ∷ Base ∷ [])
+allDone record { Upkeep = u } = VT-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ u
 ```
 ### Linear Leios transitions
 The relation describing the transition given input and state
@@ -214,11 +214,11 @@ Note: Submitted data to the base chain is only taken into account
          ──────────────────────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
 
-  Roles₂ : ∀ {x u s'} → let open LeiosState s in
-         ∙ ¬ (s ↝ (s' , x))
-         ∙ needsUpkeep u
+  Roles₂ : ∀ {u} → let open LeiosState in
+         ∙ ¬ (∃[ s'×i ] (s ↝ s'×i × Upkeep (addUpkeep s u) ≡ Upkeep (proj₁ s'×i)))
+         ∙ needsUpkeep s u
          ∙ u ≢ Base
-         ──────────────────────────────────────────────────────────────
+         ─────────────────────────────────────────────────────────────────────────
          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ addUpkeep s u
 ```
 <!--
@@ -228,6 +228,10 @@ ShortLeios .Machine.State = LeiosState
 ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 
 open import Prelude.STS.GenPremises
+
+instance
+  Dec-isValid : ∀ {s x} → isValid s x ⁇
+  Dec-isValid {s} {x} = ⁇ isValid? s x
 
 unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
 unquoteDecl VT-Role-premises = genPremises VT-Role-premises (quote _↝_.VT-Role)

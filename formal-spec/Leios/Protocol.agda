@@ -232,13 +232,14 @@ module _ (s : LeiosState)  where
   bodyValid? : (b : Body) → Dec (bodyValid b)
   bodyValid? (ibBody b) = ibBodyValid? b
 
-  isValid : Header ⊎ Body → Type
-  isValid (inj₁ h) = headerValid h
-  isValid (inj₂ b) = bodyValid b
+  opaque
+    isValid : Header ⊎ Body → Type
+    isValid (inj₁ h) = headerValid h
+    isValid (inj₂ b) = bodyValid b
 
-  isValid? : ∀ (x : Header ⊎ Body) → Dec (isValid x)
-  isValid? (inj₁ h) = headerValid? h
-  isValid? (inj₂ b) = bodyValid? b
+    isValid? : ∀ (x : Header ⊎ Body) → Dec (isValid x)
+    isValid? (inj₁ h) = headerValid? h
+    isValid? (inj₂ b) = bodyValid? b
 
 -- some predicates about EBs
 module _ (s : LeiosState) (eb : EndorserBlock) where

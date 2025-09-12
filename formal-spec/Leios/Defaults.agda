@@ -137,7 +137,7 @@ instance
   hhs .hash = IBHeaderOSig.bodyHash
 
   hpe : Hashable PreEndorserBlock (List ℕ)
-  hpe .hash = L.concat ∘ EndorserBlockOSig.ibRefs
+  hpe .hash = EndorserBlockOSig.txs
 
 record FFDBuffers : Type where
   field inIBs : List InputBlock
