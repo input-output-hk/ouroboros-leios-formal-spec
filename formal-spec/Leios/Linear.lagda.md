@@ -175,7 +175,7 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 
   Slot₂ : let open LeiosState s in
         ────────────────────────────────────────────────────────────────────
-        s -⟦ honestChannelA {In} $ ⊗-left-intro $ BASE-LDG rbs / nothing ⟧⇀
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ BASE-LDG rbs / nothing ⟧⇀
           record s { RBs = rbs }
 ```
 ```agda
