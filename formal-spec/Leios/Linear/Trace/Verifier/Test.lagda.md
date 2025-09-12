@@ -56,6 +56,7 @@ module _ where
 
     opaque
       unfolding List-Model
+      unfolding isValid?
 ```
 Starting at slot 100
 ```agda
