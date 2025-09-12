@@ -186,14 +186,14 @@ genesis.
 allDone : LeiosState → Type
 allDone record { slot = s ; Upkeep = u ; Upkeep-Stage = v } =
   -- bootstrapping
-    (stage s < 3 ×                        u ≡ᵉ fromList (IB-Role           ∷ Base ∷ []))
-  ⊎ (stage s ≡ 3 ×   beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
-  ⊎ (stage s ≡ 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role           ∷ Base ∷ []))
+    (stage s < 3 ×                        IB-Role ∈ˡ u                × Base ∈ˡ u)
+  ⊎ (stage s ≡ 3 ×   beginningOfStage s × IB-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ u)
+  ⊎ (stage s ≡ 3 × ¬ beginningOfStage s × IB-Role ∈ˡ u                × Base ∈ˡ u)
   -- done
-  ⊎ (stage s > 3 ×   beginningOfStage s × u ≡ᵉ fromList (IB-Role ∷ EB-Role ∷ Base ∷ []))
-  ⊎ (stage s > 3 × ¬ beginningOfStage s × u ≡ᵉ fromList (IB-Role           ∷ Base ∷ []) ×
+  ⊎ (stage s > 3 ×   beginningOfStage s × IB-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ u)
+  ⊎ (stage s > 3 × ¬ beginningOfStage s × IB-Role ∈ˡ u                × Base ∈ˡ u) ×
        (((  endOfStage s × v ≡ᵉ fromList (VT-Role ∷ []))
-       ⊎ (¬ endOfStage s))))
+       ⊎ (¬ endOfStage s)))
 ```
 ### (Full-)Short Leios transitions
 The relation describing the transition given input and state
@@ -218,7 +218,7 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
         ────────────────────────────────────────────────────────────────────────────────────────────
         s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
             { slot         = suc slot
-            ; Upkeep       = ∅
+            ; Upkeep       = []
             ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
             } ↑ L.filter (isValid? s) msgs
 
@@ -275,7 +275,7 @@ ShortLeios : Machine (FFD ⊗ BaseC) (IO ⊗ Adv)
 ShortLeios .Machine.State = LeiosState
 ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 
-open import GenPremises
+open import Prelude.STS.GenPremises
 
 unquoteDecl IB-Role-premises = genPremises IB-Role-premises (quote _↝_.IB-Role)
 unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
@@ -288,7 +288,6 @@ unquoteDecl No-VT-Role-premises = genPremises No-VT-Role-premises (quote No-VT-R
 unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
 unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
 unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
-unquoteDecl Base₂a-premises = genPremises Base₂a-premises (quote Base₂a)
 unquoteDecl Base₂b-premises = genPremises Base₂b-premises (quote Base₂b)
 ```
 --!>

@@ -47,12 +47,13 @@ open import Leios.Foreign.Util
 open import Leios.KeyRegistration
 open import Leios.Linear
 open import Leios.Linear.Trace.Verifier
+open import Leios.Linear.Trace.Verifier.Test
 -- open import Leios.Network
 open import Leios.Prelude
 open import Leios.Protocol
--- open import Leios.Short
+open import Leios.Short
 -- open import Leios.Short.Deterministic
--- open import Leios.Short.Trace.Verifier
+open import Leios.Short.Trace.Verifier
 -- open import Leios.Short.Trace.Verifier.Test
 -- open import Leios.Simplified
 -- open import Leios.Simplified.Deterministic
