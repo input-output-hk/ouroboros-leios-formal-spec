@@ -228,6 +228,10 @@ ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 
 open import Prelude.STS.GenPremises
 
+instance
+  Dec-isValid : ∀ {s x} → isValid s x ⁇
+  Dec-isValid {s} {x} = ⁇ isValid? s x
+
 unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
 unquoteDecl VT-Role-premises = genPremises VT-Role-premises (quote _↝_.VT-Role)
 

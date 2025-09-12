@@ -180,11 +180,12 @@ module Defaults
     → find (λ (_ , eb') → hash eb' ≟ ebHash₁) (LeiosState.EBs' s) ≡ just (slot'' , eb₁)
     → getCurrentEBHash s ≡ just ebHash
     → find (λ (_ , eb') → hash eb' ≟ ebHash) (LeiosState.EBs' s) ≡ just (slot' , eb)
-    → slot'' ≡ slot' × eb₁ ≡ eb
-  subst' {s} {slot' = slot'} {eb = eb} x y eq₂ eq₃ =
-    let ji = just-injective (trans (sym x) eq₂)
-        js = subst (found s eb slot') (sym ji) eq₃
-    in ,-injective (just-injective (trans (sym y) js))
+    → (eb₁ , ebHash₁ , slot'') ≡ (eb , ebHash , slot')
+  subst' {s} {ebHash = ebHash} {eb = eb} eq₁₁ eq₁₂ eq₂₁ eq₂₂
+    with getCurrentEBHash s | eq₁₁ | eq₂₁
+  ... | _ | refl | refl
+    with find (λ (_ , eb') → hash eb' ≟ ebHash) (LeiosState.EBs' s) | eq₁₂ | eq₂₂
+  ... | _ | refl | refl = refl
 
   Base≢EB-Role : SlotUpkeep.Base ≢ SlotUpkeep.EB-Role
   Base≢EB-Role = λ ()
@@ -214,47 +215,12 @@ module Defaults
         let ji = just-injective (trans (sym x) eq₂)
         in just≢nothing $ trans (sym y) (subst (not-found s) (sym ji) eq₃)
     ... | just (slot' , eb)
-      with ¿ hash eb ∉ (LeiosState.VotedEBs s) ¿
-    ... | no ¬p = no λ where
-      (_ , VT-Role (x , y , p , _) , _) → ¬p $ subst (λ b → hash (EndorserBlock ∋ b) ∉ LeiosState.VotedEBs s) (proj₂ $ subst' {s} x y eq₂ eq₃) p
-    ... | yes p
-      with ¿ ¬ isEquivocated s eb ¿
-    ... | no ¬a = no λ where
-      (_ , VT-Role (x , y , _ , p , _) , _) → ¬a $ subst (λ b → ¬ isEquivocated s b) (proj₂ $ subst' {s} x y eq₂ eq₃) p
-    ... | yes a
-      with isValid? s (inj₁ (ebHeader eb))
-    ... | no ¬b = no λ where
-      (_ , VT-Role (x , y , _ , _ , p , _) , _) → ¬b $ subst (λ b → isValid s (inj₁ (ebHeader b))) (proj₂ $ subst' {s} x y eq₂ eq₃) p
-    ... | yes b
-      with ¿ slot' ≤ slotNumber eb + Lhdr ¿
-    ... | no ¬c = no λ where
-      (_ , VT-Role (x , y , _ , _ , _ , p , _ ) , _) → let (x₁ , x₂) = subst' {s} x y eq₂ eq₃ in ¬c $ subst₂ (λ a b → a ≤ slotNumber b + Lhdr) x₁ x₂ p
-    ... | yes c
-      with ¿ slotNumber eb + 3 * Lhdr ≤ LeiosState.slot s ¿
-    ... | no ¬d = no λ where
-      (_ , VT-Role (x , y , _ , _ , _ , _ , p , _) , _) → ¬d $ subst (λ b → slotNumber b + 3 * Lhdr ≤ LeiosState.slot s) (proj₂ $ subst' {s} x y eq₂ eq₃) p
-    ... | yes d
-      with ¿ LeiosState.slot s ≡ slotNumber eb + validityCheckTime eb ¿
-    ... | no ¬e = no λ where
-      (_ , VT-Role (x , y , _ , _ , _ , _ , _ , p , _) , _) → ¬e $ subst (λ b → LeiosState.slot s ≡ slotNumber b + validityCheckTime b) (proj₂ $ subst' {s} x y eq₂ eq₃) p
-    ... | yes e
-      with ¿ validityCheckTime eb ≤ 3 * Lhdr + Lvote ¿
-    ... | no ¬f = no λ where
-      (_ , VT-Role (x , y , _ , _ , _ , _ , _ , _ , p , _) , _) → ¬f $ subst (λ b → validityCheckTime b ≤ 3 * Lhdr + Lvote) (proj₂ $ subst' {s} x y eq₂ eq₃) p
-    ... | yes f
-      with ¿ EndorserBlockOSig.txs eb ≢ [] ¿
-    ... | no ¬g = no λ where
-      (_ , VT-Role (x , y , _ , _ , _ , _ , _ , _ , _ , p , _ ) , _) → ¬g $ subst (λ b → EndorserBlockOSig.txs b ≢ []) (proj₂ $ subst' {s} x y eq₂ eq₃) p
-    ... | yes g
-      with ¿ needsUpkeep s VT-Role ¿
-    ... | no ¬h = no λ where
-      (_ , VT-Role (_ , _ , _ , _ , _ , _ , _ , _ , _ , _ , p , _) , _) → ¬h p
-    ... | yes h
-      with ¿ canProduceV (slotNumber eb) sk-VT (stake s) ¿
-    ... | no ¬i = no λ where
-      (_ , VT-Role (x , y , _ , _ , _ , _ , _ , _ , _ , _ , _ , p) , refl) → ¬i $ subst (λ b → canProduceV (slotNumber b) sk-VT (stake s)) (proj₂ $ subst' {s} x y eq₂ eq₃) p
-    ... | yes i = yes ((rememberVote (addUpkeep s VT-Role) eb , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing) ,
-                       (VT-Role ((eq₂ , eq₃ , p , a , b , c , d , e , f , g , h , i))), refl)
+      with ¿ VT-Role-premises {s} {eb} {ebHash} {slot'} .proj₁ ¿
+    ... | yes p = yes ((rememberVote (addUpkeep s VT-Role) eb , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing) ,
+                        VT-Role p , refl)
+    ... | no ¬p = no λ where (_ , VT-Role (x , y , p) , _) → ¬p $ subst
+                               (λ where (eb , ebHash , slot) → VT-Role-premises {s} {eb} {ebHash} {slot} .proj₁)
+                               (subst' {s} x y eq₂ eq₃) (x , y , p)
     Dec-↝ {s} {Base} .dec = no λ where
       (_ , EB-Role _ , x) → Base≢EB-Role (∷-injectiveˡ (trans x refl))
       (_ , VT-Role _ , x) → Base≢VT-Role (∷-injectiveˡ (trans x refl))
@@ -272,10 +238,8 @@ module Defaults
   verifyStep' (EB-Role-Action _ _) (inj₁ (FFD-OUT _)) _ _ = Err dummyErr
   verifyStep' (VT-Role-Action .(slot s) eb slot') (inj₁ SLOT) s refl
     with ¿ VT-Role-premises {s = s} {eb = eb} {ebHash = hash eb} {slot' = slot'} .proj₁ ¿
-       | isValid? s (inj₁ (ebHeader eb)) -- TODO:  why not covered above?
-  ... | yes (x , x₁ , x₂ , x₃ , x₄ , x₅ , x₆ , x₇ , x₈ , x₉ , x₁₀) | yes h = Ok' (Roles₁ (VT-Role {ebHash = hash eb} {slot' = slot'} ((x , x₁ , x₂ , x₃ , h , x₄ , x₅ , x₆ , x₇ , x₈ , x₉ , x₁₀))))
-  ... | yes (x , x₁ , x₂ , x₃ , x₄ , x₅ , x₆ , x₇ , x₈ , x₉ , x₁₀) | no _ = Err dummyErr
-  ... | no ¬h | _ = Err dummyErr
+  ... | yes p = Ok' (Roles₁ (VT-Role {ebHash = hash eb} {slot' = slot'} p))
+  ... | no ¬h = Err dummyErr
   verifyStep' (VT-Role-Action _ _ _) (inj₁ FTCH) _ _ = Err dummyErr
   verifyStep' (VT-Role-Action _ _ _) (inj₁ (FFD-OUT _)) _ _ = Err dummyErr
   verifyStep' (VT-Role-Action _ _ _) (inj₂ _) _ refl = Err dummyErr
