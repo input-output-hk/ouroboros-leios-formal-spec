@@ -13,6 +13,7 @@ open import Function
 -- above pattern often arises, thus we provide helpers to select channels from     --
 -- it. Adv is the adversary channels, and A and B honest channels.                 --
 -------------------------------------------------------------------------------------
+-- ChannelSelection
 
 honestChannelA : ∀ {m A B Adv} → A [ m ]⇒[ m ] A ⊗ (B ⊗ Adv) ᵀ
 honestChannelA = ⊗-right-intro
@@ -36,10 +37,6 @@ data _[_]⇒[_]ᵍ_ : Channel → Mode → Mode → Channel → Set₁ where
   L⊗_ : ∀ {m m' A B C} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ]ᵍ C ⊗ B
   _ᵗ : ∀ {m m' A B} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ ¬ₘ m' ]ᵍ B ᵀ
   ¬¬_ : ∀ {m A B} → A [ m ]⇒[ ¬ₘ (¬ₘ m) ]ᵍ B → A [ m ]⇒[ m ]ᵍ B
-
--- Other approaches :
--- 1. remove ¬¬ but it requires to case split on the mode
--- 2. have lift take m' and m'' and an implicit proof that m' ≡ m'' is it even possible with decidability?
 
 lift : ∀ {m m' A B} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ] B
 lift ϵ = ⇒-refl
@@ -66,10 +63,10 @@ adversarialChannel' : ∀ {m A B Adv} → Adv [ m ]⇒[ ¬ₘ m ] A ⊗ (B ⊗ A
 adversarialChannel' = L⊗ (L⊗ ϵ) ᵗ ↑
 
 multiple : ∀ {m A B} → A [ m ]⇒[ m ] A ⊗ (A ⊗ B)
-multiple = ϵ ⊗R ↑
+multiple = L⊗ (ϵ ⊗R) ↑
 
 multiple-negates : ∀ {m A B} → A [ m ]⇒[ ¬ₘ m ] ((((A ᵀ ⊗ B) ᵀ ⊗ B) ᵀ ⊗ B) ᵀ ⊗ B) ᵀ
 multiple-negates = ((¬¬ (((¬¬ (ϵ ᵗ ⊗R) ᵗ) ⊗R) ᵗ ⊗R) ᵗ) ⊗R) ᵗ ↑
 
 test : ∀ {m A B C D E} → E [ m ]⇒[ m ] A ⊗ ((B ⊗ E ⊗ D) ᵀ ⊗ C) ᵀ ⊗ (A ⊗ B)
-test = L⊗ (¬¬ ((L⊗ ϵ ⊗R) ᵗ ⊗R) ᵗ) ⊗R ↑
+test = L⊗ (¬¬ ((L⊗ ϵ ⊗R) ᵗ ⊗R) ᵗ ⊗R) ↑
