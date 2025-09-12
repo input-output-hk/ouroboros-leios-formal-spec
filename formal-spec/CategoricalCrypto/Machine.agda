@@ -5,7 +5,8 @@ module CategoricalCrypto.Machine where
 open import abstract-set-theory.Prelude hiding (id; _∘_; _⊗_; lookup; Dec; [_])
 import abstract-set-theory.Prelude as P
 open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
-open import CategoricalCrypto.Channel 
+open import CategoricalCrypto.Channel.Core
+open import CategoricalCrypto.Channel.Selection
 
 -- --------------------------------------------------------------------------------
 -- -- Machines, which form the morphisms
@@ -97,12 +98,12 @@ module _ {A B C} (M : Machine (A ⊗ C) (B ⊗ C)) (let open Machine M) where
 
     Trace[_] : ∀ {s m m' s'} → stepRel s m m' s' → TraceRel s m m' s'
 
-    _Trace∷₁_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (⊗-right-intro {Out} $ ⊗-left-intro {Out} m')) s' →
-                                        TraceRel s' (⊗-left-intro {In} $ ⊗-ᵀ-factor $ ⊗-left-intro $ ⇒-transpose m') m'' s'' →
+    _Trace∷₁_ : ∀ {s s' s'' m m' m''} → stepRel s m (just ((L⊗ ϵ) ⊗R ↑ₒ m')) s' →
+                                        TraceRel s' (L⊗ (L⊗ ϵ ᵗ) ᵗ ↑ᵢ m') m'' s'' →
                                         TraceRel s m m'' s''
                                         
-    _Trace∷₂_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (⊗-left-intro {Out} $ ⊗-ᵀ-factor $ ⊗-left-intro $ ⇒-transpose m')) s' →
-                                        TraceRel s' (⊗-right-intro {In} $ ⊗-left-intro {In} m') m'' s'' →
+    _Trace∷₂_ : ∀ {s s' s'' m m' m''} → stepRel s m (just (L⊗ (L⊗ ϵ ᵗ) ᵗ ↑ₒ m')) s' →
+                                        TraceRel s' ((L⊗ ϵ) ⊗R ↑ᵢ m') m'' s'' →
                                         TraceRel s m m'' s''
 
   tr : Machine A B
@@ -123,7 +124,7 @@ _∘_ M₁ M₂ = tr $ modifyStepRel (M₂ ⊗' M₁) $ ⊗-left-double-intro $ 
 ⊗-symₘ = TotalFunctionMachine' ⊗-sym ⊗-sym
 
 idᴷ : Machine I (I ⊗ I)
-idᴷ rewrite ᵀ-identity = TotalFunctionMachine $ ⊗-combine {In} ⇒-transpose $ ⊗-ᵀ-distrib ⇒ₜ ⊗-fusion ⇒ₜ ⇒-transpose ⇒ₜ ⊗-duplicate ⇒ₜ ⊗-ᵀ-factor
+idᴷ rewrite ᵀ-identity = TotalFunctionMachine $ ⊗-combine {In} ⇒-transpose $ ⊗-ᵀ-distrib ⇒ₜ ⊗-fusion ⇒ₜ ⇒-transpose ⇒ₜ ⊗-right-intro ⇒ₜ ⊗-ᵀ-factor
 
 transpose : ∀ {A B} → Machine A B → Machine (B ᵀ) (A ᵀ)
 transpose M = modifyStepRel M ⊗-sym
