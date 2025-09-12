@@ -39,7 +39,7 @@ data _[_]⇒[_]ᵍ_ : Channel → Mode → Mode → Channel → Set₁ where
 
 -- Other approaches :
 -- 1. remove ¬¬ but it requires to case split on the mode
--- 2. have lift take m' and m'' and an implicit proof that m' ≡ m''
+-- 2. have lift take m' and m'' and an implicit proof that m' ≡ m'' is it even possible with decidability?
 
 lift : ∀ {m m' A B} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ] B
 lift ϵ = ⇒-refl
@@ -48,24 +48,28 @@ lift (L⊗ x) = lift x ⇒ₜ ⊗-left-intro
 lift (x ᵗ) = lift x ⇒ₜ ⇒-transpose
 lift (¬¬ x) = lift x ⇒ₜ ⇒-double-negate
 
-_|ₗ = lift
+_↑ = lift
 
-infix 7 _|ₗ
+_↑ᵢ_ = lift {In}
+
+_↑ₒ_ = lift {Out}
+
+infix 7 _↑ _↑ᵢ_ _↑ₒ_
 
 honestChannelA' : ∀ {m A B Adv} → A [ m ]⇒[ m ] A ⊗ (B ⊗ Adv) ᵀ
-honestChannelA' = ϵ ⊗R |ₗ
+honestChannelA' = ϵ ⊗R ↑
 
 honestChannelB' : ∀ {m A B Adv} → B [ m ]⇒[ ¬ₘ m ] A ⊗ (B ⊗ Adv) ᵀ
-honestChannelB' = L⊗ (ϵ ⊗R) ᵗ |ₗ
+honestChannelB' = L⊗ (ϵ ⊗R) ᵗ ↑
 
 adversarialChannel' : ∀ {m A B Adv} → Adv [ m ]⇒[ ¬ₘ m ] A ⊗ (B ⊗ Adv) ᵀ
-adversarialChannel' = L⊗ (L⊗ ϵ) ᵗ |ₗ
+adversarialChannel' = L⊗ (L⊗ ϵ) ᵗ ↑
 
 multiple : ∀ {m A B} → A [ m ]⇒[ m ] A ⊗ (A ⊗ B)
-multiple = ϵ ⊗R |ₗ
+multiple = ϵ ⊗R ↑
 
 multiple-negates : ∀ {m A B} → A [ m ]⇒[ ¬ₘ m ] ((((A ᵀ ⊗ B) ᵀ ⊗ B) ᵀ ⊗ B) ᵀ ⊗ B) ᵀ
-multiple-negates = ((¬¬ (((¬¬ (ϵ ᵗ ⊗R) ᵗ) ⊗R) ᵗ ⊗R) ᵗ) ⊗R) ᵗ |ₗ
+multiple-negates = ((¬¬ (((¬¬ (ϵ ᵗ ⊗R) ᵗ) ⊗R) ᵗ ⊗R) ᵗ) ⊗R) ᵗ ↑
 
 test : ∀ {m A B C D E} → E [ m ]⇒[ m ] A ⊗ ((B ⊗ E ⊗ D) ᵀ ⊗ C) ᵀ ⊗ (A ⊗ B)
-test = L⊗ (¬¬ ((L⊗ ϵ ⊗R) ᵗ ⊗R) ᵗ) ⊗R |ₗ
+test = L⊗ (¬¬ ((L⊗ ϵ ⊗R) ᵗ ⊗R) ᵗ) ⊗R ↑
