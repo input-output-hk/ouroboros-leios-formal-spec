@@ -1,4 +1,4 @@
-open import Leios.Prelude hiding (id; _>>=_; return)
+open import Leios.Prelude hiding (id; _>>=_; return; _⊗_)
 open import Leios.Config
 open import Leios.SpecStructure using (SpecStructure)
 
@@ -91,47 +91,30 @@ module Defaults
 
   open import Prelude.Closures _—→_
 
+  toRcvType : FFDT Out ⊎ BaseT Out ⊎ IOT In → ∃ (Channel.rcvType ((FFD ⊗ BaseC) ⊗ ((IO ⊗ Adv) ᵀ)))
+  toRcvType (inj₁ i) = honestOutputI (rcvˡ (-, i))
+  toRcvType (inj₂ (inj₁ i)) = honestOutputI (rcvʳ (-, i))
+  toRcvType (inj₂ (inj₂ i)) = honestInputI (-, i)
+
   infix 0 _≈_ _≈¹_
 
   data _≈¹_ : Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In) → s′ —→ s → Type where
 
-    FromAction¹ :
+    FromAction :
       ∀ i {s′ o}
-        → (σ : s -⟦ honestOutputI (rcvˡ (-, i)) / o ⟧⇀ s′)
-        → (getAction σ , inj₁ i) ≈¹ ActionStep σ
-
-    FromAction² :
-      ∀ i {s′ o}
-        → (σ : s -⟦ honestOutputI (rcvʳ (-, i)) / o ⟧⇀ s′)
-        → (getAction σ , inj₂ (inj₁ i)) ≈¹ ActionStep σ
-
-    FromAction³ :
-      ∀ i {s′ o}
-        → (σ : s -⟦ honestInputI (-, i) / o ⟧⇀ s′)
-        → (getAction σ , inj₂ (inj₂ i)) ≈¹ ActionStep σ
+        → (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
+        → (getAction σ , i) ≈¹ ActionStep σ
 
   data ValidStep (es : Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In)) (s : LeiosState) : Type where
     Valid : (tr : s′ —→ s) → es ≈¹ tr → ValidStep es s
 
   data _≈_ : TestTrace → s′ —↠ s → Type where
 
-    FromAction-FFD :
+    FromAction :
       ∀ i {σs s′ s₀ o} {tr : s —↠ s₀}
         → σs ≈ tr
-        → (σ : s -⟦ honestOutputI (rcvˡ (-, i)) / o ⟧⇀ s′)
-        → (getAction σ , inj₁ i) ∷ σs ≈ s′ —→⟨ ActionStep σ ⟩ tr
-
-    FromAction-Base :
-      ∀ i {σs s′ s₀ o} {tr : s —↠ s₀}
-        → σs ≈ tr
-        → (σ : s -⟦ honestOutputI (rcvʳ (-, i)) / o ⟧⇀ s′)
-        → (getAction σ , inj₂ (inj₁ i)) ∷ σs ≈ s′ —→⟨ ActionStep σ ⟩ tr
-
-    FromAction-IO :
-      ∀ i {σs s′ s₀ o} {tr : s —↠ s₀}
-        → σs ≈ tr
-        → (σ : s -⟦ honestInputI (-, i) / o ⟧⇀ s′)
-        → (getAction σ , inj₂ (inj₂ i)) ∷ σs ≈ s′ —→⟨ ActionStep σ ⟩ tr
+        → (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
+        → (getAction σ , i) ∷ σs ≈ s′ —→⟨ ActionStep σ ⟩ tr
 
     Done : [] ≈ s ∎
 
@@ -145,17 +128,9 @@ module Defaults
     Err-StepOk   : Err-verifyTrace σs s → Err-verifyTrace ((σ , i) ∷ σs) s
     Err-Action   : Err-verifyAction σ i s′ → Err-verifyTrace ((σ , i) ∷ σs) s
 
-  Ok' : ∀ {s i o s′} → (σ : s -⟦ honestOutputI (rcvˡ (-, i)) / o ⟧⇀ s′)
-      → Result (Err-verifyAction (getAction σ) (inj₁ i) s) (ValidStep (getAction σ , inj₁ i) s)
-  Ok' a = Ok (Valid _ (FromAction¹ _ a))
-
-  Ok'' : ∀ {s i o s′} → (σ : s -⟦ honestOutputI (rcvʳ (-, i)) / o ⟧⇀ s′)
-      → Result (Err-verifyAction (getAction σ) (inj₂ (inj₁ i)) s) (ValidStep (getAction σ , inj₂ (inj₁ i)) s)
-  Ok'' a = Ok (Valid _ (FromAction² _ a))
-
-  Ok''' : ∀ {s i o s′} → (σ : s -⟦ honestInputI (-, i) / o ⟧⇀ s′)
-    → Result (Err-verifyAction (getAction σ) (inj₂ (inj₂ i)) s) (ValidStep (getAction σ , inj₂ (inj₂ i)) s)
-  Ok''' a = Ok (Valid _ (FromAction³ _ a))
+  Ok' : ∀ {s i o s′} → (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
+      → Result (Err-verifyAction (getAction σ) i s) (ValidStep (getAction σ , i) s)
+  Ok' a = Ok (Valid _ (FromAction _ a))
 
   just≢nothing : ∀ {ℓ} {A : Type ℓ} {x} → (Maybe A ∋ just x) ≡ nothing → ⊥
   just≢nothing = λ ()
@@ -168,9 +143,6 @@ module Defaults
 
   P? : (h : EBRef) → ((s , eb) : ℕ × EndorserBlock) → Dec (P h (s , eb))
   P? h (_ , eb) = hash eb ≟ h
-
-  found : LeiosState → EndorserBlock → ℕ → EBRef → Type
-  found s eb slot' k = find (P? k) (LeiosState.EBs' s) ≡ just (slot' , eb)
 
   not-found : LeiosState → EBRef → Type
   not-found s k = find (P? k) (LeiosState.EBs' s) ≡ nothing
@@ -194,20 +166,17 @@ module Defaults
   Base≢VT-Role = λ ()
 
   instance
-    Dec-↝ : ∀ {s} {u : SlotUpkeep} → (∃[ s'×i ] (s ↝ s'×i × (u ∷ LeiosState.Upkeep s) ≡ LeiosState.Upkeep (proj₁ s'×i))) ⁇
+    Dec-↝ : ∀ {s u} → (∃[ s'×i ] (s ↝ s'×i × (u ∷ LeiosState.Upkeep s) ≡ LeiosState.Upkeep (proj₁ s'×i))) ⁇
     Dec-↝ {s} {EB-Role} .dec
       with toProposeEB s _ in eq₁
-    ... | nothing = no λ where
-      (_ , EB-Role (p , _) , _) → nothing≢just (trans (sym eq₁) p)
+    ... | nothing = no λ where (_ , EB-Role (p , _) , _) → nothing≢just (trans (sym eq₁) p)
     ... | just eb
       with ¿ canProduceEB (LeiosState.slot s) sk-EB (stake s) _ ¿
-    ... | yes q = yes ((_ , _) , EB-Role (eq₁ , q) , refl)
-    ... | no ¬q = no λ where
-      (_ , EB-Role (_ , q) , _) → ¬q q
+    ... | yes q = yes (_ , EB-Role (eq₁ , q) , refl)
+    ... | no ¬q = no λ where (_ , EB-Role (_ , q) , _) → ¬q q
     Dec-↝ {s} {VT-Role} .dec
       with getCurrentEBHash s in eq₂
-    ... | nothing = no λ where
-      (_ , VT-Role (p , _) , _) → nothing≢just (trans (sym eq₂) p)
+    ... | nothing = no λ where (_ , VT-Role (p , _) , _) → nothing≢just (trans (sym eq₂) p)
     ... | just ebHash
       with find (λ (_ , eb') → hash eb' ≟ ebHash) (LeiosState.EBs' s) in eq₃
     ... | nothing = no λ where
@@ -254,11 +223,11 @@ module Defaults
   ... | yes p = Ok' (Slot₁ {s = s} {msgs = msgs} p)
   ... | no _ = Err dummyErr
   verifyStep' (Slot₂-Action n) (inj₁ _) _ _ = Err dummyErr
-  verifyStep' (Slot₂-Action n) (inj₂ (inj₁ (BASE-LDG rbs))) s refl = Ok'' (Slot₂ {s = s} {rbs = rbs})
+  verifyStep' (Slot₂-Action n) (inj₂ (inj₁ (BASE-LDG rbs))) s refl = Ok' (Slot₂ {s = s} {rbs = rbs})
   verifyStep' (Slot₂-Action n) (inj₂ (inj₂ y)) s refl = Err dummyErr
 
   -- Different IO pattern again
-  verifyStep' (Base₁-Action n) (inj₂ (inj₂ (SubmitTxs txs))) s refl = Ok''' Base₁
+  verifyStep' (Base₁-Action n) (inj₂ (inj₂ (SubmitTxs txs))) s refl = Ok' Base₁
   verifyStep' (Base₂-Action n) (inj₁ SLOT) s refl with ¿ Base₂-premises {s = s} .proj₁ ¿
   ... | yes p = Ok' (Base₂ p)
   ... | no _ = Err dummyErr
@@ -292,6 +261,4 @@ module Defaults
     where
       open Monad-Result
       _Valid∷ʳ_ : ∀ {e es s} → (σs : ValidTrace es s) → ValidStep e (getNewState σs) → ValidTrace (e ∷ es) s
-      Valid tr x Valid∷ʳ Valid (ActionStep as) (FromAction¹ a _) = Valid (_ —→⟨ ActionStep as ⟩ tr) (FromAction-FFD a x as)
-      Valid tr x Valid∷ʳ Valid (ActionStep as) (FromAction² a _) = Valid (_ —→⟨ ActionStep as ⟩ tr) (FromAction-Base a x as)
-      Valid tr x Valid∷ʳ Valid (ActionStep as) (FromAction³ a _) = Valid (_ —→⟨ ActionStep as ⟩ tr) (FromAction-IO a x as)
+      Valid tr x Valid∷ʳ Valid (ActionStep as) (FromAction a _) = Valid (_ —→⟨ ActionStep as ⟩ tr) (FromAction a x as)
