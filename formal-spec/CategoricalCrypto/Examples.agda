@@ -8,7 +8,8 @@ import abstract-set-theory.Prelude as P
 open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 
 open import CategoricalCrypto.Machine
-open import CategoricalCrypto.Channel
+open import CategoricalCrypto.Channel.Core
+open import CategoricalCrypto.Channel.Selection
 
 --------------------------------------------------------------------------------
 -- Example functionalities
@@ -33,13 +34,13 @@ module TemplateChannel (M : Type) {M' : Type} (f : M → M') where
   data WithState_receive_return_newState_ : MachineType I ((A ⊗ B) ⊗ E) (List M) where
 
     Send : ∀ {m s} → WithState s
-                     receive ⊗-left-intro {In} $ ⇒-transpose $ ⊗-right-intro $ ⊗-right-intro m
-                     return just $ ⊗-left-intro {Out} $ ⇒-transpose $ ⊗-right-intro $ ⊗-left-intro m
+                     receive L⊗ ((ϵ ᵗ ⊗R) ⊗R) ᵗ ↑ᵢ m
+                     return just $ L⊗ ((L⊗ ϵ ᵗ) ⊗R) ᵗ ↑ₒ m
                      newState (s ∷ʳ m)
 
     Req  : ∀ {m s} → WithState m ∷ s
-                     receive ⊗-left-intro {In} $ ⇒-transpose $ ⊗-left-intro tt
-                     return just $ ⊗-left-intro {Out} $ ⇒-transpose $ ⊗-left-intro $ f m
+                     receive L⊗ (L⊗ ϵ ᵗ) ᵗ ↑ᵢ tt
+                     return just $ L⊗ (L⊗ ϵ ᵗ) ᵗ ↑ₒ f m
                      newState s
 
   Functionality : Machine I ((A ⊗ B) ⊗ E)
@@ -73,13 +74,13 @@ module Encryption (PlainText CipherText PubKey PrivKey : Type)
   data WithState_receive_return_newState_ : MachineType I C S where
 
     Enc : ∀ {p k s} → let c = genCT (length s) in WithState s
-                                                  receive ⊗-left-intro {In} $ inj₁ (p , k)
-                                                  return just $ ⊗-left-intro {Out} $ inj₁ c
+                                                  receive L⊗ ϵ ↑ᵢ inj₁ (p , k)
+                                                  return just $ L⊗ ϵ ↑ₒ inj₁ c
                                                   newState ((k , p , c) ∷ s)
 
     Dec : ∀ {c k s} → let p = lookupPlainText s (c , getPubKey k) in WithState s
-                                                                     receive ⊗-left-intro {In} $ inj₂ (c , k)
-                                                                     return just $ ⊗-left-intro {Out} $ inj₁ c
+                                                                     receive L⊗ ϵ ↑ᵢ inj₂ (c , k)
+                                                                     return just $ L⊗ ϵ ↑ₒ inj₁ c
                                                                      newState s
 
   Functionality : Machine I C
@@ -102,21 +103,21 @@ module EncryptionShim (PlainText CipherText PubKey PrivKey : Type)
   data WithState_receive_return_newState_ : MachineType ((L.A ⊗ L.B) ⊗ L.E) ((S.A ⊗ S.B) ⊗ S.E) (E.Functionality .State) where
   
     EncSend : ∀ {m m' s s'} → E.WithState s
-                              receive ⊗-left-intro {In} $ inj₁ (m , pubKey)
-                              return just $ ⊗-left-intro {Out} $ inj₁ m'
+                              receive L⊗ ϵ ↑ᵢ inj₁ (m , pubKey)
+                              return just $ L⊗ ϵ ↑ₒ inj₁ m'
                               newState s'
                             → WithState s
-                              receive ⊗-left-intro {In} $ ⇒-transpose $ ⊗-right-intro $ ⊗-right-intro m 
-                              return just $ ⊗-right-intro {Out} $ ⊗-right-intro $ ⊗-right-intro m'
+                              receive L⊗ ((ϵ ᵗ ⊗R) ⊗R) ᵗ ↑ᵢ m
+                              return just $ ((ϵ ⊗R) ⊗R) ⊗R ↑ₒ m'
                               newState s'
 
     DecRcv  : ∀ {m m' s s'} → E.WithState s
-                              receive ⊗-left-intro {In} $ inj₂ (m , privKey)
-                              return just $ ⊗-left-intro {Out} $ inj₂ $ just m'
+                              receive L⊗ ϵ ↑ᵢ inj₂ (m , privKey)
+                              return just $ L⊗ ϵ ↑ₒ inj₂ (just m')
                               newState s'
                             → WithState s
-                              receive ⊗-right-intro {In} $ ⊗-right-intro $ ⊗-left-intro m
-                              return just $ ⊗-left-intro {Out} $ ⇒-transpose $ ⊗-right-intro $ ⊗-left-intro $ m'
+                              receive ((L⊗ ϵ) ⊗R) ⊗R ↑ᵢ m
+                              return just $ L⊗ ((L⊗ ϵ ᵗ) ⊗R) ᵗ ↑ₒ m'
                               newState s'
 
   Functionality : Machine ((L.A ⊗ L.B) ⊗ L.E) ((S.A ⊗ S.B) ⊗ S.E)
