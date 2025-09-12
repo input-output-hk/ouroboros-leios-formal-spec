@@ -90,11 +90,12 @@ module Defaults
         s′ —→ s
 
   open import Prelude.Closures _—→_
+  open import CategoricalCrypto.Channel.Selection
 
-  toRcvType : FFDT Out ⊎ BaseT Out ⊎ IOT In → ∃ (Channel.rcvType ((FFD ⊗ BaseC) ⊗ ((IO ⊗ Adv) ᵀ)))
-  toRcvType (inj₁ i) = honestOutputI (rcvˡ (-, i))
-  toRcvType (inj₂ (inj₁ i)) = honestOutputI (rcvʳ (-, i))
-  toRcvType (inj₂ (inj₂ i)) = honestInputI (-, i)
+  toRcvType : FFDT Out ⊎ BaseT Out ⊎ IOT In → Channel.inType ((FFD ⊗ BaseC) ⊗ ((IO ⊗ Adv) ᵀ))
+  toRcvType (inj₁ i) = (ϵ ⊗R) ⊗R ↑ᵢ i
+  toRcvType (inj₂ (inj₁ i)) = (L⊗ ϵ) ⊗R ↑ᵢ i
+  toRcvType (inj₂ (inj₂ i)) = L⊗ (ϵ ᵗ ⊗R) ᵗ ↑ᵢ i
 
   infix 0 _≈_ _≈¹_
 
