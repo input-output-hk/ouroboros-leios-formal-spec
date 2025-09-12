@@ -12,6 +12,7 @@ open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
 open import CategoricalCrypto hiding (id; _∘_)
+open import CategoricalCrypto.Channel.Selection
 
 module Leios.Short (⋯ : SpecStructure 1)
   (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified'))
@@ -215,22 +216,21 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```agda
   Slot₁ : let open LeiosState s in
         ∙ allDone s
-        ────────────────────────────────────────────────────────────────────────────────────────────
-        s -⟦ honestOutputI (rcvˡ (-, FFD-OUT msgs)) / honestInputO' (sndʳ (-, FTCH-LDG)) ⟧⇀ record s
+        ─────────────────────────────────────────────────────────────────────────
+        s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ FFD-OUT msgs / just ((L⊗ ϵ) ⊗R ↑ₒ FTCH-LDG) ⟧⇀ record s
             { slot         = suc slot
             ; Upkeep       = []
             ; Upkeep-Stage = ifᵈ (endOfStage slot) then ∅ else Upkeep-Stage
             } ↑ L.filter (isValid? s) msgs
 
   Slot₂ : let open LeiosState s in
-        ────────────────────────────────────────────────────────
-        s -⟦ honestOutputI (rcvʳ (-, BASE-LDG rbs)) / nothing ⟧⇀
-          record s { RBs = rbs }
+        ──────────────────────────────────────────────────────────────────
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ BASE-LDG rbs / nothing ⟧⇀ record s { RBs = rbs }
 ```
 ```agda
   Ftch :
-       ───────────────────────────────────────────────────────────────────────────────────────────
-       s -⟦ honestInputI (-, FetchLdgI) / honestOutputO' (-, FetchLdgO (LeiosState.Ledger s)) ⟧⇀ s
+       ──────────────────────────────────────────────────────────────────────────────────────────
+       s -⟦ L⊗ (ϵ ᵗ ⊗R) ᵗ ↑ᵢ FetchLdgI / just (L⊗ (ϵ ⊗R) ᵗ ↑ᵢ FetchLdgO (LeiosState.Ledger s)) ⟧⇀ s
 ```
 #### Base chain
 
@@ -239,35 +239,35 @@ Note: Submitted data to the base chain is only taken into account
       for the given slot
 ```agda
   Base₁   :
-          ──────────────────────────────────────────────────────────────────────────────
-          s -⟦ honestInputI (-, SubmitTxs txs) / nothing ⟧⇀ record s { ToPropose = txs }
+          ───────────────────────────────────────────────────────────────────────────
+          s -⟦ L⊗ (ϵ ᵗ ⊗R) ᵗ ↑ᵢ SubmitTxs txs / nothing ⟧⇀ record s { ToPropose = txs }
 ```
 ```agda
   Base₂a  : let open LeiosState s in
           ∙ needsUpkeep Base
           ∙ (eb , cert) ∈ filter (λ (x , _) → x ∈ᴮ slice L slot 2) (ebsWithCert fzero)
           ───────────────────────────────────────────────────────────────────────────────────
-          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT record { txs = [] ; announcedEB = nothing ; ebCert = just cert })) ⟧⇀
+          s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just ((L⊗ ϵ) ⊗R ↑ₒ SUBMIT record { txs = [] ; announcedEB = nothing ; ebCert = just cert }) ⟧⇀
             addUpkeep s Base
 
   Base₂b  : let open LeiosState s in
           ∙ needsUpkeep Base
           ∙ [] ≡ filter (λ x → isVoteCertified s x × x ∈ᴮ slice L slot 2) EBs
           ──────────────────────────────────────────────────────────────────────────────────────────
-          s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndʳ (-, SUBMIT record { txs = ToPropose ; announcedEB = nothing ; ebCert = nothing })) ⟧⇀
+          s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just ((L⊗ ϵ) ⊗R ↑ₒ SUBMIT record { txs = ToPropose ; announcedEB = nothing ; ebCert = nothing }) ⟧⇀
             addUpkeep s Base
 ```
 #### Protocol rules
 ```agda
   Roles₁ :
          ∙ s ↝ (s' , just i)
-         ──────────────────────────────────────────────────────────────────────────────
-         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / honestInputO' (sndˡ (-, FFD-IN i)) ⟧⇀ s'
+         ───────────────────────────────────────────────────────────
+         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just ((ϵ ⊗R) ⊗R ↑ₒ FFD-IN i) ⟧⇀ s'
 
   Roles₂ :
          ∙ s ↝ (s' , nothing)
-         ───────────────────────────────────────────────────
-         s -⟦ honestOutputI (rcvˡ (-, SLOT)) / nothing ⟧⇀ s'
+         ─────────────────────────────────────
+         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ s'
 ```
 <!--
 ```agda
