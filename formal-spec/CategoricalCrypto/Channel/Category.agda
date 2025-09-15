@@ -8,6 +8,7 @@ open import Categories.Category.Helper
 open import Categories.Category.Monoidal
 open import Categories.Category.Monoidal.Braided
 open import Categories.Category.Monoidal.Symmetric
+open import Categories.Object.Coproduct
 open import Categories.Functor
 open import Categories.Functor.Monoidal
 open import Categories.Functor.Bifunctor
@@ -20,6 +21,8 @@ opaque
   channel-category                       : Category (sucˡ zeroˡ) zeroˡ zeroˡ
 
   ⊗-bifunctor                           : Bifunctor channel-category channel-category channel-category
+
+  ⊗-coproduct                           : ∀ A B → Coproduct channel-category A B
 
   channel-⊗-monoidal                    : Monoidal  channel-category
   channel-⊗-braided                     : Braided   channel-⊗-monoidal
@@ -50,6 +53,24 @@ opaque
         }
     ; ∘-resp-≈ = λ where
         {h = B⇒C} {A⇒B} f≈B⇒C A⇒B≈i _ → trans (f≈B⇒C ∘ A⇒B $ _) (cong B⇒C ∘ A⇒B≈i $ _)
+    }
+
+  ⊗-coproduct A B = record
+    { A+B = A ⊗ B
+    ; i₁ = ⊗-right-intro
+    ; i₂ = ⊗-left-intro
+    ; [_,_] = λ A⇒C B⇒C → ⊗-combine A⇒C B⇒C ⇒ₜ ⊗-fusion
+    ; inject₁ = λ where
+        {m = Out} _ → refl
+        {m = In } _ → refl
+    ; inject₂ = λ where
+        {m = Out} _ → refl
+        {m = In } _ → refl
+    ; unique = λ where
+        f _ {Out} (inj₁ i) → sym (f i)
+        _ g {Out} (inj₂ o) → sym (g o)
+        f _ {In } (inj₁ i) → sym (f i)
+        _ g {In } (inj₂ o) → sym (g o)
     }
 
   ⊗-bifunctor = record
