@@ -4,6 +4,7 @@ module CategoricalCrypto.Channel.Category where
 
 open import CategoricalCrypto.Channel.Core
 open import Categories.Category.Core
+open import Categories.Category.Cocartesian
 open import Categories.Category.Helper
 open import Categories.Category.Monoidal
 open import Categories.Category.Monoidal.Braided
@@ -22,7 +23,8 @@ opaque
 
   ⊗-bifunctor                           : Bifunctor channel-category channel-category channel-category
 
-  ⊗-coproduct                           : ∀ A B → Coproduct channel-category A B
+  ⊗-binary-coproducts                   : BinaryCoproducts channel-category
+  ⊗-cocartesian                         : Cocartesian channel-category
 
   channel-⊗-monoidal                    : Monoidal  channel-category
   channel-⊗-braided                     : Braided   channel-⊗-monoidal
@@ -55,22 +57,39 @@ opaque
         {h = B⇒C} {A⇒B} f≈B⇒C A⇒B≈i _ → trans (f≈B⇒C ∘ A⇒B $ _) (cong B⇒C ∘ A⇒B≈i $ _)
     }
 
-  ⊗-coproduct A B = record
-    { A+B = A ⊗ B
-    ; i₁ = ⊗-right-intro
-    ; i₂ = ⊗-left-intro
-    ; [_,_] = λ A⇒C B⇒C → ⊗-combine A⇒C B⇒C ⇒ₜ ⊗-fusion
-    ; inject₁ = λ where
-        {m = Out} _ → refl
-        {m = In } _ → refl
-    ; inject₂ = λ where
-        {m = Out} _ → refl
-        {m = In } _ → refl
-    ; unique = λ where
-        f _ {Out} (inj₁ i) → sym (f i)
-        _ g {Out} (inj₂ o) → sym (g o)
-        f _ {In } (inj₁ i) → sym (f i)
-        _ g {In } (inj₂ o) → sym (g o)
+  ⊗-binary-coproducts = record
+    { coproduct = λ {A} {B} → record
+        { A+B = A ⊗ B
+        ; i₁ = ⊗-right-intro
+        ; i₂ = ⊗-left-intro
+        ; [_,_] = λ A⇒C B⇒C → ⊗-combine A⇒C B⇒C ⇒ₜ ⊗-fusion
+        ; inject₁ = λ where
+            {m = Out} _ → refl
+            {m = In } _ → refl
+        ; inject₂ = λ where
+            {m = Out} _ → refl
+            {m = In } _ → refl
+        ; unique = λ where
+            f _ {Out} (inj₁ i) → sym (f i)
+            _ g {Out} (inj₂ o) → sym (g o)
+            f _ {In } (inj₁ i) → sym (f i)
+            _ g {In } (inj₂ o) → sym (g o)
+        }
+    }
+
+  ⊗-cocartesian = record
+    { initial = record
+        { ⊥ = I
+        ; ⊥-is-initial = record
+            { ! = λ where
+                {m = Out} ()
+                {m = In } ()
+            ; !-unique = λ where
+                _ {Out} ()
+                _ {In } ()
+            }
+        }
+    ; coproducts = ⊗-binary-coproducts
     }
 
   ⊗-bifunctor = record
@@ -93,136 +112,9 @@ opaque
         (_   , f≈g) {In } (inj₂ i) → cong inj₂ (f≈g i)
     }
 
-  channel-⊗-monoidal = monoidalHelper channel-category record
-    { ⊗ = ⊗-bifunctor
-    ; unit = I
-    ; unitorˡ = record
-        { from = ⊗-left-neutral
-        ; to = ⊗-left-intro
-        ; iso = record
-            { isoˡ = λ where
-                {Out} (inj₂ _) → refl
-                {In } (inj₂ _) → refl
-            ; isoʳ = λ where
-                {Out} _ → refl
-                {In } _ → refl
-            }
-        }
-    ; unitorʳ = record
-        { from = ⊗-right-neutral
-        ; to = ⊗-right-intro
-        ; iso = record
-            { isoˡ = λ where
-                {Out} (inj₁ _) → refl
-                {In } (inj₁ _) → refl
-            ; isoʳ = λ where
-                {Out} _ → refl
-                {In } _ → refl
-            }
-        }
-      ; associator = record
-          { from = ⊗-right-assoc
-          ; to = ⊗-left-assoc
-          ; iso = record
-              { isoˡ = λ where
-                  {Out} (inj₁ (inj₁ _)) → refl
-                  {Out} (inj₁ (inj₂ _)) → refl
-                  {Out} (inj₂ _       ) → refl
-                  {In } (inj₁ (inj₁ _)) → refl
-                  {In } (inj₁ (inj₂ _)) → refl
-                  {In } (inj₂ _       ) → refl
-              ; isoʳ = λ where
-                  {Out} (inj₁ _       ) → refl
-                  {Out} (inj₂ (inj₁ _)) → refl
-                  {Out} (inj₂ (inj₂ _)) → refl
-                  {In } (inj₁ _       ) → refl
-                  {In } (inj₂ (inj₁ _)) → refl
-                  {In } (inj₂ (inj₂ _)) → refl
-              }
-          }
-      ; unitorˡ-commute = λ where
-          {m = Out} (inj₂ _) → refl
-          {m = In } (inj₂ _) → refl
-      ; unitorʳ-commute = λ where
-          {m = Out} (inj₁ _) → refl
-          {m = In } (inj₁ _) → refl
-      ; assoc-commute = λ where
-          {m = Out} (inj₁ (inj₁ _)) → refl
-          {m = Out} (inj₁ (inj₂ _)) → refl
-          {m = Out} (inj₂ _       ) → refl
-          {m = In } (inj₁ (inj₁ _)) → refl
-          {m = In } (inj₁ (inj₂ _)) → refl
-          {m = In } (inj₂ _       ) → refl
-      ; triangle = λ where
-          {m = Out} (inj₁ (inj₁ _)) → refl
-          {m = Out} (inj₂ _       ) → refl
-          {m = In } (inj₁ (inj₁ _)) → refl
-          {m = In } (inj₂ _       ) → refl
-      ; pentagon = λ where
-          {m = Out} (inj₁ (inj₁ (inj₁ _))) → refl
-          {m = Out} (inj₁ (inj₁ (inj₂ _))) → refl
-          {m = Out} (inj₁ (inj₂ _       )) → refl
-          {m = Out} (inj₂ _              ) → refl
-          {m = In } (inj₁ (inj₁ (inj₁ _))) → refl
-          {m = In } (inj₁ (inj₁ (inj₂ _))) → refl
-          {m = In } (inj₁ (inj₂ _       )) → refl
-          {m = In } (inj₂ _              ) → refl
-    }
+  channel-⊗-monoidal = CocartesianMonoidal.+-monoidal channel-category ⊗-cocartesian
 
-  channel-⊗-symmetric = symmetricHelper channel-⊗-monoidal record
-    { braiding = record
-        { F⇒G = record
-            { η = λ _ → ⊗-sym
-            ; commute = λ where
-                _ {Out} (inj₁ _) → refl
-                _ {Out} (inj₂ _) → refl
-                _ {In } (inj₁ _) → refl
-                _ {In } (inj₂ _) → refl
-            ; sym-commute = λ where
-                _ {Out} (inj₁ _) → refl
-                _ {Out} (inj₂ _) → refl
-                _ {In } (inj₁ _) → refl
-                _ {In } (inj₂ _) → refl
-            }
-        ; F⇐G = record
-            { η = λ _ → ⊗-sym
-            ; commute = λ where
-                _ {Out} (inj₁ _) → refl
-                _ {Out} (inj₂ _) → refl
-                _ {In } (inj₁ _) → refl
-                _ {In } (inj₂ _) → refl
-            ; sym-commute = λ where
-                _ {Out} (inj₁ _) → refl
-                _ {Out} (inj₂ _) → refl
-                _ {In } (inj₁ _) → refl
-                _ {In } (inj₂ _) → refl
-            }
-        ; iso = λ _ → record
-            { isoˡ = λ where
-                {Out} (inj₁ _) → refl
-                {Out} (inj₂ _) → refl
-                {In } (inj₁ _) → refl
-                {In } (inj₂ _) → refl
-            ; isoʳ = λ where
-                {Out} (inj₁ _) → refl
-                {Out} (inj₂ _) → refl
-                {In } (inj₁ _) → refl
-                {In } (inj₂ _) → refl
-            }
-        }
-    ; commutative = λ where
-        {m = Out} (inj₁ _) → refl
-        {m = Out} (inj₂ _) → refl
-        {m = In } (inj₁ _) → refl
-        {m = In } (inj₂ _) → refl
-    ; hexagon = λ where
-        {m = Out} (inj₁ (inj₁ _)) → refl
-        {m = Out} (inj₁ (inj₂ _)) → refl
-        {m = Out} (inj₂ _       ) → refl
-        {m = In } (inj₁ (inj₁ _)) → refl
-        {m = In } (inj₁ (inj₂ _)) → refl
-        {m = In } (inj₂ _       ) → refl
-    }
+  channel-⊗-symmetric = CocartesianSymmetricMonoidal.+-symmetric channel-category ⊗-cocartesian
 
   channel-⊗-braided = Symmetric.braided channel-⊗-symmetric
 
