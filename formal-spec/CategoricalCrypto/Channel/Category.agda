@@ -92,25 +92,7 @@ opaque
     ; coproducts = ⊗-binary-coproducts
     }
 
-  ⊗-bifunctor = record
-    { F₀ = uncurry _⊗_
-    ; F₁ = λ (A⇒B , C⇒D) → ⊗-combine A⇒B C⇒D
-    ; identity = λ where
-        {m = Out} (inj₁ _) → refl
-        {m = Out} (inj₂ _) → refl
-        {m = In } (inj₁ _) → refl
-        {m = In } (inj₂ _) → refl
-    ; homomorphism = λ where
-        {m = Out} (inj₁ _) → refl
-        {m = Out} (inj₂ _) → refl
-        {m = In } (inj₁ _) → refl
-        {m = In } (inj₂ _) → refl
-    ; F-resp-≈ = λ where
-        (f≈g , _  ) {Out} (inj₁ o) → cong inj₁ (f≈g o)
-        (_   , f≈g) {Out} (inj₂ o) → cong inj₂ (f≈g o)
-        (f≈g , _  ) {In } (inj₁ i) → cong inj₁ (f≈g i)
-        (_   , f≈g) {In } (inj₂ i) → cong inj₂ (f≈g i)
-    }
+  ⊗-bifunctor = BinaryCoproducts.-+- ⊗-binary-coproducts
 
   channel-⊗-monoidal = CocartesianMonoidal.+-monoidal channel-category ⊗-cocartesian
 
