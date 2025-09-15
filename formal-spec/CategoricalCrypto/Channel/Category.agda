@@ -17,18 +17,23 @@ open import abstract-set-theory.Prelude hiding (_⊗_ ; Functor ; Bifunctor)
 opaque
   unfolding _⊗_
 
-  channel-category : Category (sucˡ zeroˡ) zeroˡ zeroˡ
-  ⊗-bifunctor : Bifunctor channel-category channel-category channel-category
-  channel-⊗-monoidal : Monoidal channel-category
-  channel-⊗-monoidal-category : MonoidalCategory (sucˡ zeroˡ) zeroˡ zeroˡ
-  channel-⊗-braided : Braided channel-⊗-monoidal
-  channel-⊗-braided-monoidal-category : BraidedMonoidalCategory (sucˡ zeroˡ) zeroˡ zeroˡ
-  channel-⊗-symmetric : Symmetric channel-⊗-monoidal
+  channel-category                       : Category (sucˡ zeroˡ) zeroˡ zeroˡ
+
+  ⊗-bifunctor                           : Bifunctor channel-category channel-category channel-category
+
+  channel-⊗-monoidal                    : Monoidal  channel-category
+  channel-⊗-braided                     : Braided   channel-⊗-monoidal
+  channel-⊗-symmetric                   : Symmetric channel-⊗-monoidal
+
+  channel-⊗-monoidal-category           : MonoidalCategory          (sucˡ zeroˡ) zeroˡ zeroˡ
+  channel-⊗-braided-monoidal-category   : BraidedMonoidalCategory   (sucˡ zeroˡ) zeroˡ zeroˡ
   channel-⊗-symmetric-monoidal-category : SymmetricMonoidalCategory (sucˡ zeroˡ) zeroˡ zeroˡ
-  ᵀ-endofunctor : Endofunctor channel-category
-  ᵀ-monoidal-functor : MonoidalFunctor channel-⊗-monoidal-category channel-⊗-monoidal-category
-  ᵀ-strong-monoidal-functor : StrongMonoidalFunctor channel-⊗-monoidal-category channel-⊗-monoidal-category
-      
+
+  ᵀ-endofunctor                          : Endofunctor channel-category
+
+  ᵀ-monoidal-functor                     : MonoidalFunctor       channel-⊗-monoidal-category channel-⊗-monoidal-category
+  ᵀ-strong-monoidal-functor              : StrongMonoidalFunctor channel-⊗-monoidal-category channel-⊗-monoidal-category
+
   channel-category = categoryHelper record
     { Obj = Channel
     ; _⇒_ = λ A B → ∀ {m} → A [ m ]⇒[ m ] B
@@ -46,7 +51,7 @@ opaque
     ; ∘-resp-≈ = λ where
         {h = B⇒C} {A⇒B} f≈B⇒C A⇒B≈i _ → trans (f≈B⇒C ∘ A⇒B $ _) (cong B⇒C ∘ A⇒B≈i $ _)
     }
-    
+
   ⊗-bifunctor = record
     { F₀ = uncurry _⊗_
     ; F₁ = λ (A⇒B , C⇒D) → ⊗-combine A⇒B C⇒D
@@ -156,7 +161,7 @@ opaque
                 _ {Out} (inj₁ _) → refl
                 _ {Out} (inj₂ _) → refl
                 _ {In } (inj₁ _) → refl
-                _ {In } (inj₂ _) → refl 
+                _ {In } (inj₂ _) → refl
             }
         ; F⇐G = record
             { η = λ _ → ⊗-sym
@@ -169,7 +174,7 @@ opaque
                 _ {Out} (inj₁ _) → refl
                 _ {Out} (inj₂ _) → refl
                 _ {In } (inj₁ _) → refl
-                _ {In } (inj₂ _) → refl 
+                _ {In } (inj₂ _) → refl
             }
         ; iso = λ _ → record
             { isoˡ = λ where
@@ -199,7 +204,7 @@ opaque
     }
 
   channel-⊗-braided = Symmetric.braided channel-⊗-symmetric
-  
+
   channel-⊗-symmetric-monoidal-category = record
     { U = channel-category
     ; monoidal = channel-⊗-monoidal
@@ -292,4 +297,3 @@ opaque
     }
 
   ᵀ-monoidal-functor = StrongMonoidalFunctor.monoidalFunctor ᵀ-strong-monoidal-functor
-
