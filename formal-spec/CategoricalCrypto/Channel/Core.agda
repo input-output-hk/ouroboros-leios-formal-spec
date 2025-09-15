@@ -75,8 +75,11 @@ infixr 10 _⇒ₜ_
 
 _⇒ₜ_ = ⇒-trans 
 
+⇒-refl' : ∀ {m A B} → A ≡ B → A [ m ]⇒[ m ] B
+⇒-refl' refl = id
+
 ⇒-refl : ∀ {m A} → A [ m ]⇒[ m ] A
-⇒-refl = id
+⇒-refl = ⇒-refl' refl
 
 ----------------------------------
 -- Forwarding and transposition --
