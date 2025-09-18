@@ -99,7 +99,7 @@ data _≈¹_ : Action × FFDT Out → s′ —→ s → Type where
 
   FromAction¹ :
     ∀ i {s′ o}
-      → (α : s -⟦ honestOutputI (rcvˡ (-, i)) / o ⟧⇀ s′)
+      → (α : s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ i / o ⟧⇀ s′)
       → (getLabel α , i) ≈¹ ActionStep α
 
 data ValidStep (es : Action × FFDT Out) (s : LeiosState) : Type where
@@ -110,7 +110,7 @@ data _≈_ : TestTrace → s′ —↠ s → Type where
   FromAction :
     ∀ i {αs s′ s₀ o} {tr : s —↠ s₀}
       → αs ≈ tr
-      → (α : s -⟦ honestOutputI (rcvˡ (-, i)) / o ⟧⇀ s′)
+      → (α : s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ i / o ⟧⇀ s′)
       → (getLabel α , i) ∷ αs ≈ s′ —→⟨ ActionStep α ⟩ tr
 
   Done : [] ≈ s ∎
@@ -125,7 +125,7 @@ data Err-verifyTrace : TestTrace → LeiosState → Type where
   Err-StepOk   : Err-verifyTrace αs s → Err-verifyTrace ((α , i) ∷ αs) s
   Err-Action   : Err-verifyAction α i s′ → Err-verifyTrace ((α , i) ∷ αs) s
 
-Ok' : ∀ {s i o s′} → (α : s -⟦ honestOutputI (rcvˡ (-, i)) / o ⟧⇀ s′)
+Ok' : ∀ {s i o s′} → (α : s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ i / o ⟧⇀ s′)
     → Result (Err-verifyAction (getLabel α) i s) (ValidStep (getLabel α , i) s)
 Ok' a = Ok (Valid _ (FromAction¹ _ a))
 

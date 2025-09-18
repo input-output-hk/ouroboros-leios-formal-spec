@@ -14,11 +14,13 @@ data Mode : Type where
   Out : Mode
   In : Mode
 
+infixr 10 ¬ₘ_
+
 ¬ₘ_ : Fun₁ Mode
 ¬ₘ Out = In
 ¬ₘ In = Out
 
-¬ₘ-idempotent : ∀ {m} → ¬ₘ (¬ₘ m) ≡ m
+¬ₘ-idempotent : ∀ {m} → ¬ₘ ¬ₘ m ≡ m
 ¬ₘ-idempotent {Out} = refl
 ¬ₘ-idempotent {In} = refl
 
@@ -85,7 +87,7 @@ _⇒ₜ_ = ⇒-trans
 -- Forwarding and transposition --
 ----------------------------------
 
-⇒-double-negate : ∀ {m A} → A [ ¬ₘ (¬ₘ m) ]⇒[ m ] A
+⇒-double-negate : ∀ {m A} → A [ ¬ₘ ¬ₘ m ]⇒[ m ] A
 ⇒-double-negate {m} rewrite (¬ₘ-idempotent {m}) = ⇒-refl
 
 ⇒-transpose : ∀ {m A} → A [ m ]⇒[ ¬ₘ m ] A ᵀ
