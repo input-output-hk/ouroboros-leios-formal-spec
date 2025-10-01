@@ -7,79 +7,150 @@ open import CategoricalCrypto.Channel.Core
 open import Relation.Nullary 
 open import Meta.Prelude
 open import Meta.Init
-open import Data.Sum
+open import Data.Sum hiding (reduce)
 open import Reflection.AST.Term
 open import Reflection.Tactic
 open import Reflection.Utils
 open import Reflection.Utils.TCI
 open import Class.Monad
+open import Class.Functor
 open import Class.MonadError.Instances
 open import Class.MonadTC.Instances hiding (_ᵗ)
 
-instance _ = Functor-M ⦃ Class.Monad.Monad-TC ⦄
+-- infix 4 _[_]⇒[_]ᵍ_
 
-data LiftError : Set where
-  MultipleSolutions : LiftError
-  NoSolution : LiftError
+-- infix 10 _ᵗ¹ _ᵗ²
+-- infix 9 _⊗R
+-- infix 8 L⊗_
+
+-- data _[_]⇒[_]ᵍ_ : Channel → Mode → Mode → Channel → Set₁ where 
+--   ϵ : ∀ {m A} → A [ m ]⇒[ m ]ᵍ A
+--   _⊗R : ∀ {m m' A B C} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ]ᵍ B ⊗ C
+--   L⊗_ : ∀ {m m' A B C} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ]ᵍ C ⊗ B
+--   _ᵗ¹ : ∀ {m m' A B} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ ¬ₘ m' ]ᵍ B ᵀ
+--   _ᵗ² : ∀ {m m' A B} → A [ m ]⇒[ ¬ₘ m' ]ᵍ B → A [ m ]⇒[ m' ]ᵍ B ᵀ
+
+-- infix 7 _↑ _↑ᵢ_ _↑ₒ_
+
+-- _↑ : ∀ {m m' A B} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ] B
+-- ϵ ↑ = ⇒-refl
+-- (x ⊗R) ↑ = (x ↑) ⇒ₜ ⊗-right-intro
+-- (L⊗ x) ↑ = (x ↑) ⇒ₜ ⊗-left-intro
+-- (x ᵗ¹) ↑ = (x ↑) ⇒ₜ ⇒-negate-transpose-right
+-- (x ᵗ²) ↑ = (x ↑) ⇒ₜ ⇒-negate-transpose-left
+
+-- _↑ᵢ_ = _↑ {In}
+-- _↑ₒ_ = _↑ {Out}
+
+instance _ = Functor-M ⦃ Class.Monad.Monad-TC ⦄
 
 liftConstr : TC ⊤
 liftConstr = inDebugPath "Auto _[_]⇒[_]_ tactic" $ do
   holeType ← goalTy
   ensureNoMetas holeType
   quote _[_]⇒[_]_ ∙⟦ A ∣ m ∣ m' ∣ B ⟧ ← return holeType
-    where _ → error ("Bad type shape1: " ∷ᵈ holeType ∷ᵈ [])
-  inj₂ solution ← return $ handle-pattern A m m' B
-    where
-      (inj₁ NoSolution) → error1 "No solution found"
-      (inj₁ MultipleSolutions) → error1 "Multiple solutions found"
-  debugLog (solution ∷ᵈ [])
+    where _ → error ("Bad type shape: " ∷ᵈ holeType ∷ᵈ [])
+  -- Reductions must happen on the mode to compute negations when the mode is
+  -- actually known
+  mN ← reduce m
+  m'N ← reduce m'
+  solution ← handle-pattern A mN m'N B
+  debugLog ("Solution: " ∷ᵈ solution ∷ᵈ [])
   unifyWithGoal solution
   where
-    handle-pattern : Term → Term → Term → Term → LiftError ⊎ Term
-    handle-pattern A m m' B with isYes (A ≟ B ×-dec m ≟ m')
-    handle-pattern A m _ _ | true =
-      inj₂ $ def (quote ⇒-refl) []
-    handle-pattern A m (quote ¬ₘ_ ∙⟦ m' ⟧) (quote _ᵀ ∙⟦ B ⟧) | false =
-      map₂ (quote ⇒-trans ∙⟦_∣ quote ⇒-transpose ∙ ⟧)
-           (handle-pattern A m m' B)
-    handle-pattern A m m' (quote _ᵀ ∙⟦ B ⟧) | false =
-      map₂ (quote ⇒-trans ∙⟦_∣ quote ⇒-trans ∙⟦ quote ⇒-transpose ∙ ∣ quote ⇒-double-negate ∙ ⟧ ⟧)
-           (handle-pattern A m (quote ¬ₘ_ ∙⟦ m' ⟧) B)    
-    handle-pattern A m m' (quote _⊗_ ∙⟦ B ∣ C ⟧) | false =
-      case (handle-pattern A m m' B) of λ where
-        (inj₁ NoSolution) →
-          map₂ (quote ⇒-trans ∙⟦_∣ quote ⊗-left-intro ∙ ⟧)
-               (handle-pattern A m m' C)
-        (inj₁ MultipleSolutions) → inj₁ MultipleSolutions
-        (inj₂ solution) → case (handle-pattern A m m' C) of λ where
-          (inj₁ _) → inj₂ $ quote ⇒-trans ∙⟦ solution ∣ quote ⊗-right-intro ∙ ⟧
-          (inj₂ _) → inj₁ MultipleSolutions
-    handle-pattern _ _ _ _ | false = inj₁ NoSolution
 
-module _ ⦃ _ : TCOptions ⦄ where
-  liftC = initTac liftConstr
-
-instance
-  defaultTCOptionsI = record
-    { debug = record defaultDebugOptions
-      { prefix = '┃'
-      ; filter = Filter.⊤
-      }
-    ; fuel  = ("reduceDec/constrs" , 5) ∷ []
-    }
+    handle-pattern : Term → Term → Term → Term → TC Term
+    handle-full-pattern : Term → Term → Term → Term → TC Term
     
-liftᵍ : ∀ {m m' A B} {@(tactic liftC) p : A [ m ]⇒[ m' ] B} → A [ m ]⇒[ m' ] B
-liftᵍ {p = p} = p
+    handle-full-pattern A m m' B = if isYes (A ≟ B ×-dec m ≟ m')
+      then return $ quote ⇒-refl ∙
+      else handle-pattern A m m' B
 
-↑ = liftᵍ
+    ------------------------
+    -- Inspecting the LHS --
+    ------------------------
 
-_↑ᵢ_ : ∀ {m'} A {B} {@(tactic liftC) p : A [ In ]⇒[ m' ] B} → A [ In ]⇒[ m' ] B
-_↑ᵢ_ _ {p = p} = liftᵍ {p = p}
+    -- A ᵀ ᵀ [ m ]⇒[ m' ] B
+    handle-pattern (quote _ᵀ ∙⟦ quote _ᵀ ∙⟦ A ⟧ ⟧) m m' B = do
+      rec ← handle-full-pattern A m m' B
+      return $ quote _⇒ₜ_ ∙⟦ quote ⇒-double-transpose-left ∙ ∣ rec ⟧
+      
+    -- -- A [ ¬ₘ ¬ₘ m ]⇒[ m' ] B
+    -- handle-pattern A (quote ¬ₘ_ ∙⟦ quote ¬ₘ_ ∙⟦ m ⟧ ⟧) m' B = do
+    --   rec ← handle-pattern A m m' B
+    --   return $ quote _⇒ₜ_ ∙⟦ quote ⇒-double-negate-left ∙ ∣ rec ⟧
+      
+    -- A ᵀ [ ¬ₘ m ]⇒[ m' ] B
+    handle-pattern (quote _ᵀ ∙⟦ A ⟧) (quote ¬ₘ_ ∙⟦ m ⟧) m' B  = do
+      rec ← handle-full-pattern A m m' B 
+      return $ quote _⇒ₜ_ ∙⟦ quote ⇒-negate-transpose-left ∙ ∣ rec ⟧
 
-_↑ₒ_ : ∀ {m'} A {B} {@(tactic liftC) p : A [ Out ]⇒[ m' ] B} → A [ Out ]⇒[ m' ] B
-_↑ₒ_ _ {p = p} = liftᵍ {p = p}
+    -- A ᵀ [ m ]⇒[ m' ] B
+    handle-pattern (quote _ᵀ ∙⟦ A ⟧) m m' B = do
+      m'' ← reduce (quote ¬ₘ_ ∙⟦ m ⟧)
+      rec ← handle-full-pattern A m'' m' B
+      return $ quote _⇒ₜ_ ∙⟦ quote ⇒-transpose-left-negate-right ∙ ∣ rec ⟧
 
-infix 7 _↑ᵢ_ _↑ₒ_
+    -- A ⊗ C [ m ]⇒[ m' ] B
+    handle-pattern (quote _⊗_ ∙⟦ A ∣ C ⟧) m m' B = do    
+      rec-left ← handle-full-pattern A m m' B
+      rec-right ← handle-full-pattern C m m' B
+      return $ quote ⊗-merge ∙⟦ rec-left ∣ rec-right ⟧
 
-test : ∀ {A B D m} → A [ m ]⇒[ m ] ((D ⊗ A) ᵀ ⊗ B) ᵀ ⊗ (B ⊗ D)
-test = ↑
+    ------------------------
+    -- Inspecting the RHS --
+    ------------------------
+
+    -- A [ m ]⇒[ m' ] B ᵀ ᵀ 
+    handle-pattern A m m' (quote _ᵀ ∙⟦ quote _ᵀ ∙⟦ B ⟧ ⟧) = do
+      rec ← handle-full-pattern A m m' B
+      return $ quote _⇒ₜ_ ∙⟦ rec ∣ quote ⇒-double-transpose-right ∙ ⟧
+      
+    -- -- A [ m ]⇒[ ¬ₘ ¬ₘ m' ] B
+    -- handle-pattern A m (quote ¬ₘ_ ∙⟦ quote ¬ₘ_ ∙⟦ m' ⟧ ⟧) B = do
+    --   rec ← handle-full-pattern A m m' B
+    --   return $ quote _⇒ₜ_ ∙⟦ rec ∣ quote ⇒-double-negate-right ∙ ⟧
+      
+    -- A [ m ]⇒[ ¬ₘ m' ] B ᵀ
+    handle-pattern A m (quote ¬ₘ_ ∙⟦ m' ⟧) (quote _ᵀ ∙⟦ B ⟧) = do
+      rec ← handle-full-pattern A m m' B 
+      return $ quote _⇒ₜ_ ∙⟦ rec ∣ quote ⇒-negate-transpose-right ∙ ⟧
+
+    -- A [ m ]⇒[ m' ] B ᵀ
+    handle-pattern A m m' (quote _ᵀ ∙⟦ B ⟧) = do
+      m'' ← reduce (quote ¬ₘ_ ∙⟦ m' ⟧)
+      rec ← handle-full-pattern A m m'' B
+      return $ quote _⇒ₜ_ ∙⟦ rec ∣ quote ⇒-negate-left-transpose-right ∙ ⟧
+      
+    -- A [ m ]⇒[ m' ] B ⊗ C
+    handle-pattern A m m' (quote _⊗_ ∙⟦ B ∣ C ⟧) = do
+      catch
+        (do
+          res-left ← handle-full-pattern A m m' B
+          catch
+            (do
+              handle-full-pattern A m m' C
+              error1 "Unique solution required, multiple found.")
+            (const $ return $ quote _⇒ₜ_ ∙⟦ res-left ∣ quote ⊗-right-intro ∙ ⟧))
+        (const $ do
+          res-right ← handle-full-pattern A m m' C
+          return $ quote _⇒ₜ_ ∙⟦ res-right ∣ quote ⊗-left-intro ∙ ⟧)
+          
+    handle-pattern A m _ _ = error ("No solution found, unable to match " ∷ᵈ A ∷ᵈ " with mode " ∷ᵈ m ∷ᵈ " on the right hand side" ∷ᵈ [])
+
+-- module _ ⦃ _ : TCOptions ⦄ where
+--   liftC = initTac liftConstr
+--   macro
+--     ⇒-solver = liftC
+
+-- instance
+--   defaultTCOptionsI = record
+--     { debug = record defaultDebugOptions
+--       { prefix = '┃'
+--       ; filter = Filter.⊤
+--       }
+--     ; fuel  = ("reduceDec/constrs" , 5) ∷ []
+--     }
+
+-- test : ∀ {A B C D E m} → A ⊗ (B ⊗ C ᵀ) ⊗ ((D ⊗ E) ᵀ ⊗ (A ⊗ B) ᵀ) [ m ]⇒[ m ] A ⊗ B ⊗ C ᵀ ⊗ D ᵀ ⊗ E ᵀ ⊗ A ᵀ ⊗ B ᵀ
+-- test = ⇒-solver 
