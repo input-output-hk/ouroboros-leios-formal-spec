@@ -17,30 +17,30 @@ open import Class.Functor
 open import Class.MonadError.Instances
 open import Class.MonadTC.Instances hiding (_ᵗ)
 
--- infix 4 _[_]⇒[_]ᵍ_
+infix 4 _[_]⇒[_]ᵍ_
 
--- infix 10 _ᵗ¹ _ᵗ²
--- infix 9 _⊗R
--- infix 8 L⊗_
+infix 10 _ᵗ¹ _ᵗ²
+infix 9 _⊗R
+infix 8 L⊗_
 
--- data _[_]⇒[_]ᵍ_ : Channel → Mode → Mode → Channel → Set₁ where 
---   ϵ : ∀ {m A} → A [ m ]⇒[ m ]ᵍ A
---   _⊗R : ∀ {m m' A B C} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ]ᵍ B ⊗ C
---   L⊗_ : ∀ {m m' A B C} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ]ᵍ C ⊗ B
---   _ᵗ¹ : ∀ {m m' A B} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ ¬ₘ m' ]ᵍ B ᵀ
---   _ᵗ² : ∀ {m m' A B} → A [ m ]⇒[ ¬ₘ m' ]ᵍ B → A [ m ]⇒[ m' ]ᵍ B ᵀ
+data _[_]⇒[_]ᵍ_ : Channel → Mode → Mode → Channel → Set₁ where 
+  ϵ : ∀ {m A} → A [ m ]⇒[ m ]ᵍ A
+  _⊗R : ∀ {m m' A B C} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ]ᵍ B ⊗ C
+  L⊗_ : ∀ {m m' A B C} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ]ᵍ C ⊗ B
+  _ᵗ¹ : ∀ {m m' A B} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ ¬ₘ m' ]ᵍ B ᵀ
+  _ᵗ² : ∀ {m m' A B} → A [ m ]⇒[ ¬ₘ m' ]ᵍ B → A [ m ]⇒[ m' ]ᵍ B ᵀ
 
--- infix 7 _↑ _↑ᵢ_ _↑ₒ_
+infix 7 _↑ _↑ᵢ_ _↑ₒ_
 
--- _↑ : ∀ {m m' A B} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ] B
--- ϵ ↑ = ⇒-refl
--- (x ⊗R) ↑ = (x ↑) ⇒ₜ ⊗-right-intro
--- (L⊗ x) ↑ = (x ↑) ⇒ₜ ⊗-left-intro
--- (x ᵗ¹) ↑ = (x ↑) ⇒ₜ ⇒-negate-transpose-right
--- (x ᵗ²) ↑ = (x ↑) ⇒ₜ ⇒-negate-transpose-left
+_↑ : ∀ {m m' A B} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ] B
+ϵ ↑ = ⇒-refl
+(x ⊗R) ↑ = (x ↑) ⇒ₜ ⊗-right-intro
+(L⊗ x) ↑ = (x ↑) ⇒ₜ ⊗-left-intro
+(x ᵗ¹) ↑ = (x ↑) ⇒ₜ ⇒-negate-transpose-right
+(x ᵗ²) ↑ = (x ↑) ⇒ₜ ⇒-negate-transpose-left
 
--- _↑ᵢ_ = _↑ {In}
--- _↑ₒ_ = _↑ {Out}
+_↑ᵢ_ = _↑ {In}
+_↑ₒ_ = _↑ {Out}
 
 instance _ = Functor-M ⦃ Class.Monad.Monad-TC ⦄
 
@@ -54,11 +54,10 @@ liftConstr = inDebugPath "Auto _[_]⇒[_]_ tactic" $ do
   -- actually known
   mN ← reduce m
   m'N ← reduce m'
-  solution ← handle-pattern A mN m'N B
+  solution ← handle-full-pattern A mN m'N B
   debugLog ("Solution: " ∷ᵈ solution ∷ᵈ [])
   unifyWithGoal solution
   where
-
     handle-pattern : Term → Term → Term → Term → TC Term
     handle-full-pattern : Term → Term → Term → Term → TC Term
     
@@ -138,19 +137,22 @@ liftConstr = inDebugPath "Auto _[_]⇒[_]_ tactic" $ do
           
     handle-pattern A m _ _ = error ("No solution found, unable to match " ∷ᵈ A ∷ᵈ " with mode " ∷ᵈ m ∷ᵈ " on the right hand side" ∷ᵈ [])
 
--- module _ ⦃ _ : TCOptions ⦄ where
---   liftC = initTac liftConstr
---   macro
---     ⇒-solver = liftC
+module _ ⦃ _ : TCOptions ⦄ where
+  liftC = initTac liftConstr
+  macro
+    ⇒-solver = liftC
 
--- instance
---   defaultTCOptionsI = record
---     { debug = record defaultDebugOptions
---       { prefix = '┃'
---       ; filter = Filter.⊤
---       }
---     ; fuel  = ("reduceDec/constrs" , 5) ∷ []
---     }
+instance
+  defaultTCOptionsI = record
+    { debug = record defaultDebugOptions
+      { prefix = '┃'
+      ; filter = Filter.⊤
+      }
+    ; fuel  = ("reduceDec/constrs" , 5) ∷ []
+    }
 
--- test : ∀ {A B C D E m} → A ⊗ (B ⊗ C ᵀ) ⊗ ((D ⊗ E) ᵀ ⊗ (A ⊗ B) ᵀ) [ m ]⇒[ m ] A ⊗ B ⊗ C ᵀ ⊗ D ᵀ ⊗ E ᵀ ⊗ A ᵀ ⊗ B ᵀ
--- test = ⇒-solver 
+test : ∀ {A B C D E m} → A ⊗ (B ⊗ C ᵀ) ⊗ ((D ⊗ E) ᵀ ⊗ (A ⊗ B) ᵀ) [ m ]⇒[ m ] A ⊗ B ⊗ C ᵀ ⊗ D ᵀ ⊗ E ᵀ ⊗ A ᵀ ⊗ B ᵀ
+test = ⇒-solver 
+
+test' : ∀ {A m} → A [ m ]⇒[ m ] A
+test' = ⇒-solver

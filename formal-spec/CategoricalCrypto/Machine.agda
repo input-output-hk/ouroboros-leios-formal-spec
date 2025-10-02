@@ -39,7 +39,7 @@ module _ {A B : Channel} (let open Channel (A ⊗ᵀ B)) where
   StatelessMachine      R       = MkMachine {State = ⊤} $ λ _ i o _ → R i o
   FunctionMachine       f       = StatelessMachine      $ λ i o → f i ≡ o
   TotalFunctionMachine  f       = FunctionMachine       $ just P.∘ f
-  TotalFunctionMachine' {f} {g} = TotalFunctionMachine  $ ⊗-combine {In} {Out} (f ⇒ₜ ⇒-transpose) (g ⇒ₜ ⇒-transpose) ⇒ₜ ⊗-sym
+  TotalFunctionMachine' {f} {g} = TotalFunctionMachine  $ ⊗-combine {In} {Out} (f ⇒ₜ ?) (g ⇒ₜ ?) ⇒ₜ ⊗-sym
   -- TotalFunctionMachine' forces all messages to go 'through' the machine, i.e.
   -- messages on the domain become messages on the codomain and vice versa if
   -- e.g. A ≡ B then it's easy to accidentally send a message the wrong way
@@ -103,10 +103,10 @@ module _ {A B C} (M : Machine (A ⊗ C) (B ⊗ C)) (let open Machine M) where
     Trace[_] : ∀ {s inM outM s'} → stepRel s inM outM s' → TraceRel s inM outM s'
 
     _Trace∷ₒ_ : ∀ {s s' s'' inM outC outMₘ} → stepRel s inM (just ((L⊗ ϵ) ⊗R ↑ₒ outC)) s' →
-                                             TraceRel s' (L⊗ (L⊗ ϵ ᵗ) ᵗ ↑ᵢ outC) outMₘ s'' →
+                                             TraceRel s' (L⊗ (L⊗ ϵ ᵗ¹) ᵗ¹ ↑ᵢ outC) outMₘ s'' →
                                              TraceRel s inM outMₘ s''
                                         
-    _Trace∷ᵢ_ : ∀ {s s' s'' inM inC outMₘ} → stepRel s inM (just (L⊗ (L⊗ ϵ ᵗ) ᵗ ↑ₒ inC)) s' →
+    _Trace∷ᵢ_ : ∀ {s s' s'' inM inC outMₘ} → stepRel s inM (just (L⊗ (L⊗ ϵ ᵗ¹) ᵗ¹ ↑ₒ inC)) s' →
                                             TraceRel s' ((L⊗ ϵ) ⊗R ↑ᵢ inC) outMₘ s'' →
                                             TraceRel s inM outMₘ s''
 
