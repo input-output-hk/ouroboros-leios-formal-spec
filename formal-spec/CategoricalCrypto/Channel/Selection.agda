@@ -44,17 +44,18 @@ _↑ₒ_ = _↑ {Out}
 
 instance _ = Functor-M ⦃ Class.Monad.Monad-TC ⦄
 
-liftConstr : TC ⊤
-liftConstr = inDebugPath "Auto _[_]⇒[_]_ tactic" $ do
+⇒-solver-tactic' : TC ⊤
+⇒-solver-tactic' = inDebugPath "Auto _[_]⇒[_]_ tactic" $ do
   holeType ← goalTy
   ensureNoMetas holeType
   quote _[_]⇒[_]_ ∙⟦ A ∣ m ∣ m' ∣ B ⟧ ← return holeType
     where _ → error ("Bad type shape: " ∷ᵈ holeType ∷ᵈ [])
+  debugLog ("Attempting to find a solution for problem " ∷ᵈ holeType ∷ᵈ [])
   -- Reductions must happen on the mode to compute negations when the mode is
   -- actually known
   mN ← reduce m
   m'N ← reduce m'
-  solution ← handle-full-pattern A mN m'N B
+  solution ← handle-pattern A mN m'N B
   debugLog ("Solution: " ∷ᵈ solution ∷ᵈ [])
   unifyWithGoal solution
   where
@@ -128,12 +129,12 @@ liftConstr = inDebugPath "Auto _[_]⇒[_]_ tactic" $ do
   -- otherwise abort
   ... | _ | _
     = error $  "No solution found, unable to match " ∷ᵈ A
-            ∷ᵈ " with mode " ∷ᵈ m ∷ᵈ " on the right hand side" ∷ᵈ []
+            ∷ᵈ " with mode " ∷ᵈ m ∷ᵈ " on the right hand side" ∷ᵈ B ∷ᵈ " with mode " ∷ᵈ m' ∷ᵈ []
 
 module _ ⦃ _ : TCOptions ⦄ where
-  liftC = initTac liftConstr
+  ⇒-solver-tactic = initTac ⇒-solver-tactic'
   macro
-    ⇒-solver = liftC
+    ⇒-solver = ⇒-solver-tactic
 
 instance
   defaultTCOptionsI = record
@@ -143,9 +144,3 @@ instance
       }
     ; fuel  = ("reduceDec/constrs" , 5) ∷ []
     }
-
-test : ∀ {A B C D E m} → A ⊗ (B ⊗ C ᵀ) ⊗ ((D ⊗ E) ᵀ ⊗ (A ⊗ B) ᵀ) [ m ]⇒[ m ] A ⊗ B ⊗ C ᵀ ⊗ D ᵀ ⊗ E ᵀ ⊗ A ᵀ ⊗ B ᵀ
-test = ⇒-solver
-
-test' : ∀ {A m} → A [ m ]⇒[ m ] A
-test' = ⇒-solver

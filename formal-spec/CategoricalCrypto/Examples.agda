@@ -34,13 +34,13 @@ module TemplateChannel (M : Type) {M' : Type} (f : M → M') where
   data WithState_receive_return_newState_ : MachineType I ((A ⊗ B) ⊗ E) (List M) where
 
     Send : ∀ {m s} → WithState s
-                     receive L⊗ ((ϵ ᵗ ⊗R) ⊗R) ᵗ ↑ᵢ m
-                     return just $ L⊗ ((L⊗ ϵ ᵗ) ⊗R) ᵗ ↑ₒ m
+                     receive L⊗ ((ϵ ᵗ¹ ⊗R) ⊗R) ᵗ¹ ↑ᵢ m
+                     return just $ L⊗ ((L⊗ ϵ ᵗ¹) ⊗R) ᵗ¹ ↑ₒ m
                      newState (s ∷ʳ m)
 
     Req  : ∀ {m s} → WithState m ∷ s
-                     receive L⊗ (L⊗ ϵ ᵗ) ᵗ ↑ᵢ tt
-                     return just $ L⊗ (L⊗ ϵ ᵗ) ᵗ ↑ₒ f m
+                     receive L⊗ (L⊗ ϵ ᵗ¹) ᵗ¹ ↑ᵢ tt
+                     return just $ L⊗ (L⊗ ϵ ᵗ¹) ᵗ¹ ↑ₒ f m
                      newState s
 
   Functionality : Machine I ((A ⊗ B) ⊗ E)
@@ -107,7 +107,7 @@ module EncryptionShim (PlainText CipherText PubKey PrivKey : Type)
                               return just $ L⊗ ϵ ↑ₒ inj₁ m'
                               newState s'
                             → WithState s
-                              receive L⊗ ((ϵ ᵗ ⊗R) ⊗R) ᵗ ↑ᵢ m
+                              receive L⊗ ((ϵ ᵗ¹ ⊗R) ⊗R) ᵗ¹ ↑ᵢ m
                               return just $ ((ϵ ⊗R) ⊗R) ⊗R ↑ₒ m'
                               newState s'
 
@@ -117,7 +117,7 @@ module EncryptionShim (PlainText CipherText PubKey PrivKey : Type)
                               newState s'
                             → WithState s
                               receive ((L⊗ ϵ) ⊗R) ⊗R ↑ᵢ m
-                              return just $ L⊗ ((L⊗ ϵ ᵗ) ⊗R) ᵗ ↑ₒ m'
+                              return just $ L⊗ ((L⊗ ϵ ᵗ¹) ⊗R) ᵗ¹ ↑ₒ m'
                               newState s'
 
   Functionality : Machine ((L.A ⊗ L.B) ⊗ L.E) ((S.A ⊗ S.B) ⊗ S.E)
