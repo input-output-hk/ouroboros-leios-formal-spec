@@ -53,6 +53,7 @@ R₁ ≡ᵗ R₂ = R₁ ≤ᵗ R₂ × R₂ ≤ᵗ R₁
 module _ ((record { State = S₁ ; rel = rel₁ }) : SRel A B)
          ((record { State = S₂ ; rel = rel₂ }) : SRel A B) where
 
+  infix 4 _≡ᵉ_
   record _≡ᵉ_ : Type where
     field S₁↔S₂ : S₁ ↔ S₂
 
@@ -70,8 +71,10 @@ module _ ((record { State = S₁ ; rel = rel₁ }) : SRel A B)
       rel₂ s a b (to s') ∎
       where open R.EquationalReasoning
 
+private variable R R₁ R₂ R₃ R₄ : SRel A B
+
 -- ≡ᵉ is much easier to prove, but less general
-≡ᵉ⇒≡ᵗ : ∀ {R₁ R₂ : SRel A B} → R₁ ≡ᵉ R₂ → R₁ ≡ᵗ R₂
+≡ᵉ⇒≡ᵗ : R₁ ≡ᵉ R₂ → R₁ ≡ᵗ R₂
 ≡ᵉ⇒≡ᵗ {R₁ = R₁} {R₂} R₁≡ᵉR₂ = < to , trace⇔₁ > , < from , trace⇔₂ >
   where
     open _≡ᵉ_ R₁≡ᵉR₂; open Inverse S₁↔S₂
@@ -87,6 +90,8 @@ module _ ((record { State = S₁ ; rel = rel₁ }) : SRel A B)
     trace⇔₂ s (_ ∷ _) [] = R.K-refl
     trace⇔₂ s (a ∷ as) (b ∷ bs) = R.SK-sym $ ∃-cong S₁↔S₂ (rel₁f⇔rel₂t ×-cong R.SK-sym (trace⇔₂ s as bs))
 
+infix  4 _≡ᵗ_ _≡ⁱ_
+
 module _ ((record { State = S₁ ; rel = rel₁ }) : SRel B C)
          ((record { State = S₂ ; rel = rel₂ }) : SRel A B) where
 
@@ -95,8 +100,63 @@ module _ ((record { State = S₁ ; rel = rel₁ }) : SRel B C)
           ∘-rel₁ : rel₁ (proj₁ s) b c (proj₁ s')
           ∘-rel₂ : rel₂ (proj₂ s) a b (proj₂ s')
 
+  infixr 9 _∘_
   _∘_ : SRel A C
   _∘_ = record { State = _ ; rel = ∘-rel }
+
+⊗₀ : Type × Type → Type
+⊗₀ = uncurry _⊎_
+
+module ⊗ ((record { State = State₁ ; rel = rel₁ }
+         , record { State = State₂ ; rel = rel₂ }) : SRel A B × SRel C D) where
+
+  data ⊗-rel : SRelType (A ⊎ C) (B ⊎ D) (State₁ × State₂) where
+    ⊗₁₁ : ∀ {s₁ s₁' s₂ a c} → rel₁ s₁ a c s₁' → ⊗-rel (s₁ , s₂) (inj₁ a) (inj₁ c) (s₁' , s₂)
+    ⊗₁₂ : ∀ {s₁ s₂ s₂' b d} → rel₂ s₂ b d s₂' → ⊗-rel (s₁ , s₂) (inj₂ b) (inj₂ d) (s₁ , s₂')
+
+  ₁ : SRel (A ⊎ C) (B ⊎ D)
+  ₁ = record { State = _ ; rel = ⊗-rel}
+
+infixr 10 _⊗₁_
+_⊗₁_ : SRel A B → SRel C D → SRel (A ⊎ C) (B ⊎ D)
+_⊗₁_ = curry ⊗.₁
+
+-- This definition is awkward, because we would prefer to allow 'arbitrary' extensions of the state.
+-- This could be done by instead having an injection `State ↪ State'` or a partial function
+-- `State' → Maybe State`.
+-- However, none of these are stronger, since you can always replace the state with an isomorphic
+-- type via `≡ᵉ⇒≡ⁱ`. I don't know what the best option would be.
+
+weakenState : SRel A B → Type → SRel A B
+weakenState R S = let open SRel R in record
+  { State = State ⊎ S
+  ; rel   = λ where
+    (inj₁ s) a b (inj₁ s') → rel s a b s'
+    _ _ _ _ → ⊥
+  }
+
+data _≡ⁱ_ : SRel A B → SRel A B → Type₁ where
+  ≡ᵉ⇒≡ⁱ : R₁ ≡ᵉ R₂ → R₁ ≡ⁱ R₂
+  weaken : ∀ {X} → R ≡ⁱ weakenState R X
+  ≡ⁱ-∘ : R₁ ≡ⁱ R₂ → R₃ ≡ⁱ R₄ → R₁ ∘ R₂ ≡ⁱ R₃ ∘ R₄
+  ≡ⁱ-⊗ : R₁ ≡ⁱ R₂ → R₃ ≡ⁱ R₄ → R₁ ⊗₁ R₂ ≡ⁱ R₃ ⊗₁ R₄
+
+  ≡ⁱ-refl : R ≡ⁱ R
+  ≡ⁱ-sym : R₁ ≡ⁱ R₂ → R₂ ≡ⁱ R₁
+  ≡ⁱ-trans : R₁ ≡ⁱ R₂ → R₂ ≡ⁱ R₃ → R₁ ≡ⁱ R₃
+
+-- this should be straightforward
+≡ⁱ⇒≡ᵗ : R₁ ≡ⁱ R₂ → R₁ ≡ᵗ R₂
+≡ⁱ⇒≡ᵗ = {!!}
+
+-- here's a proof sketch, assuming the axiom of choice:
+-- - we can assume that R₁ and R₂ have 'minimal' state because of `weaken` (choose a minimal one)
+-- - WLOG assume S₁ ↪ S₂, then again by weaken & ≡ᵉ⇒≡ⁱ it follows that we can weaken R₂ to
+--   have state type S₂, so we can assume R₁ and R₂ have the same state type
+-- - now proving R₁ ≡ᵉ R₂ should be straightforward since we just need to prove `rel₁⇔rel₂'`,
+--   and that follows from the traces
+-- ≡ᵗ⇒≡ⁱ : R₁ ≡ᵗ R₂ → R₁ ≡ⁱ R₂
+-- ≡ᵗ⇒≡ⁱ = {!!}
 
 SRelC : Category (sucˡ ℓ0) (sucˡ ℓ0) ℓ0
 SRelC = categoryHelper record
@@ -146,19 +206,6 @@ module RelsMonoidal where
   open Monoidal (CocartesianMonoidal.+-monoidal (Rels 0ℓ 0ℓ) Rels-Cocartesian) public
   open import Categories.Category.Monoidal.Utilities (CocartesianMonoidal.+-monoidal (Rels 0ℓ 0ℓ) Rels-Cocartesian) public
   open Shorthands public
-
-⊗₀ : Type × Type → Type
-⊗₀ = uncurry _⊎_
-
-module _ ((record { State = State₁ ; rel = rel₁ }
-         , record { State = State₂ ; rel = rel₂ }) : SRel A B × SRel C D) where
-
-  data ⊗-rel : SRelType (A ⊎ C) (B ⊎ D) (State₁ × State₂) where
-    ⊗₁₁ : ∀ {s₁ s₁' s₂ a c} → rel₁ s₁ a c s₁' → ⊗-rel (s₁ , s₂) (inj₁ a) (inj₁ c) (s₁' , s₂)
-    ⊗₁₂ : ∀ {s₁ s₂ s₂' b d} → rel₂ s₂ b d s₂' → ⊗-rel (s₁ , s₂) (inj₂ b) (inj₂ d) (s₁ , s₂')
-
-  ⊗₁ : SRel (A ⊎ C) (B ⊎ D)
-  ⊗₁ = record { State = _ ; rel = ⊗-rel}
 
 Monoidal-SRelC : Monoidal SRelC
 Monoidal-SRelC = monoidalHelper SRelC record
