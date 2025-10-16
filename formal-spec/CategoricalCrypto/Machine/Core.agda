@@ -1,13 +1,14 @@
 {-# OPTIONS --safe --no-require-unique-meta-solutions #-}
 {-# OPTIONS -v allTactics:100 #-}
 
-module CategoricalCrypto.Machine where
+module CategoricalCrypto.Machine.Core where
 
 open import abstract-set-theory.Prelude hiding (id; _∘_; _⊗_; lookup; Dec; [_])
 import abstract-set-theory.Prelude as P
 open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 open import CategoricalCrypto.Channel.Core
 open import CategoricalCrypto.Channel.Selection
+open import Relation.Binary.PropositionalEquality.Properties
 
 -- --------------------------------------------------------------------------------
 -- -- Machines, which form the morphisms
@@ -34,28 +35,26 @@ record Machine (A B : Channel) : Type₁ where
 -- TODO: all of these are functors from the appropriate categories
 module _ {A B : Channel} (let open Channel (A ⊗ᵀ B)) where
 
-  StatelessMachine      : (inType → Maybe outType → Type)                                 → Machine A B
-  FunctionMachine       : (inType → Maybe outType)                                        → Machine A B
-  TotalFunctionMachine  : {@(tactic ⇒-solver-tactic) p : A ⊗ B ᵀ [ In ]⇒[ Out ] A ⊗ B ᵀ} → Machine A B
-  TotalFunctionMachine' : {@(tactic ⇒-solver-tactic) p : A [ In ]⇒[ In ] B}
-                          {@(tactic ⇒-solver-tactic) q : B [ Out ]⇒[ Out ] A}             → Machine A B
+  StatelessMachine      : (inType → Maybe outType → Type)          → Machine A B
+  FunctionMachine       : (inType → Maybe outType)                 → Machine A B
+  TotalFunctionMachine  : A ⊗ B ᵀ [ In ]⇒[ Out ] A ⊗ B ᵀ          → Machine A B
+  TotalFunctionMachine' : A [ In ]⇒[ In ] B → B [ Out ]⇒[ Out ] A  → Machine A B
   
-  StatelessMachine      R       = MkMachine {State = ⊤} $ λ _ i o _ → R i o
-  FunctionMachine       f       = StatelessMachine      $ λ i o → f i ≡ o
-  TotalFunctionMachine  {p}     = FunctionMachine       $ just P.∘ p
-  TotalFunctionMachine' {p} {q} = TotalFunctionMachine  {p = ⊗-combine {In} {Out} (p ⇒ₜ ⇒-solver) (q ⇒ₜ ⇒-solver) ⇒ₜ ⊗-sym}
+  StatelessMachine      R   = MkMachine {State = ⊤} $ λ _ i o _ → R i o
+  FunctionMachine       f   = StatelessMachine      $ λ i → f i ≡_
+  TotalFunctionMachine  p   = FunctionMachine       $ just P.∘ p
+  TotalFunctionMachine' p q = TotalFunctionMachine  $ ⊗-combine {In} {Out} p q ⇒ₜ ⊗-sym
   -- TotalFunctionMachine' forces all messages to go 'through' the machine, i.e.
   -- messages on the domain become messages on the codomain and vice versa if
   -- e.g. A ≡ B then it's easy to accidentally send a message the wrong way
   -- which is prevented here
 
 id : ∀ {A} → Machine A A
-id = TotalFunctionMachine'
+id = TotalFunctionMachine' ⇒-solver ⇒-solver
 
 -- given transformation on the channels, transform the machine
-modifyStepRel : ∀ {A B C D} {@(tactic ⇒-solver-tactic) p : C ⊗ D ᵀ [ In ]⇒[ In ] A ⊗ B ᵀ}
-                            {@(tactic ⇒-solver-tactic) q : C ⊗ D ᵀ [ Out ]⇒[ Out ] A ⊗ B ᵀ} → Machine A B → Machine C D
-modifyStepRel {p = p} {q} (MkMachine stepRel) = MkMachine $ \s m m' s' → stepRel s (p m) (q <$> m') s'
+modifyStepRel : ∀ {A B C D} → (∀ {m} → C ⊗ D ᵀ [ m ]⇒[ m ] A ⊗ B ᵀ) → Machine A B → Machine C D
+modifyStepRel p (MkMachine stepRel) = MkMachine $ \s m m' s' → stepRel s (p {In} m) (p {Out} <$> m') s'
 
 module Tensor {A B C D} (M₁ : Machine A B) (M₂ : Machine C D) where
   open Machine M₁ renaming (State to State₁; stepRel to stepRel₁; machine-channel to machine-channel₁)
@@ -69,7 +68,7 @@ module Tensor {A B C D} (M₁ : Machine A B) (M₂ : Machine C D) where
     Step₂ : ∀ {m m' s s' s₁} → stepRel₂ s m m' s' → CompRel (s₁ , s) (L⊗ ϵ ↑ᵢ m) (L⊗ ϵ ↑ₒ_ <$> m') (s₁ , s')
 
   _⊗'_ : Machine (A ⊗ C) (B ⊗ D)
-  _⊗'_ = modifyStepRel machine-inter
+  _⊗'_ = modifyStepRel ⇒-solver machine-inter
     where
       machine-inter : Machine (A ⊗ B ᵀ) ((C ⊗ D ᵀ) ᵀ)
       machine-inter = MkMachine CompRel
@@ -83,16 +82,16 @@ _⊗ʳ_ : ∀ {A B} → Machine A B → (C : Channel) → Machine (A ⊗ C) (B �
 M ⊗ʳ C = M ⊗' id
 
 _∣ˡ : ∀ {A B C} → Machine (A ⊗ B) C → Machine A C
-_∣ˡ = modifyStepRel
+_∣ˡ = modifyStepRel ⇒-solver
 
 _∣ʳ : ∀ {A B C} → Machine (A ⊗ B) C → Machine B C
-_∣ʳ = modifyStepRel
+_∣ʳ = modifyStepRel ⇒-solver
 
 _∣^ˡ : ∀ {A B C} → Machine A (B ⊗ C) → Machine A B
-_∣^ˡ = modifyStepRel
+_∣^ˡ = modifyStepRel ⇒-solver
   
 _∣^ʳ : ∀ {A B C} → Machine A (B ⊗ C) → Machine A C
-_∣^ʳ = modifyStepRel
+_∣^ʳ = modifyStepRel ⇒-solver
 
 -- trace monoidal category?
 -- What happens when you compose with a trace ?
@@ -119,34 +118,34 @@ module _ {A B C} (M : Machine (A ⊗ C) (B ⊗ C)) (let open Machine M) where
 infixr 9 _∘_
 
 _∘_ : ∀ {B C A} → Machine B C → Machine A B → Machine A C
-_∘_ {B} M₁ M₂ = tr {C = B} $ modifyStepRel (M₂ ⊗' M₁)
+_∘_ {B} M₁ M₂ = tr {C = B} $ modifyStepRel ⇒-solver (M₂ ⊗' M₁)
 
 ⊗-assoc : ∀ {A B C} → Machine ((A ⊗ B) ⊗ C) (A ⊗ (B ⊗ C))
-⊗-assoc = TotalFunctionMachine'
+⊗-assoc = TotalFunctionMachine' ⇒-solver ⇒-solver
   
 ⊗-assoc⃖ : ∀ {A B C} → Machine (A ⊗ (B ⊗ C)) ((A ⊗ B) ⊗ C)
-⊗-assoc⃖ = TotalFunctionMachine'
+⊗-assoc⃖ = TotalFunctionMachine' ⇒-solver ⇒-solver
 
 ⊗-symₘ : ∀ {A B} → Machine (A ⊗ B) (B ⊗ A)
-⊗-symₘ = TotalFunctionMachine'
+⊗-symₘ = TotalFunctionMachine' ⇒-solver ⇒-solver
 
 idᴷ : Machine I (I ⊗ I)
-idᴷ rewrite ᵀ-identity = TotalFunctionMachine
+idᴷ rewrite ᵀ-identity = TotalFunctionMachine ⇒-solver
 
 transpose : ∀ {A B} → Machine A B → Machine (B ᵀ) (A ᵀ)
-transpose = modifyStepRel
+transpose = modifyStepRel ⇒-solver
  
 -- cup : Machine I (A ⊗ A ᵀ)
 -- cup = StatelessMachine λ x x₁ → {!!}
 
 -- cap : Machine (A ᵀ ⊗ A) I
--- cap {A} = modifyStepRel (transpose (cup {A})) {!!} {!!}
+-- cap {A} = modifyStepRel ⇒-solver (transpose (cup {A})) {!!} {!!}
 
 _∘ᴷ_ : ∀ {A B C E₁ E₂} → Machine B (C ⊗ E₂) → Machine A (B ⊗ E₁) → Machine A (C ⊗ (E₁ ⊗ E₂))
-_∘ᴷ_ {E₁ = E₁} M₂ M₁ = TotalFunctionMachine' ∘ (M₂ ⊗ʳ E₁ ∘ M₁)
+_∘ᴷ_ {E₁ = E₁} M₂ M₁ = TotalFunctionMachine' ⇒-solver ⇒-solver ∘ (M₂ ⊗ʳ E₁ ∘ M₁)
 
 _⊗ᴷ_ : ∀ {A₁ B₁ E₁ A₂ B₂ E₂} → Machine A₁ (B₁ ⊗ E₁) → Machine A₂ (B₂ ⊗ E₂) → Machine (A₁ ⊗ A₂) ((B₁ ⊗ B₂) ⊗ (E₁ ⊗ E₂))
-M₁ ⊗ᴷ M₂ = TotalFunctionMachine' ∘ M₁ ⊗' M₂
+M₁ ⊗ᴷ M₂ = TotalFunctionMachine' ⇒-solver ⇒-solver ∘ M₁ ⊗' M₂
 
 ⨂ᴷ : ∀ {n} → {A B E : Fin n → Channel} → ((k : Fin n) → Machine (A k) (B k ⊗ E k)) → Machine (⨂ A) (⨂ B ⊗ ⨂ E)
 ⨂ᴷ {zero} M = idᴷ

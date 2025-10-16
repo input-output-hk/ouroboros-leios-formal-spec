@@ -7,7 +7,7 @@ import abstract-set-theory.Prelude as P
 
 open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 
-open import CategoricalCrypto.Machine
+open import CategoricalCrypto.Machine.Core
 open import CategoricalCrypto.Channel.Core
 open import CategoricalCrypto.Channel.Selection
 

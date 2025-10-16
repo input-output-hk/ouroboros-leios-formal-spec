@@ -8,6 +8,7 @@ open import Relation.Nullary
 open import Meta.Prelude
 open import Meta.Init
 open import Data.Sum hiding (reduce)
+open import Data.List renaming (map to mapₗ)
 open import Reflection.AST.Term
 open import Reflection.Tactic
 open import Reflection.Utils
@@ -46,18 +47,20 @@ instance _ = Functor-M ⦃ Class.Monad.Monad-TC ⦄
 
 ⇒-solver-tactic' : TC ⊤
 ⇒-solver-tactic' = inDebugPath "Auto _[_]⇒[_]_ tactic" $ do
-  holeType ← goalTy
-  ensureNoMetas holeType
-  quote _[_]⇒[_]_ ∙⟦ A ∣ m ∣ m' ∣ B ⟧ ← return holeType
-    where _ → error ("Bad type shape: " ∷ᵈ holeType ∷ᵈ [])
-  debugLog ("Attempting to find a solution for problem " ∷ᵈ holeType ∷ᵈ [])
-  -- Reductions must happen on the mode to compute negations when the mode is
-  -- actually known
-  mN ← reduce m
-  m'N ← reduce m'
-  solution ← handle-pattern A mN m'N B
-  debugLog ("Solution: " ∷ᵈ solution ∷ᵈ [])
-  unifyWithGoal solution
+  holeType' ← goalTy
+  ensureNoMetas holeType'
+  let (args , holeType) = stripPis holeType'
+  inContext args $ do
+    quote _[_]⇒[_]_ ∙⟦ A ∣ m ∣ m' ∣ B ⟧ ← return holeType
+      where _ → error ("Bad type shape: " ∷ᵈ holeType ∷ᵈ [])
+    debugLog ("Attempting to find a solution for problem " ∷ᵈ holeType ∷ᵈ [])
+    -- Reductions must happen on the mode to compute negations when the mode is
+    -- actually known
+    mN ← reduce m
+    m'N ← reduce m'
+    solution ← handle-pattern A mN m'N B
+    debugLog ("Solution: " ∷ᵈ solution ∷ᵈ [])
+    unifyWithGoal $ prependLams (mapₗ (\{(s , arg (arg-info v _) _) → (s , v)}) args) solution
   where
   handle-pattern : Term → Term → Term → Term → TC Term
   handle-pattern A m m' B
@@ -126,7 +129,7 @@ instance _ = Functor-M ⦃ Class.Monad.Monad-TC ⦄
       (const $ do
         res-right ← handle-pattern A m m' C
         return $ quote _⇒ₜ_ ∙⟦ res-right ∣ quote ⊗-left-intro ∙ ⟧)
-  -- otherwise abort
+  -- otherwise throw error
   ... | _ | _
     = error $  "No solution found, unable to match " ∷ᵈ A
             ∷ᵈ " with mode " ∷ᵈ m ∷ᵈ " on the right hand side" ∷ᵈ B ∷ᵈ " with mode " ∷ᵈ m' ∷ᵈ []
