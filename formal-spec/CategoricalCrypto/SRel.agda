@@ -42,7 +42,7 @@ trace : (R : SRel A B) → SRel.State R → List A → List B → Type
 trace R s [] [] = ⊤
 trace R s [] (_ ∷ _) = ⊥
 trace R s (_ ∷ _) [] = ⊥
-trace R s (x ∷ xs) (y ∷ ys) = ∃[ s' ] SRel.rel R s x y s' × trace R s xs ys
+trace R s (x ∷ xs) (y ∷ ys) = ∃[ s' ] SRel.rel R s x y s' × trace R s' xs ys
 
 _≤ᵗ_ : SRel A B → SRel A B → Type
 R₁ ≤ᵗ R₂ = ∀ s₁ → ∃[ s₂ ] ∀ a b → trace R₁ s₁ a b ⇔ trace R₂ s₂ a b
@@ -82,13 +82,14 @@ private variable R R₁ R₂ R₃ R₄ : SRel A B
     trace⇔₁ s [] [] = R.K-refl
     trace⇔₁ s [] (_ ∷ _) = R.K-refl
     trace⇔₁ s (_ ∷ _) [] = R.K-refl
-    trace⇔₁ s (a ∷ as) (b ∷ bs) = ∃-cong S₁↔S₂ (rel₁⇔rel₂' ×-cong trace⇔₁ s as bs)
+    trace⇔₁ s (a ∷ as) (b ∷ bs) = ∃-cong S₁↔S₂ λ {s'} → rel₁⇔rel₂' ×-cong trace⇔₁ s' as bs
 
     trace⇔₂ : ∀ s as bs → trace R₂ s as bs ⇔ trace R₁ (from s) as bs
     trace⇔₂ s [] [] = R.K-refl
     trace⇔₂ s [] (_ ∷ _) = R.K-refl
     trace⇔₂ s (_ ∷ _) [] = R.K-refl
-    trace⇔₂ s (a ∷ as) (b ∷ bs) = R.SK-sym $ ∃-cong S₁↔S₂ (rel₁f⇔rel₂t ×-cong R.SK-sym (trace⇔₂ s as bs))
+    trace⇔₂ s (a ∷ as) (b ∷ bs) = R.SK-sym $ ∃-cong S₁↔S₂ λ {s'} → rel₁f⇔rel₂t ×-cong
+      R.SK-sym (subst (λ s → _ ⇔ trace _ s _ _) (strictlyInverseʳ s') (trace⇔₂ (to s') as bs))
 
 infix  4 _≡ᵗ_ _≡ⁱ_
 
@@ -211,14 +212,14 @@ Monoidal-SRelC : Monoidal SRelC
 Monoidal-SRelC = monoidalHelper SRelC record
   { ⊗               = record
     { F₀ = ⊗₀
-    ; F₁ = ⊗₁
+    ; F₁ = ⊗.₁
     ; identity = ≡ᵉ⇒≡ᵗ record
       { S₁↔S₂ = ×-identityʳ ℓ0 _
       ; rel₁⇔rel₂' = λ {_} {a} → mk⇔
-        (λ where (⊗₁₁ refl) → refl ; (⊗₁₂ refl) → refl)
-        (λ where refl → case a returning (λ a → ⊗-rel _ _ a a _) of λ where
-           (inj₁ x) → ⊗₁₁ refl
-           (inj₂ y) → ⊗₁₂ refl)
+        (λ where (⊗.⊗₁₁ refl) → refl ; (⊗.⊗₁₂ refl) → refl)
+        (λ where refl → case a returning (λ a → ⊗.⊗-rel _ _ a a _) of λ where
+           (inj₁ x) → ⊗.⊗₁₁ refl
+           (inj₂ y) → ⊗.⊗₁₂ refl)
       }
     ; homomorphism = {!!}
     ; F-resp-≈ = {!!}
@@ -230,19 +231,19 @@ Monoidal-SRelC = monoidalHelper SRelC record
   ; unitorˡ-commute = λ {_} {_} {f} → begin
     -- cannot lift this via `StatelessRel`, since `f` isn't stateless
     -- this is the only reason, for stateless `f`s this can be lifted
-    Functor.F₁ StatelessRel RelsMonoidal.λ⇒ SRelC.∘ (⊗₁ (SRelC.id , f))
+    Functor.F₁ StatelessRel RelsMonoidal.λ⇒ SRelC.∘ (⊗.₁ (SRelC.id , f))
       ≈⟨ {!!} ⟩
     f SRelC.∘ Functor.F₁ StatelessRel RelsMonoidal.λ⇒ ∎
   ; unitorʳ-commute = {!!}
   ; assoc-commute   = {!!}
   ; triangle        = begin
-    ⊗₁ (SRelC.id , Functor.F₁ StatelessRel RelsMonoidal.λ⇒) SRelC.∘ Functor.F₁ StatelessRel RelsMonoidal.α⇒
+    ⊗.₁ (SRelC.id , Functor.F₁ StatelessRel RelsMonoidal.λ⇒) SRelC.∘ Functor.F₁ StatelessRel RelsMonoidal.α⇒
       ≈⟨ {!!} ⟩ -- by functor laws
     Functor.F₁ StatelessRel (RelsMonoidal.id RelsMonoidal.⊗₁ RelsMonoidal.λ⇒ RelsMonoidal.∘ RelsMonoidal.α⇒)
       ≈⟨ Functor.F-resp-≈ StatelessRel RelsMonoidal.triangle ⟩
     Functor.F₁ StatelessRel (RelsMonoidal.ρ⇒ RelsMonoidal.⊗₁ RelsMonoidal.id)
       ≈⟨ {!!} ⟩ -- by functor laws
-    ⊗₁ (Functor.F₁ StatelessRel RelsMonoidal.ρ⇒ , SRelC.id) ∎
+    ⊗.₁ (Functor.F₁ StatelessRel RelsMonoidal.ρ⇒ , SRelC.id) ∎
   ; pentagon        = {!!} -- same proof as triangle
   }
   where open Category.HomReasoning SRelC
