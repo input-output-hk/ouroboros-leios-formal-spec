@@ -15,8 +15,11 @@ open import Categories.Functor
 open import Categories.Functor.Properties
 
 open import CategoricalCrypto.NaturalTransformationHelper
-
+open import Relation.Binary.Core using (Rel)
+import Relation.Binary.Structures
+open import Relation.Binary.Definitions
 open import Relation.Binary.PropositionalEquality using (_≡_; refl; sym; trans)
+open import Relation.Binary.PropositionalEquality.Properties renaming (setoid to ≡-setoid)
 open import abstract-set-theory.Prelude hiding (id; _∘_; _⊗_; lookup; Dec; [_]; ⊤; ⊥; Functor)
 import abstract-set-theory.Prelude as P
 import Function.Related.Propositional as R
@@ -48,6 +51,43 @@ infix  4 _≡ᵗ_
 _≡ᵗ_ : SRel A B → SRel A B → Type
 R₁ ≡ᵗ R₂ = R₁ ≤ᵗ R₂ × R₂ ≤ᵗ R₁
 
+module _ {A B} (let open Relation.Binary.Structures (_≡ᵗ_ {A} {B}))  where
+
+  ≤ᵗ-transitive : Transitive (_≤ᵗ_ {A} {B})
+  ≤ᵗ-transitive a b = λ s₁ →
+    let (u , v) = a s₁
+        (w , x) = b u
+     in w , λ _ _ → R.K-trans (v _ _) (x _ _)
+
+  ≤ᵗ-reflexive : Reflexive (_≤ᵗ_ {A} {B})
+  ≤ᵗ-reflexive s = s , λ _ _ → R.K-refl
+  
+  ≡ᵗ-reflexive : Reflexive (_≡ᵗ_ {A} {B})
+  ≡ᵗ-reflexive = ≤ᵗ-reflexive , ≤ᵗ-reflexive
+
+  ≡ᵗ-symmetric : Symmetric (_≡ᵗ_ {A} {B})
+  ≡ᵗ-symmetric (u , v) = (v , u)
+
+  ≡ᵗ-transitive : Transitive (_≡ᵗ_ {A} {B})
+  ≡ᵗ-transitive (u , v) (w , x) = ≤ᵗ-transitive u w , ≤ᵗ-transitive x v
+
+  ≡ᵗ-equivalence : IsEquivalence
+  ≡ᵗ-equivalence = record
+    { refl = ≡ᵗ-reflexive
+    ; sym = ≡ᵗ-symmetric
+    ; trans = ≡ᵗ-transitive }
+
+  ≤ᵗ-antisym : Antisymmetric (_≡ᵗ_ {A} {B}) (_≤ᵗ_ {A} {B})
+  ≤ᵗ-antisym = _,_
+
+  ≤ᵗ-partial-order : IsPartialOrder _≤ᵗ_
+  ≤ᵗ-partial-order = record
+    { isPreorder = record
+      { isEquivalence = ≡ᵗ-equivalence
+      ; reflexive = proj₁
+      ; trans = ≤ᵗ-transitive }
+    ; antisym = ≤ᵗ-antisym }
+
 module _ ((S₁ , rel₁) (S₂ , rel₂) : SRel A B) where
 
   infix 4 _≡ᵉ_
@@ -56,69 +96,47 @@ module _ ((S₁ , rel₁) (S₂ , rel₂) : SRel A B) where
     field S₁↔S₂ : S₁ ↔ S₂
 
     open Inverse S₁↔S₂
-    
-    rel₂' : SRelType A B S₁
-    rel₂' s₁ a b s₁' = rel₂ (to s₁) a b (to s₁')
+   
+    field rel₁⇔rel₂[to-to] : ∀ {s a b s'} → rel₁ s a b s' ⇔ rel₂ (to s) a b (to s')
 
-    rel₁' : SRelType A B S₂
-    rel₁' s₂ a b s₂' = rel₁ (from s₂) a b (from s₂') 
+    ≡-≡-rel₁⇔rel₂ : ∀ {s₁ s₁' a b s₂ s₂'} → to s₁ ≡ s₂ → to s₁' ≡ s₂' → rel₁ s₁ a b s₁' ⇔ rel₂ s₂ a b s₂'
+    ≡-≡-rel₁⇔rel₂ refl refl = rel₁⇔rel₂[to-to]
 
-    field rel₁⇔rel₂' : ∀ {s a b s'} → rel₁ s a b s' ⇔ rel₂' s a b s'
-
-    open R.EquationalReasoning
-
-    rel₂⇔rel₁' : ∀ {s₂ a b s₂'} → rel₂ s₂ a b s₂' ⇔ rel₁' s₂ a b s₂'
-    rel₂⇔rel₁' {s₂} {a} {b} {s₂'} =
-      rel₂ s₂ a b s₂'                         ≡⟨ cong₂ (λ s₂ s₂' → rel₂ s₂ _ _ s₂') (sym (strictlyInverseˡ s₂)) (sym (strictlyInverseˡ s₂')) ⟩
-      rel₂ (to (from s₂)) a b (to (from s₂')) ∼⟨ sym⇔ rel₁⇔rel₂' ⟩
-      rel₁ (from s₂) a b (from s₂')           ∎
+    rel₁[from-from]⇔rel₂ : ∀ {s₂ a b s₂'} → rel₁ (from s₂) a b (from s₂') ⇔ rel₂ s₂ a b s₂'
+    rel₁[from-from]⇔rel₂ = ≡-≡-rel₁⇔rel₂ (strictlyInverseˡ _) (strictlyInverseˡ _)
       
-    -- all the other type-correct variants are equivalent as well
-    rel₁f⇔rel₂t : ∀ {s₂ a b s₁} → rel₁ (from s₂) a b s₁ ⇔ rel₂ s₂ a b (to s₁)
-    rel₁f⇔rel₂t {s₂} {a} {b} {s₁} =
-      rel₁ (from s₂) a b s₁           ∼⟨ rel₁⇔rel₂' ⟩
-      rel₂ (to (from s₂)) a b (to s₁) ≡⟨ cong (λ s₂ → rel₂ s₂ _ _ _) (strictlyInverseˡ s₂) ⟩
-      rel₂ s₂ a b (to s₁) ∎
+    rel₁[from-]⇔rel₂[-to] : ∀ {s₂ a b s₁} → rel₁ (from s₂) a b s₁ ⇔ rel₂ s₂ a b (to s₁)
+    rel₁[from-]⇔rel₂[-to] = ≡-≡-rel₁⇔rel₂ (strictlyInverseˡ _) P.refl
+
+    rel₁[-from]⇔rel₂[to-] : ∀ {s₂ a b s₁} → rel₁ s₁ a b (from s₂) ⇔ rel₂ (to s₁) a b s₂
+    rel₁[-from]⇔rel₂[to-] = ≡-≡-rel₁⇔rel₂ P.refl (strictlyInverseˡ _)
 
 private variable R R₁ R₂ R₃ R₄ : SRel A B
 
 -- ≡ᵉ is much easier to prove, but less general
 ≡ᵉ⇒≡ᵗ : R₁ ≡ᵉ R₂ → R₁ ≡ᵗ R₂
-≡ᵉ⇒≡ᵗ {R₁ = R₁} {R₂} R₁≡ᵉR₂ = < to , trace⇔₁ > , < from , trace⇔₂ >
+≡ᵉ⇒≡ᵗ {R₁ = R₁} {R₂} R₁≡ᵉR₂ =
+  < to   , (λ _ _ _ → ≡-≡-trace⇔ P.refl) > ,
+  < from , (λ _ _ _ → R.SK-sym (≡-≡-trace⇔ (sym (strictlyInverseˡ _)))) >
   where
     open _≡ᵉ_ R₁≡ᵉR₂
     open Inverse S₁↔S₂
 
-    trace⇔₁ : ∀ s as bs → Trace R₁ s as bs ⇔ Trace R₂ (to s) as bs
-    trace⇔₁ s []       []        = mk⇔ (const trace[]) (const trace[])
-    trace⇔₁ _ []       (_ ∷ _  ) = mk⇔ (λ ()) (λ ())
-    trace⇔₁ _ (_ ∷ _ ) []        = mk⇔ (λ ()) (λ ())
-    trace⇔₁ s (x ∷ as) (x₁ ∷ bs) = mk⇔
-      (λ where
-        (trace∷ {next = next} x x₂) →
-          trace∷ (rel₁⇔rel₂' .Equivalence.to x)
-                 (trace⇔₁ next as bs .Equivalence.to x₂))
-      (λ where
-        (trace∷ {next = next} x x₂) →
-          trace∷ (rel₁⇔rel₂' .Equivalence.from (subst (proj₂ R₂ _ _ _) (sym (strictlyInverseˡ next)) x))
-                 (trace⇔₁ (from next) as bs .Equivalence.from (subst (λ v → Trace _ v _ _) (sym (strictlyInverseˡ next)) x₂ )))
+    ≡-trace₁⇒trace₂ : ∀ {s s' as bs} → s' ≡ to s → Trace R₁ s as bs → Trace R₂ s' as bs
+    ≡-trace₁⇒trace₂ P.refl trace[] = trace[]
+    ≡-trace₁⇒trace₂ P.refl (trace∷ {next = next} x x₁) = trace∷ (rel₁⇔rel₂[to-to] .Equivalence.to x)
+                                                                (≡-trace₁⇒trace₂ P.refl x₁)
 
-    trace⇔₂ : ∀ s as bs → Trace R₂ s as bs ⇔ Trace R₁ (from s) as bs
-    trace⇔₂ s []       []        = mk⇔ (const trace[]) (const trace[])
-    trace⇔₂ _ []       (_ ∷ _  ) = mk⇔ (λ ()) (λ ())
-    trace⇔₂ _ (_ ∷ _ ) []        = mk⇔ (λ ()) (λ ())
-    trace⇔₂ s (x ∷ as) (x₁ ∷ bs) = mk⇔
-      (λ where
-        (trace∷ {next = next} x x₁) →
-          trace∷ (rel₂⇔rel₁' .Equivalence.to x)
-                 (trace⇔₂ next as bs .Equivalence.to x₁))
-      (λ where
-        (trace∷ {next = next} x x₂) →
-          trace∷ (rel₂⇔rel₁' .Equivalence.from (subst (proj₂ R₁ _ _ _) (sym (strictlyInverseʳ next)) x))
-                 (trace⇔₂ (to next) as bs .Equivalence.from (subst (λ v → Trace _ v _ _) (sym (strictlyInverseʳ next)) x₂ )))
+    ≡-trace₂⇒trace₁ : ∀ {s s' as bs} → s' ≡ to s → Trace R₂ s' as bs → Trace R₁ s as bs
+    ≡-trace₂⇒trace₁ P.refl trace[] = trace[]
+    ≡-trace₂⇒trace₁ P.refl (trace∷ {next = next} x x₁) = trace∷ ((R.SK-sym rel₁[-from]⇔rel₂[to-]) .Equivalence.to x)
+                                                                (≡-trace₂⇒trace₁ (sym (strictlyInverseˡ next)) x₁)
+
+    ≡-≡-trace⇔ : ∀ {s s' as bs} → s' ≡ to s → Trace R₁ s as bs ⇔ Trace R₂ s' as bs
+    ≡-≡-trace⇔ p = mk⇔ (≡-trace₁⇒trace₂ p) (≡-trace₂⇒trace₁ p)
 
 module _ ((S₁ , rel₁) : SRel B C) ((S₂ , rel₂) : SRel A B) where
-
+  
   record ∘-rel (s : S₁ × S₂) (a : A) (c : C) (s' : S₁ × S₂) : Type where
     field
       b     : B
@@ -130,64 +148,71 @@ module _ ((S₁ , rel₁) : SRel B C) ((S₂ , rel₂) : SRel A B) where
   _∘_ : SRel A C
   _∘_ = -, ∘-rel
 
--- ⊗₀ : Type × Type → Type
--- ⊗₀ = uncurry _⊎_
+_⊗₀_ : Type × Type → Type
+_⊗₀_ = uncurry _⊎_
 
--- module ⊗ ((record { State = State₁ ; rel = rel₁ }
---          , record { State = State₂ ; rel = rel₂ }) : SRel A B × SRel C D) where
+module _ ((S₁ , rel₁) : SRel A B) ((S₂ , rel₂) : SRel C D) where
 
---   data ⊗-rel : SRelType (A ⊎ C) (B ⊎ D) (State₁ × State₂) where
---     ⊗₁₁ : ∀ {s₁ s₁' s₂ a c} → rel₁ s₁ a c s₁' → ⊗-rel (s₁ , s₂) (inj₁ a) (inj₁ c) (s₁' , s₂)
---     ⊗₁₂ : ∀ {s₁ s₂ s₂' b d} → rel₂ s₂ b d s₂' → ⊗-rel (s₁ , s₂) (inj₂ b) (inj₂ d) (s₁ , s₂')
+  data ⊗-rel : SRelType (A ⊎ C) (B ⊎ D) (S₁ × S₂) where
+    ⊗₁₁ : ∀ {s₁ s₁' s₂ a c} → rel₁ s₁ a c s₁' → ⊗-rel (s₁ , s₂) (inj₁ a) (inj₁ c) (s₁' , s₂)
+    ⊗₁₂ : ∀ {s₁ s₂ s₂' b d} → rel₂ s₂ b d s₂' → ⊗-rel (s₁ , s₂) (inj₂ b) (inj₂ d) (s₁ , s₂')
 
---   ₁ : SRel (A ⊎ C) (B ⊎ D)
---   ₁ = record { State = _ ; rel = ⊗-rel}
+  _⊗₁_ : SRel (A ⊎ C) (B ⊎ D)
+  _⊗₁_ = -, ⊗-rel
 
--- infixr 10 _⊗₁_
--- _⊗₁_ : SRel A B → SRel C D → SRel (A ⊎ C) (B ⊎ D)
--- _⊗₁_ = curry ⊗.₁
+-- This definition is awkward, because we would prefer to allow 'arbitrary' extensions of the state.
+-- This could be done by instead having an injection `State ↪ State'` or a partial function
+-- `State' → Maybe State`.
+-- However, none of these are stronger, since you can always replace the state with an isomorphic
+-- type via `≡ᵉ⇒≡ⁱ`. I don't know what the best option would be.
 
--- -- This definition is awkward, because we would prefer to allow 'arbitrary' extensions of the state.
--- -- This could be done by instead having an injection `State ↪ State'` or a partial function
--- -- `State' → Maybe State`.
--- -- However, none of these are stronger, since you can always replace the state with an isomorphic
--- -- type via `≡ᵉ⇒≡ⁱ`. I don't know what the best option would be.
+module _
+  {Extension : Type}
+  ((S , rel) : SRel A B)
+  {_≈_       : Rel Extension lzero}
+  (≈-equiv   : let open Relation.Binary.Structures _≈_ in IsEquivalence)
+  (f         : Injection (record { Carrier = Extension ; _≈_ = _≈_ ; isEquivalence = ≈-equiv }) (≡-setoid S)) where
 
--- weakenState : SRel A B → Type → SRel A B
--- weakenState R S = let open SRel R in record
---   { State = State ⊎ S
---   ; rel   = λ where
---     (inj₁ s) a b (inj₁ s') → rel s a b s'
---     _ _ _ _ → ⊥
---   }
+  open Injection f
 
--- infix  4 _≡ⁱ_
+  Ext : SRelType A B Extension 
+  Ext s a b s' = rel (to s) a b (to s')
 
--- data _≡ⁱ_ : SRel A B → SRel A B → Type₁ where
---   ≡ᵉ⇒≡ⁱ : R₁ ≡ᵉ R₂ → R₁ ≡ⁱ R₂
---   weaken : ∀ {X} → R ≡ⁱ weakenState R X
---   ≡ⁱ-∘ : R₁ ≡ⁱ R₂ → R₃ ≡ⁱ R₄ → R₁ ∘ R₂ ≡ⁱ R₃ ∘ R₄
---   ≡ⁱ-⊗ : R₁ ≡ⁱ R₂ → R₃ ≡ⁱ R₄ → R₁ ⊗₁ R₂ ≡ⁱ R₃ ⊗₁ R₄
---   ≡ⁱ-refl : R ≡ⁱ R
---   ≡ⁱ-sym : R₁ ≡ⁱ R₂ → R₂ ≡ⁱ R₁
---   ≡ⁱ-trans : R₁ ≡ⁱ R₂ → R₂ ≡ⁱ R₃ → R₁ ≡ⁱ R₃
+  ⊃ : SRel A B
+  ⊃ = -, Ext
 
--- -- this should be straightforward
--- ≡ⁱ⇒≡ᵗ : R₁ ≡ⁱ R₂ → R₁ ≡ᵗ R₂
--- ≡ⁱ⇒≡ᵗ (≡ᵉ⇒≡ⁱ record { S₁↔S₂ = record { to = to ; from = from ; to-cong = to-cong ; from-cong = from-cong ; inverse = inverse } ; rel₁⇔rel₂' = rel₁⇔rel₂' }) =
---   (λ s₁ → to s₁ , λ a b → record { to = λ x → {!!} ; from = {!!} ; to-cong = {!!} ; from-cong = {!!} }) , {!!}
--- ≡ⁱ⇒≡ᵗ weaken = {!!}
--- ≡ⁱ⇒≡ᵗ (≡ⁱ-∘ x x₁) = {!!}
--- ≡ⁱ⇒≡ᵗ (≡ⁱ-⊗ x x₁) = {!!}
--- ≡ⁱ⇒≡ᵗ ≡ⁱ-refl = {!!}
--- ≡ⁱ⇒≡ᵗ (≡ⁱ-sym x) = {!!}
--- ≡ⁱ⇒≡ᵗ (≡ⁱ-trans x x₁) = {!!}
+-- This extends the internal state of an SRel by making a pair with an arbitrary type
+weakenState : SRel A B → Type → SRel A B
+weakenState sRel Extension = ⊃ {Extension = proj₁ sRel × Extension} sRel {_≡_ on proj₁}
+  (record { refl = P.refl ; sym = λ {P.refl → P.refl} ; trans = λ {P.refl P.refl → P.refl}})
+  (record { to = proj₁ ; cong = P.id ; injective = P.id })
+
+infix  4 _≡ⁱ_
+
+data _≡ⁱ_ : SRel A B → SRel A B → Type₁ where
+  ≡ᵉ⇒≡ⁱ    : R₁ ≡ᵉ R₂ → R₁ ≡ⁱ R₂
+  weaken  : ∀ {X} → R ≡ⁱ weakenState R X
+  ≡ⁱ-∘     : R₁ ≡ⁱ R₂ → R₃ ≡ⁱ R₄ → R₁ ∘ R₂ ≡ⁱ R₃ ∘ R₄
+  ≡ⁱ-⊗    : R₁ ≡ⁱ R₂ → R₃ ≡ⁱ R₄ → R₁ ⊗₁ R₂ ≡ⁱ R₃ ⊗₁ R₄
+  ≡ⁱ-refl  : R ≡ⁱ R
+  ≡ⁱ-sym   : R₁ ≡ⁱ R₂ → R₂ ≡ⁱ R₁
+  ≡ⁱ-trans : R₁ ≡ⁱ R₂ → R₂ ≡ⁱ R₃ → R₁ ≡ⁱ R₃
+
+-- this should be straightforward
+≡ⁱ⇒≡ᵗ : R₁ ≡ⁱ R₂ → R₁ ≡ᵗ R₂
+≡ⁱ⇒≡ᵗ (≡ᵉ⇒≡ⁱ x) = ≡ᵉ⇒≡ᵗ x
+≡ⁱ⇒≡ᵗ weaken = {!!}
+≡ⁱ⇒≡ᵗ (≡ⁱ-∘ x x₁) = {!!}
+≡ⁱ⇒≡ᵗ (≡ⁱ-⊗ x x₁) = {!!}
+≡ⁱ⇒≡ᵗ ≡ⁱ-refl = {!!} -- ≡ᵗ-reflexive
+≡ⁱ⇒≡ᵗ (≡ⁱ-sym x) = let (u , v) = ≡ⁱ⇒≡ᵗ x in (v , u)
+≡ⁱ⇒≡ᵗ (≡ⁱ-trans x x₁) = {!!}
 
 -- -- here's a proof sketch, assuming the axiom of choice:
 -- -- - we can assume that R₁ and R₂ have 'minimal' state because of `weaken` (choose a minimal one)
 -- -- - WLOG assume S₁ ↪ S₂, then again by weaken & ≡ᵉ⇒≡ⁱ it follows that we can weaken R₂ to
 -- --   have state type S₂, so we can assume R₁ and R₂ have the same state type
--- -- - now proving R₁ ≡ᵉ R₂ should be straightforward since we just need to prove `rel₁⇔rel₂'`,
+-- -- - now proving R₁ ≡ᵉ R₂ should be straightforward since we just need to prove `rel₁⇔rel₂[to-to]`,
 -- --   and that follows from the traces
 -- -- ≡ᵗ⇒≡ⁱ : R₁ ≡ᵗ R₂ → R₁ ≡ⁱ R₂
 -- -- ≡ᵗ⇒≡ⁱ = {!!}
@@ -202,13 +227,13 @@ module _ ((S₁ , rel₁) : SRel B C) ((S₂ , rel₂) : SRel A B) where
 --   ; assoc     = ≡ᵉ⇒≡ᵗ {!!}
 --   ; identityˡ = ≡ᵉ⇒≡ᵗ record
 --     { S₁↔S₂ = ×-identityˡ ℓ0 _
---     ; rel₁⇔rel₂' = mk⇔
+--     ; rel₁⇔rel₂[to-to] = mk⇔
 --       (λ where record { b = _ ; ∘-rel₁ = refl ; ∘-rel₂ = ∘-rel₂ } → ∘-rel₂)
 --       (λ rel → record { b = _ ; ∘-rel₁ = refl ; ∘-rel₂ = rel })
 --     }
 --   ; identityʳ = ≡ᵉ⇒≡ᵗ record
 --     { S₁↔S₂ = ×-identityʳ ℓ0 _
---     ; rel₁⇔rel₂' = mk⇔
+--     ; rel₁⇔rel₂[to-to] = mk⇔
 --       (λ where record { b = _ ; ∘-rel₁ = ∘-rel₁ ; ∘-rel₂ = refl } → ∘-rel₁)
 --       (λ rel → record { b = _ ; ∘-rel₁ = rel ; ∘-rel₂ = refl })
 --     }
@@ -223,16 +248,16 @@ module _ ((S₁ , rel₁) : SRel B C) ((S₂ , rel₂) : SRel A B) where
 --   ; F₁ = λ R → record { State = ⊤ ; rel = λ _ a b _ → R a b }
 --   ; identity = ≡ᵉ⇒≡ᵗ record
 --     { S₁↔S₂ = R.K-refl
---     ; rel₁⇔rel₂' = mk⇔ (λ where (lift refl) → refl) λ where refl → lift refl
+--     ; rel₁⇔rel₂[to-to] = mk⇔ (λ where (lift refl) → refl) λ where refl → lift refl
 --     }
 --   ; homomorphism = ≡ᵉ⇒≡ᵗ record
 --     { S₁↔S₂ = R.SK-sym $ ×-identityʳ ℓ0 _
---     ; rel₁⇔rel₂' = mk⇔
+--     ; rel₁⇔rel₂[to-to] = mk⇔
 --       (λ where (_ , Rab , Rbc) → record { b = _ ; ∘-rel₁ = Rbc ; ∘-rel₂ = Rab })
 --       (λ where record { b = b ; ∘-rel₁ = ∘-rel₁ ; ∘-rel₂ = ∘-rel₂ } → b , ∘-rel₂ , ∘-rel₁ )
 --     }
 --   ; F-resp-≈ = λ where
---     (R₁⇒R₂ , R₂⇒R₁) → ≡ᵉ⇒≡ᵗ record { S₁↔S₂ = R.K-refl ; rel₁⇔rel₂' = mk⇔ R₁⇒R₂ R₂⇒R₁ }
+--     (R₁⇒R₂ , R₂⇒R₁) → ≡ᵉ⇒≡ᵗ record { S₁↔S₂ = R.K-refl ; rel₁⇔rel₂[to-to] = mk⇔ R₁⇒R₂ R₂⇒R₁ }
 --   }
 
 -- module RelsMonoidal where
@@ -248,7 +273,7 @@ module _ ((S₁ , rel₁) : SRel B C) ((S₂ , rel₂) : SRel A B) where
 --     ; F₁ = _⊗₁_
 --     ; identity = ≡ᵉ⇒≡ᵗ record
 --       { S₁↔S₂ = ×-identityʳ ℓ0 _
---       ; rel₁⇔rel₂' = ? -- λ {_} {a} → mk⇔
+--       ; rel₁⇔rel₂[to-to] = ? -- λ {_} {a} → mk⇔
 --       --   (λ where (⊗₁₁ refl) → refl ; (⊗₁₂ refl) → refl)
 --       --   (λ where refl → case a returning (λ a → ⊗-rel _ _ a a _) of λ where
 --       --      (inj₁ x) → ⊗₁₁ refl
