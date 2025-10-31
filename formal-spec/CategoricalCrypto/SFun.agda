@@ -22,49 +22,60 @@ record SFunᵉ (A B : Type) : Type₁ where
     fun   : SFunType A B State
 
 private variable A B C D State : Type
-                 m n : ℕ
 
-trace : SFunType A B State → State → Vec A n → Vec B n
+trace : ∀ {n} → SFunType A B State → State → Vec A n → Vec B n
 trace f s [] = []
 trace f s (a ∷ as) = let (s , b) = f (s , a) in b ∷ trace f s as
 
-take-trace : ∀ {f : SFunType A B State} {s} {as : Vec A (n + m)}
+take-trace : ∀ {m n } {f : SFunType A B State} {s} {as : Vec A (n + m)}
            → take n (trace f s as) ≡ trace f s (take n as)
 take-trace {n = zero} = refl
 take-trace {n = suc _} {as = _ ∷ _} = cong (_ ∷_) take-trace
 
 -- implicit state
 record SFunⁱ (A B : Type) : Type where
+
   field
-    fun : Vec A n → Vec B n
-    take-fun : ∀ {as : Vec A (m + n)} → take m (fun as) ≡ fun (take m as)
+    fun : ∀ {n} → Vec A n → Vec B n
+    take-fun : ∀ {m n} {as : Vec A (m + n)} → take m (fun as) ≡ fun (take m as)
 
   fun₁ : A → B
   fun₁ a = head (fun [ a ])
-
-  -- the function on traces after making one fixed step
-  apply₁ : A → SFunⁱ A B
-  apply₁ a = record { fun = λ as → tail (fun (a ∷ as)) ; take-fun = prop  }
+  
+  take-tail : {m n : ℕ} {a : A} {as : Vec A (m + n)} → take m (tail (fun (a ∷ as))) ≡ tail (fun (a ∷ take m as))
+  take-tail {m} {a = a} {as} = begin
+    take m (tail (fun (a ∷ as)))         ≡⟨ take-suc {v = fun (a ∷ as)} ⟩
+    tail (take (ℕ.suc m) (fun (a ∷ as))) ≡⟨ cong tail take-fun ⟩
+    tail (fun (take (ℕ.suc m) (a ∷ as))) ≡⟨⟩
+    tail (fun (a ∷ take m as))           ∎
     where
       open ≡-Reasoning
-
-      tail[a]≡[] : ∀ {a} {A : Set a} {v : Vec A 1} → tail v ≡ []
-      tail[a]≡[] {v = _ ∷ []} = refl
-      
-      prop : {m n : ℕ} {a : A} {as : Vec A (m + n)} → take m (tail (fun (a ∷ as))) ≡ tail (fun (a ∷ take m as))
-      prop {zero} {a = a} {as} =
-        begin
-          take zero (tail (fun (a ∷ as))) ≡⟨⟩
-          [] ≡⟨ tail[a]≡[] {v = fun (a ∷ [])} ⟨
-          tail (fun (a ∷ [])) ≡⟨⟩
-          tail (fun (a ∷ take zero as)) ∎ 
-      prop {ℕ.suc m} = {!!}
-
+      take-suc : ∀ {m n} {v : Vec B (ℕ.suc (m + n))} → take m (tail v) ≡ tail (take (ℕ.suc m) v)
+      take-suc {v = _ ∷ _} = refl
+        
+  -- the function on traces after making one fixed step
+  apply₁ : A → SFunⁱ A B
+  apply₁ a = record { fun = λ as → tail (fun (a ∷ as)) ; take-fun = take-tail  }
 
 module _ where
   open SFunⁱ
-  fun-∷ : ∀ {f : SFunⁱ A B} {a} {as : Vec A n} → fun f (a ∷ as) ≡ fun₁ f a ∷ fun (apply₁ f a) as
-  fun-∷ = {!!}
+  open ≡-Reasoning
+
+  take₁ : ∀ {A : Type} {n} {as : Vec A (ℕ.suc n)} → head (take 1 as) ≡ head as 
+  take₁ {as = _ ∷ _} = refl
+
+  head-tail : ∀ {A : Type} {n} {as : Vec A (ℕ.suc n)} {y} → y ≡ head as → as ≡ y ∷ tail as
+  head-tail {as = _ ∷ _} refl = refl
+
+  fun-∷ : ∀ {n} {f : SFunⁱ A B} {a} {as : Vec A n} → fun f (a ∷ as) ≡ fun₁ f a ∷ fun (apply₁ f a) as
+  fun-∷ {f = f} {a} {as} = head-tail $ begin
+    fun₁ f a                       ≡⟨⟩
+    head (fun f (a ∷ []))          ≡⟨ take₁ {as = fun f (a ∷ [])} ⟨
+    head (take 1 (fun f (a ∷ []))) ≡⟨ cong head (take-fun f) ⟩
+    head (fun f (take 1 (a ∷ []))) ≡⟨⟩
+    head (fun f (take 1 (a ∷ as))) ≡⟨ cong head (take-fun f) ⟨
+    head (take 1 (fun f (a ∷ as))) ≡⟨ take₁ {as = fun f (a ∷ as)} ⟩
+    head (fun f (a ∷ as))          ∎
 
 eval : SFunᵉ A B → SFunⁱ A B
 eval f = let open SFunᵉ f in record { fun = trace fun init ; take-fun = take-trace }
@@ -97,10 +108,16 @@ resume∘eval≡id : ∀ {f : SFunᵉ A B} → resume (eval f) ≈ᵉ f
 resume∘eval≡id {f = f} {n} = eval∘resume≡id {f = eval f}
 
 IsEquivalence-≈ⁱ : IsEquivalence (_≈ⁱ_ {A} {B})
-IsEquivalence-≈ⁱ = {!!}
+IsEquivalence-≈ⁱ = record
+  { refl = λ _ → refl
+  ; sym = λ x x₁ → sym (x x₁)
+  ; trans = λ x x₁ x₂ → trans (x x₂) (x₁ x₂) }
 
 IsEquivalence-≈ᵉ : IsEquivalence (_≈ᵉ_ {A} {B})
-IsEquivalence-≈ᵉ = {!!}
+IsEquivalence-≈ᵉ = record
+  { refl = λ _ → refl
+  ; sym = λ x x₁ → sym (x x₁)
+  ; trans = λ x x₁ x₂ → trans (x x₂) (x₁ x₂) }
 
 SFunⁱ-Setoid : (A B : Type) → Setoid ℓ0 ℓ0
 SFunⁱ-Setoid A B = record { Carrier = SFunⁱ A B ; _≈_ = _≈ⁱ_ ; isEquivalence = IsEquivalence-≈ⁱ }
