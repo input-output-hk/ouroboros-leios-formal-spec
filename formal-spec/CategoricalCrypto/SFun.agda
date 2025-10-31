@@ -8,6 +8,8 @@ import abstract-set-theory.Prelude as P
 open import Data.Vec hiding (init)
 open import Data.Nat using (_+_)
 open import Relation.Binary
+open import Categories.Category
+open import Categories.Category.Helper
 
 -- M = id, Maybe, Powerset (relation), Giry (probability)
 -- SFunType A B S = S × A → M (S × B)
@@ -35,6 +37,8 @@ take-trace {n = suc _} {as = _ ∷ _} = cong (_ ∷_) take-trace
 -- implicit state
 record SFunⁱ (A B : Type) : Type where
 
+  constructor SF
+
   field
     fun : ∀ {n} → Vec A n → Vec B n
     take-fun : ∀ {m n} {as : Vec A (m + n)} → take m (fun as) ≡ fun (take m as)
@@ -56,6 +60,12 @@ record SFunⁱ (A B : Type) : Type where
   -- the function on traces after making one fixed step
   apply₁ : A → SFunⁱ A B
   apply₁ a = record { fun = λ as → tail (fun (a ∷ as)) ; take-fun = take-tail  }
+
+idⁱ : SFunⁱ A A
+idⁱ = SF P.id refl
+
+_∘ⁱ_ : ∀ {A B C} → SFunⁱ B C → SFunⁱ A B → SFunⁱ A C
+_∘ⁱ_ (SF fun take-fun) (SF fun₁ take-fun₁) = SF (fun P.∘ fun₁) (trans take-fun (cong fun take-fun₁))
 
 module _ where
   open SFunⁱ
@@ -96,11 +106,9 @@ eval∘resume≡id : ∀ {f : SFunⁱ A B} → eval (resume f) ≈ⁱ f
 eval∘resume≡id {f = f} [] with SFunⁱ.fun f []
 ... | [] = refl
 eval∘resume≡id {f = f} (a ∷ as) = begin
-  head (fun f (a ∷ [])) ∷ fun (eval (resume (apply₁ f a))) as
-    ≡⟨ cong (_ ∷_) (eval∘resume≡id as) ⟩
-  fun₁ f a ∷ fun (apply₁ f a) as
-    ≡⟨ sym (fun-∷ {f = f}) ⟩
-  fun f (a ∷ as) ∎
+  head (fun f (a ∷ [])) ∷ fun (eval (resume (apply₁ f a))) as ≡⟨ cong (_ ∷_) (eval∘resume≡id as) ⟩
+  fun₁ f a ∷ fun (apply₁ f a) as                              ≡⟨ sym (fun-∷ {f = f}) ⟩
+  fun f (a ∷ as)                                              ∎
   where open ≡-Reasoning
         open SFunⁱ
 
@@ -134,19 +142,32 @@ Inverse-resume-eval {A} {B} = record { to = resume ; from = eval ; Go }
     module Go where
       to-cong : Congruent _≈ⁱ_ _≈ᵉ_ resume
       to-cong {x} {y} x≈y = begin
-        eval (resume x) ≈⟨ eval∘resume≡id ⟩ x ≈⟨ x≈y ⟩ y ≈⟨ eval∘resume≡id ⟨ eval (resume y) ∎
+        eval (resume x) ≈⟨ eval∘resume≡id ⟩
+        x               ≈⟨ x≈y ⟩
+        y               ≈⟨ eval∘resume≡id ⟨
+        eval (resume y) ∎
       from-cong : Congruent _≈ᵉ_ _≈ⁱ_ eval
       from-cong f≈g = f≈g
       inverse : Inverseᵇ _≈ⁱ_ _≈ᵉ_ resume eval
       inverse = (λ {x} {y} y≈eval[x] → begin
-                 eval (resume y)
-                   ≈⟨ from-cong (to-cong y≈eval[x]) ⟩
-                 eval (resume (eval x))
-                   ≈⟨ resume∘eval≡id ⟩
-                 eval x ∎)
+        eval (resume y)        ≈⟨ from-cong (to-cong y≈eval[x]) ⟩
+        eval (resume (eval x)) ≈⟨ resume∘eval≡id ⟩
+        eval x                 ∎)
               , λ {x} {y} y≈resume[x] → begin
-                  eval y
-                    ≈⟨ from-cong y≈resume[x] ⟩
-                  eval (resume x)
-                    ≈⟨ eval∘resume≡id ⟩
-                  x ∎
+        eval y          ≈⟨ from-cong y≈resume[x] ⟩
+        eval (resume x) ≈⟨ eval∘resume≡id ⟩
+        x               ∎
+
+sFunCategory : Category _ _ _
+sFunCategory = categoryHelper $ record
+  { Obj = Type
+  ; _⇒_ = SFunⁱ
+  ; _≈_ = _≈ⁱ_
+  ; id = idⁱ
+  ; _∘_ = _∘ⁱ_
+  ; assoc = λ _ → refl
+  ; identityˡ = λ _ → refl
+  ; identityʳ = λ _ → refl
+  ; equiv = IsEquivalence-≈ⁱ
+  ; ∘-resp-≈ = λ { {h = SF fun _} {SF fun₁ _} f≈ⁱh g≈ⁱi {n} v → trans (f≈ⁱh (fun₁ v)) (cong fun (g≈ⁱi v)) }
+  }
