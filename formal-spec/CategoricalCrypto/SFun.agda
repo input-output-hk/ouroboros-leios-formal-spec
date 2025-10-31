@@ -44,7 +44,22 @@ record SFunⁱ (A B : Type) : Type where
 
   -- the function on traces after making one fixed step
   apply₁ : A → SFunⁱ A B
-  apply₁ a = record { fun = λ as → tail (fun (a ∷ as)) ; take-fun = {!!} }
+  apply₁ a = record { fun = λ as → tail (fun (a ∷ as)) ; take-fun = prop  }
+    where
+      open ≡-Reasoning
+
+      tail[a]≡[] : ∀ {a} {A : Set a} {v : Vec A 1} → tail v ≡ []
+      tail[a]≡[] {v = _ ∷ []} = refl
+      
+      prop : {m n : ℕ} {a : A} {as : Vec A (m + n)} → take m (tail (fun (a ∷ as))) ≡ tail (fun (a ∷ take m as))
+      prop {zero} {a = a} {as} =
+        begin
+          take zero (tail (fun (a ∷ as))) ≡⟨⟩
+          [] ≡⟨ tail[a]≡[] {v = fun (a ∷ [])} ⟨
+          tail (fun (a ∷ [])) ≡⟨⟩
+          tail (fun (a ∷ take zero as)) ∎ 
+      prop {ℕ.suc m} = {!!}
+
 
 module _ where
   open SFunⁱ
