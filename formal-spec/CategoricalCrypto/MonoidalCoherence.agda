@@ -35,9 +35,10 @@ open import CategoricalCrypto.Properties
 
 import Data.Vec as V
 open import Data.Fin using (Fin)
+open import Data.Empty
 
 module CoherenceThm (X : Set) where
-  open FreeMonoidal X
+  open FreeMonoidal (record { v = Mon ; X = X ; mor = λ _ _ → ⊥ ; _≈mor_ = λ _ _ → ⊥ })
 
   open Commutation FreeMonoidal
   open import CategoricalCrypto.Discrete
@@ -377,9 +378,16 @@ module CoherenceThm (X : Set) where
 module Solver (C : MonoidalCategory 0ℓ 0ℓ 0ℓ)
               {n} (vars : V.Vec (C .MonoidalCategory.Obj) n) where
   open MonoidalCategory
-  open FreeMonoidal (Fin n) public
+  d : FreeMonoidalData
+  d = record { v = Mon ; X = Fin n ; mor = λ _ _ → ⊥ ; _≈mor_ = λ _ _ → ⊥ }
+  open FreeMonoidal d public
   open CoherenceThm (Fin n) hiding (⟦_⟧₁)
-  open Free {C = C .U} {C .monoidal} (V.lookup vars)
+  open FreeFunctor {d = d} record
+    { ⟦v⟧ = record { C = C .U ; Monoidal-C = C .monoidal ; Symmetric-C = λ where ⦃ () ⦄ }
+    ; ⟦_⟧ᵖ₀ = V.lookup vars
+    ; ⟦_⟧ᵖ₁ = λ ()
+    ; ⟦⟧-≈ = λ ()
+    }
 
   opaque
     solveM : ∀ {X Y} → (f g : FreeMonoidal [ X , Y ]) → (C .U) [ ⟦ f ⟧₁ ≈ ⟦ g ⟧₁ ]
