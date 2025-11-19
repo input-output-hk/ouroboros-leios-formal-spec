@@ -138,12 +138,3 @@ module _ ⦃ _ : TCOptions ⦄ where
   ⇒-solver-tactic = initTac ⇒-solver-tactic'
   macro
     ⇒-solver = ⇒-solver-tactic
-
-instance
-  defaultTCOptionsI = record
-    { debug = record defaultDebugOptions
-      { prefix = '┃'
-      ; filter = Filter.⊤
-      }
-    ; fuel  = ("reduceDec/constrs" , 5) ∷ []
-    }

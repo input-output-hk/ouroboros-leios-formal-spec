@@ -9,6 +9,7 @@ open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 open import CategoricalCrypto.Channel.Core
 open import CategoricalCrypto.Channel.Selection
 open import Relation.Binary.PropositionalEquality.Properties
+open import Tactic.Defaults
 
 -- --------------------------------------------------------------------------------
 -- -- Machines, which form the morphisms

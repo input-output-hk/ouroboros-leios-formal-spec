@@ -15,4 +15,5 @@ open import CategoricalCrypto.Channel.Core public
 open import CategoricalCrypto.Channel.Selection public
 open import CategoricalCrypto.Channel.Category public
 open import CategoricalCrypto.Machine.Core public
+open import CategoricalCrypto.SFun
 open import CategoricalCrypto.Examples

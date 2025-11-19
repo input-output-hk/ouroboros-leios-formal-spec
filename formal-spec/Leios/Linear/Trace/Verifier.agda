@@ -95,7 +95,7 @@ module Defaults
   toRcvType : FFDT Out ⊎ BaseT Out ⊎ IOT In → Channel.inType ((FFD ⊗ BaseC) ⊗ ((IO ⊗ Adv) ᵀ))
   toRcvType (inj₁ i) = (ϵ ⊗R) ⊗R ↑ᵢ i
   toRcvType (inj₂ (inj₁ i)) = (L⊗ ϵ) ⊗R ↑ᵢ i
-  toRcvType (inj₂ (inj₂ i)) = L⊗ (ϵ ᵗ ⊗R) ᵗ ↑ᵢ i
+  toRcvType (inj₂ (inj₂ i)) = L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ i
 
   infix 0 _≈_ _≈¹_
 
