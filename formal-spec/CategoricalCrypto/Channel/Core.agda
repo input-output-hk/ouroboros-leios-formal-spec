@@ -14,11 +14,13 @@ data Mode : Type where
   Out : Mode
   In : Mode
 
+infixr 10 ¬ₘ_
+
 ¬ₘ_ : Fun₁ Mode
 ¬ₘ Out = In
 ¬ₘ In = Out
 
-¬ₘ-idempotent : ∀ {m} → ¬ₘ (¬ₘ m) ≡ m
+¬ₘ-idempotent : ∀ {m} → ¬ₘ ¬ₘ m ≡ m
 ¬ₘ-idempotent {Out} = refl
 ¬ₘ-idempotent {In} = refl
 
@@ -85,15 +87,30 @@ _⇒ₜ_ = ⇒-trans
 -- Forwarding and transposition --
 ----------------------------------
 
-⇒-double-negate : ∀ {m A} → A [ ¬ₘ (¬ₘ m) ]⇒[ m ] A
-⇒-double-negate {m} rewrite (¬ₘ-idempotent {m}) = ⇒-refl
+⇒-double-transpose-left : ∀ {m A} → A ᵀ ᵀ [ m ]⇒[ m ] A
+⇒-double-transpose-left {A = A} rewrite ᵀ-idempotent {A} = ⇒-refl
 
-⇒-transpose : ∀ {m A} → A [ m ]⇒[ ¬ₘ m ] A ᵀ
-⇒-transpose {Out} = id
-⇒-transpose {In} = id
+⇒-double-transpose-right : ∀ {m A} → A [ m ]⇒[ m ] A ᵀ ᵀ
+⇒-double-transpose-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-refl
 
-⇒-reduce : ∀ {m A} → A ᵀ [ ¬ₘ m ]⇒[ m ] A
-⇒-reduce = ⇒-transpose ⇒ₜ ⇒-double-negate
+⇒-double-negate-left : ∀ {m A} → A [ ¬ₘ ¬ₘ m ]⇒[ m ] A
+⇒-double-negate-left {m} rewrite (¬ₘ-idempotent {m}) = ⇒-refl
+
+⇒-double-negate-right : ∀ {m A} → A [ m ]⇒[ ¬ₘ ¬ₘ m ] A
+⇒-double-negate-right {m} rewrite (¬ₘ-idempotent {m}) = ⇒-refl
+
+⇒-negate-transpose-right : ∀ {m A} → A [ m ]⇒[ ¬ₘ m ] A ᵀ
+⇒-negate-transpose-right {Out} = id
+⇒-negate-transpose-right {In} = id
+
+⇒-negate-transpose-left : ∀ {m A} → A ᵀ [ ¬ₘ m ]⇒[ m ] A
+⇒-negate-transpose-left = ⇒-negate-transpose-right ⇒ₜ ⇒-double-negate-left
+
+⇒-transpose-left-negate-right : ∀ {m A} → A ᵀ [ m ]⇒[ ¬ₘ m ] A
+⇒-transpose-left-negate-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-negate-transpose-right {A = A ᵀ}
+
+⇒-negate-left-transpose-right : ∀ {m A} → A [ ¬ₘ m ]⇒[ m ] A ᵀ
+⇒-negate-left-transpose-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-negate-transpose-left {A = A ᵀ}
 
 -----------------------------------
 -- Tensorial product on Channels --
@@ -162,6 +179,9 @@ opaque
 
 ⊗-left-double-intro : ∀ {m A B C} → B [ m ]⇒[ m ] C → A ⊗ B [ m ]⇒[ m ] A ⊗ C
 ⊗-left-double-intro p = ⊗-sym ⇒ₜ ⊗-right-double-intro p ⇒ₜ ⊗-sym
+
+⊗-merge : ∀ {m m₁ A B C} → A [ m ]⇒[ m₁ ] C → B [ m ]⇒[ m₁ ] C → A ⊗ B [ m ]⇒[ m₁ ] C
+⊗-merge p q = ⊗-combine p q ⇒ₜ ⊗-fusion
 
 --------------------------------
 -- Additional Channel builder --

@@ -180,7 +180,7 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
 ```agda
   Ftch : let open LeiosState s in
        ───────────────────────────────────────────────────────────────────────────
-       s -⟦ L⊗ (ϵ ⊗R) ᵗ ↑ₒ FetchLdgI / just $ L⊗ (ϵ ⊗R) ᵗ ↑ᵢ FetchLdgO Ledger ⟧⇀ s
+       s -⟦ L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FetchLdgI / just $ L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ FetchLdgO Ledger ⟧⇀ s
 ```
 #### Base chain
 
@@ -190,7 +190,7 @@ Note: Submitted data to the base chain is only taken into account
 ```agda
   Base₁   :
           ───────────────────────────────────────────────────────────────────────────
-          s -⟦ L⊗ (ϵ ⊗R) ᵗ ↑ₒ SubmitTxs txs / nothing ⟧⇀ record s { ToPropose = txs }
+          s -⟦ L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ SubmitTxs txs / nothing ⟧⇀ record s { ToPropose = txs }
 ```
 ```agda
   Base₂   : let open LeiosState s
