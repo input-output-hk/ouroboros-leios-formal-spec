@@ -112,7 +112,7 @@ opaque
 
   ᵀ-endofunctor = record
     { F₀ = _ᵀ
-    ; F₁ = λ A⇒B → ⇒-transpose ⇒ₜ A⇒B ⇒ₜ ⇒-reduce
+    ; F₁ = λ A⇒B → ⇒-transpose-left-negate-right ⇒ₜ A⇒B ⇒ₜ ⇒-negate-left-transpose-right
     ; identity = λ where
         {m = Out} _ → refl
         {m = In } _ → refl
@@ -120,8 +120,8 @@ opaque
         {m = Out} _ → refl
         {m = In } _ → refl
     ; F-resp-≈ = λ where
-        f≈g {Out} → f≈g ∘ ⇒-transpose
-        f≈g {In } → f≈g ∘ ⇒-transpose
+        f≈g {Out} → f≈g ∘ ⇒-transpose-left-negate-right
+        f≈g {In } → f≈g ∘ ⇒-transpose-left-negate-right
     }
 
   ᵀ-strong-monoidal-functor = record
