@@ -30,13 +30,13 @@ Ms = ⨂ const {B = Participant} M
 data WithState_receive_return_newState_ : MachineType I (Ms ⊗ A) (List (Message × Participant)) where
 
   Send : WithState buffer
-         receive L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ ⨂⇒ p (SndMessage ms) -- p wants to send messages ms
-         return just $ L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ ⨂⇒ p Activate -- return control to p
+         receive L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ app (⨂⇒ p) (SndMessage ms) -- p wants to send messages ms
+         return just $ L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ app (⨂⇒ p) Activate -- return control to p
          newState (concatMap (λ m → tabulate (m ,_)) ms ++ buffer) -- buffer a copy of every message for every participant
 
   Deliver : WithState buffer₁ ++ (m , p) ∷ buffer₂ -- state decomposes appropriately
             receive L⊗ (L⊗ ϵ) ᵗ¹ ↑ₒ inj₁ (length buffer₁) -- adversary wants to deliver k-th message
-            return just $ L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ ⨂⇒ p (RcvMessage m) -- deliver it
+            return just $ L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ app (⨂⇒ p) (RcvMessage m) -- deliver it
             newState (buffer₁ ++ buffer₂) -- remove message
 
   Eavesdrop : WithState buffer₁ ++ x ∷ buffer₂ -- state decomposes appropriately
