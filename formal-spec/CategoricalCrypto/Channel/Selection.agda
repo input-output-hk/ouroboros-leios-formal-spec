@@ -5,7 +5,7 @@ module CategoricalCrypto.Channel.Selection where
 
 open import CategoricalCrypto.Channel.Core
 open import Relation.Nullary
-open import Meta.Prelude hiding (A ; B ; C)
+open import Meta.Prelude
 open import Meta.Init
 open import Data.Sum hiding (reduce)
 open import Data.List renaming (map to mapₗ)
@@ -54,8 +54,6 @@ instance _ = Functor-M ⦃ Class.Monad.Monad-TC ⦄
   ensureNoMetas holeType'
   let (args , holeType) = stripPis holeType'
   inContext args $ do
-    debugLog ("Initial hole type: " ∷ᵈ holeType' ∷ᵈ [])
-    debugLog ("Stripped hole type: " ∷ᵈ holeType ∷ᵈ [])
     quote _[_]⇒[_]_ ∙⟦ A ∣ m ∣ m' ∣ B ⟧ ← return holeType
       where _ → error ("Bad type shape: " ∷ᵈ holeType ∷ᵈ [])
     debugLog ("Attempting to find a solution for problem " ∷ᵈ holeType ∷ᵈ [])
