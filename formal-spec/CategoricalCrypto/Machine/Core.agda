@@ -43,8 +43,8 @@ module _ {A B : Channel} (let open Channel (A ⊗ᵀ B)) where
   
   StatelessMachine      R   = MkMachine {State = ⊤} $ λ _ i o _ → R i o
   FunctionMachine       f   = StatelessMachine      $ λ i → f i ≡_
-  TotalFunctionMachine  p   = FunctionMachine       $ just P.∘ p
-  TotalFunctionMachine' p q = TotalFunctionMachine  $ ⊗-combine {In} {Out} p q ⇒ₜ ⊗-sym
+  TotalFunctionMachine  p   = FunctionMachine       $ just P.∘ app p
+  TotalFunctionMachine' p q = TotalFunctionMachine  $ ⊗-combine {In} {Out} (p ⇒ₜ ⇒-negate-transpose-right) (⇒-transpose-left-negate-right ⇒ₜ q) ⇒ₜ ⊗-sym
   -- TotalFunctionMachine' forces all messages to go 'through' the machine, i.e.
   -- messages on the domain become messages on the codomain and vice versa if
   -- e.g. A ≡ B then it's easy to accidentally send a message the wrong way
@@ -55,7 +55,7 @@ id = TotalFunctionMachine' ⇒-solver ⇒-solver
 
 -- given transformation on the channels, transform the machine
 modifyStepRel : ∀ {A B C D} → (∀ {m} → C ⊗ D ᵀ [ m ]⇒[ m ] A ⊗ B ᵀ) → Machine A B → Machine C D
-modifyStepRel p (MkMachine stepRel) = MkMachine $ \s m m' s' → stepRel s (p {In} m) (p {Out} <$> m') s'
+modifyStepRel p (MkMachine stepRel) = MkMachine $ \s m m' s' → stepRel s (app {m₁ = In} p m) (app {m₁ = Out} p <$> m') s'
 
 module Tensor {A B C D} (M₁ : Machine A B) (M₂ : Machine C D) where
   open Machine M₁ renaming (State to State₁; stepRel to stepRel₁; machine-channel to machine-channel₁)
