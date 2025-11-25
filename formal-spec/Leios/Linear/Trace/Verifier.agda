@@ -53,40 +53,35 @@ module Defaults
   open LeiosState
 
   getAction : ∀ {i o} → s -⟦ i / o ⟧⇀ s′ → Action
-  getAction (Slot₁ {s} _)                      = Slot₁-Action (slot s)
-  getAction (Slot₂ {s})                        = Slot₂-Action (slot s)
-  getAction (Ftch {s})                         = Ftch-Action (slot s)
-  getAction (Base₁ {s})                        = Base₁-Action (slot s)
-  getAction (Base₂ {s} _)                      = Base₂-Action (slot s)
+  getAction (Slot₁ {s} _)                                      = Slot₁-Action (slot s)
+  getAction (Slot₂ {s})                                        = Slot₂-Action (slot s)
+  getAction (Ftch {s})                                         = Ftch-Action (slot s)
+  getAction (Base₁ {s})                                        = Base₁-Action (slot s)
+  getAction (Base₂ {s} _)                                      = Base₂-Action (slot s)
+  getAction (Roles₁ (EB-Role {s} {eb = eb} _))                 = EB-Role-Action (slot s) eb
   getAction (Roles₁ (VT-Role {s} {eb = eb} {slot' = slot'} _)) = VT-Role-Action (slot s) eb slot'
-  getAction (Roles₁ (EB-Role {s} {eb = eb} _)) = EB-Role-Action (slot s) eb
-  getAction (Roles₂ {u = Base} (_ , _ , x))    = ⊥-elim (x refl)
-  getAction (Roles₂ {s} {u = EB-Role} _)       = No-EB-Role-Action (slot s)
-  getAction (Roles₂ {s} {u = VT-Role} _)       = No-VT-Role-Action (slot s)
+  getAction (Roles₂ {u = Base} (_ , _ , x))                    = ⊥-elim (x refl) -- Roles₂ excludes the Base role
+  getAction (Roles₂ {s} {u = EB-Role} _)                       = No-EB-Role-Action (slot s)
+  getAction (Roles₂ {s} {u = VT-Role} _)                       = No-VT-Role-Action (slot s)
 
   getSlot : Action → ℕ
-  getSlot (EB-Role-Action x _) = x
+  getSlot (EB-Role-Action x _)   = x
   getSlot (VT-Role-Action x _ _) = x
-  getSlot (No-EB-Role-Action x) = x
-  getSlot (No-VT-Role-Action x) = x
-  getSlot (Ftch-Action x) = x
-  getSlot (Slot₁-Action x) = x
-  getSlot (Slot₂-Action x) = x
-  getSlot (Base₁-Action x) = x
-  getSlot (Base₂-Action x) = x
+  getSlot (No-EB-Role-Action x)  = x
+  getSlot (No-VT-Role-Action x)  = x
+  getSlot (Ftch-Action x)        = x
+  getSlot (Slot₁-Action x)       = x
+  getSlot (Slot₂-Action x)       = x
+  getSlot (Base₁-Action x)       = x
+  getSlot (Base₂-Action x)       = x
 
 
   data Err-verifyAction (σ : Action) (i : FFDT Out ⊎ BaseT Out ⊎ IOT In) (s : LeiosState) : Type where
     Err-Slot : getSlot σ ≢ slot s → Err-verifyAction σ i s
-
-    Err-EB-Role-premises : ∀ {π} →
-      ¬ (toProposeEB s π ≡ just eb × canProduceEB (slot s) sk-EB (stake s) π) →
-      Err-verifyAction σ i s
-
+    Err-EB-Role-premises : ∀ {π} → ¬ (toProposeEB s π ≡ just eb × canProduceEB (slot s) sk-EB (stake s) π) → Err-verifyAction σ i s
+    -- TODO: Err-VT-Role-premises
     Err-AllDone : ¬ (allDone s) → Err-verifyAction σ i s
-
     Err-BaseUpkeep : ¬ (needsUpkeep s Base) → Err-verifyAction σ i s
-
     dummyErr : Err-verifyAction σ i s
 
   -- NOTE: this goes backwards, from the current state to the initial state
@@ -216,49 +211,50 @@ module Defaults
   ... | no ¬p = Err (Err-EB-Role-premises ¬p)
   verifyStep' (EB-Role-Action _ _) (inj₁ FTCH) _ _        = Err dummyErr
   verifyStep' (EB-Role-Action _ _) (inj₁ (FFD-OUT _)) _ _ = Err dummyErr
+  verifyStep' (EB-Role-Action _ _) (inj₂ _) _ _           = Err dummyErr
   verifyStep' (VT-Role-Action .(slot s) eb slot') (inj₁ SLOT) s refl
     with ¿ VT-Role-premises {s = s} {eb = eb} {ebHash = hash eb} {slot' = slot'} .proj₁ ¿
   ... | yes p = Ok' (Roles₁ (VT-Role {ebHash = hash eb} {slot' = slot'} p))
   ... | no ¬p = Err dummyErr -- FIXME: Err-VT-Role-premises
   verifyStep' (VT-Role-Action _ _ _) (inj₁ FTCH) _ _        = Err dummyErr
   verifyStep' (VT-Role-Action _ _ _) (inj₁ (FFD-OUT _)) _ _ = Err dummyErr
-  verifyStep' (VT-Role-Action _ _ _) (inj₂ _) _ refl        = Err dummyErr
+  verifyStep' (VT-Role-Action _ _ _) (inj₂ _) _ _           = Err dummyErr
 
   -- This has a different IO pattern, not sure if we want to model that here
   -- For now we'll just fail
-  verifyStep' (Ftch-Action n) _ _ _ = Err dummyErr
+  verifyStep' (Ftch-Action _) _ _ _ = Err dummyErr
 
-  verifyStep' (Slot₁-Action n) (inj₁ SLOT) _ _ = Err dummyErr
-  verifyStep' (Slot₁-Action n) (inj₁ FTCH) _ _ = Err dummyErr
-  verifyStep' (Slot₁-Action n) (inj₁ (FFD-OUT msgs)) s refl
+  verifyStep' (Slot₁-Action _) (inj₁ SLOT) _ _ = Err dummyErr
+  verifyStep' (Slot₁-Action _) (inj₁ FTCH) _ _ = Err dummyErr
+  verifyStep' (Slot₁-Action _) (inj₁ (FFD-OUT msgs)) s refl
     with ¿ Slot₁-premises {s = s} .proj₁ ¿
   ... | yes p = Ok' (Slot₁ {s = s} {msgs = msgs} p)
   ... | no ¬p = Err (Err-AllDone ¬p)
-  verifyStep' (Slot₂-Action n) (inj₁ _) _ _ = Err dummyErr
-  verifyStep' (Slot₂-Action n) (inj₂ (inj₁ (BASE-LDG rbs))) s refl = Ok' Slot₂
-  verifyStep' (Slot₂-Action n) (inj₂ (inj₂ y)) s refl = Err dummyErr
+  verifyStep' (Slot₁-Action _) (inj₂ _) _ _        = Err dummyErr
+  verifyStep' (Slot₂-Action _) (inj₁ _) _ _        = Err dummyErr
+  verifyStep' (Slot₂-Action _) (inj₂ (inj₂ _)) _ _ = Err dummyErr
+  verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (BASE-LDG rbs))) s refl = Ok' Slot₂
 
   -- Different IO pattern again
-  verifyStep' (Base₁-Action n) (inj₂ (inj₂ (SubmitTxs txs))) s refl = Ok' Base₁
-  verifyStep' (Base₂-Action n) (inj₁ SLOT) s refl
+  verifyStep' (Base₁-Action _) (inj₁ _) _ _                = Err dummyErr
+  verifyStep' (Base₁-Action _) (inj₂ (inj₁ _)) _ _         = Err dummyErr
+  verifyStep' (Base₁-Action _) (inj₂ (inj₂ FetchLdgI)) _ _ = Err dummyErr
+  verifyStep' (Base₁-Action _) (inj₂ (inj₂ (SubmitTxs _))) _ refl = Ok' Base₁
+  verifyStep' (Base₂-Action _) (inj₁ SLOT) s refl
     with ¿ Base₂-premises {s = s} .proj₁ ¿
   ... | yes p = Ok' (Base₂ p)
   ... | no ¬p = Err (Err-BaseUpkeep ¬p)
-  verifyStep' (Base₂-Action n) _ s refl = Err dummyErr
-  verifyStep' (No-EB-Role-Action n) (inj₁ SLOT) s refl
+  verifyStep' (Base₂-Action _) _ _ _ = Err dummyErr
+  verifyStep' (No-EB-Role-Action _) (inj₁ SLOT) s refl
     with ¿ Roles₂-premises {s = s} {u = EB-Role} .proj₁ ¿
   ... | yes p = Ok' (Roles₂ p)
-  ... | no ¬p = Err dummyErr
-  verifyStep' (No-EB-Role-Action n) _ s refl = Err dummyErr
-  verifyStep' (No-VT-Role-Action n) (inj₁ SLOT) s refl
+  ... | no ¬p = Err dummyErr -- FIXME: specific error message
+  verifyStep' (No-EB-Role-Action _) _ _ _ = Err dummyErr
+  verifyStep' (No-VT-Role-Action _) (inj₁ SLOT) s refl
     with ¿ Roles₂-premises {s = s} {u = VT-Role} .proj₁ ¿
   ... | yes p = Ok' (Roles₂ p)
-  ... | no ¬p = Err dummyErr
-  verifyStep' (No-VT-Role-Action n) _ s refl               = Err dummyErr
-  verifyStep' (EB-Role-Action .(slot s) x) (inj₂ y) s refl = Err dummyErr
-  verifyStep' (Slot₁-Action x₁) (inj₂ y) s x               = Err dummyErr
-  verifyStep' (Base₁-Action .(slot s)) (inj₁ x) s refl     = Err dummyErr
-  verifyStep' (Base₁-Action .(slot s)) (inj₂ y) s refl     = Err dummyErr
+  ... | no ¬p = Err dummyErr -- FIXME: specific error message
+  verifyStep' (No-VT-Role-Action _) _ _ _ = Err dummyErr
 
   verifyStep : (a : Action) → (i : FFDT Out ⊎ BaseT Out ⊎ IOT In) → (s : LeiosState) → Result (Err-verifyAction a i s) (ValidStep (a , i) s)
   verifyStep a i s = case getSlot a ≟ slot s of λ where
