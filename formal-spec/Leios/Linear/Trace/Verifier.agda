@@ -50,19 +50,17 @@ module Defaults
     i    : FFDT Out ⊎ BaseT Out ⊎ IOT In
     o    : FFDT In
 
-  open LeiosState
-
   getAction : ∀ {i o} → s -⟦ i / o ⟧⇀ s′ → Action
-  getAction (Slot₁ {s} _)                                      = Slot₁-Action (slot s)
-  getAction (Slot₂ {s})                                        = Slot₂-Action (slot s)
-  getAction (Ftch {s})                                         = Ftch-Action (slot s)
-  getAction (Base₁ {s})                                        = Base₁-Action (slot s)
-  getAction (Base₂ {s} _)                                      = Base₂-Action (slot s)
-  getAction (Roles₁ (EB-Role {s} {eb = eb} _))                 = EB-Role-Action (slot s) eb
-  getAction (Roles₁ (VT-Role {s} {eb = eb} {slot' = slot'} _)) = VT-Role-Action (slot s) eb slot'
+  getAction (Slot₁ {s} _)                                      = Slot₁-Action (LeiosState.slot s)
+  getAction (Slot₂ {s})                                        = Slot₂-Action (LeiosState.slot s)
+  getAction (Ftch {s})                                         = Ftch-Action (LeiosState.slot s)
+  getAction (Base₁ {s})                                        = Base₁-Action (LeiosState.slot s)
+  getAction (Base₂ {s} _)                                      = Base₂-Action (LeiosState.slot s)
+  getAction (Roles₁ (EB-Role {s} {eb = eb} _))                 = EB-Role-Action (LeiosState.slot s) eb
+  getAction (Roles₁ (VT-Role {s} {eb = eb} {slot' = slot'} _)) = VT-Role-Action (LeiosState.slot s) eb slot'
   getAction (Roles₂ {u = Base} (_ , _ , x))                    = ⊥-elim (x refl) -- Roles₂ excludes the Base role
-  getAction (Roles₂ {s} {u = EB-Role} _)                       = No-EB-Role-Action (slot s)
-  getAction (Roles₂ {s} {u = VT-Role} _)                       = No-VT-Role-Action (slot s)
+  getAction (Roles₂ {s} {u = EB-Role} _)                       = No-EB-Role-Action (LeiosState.slot s)
+  getAction (Roles₂ {s} {u = VT-Role} _)                       = No-VT-Role-Action (LeiosState.slot s)
 
   getSlot : Action → ℕ
   getSlot (EB-Role-Action x _)   = x
@@ -74,15 +72,6 @@ module Defaults
   getSlot (Slot₂-Action x)       = x
   getSlot (Base₁-Action x)       = x
   getSlot (Base₂-Action x)       = x
-
-
-  data Err-verifyAction (σ : Action) (i : FFDT Out ⊎ BaseT Out ⊎ IOT In) (s : LeiosState) : Type where
-    Err-Slot : getSlot σ ≢ slot s → Err-verifyAction σ i s
-    Err-EB-Role-premises : ∀ {π} → ¬ (toProposeEB s π ≡ just eb × canProduceEB (slot s) sk-EB (stake s) π) → Err-verifyAction σ i s
-    -- TODO: Err-VT-Role-premises
-    Err-AllDone : ¬ (allDone s) → Err-verifyAction σ i s
-    Err-BaseUpkeep : ¬ (needsUpkeep s Base) → Err-verifyAction σ i s
-    Err-Invalid : Err-verifyAction σ i s -- TODO: drop generic constructor
 
   -- NOTE: this goes backwards, from the current state to the initial state
   data _—→_ : LeiosState → LeiosState → Type where
@@ -128,12 +117,38 @@ module Defaults
   getNewState : ∀ {es s} → ValidTrace es s → LeiosState
   getNewState (Valid {s′ = s} _ _) = s
 
+  -- Errors that occur when verifying a step
+  data Err-verifyStep (σ : Action) (i : FFDT Out ⊎ BaseT Out ⊎ IOT In) (s : LeiosState) : Type where
+    Err-Slot : getSlot σ ≢ LeiosState.slot s → Err-verifyStep σ i s
+    Err-EB-Role-premises : ∀ {π} → ¬ (
+      toProposeEB s π ≡ just eb ×
+      canProduceEB (LeiosState.slot s) sk-EB (stake s) π) →
+      Err-verifyStep σ i s
+    Err-VT-Role-premises : ∀ {ebHash slot'} → let open LeiosState s in ¬ (
+      getCurrentEBHash s ≡ just ebHash ×
+      find (λ (_ , eb') → hash eb' ≟ ebHash) EBs' ≡ just (slot' , eb) ×
+      hash eb ∉ VotedEBs ×
+      ¬ isEquivocated s eb ×
+      isValid s (inj₁ (ebHeader eb)) ×
+      slot' ≤ slotNumber eb + Lhdr ×
+      slotNumber eb + 3 * Lhdr ≤ slot ×
+      slot ≡ slotNumber eb + validityCheckTime eb ×
+      validityCheckTime eb ≤ 3 * Lhdr + Lvote ×
+      EndorserBlockOSig.txs eb ≢ [] ×
+      needsUpkeep VT-Role ×
+      canProduceV (slotNumber eb) sk-VT (stake s)) →
+      Err-verifyStep σ i s
+    Err-AllDone : ¬ (allDone s) → Err-verifyStep σ i s
+    Err-BaseUpkeep : ¬ (LeiosState.needsUpkeep s Base) → Err-verifyStep σ i s
+    Err-Invalid : Err-verifyStep σ i s -- TODO: drop generic constructor
+
+  -- Errors when verifying a trace
   data Err-verifyTrace : TestTrace → LeiosState → Type where
-    Err-StepOk   : Err-verifyTrace σs s → Err-verifyTrace ((σ , i) ∷ σs) s
-    Err-Action   : Err-verifyAction σ i s′ → Err-verifyTrace ((σ , i) ∷ σs) s
+    Err-StepOk : Err-verifyTrace σs s → Err-verifyTrace ((σ , i) ∷ σs) s
+    Err-Step   : Err-verifyStep σ i s′ → Err-verifyTrace ((σ , i) ∷ σs) s
 
   Ok' : ∀ {s i o s′} → (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
-      → Result (Err-verifyAction (getAction σ) i s) (ValidStep (getAction σ , i) s)
+      → Result (Err-verifyStep (getAction σ) i s) (ValidStep (getAction σ , i) s)
   Ok' a = Ok (Valid _ (FromAction _ a))
 
   just≢nothing : ∀ {ℓ} {A : Type ℓ} {x} → (Maybe A ∋ just x) ≡ nothing → ⊥
@@ -203,8 +218,8 @@ module Defaults
 
   verifyStep' : (a : Action) →
     (i : FFDT Out ⊎ BaseT Out ⊎ IOT In) →
-    (s : LeiosState) → getSlot a ≡ slot s →
-    Result (Err-verifyAction a i s) (ValidStep (a , i) s)
+    (s : LeiosState) → getSlot a ≡ LeiosState.slot s →
+    Result (Err-verifyStep a i s) (ValidStep (a , i) s)
   verifyStep' (EB-Role-Action n ebs) (inj₁ SLOT) s refl
     with ¿ EB-Role-premises {s = s} .proj₁ ¿
   ... | yes p = Ok' (Roles₁ (EB-Role p))
@@ -212,10 +227,10 @@ module Defaults
   verifyStep' (EB-Role-Action _ _) (inj₁ FTCH) _ _        = Err Err-Invalid
   verifyStep' (EB-Role-Action _ _) (inj₁ (FFD-OUT _)) _ _ = Err Err-Invalid
   verifyStep' (EB-Role-Action _ _) (inj₂ _) _ _           = Err Err-Invalid
-  verifyStep' (VT-Role-Action .(slot s) eb slot') (inj₁ SLOT) s refl
+  verifyStep' (VT-Role-Action _ eb slot') (inj₁ SLOT) s refl
     with ¿ VT-Role-premises {s = s} {eb = eb} {ebHash = hash eb} {slot' = slot'} .proj₁ ¿
   ... | yes p = Ok' (Roles₁ (VT-Role {ebHash = hash eb} {slot' = slot'} p))
-  ... | no ¬p = Err Err-Invalid -- FIXME: Err-VT-Role-premises
+  ... | no ¬p = Err (Err-VT-Role-premises ¬p)
   verifyStep' (VT-Role-Action _ _ _) (inj₁ FTCH) _ _        = Err Err-Invalid
   verifyStep' (VT-Role-Action _ _ _) (inj₁ (FFD-OUT _)) _ _ = Err Err-Invalid
   verifyStep' (VT-Role-Action _ _ _) (inj₂ _) _ _           = Err Err-Invalid
@@ -244,20 +259,26 @@ module Defaults
     with ¿ Base₂-premises {s = s} .proj₁ ¿
   ... | yes p = Ok' (Base₂ p)
   ... | no ¬p = Err (Err-BaseUpkeep ¬p)
-  verifyStep' (Base₂-Action _) _ _ _ = Err Err-Invalid
+  verifyStep' (Base₂-Action _) (inj₁ FTCH) _ _        = Err Err-Invalid
+  verifyStep' (Base₂-Action _) (inj₁ (FFD-OUT _)) _ _ = Err Err-Invalid
+  verifyStep' (Base₂-Action _) (inj₂ _) _ _           = Err Err-Invalid
   verifyStep' (No-EB-Role-Action _) (inj₁ SLOT) s refl
     with ¿ Roles₂-premises {s = s} {u = EB-Role} .proj₁ ¿
   ... | yes p = Ok' (Roles₂ p)
   ... | no ¬p = Err Err-Invalid -- FIXME: specific error message
-  verifyStep' (No-EB-Role-Action _) _ _ _ = Err Err-Invalid
+  verifyStep' (No-EB-Role-Action _) (inj₁ FTCH) _ _        = Err Err-Invalid
+  verifyStep' (No-EB-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Err Err-Invalid
+  verifyStep' (No-EB-Role-Action _) (inj₂ _) _ _           = Err Err-Invalid
   verifyStep' (No-VT-Role-Action _) (inj₁ SLOT) s refl
     with ¿ Roles₂-premises {s = s} {u = VT-Role} .proj₁ ¿
   ... | yes p = Ok' (Roles₂ p)
   ... | no ¬p = Err Err-Invalid -- FIXME: specific error message
-  verifyStep' (No-VT-Role-Action _) _ _ _ = Err Err-Invalid
+  verifyStep' (No-VT-Role-Action _) (inj₁ FTCH) _ _        = Err Err-Invalid
+  verifyStep' (No-VT-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Err Err-Invalid
+  verifyStep' (No-VT-Role-Action _) (inj₂ _) _ _           = Err Err-Invalid
 
-  verifyStep : (a : Action) → (i : FFDT Out ⊎ BaseT Out ⊎ IOT In) → (s : LeiosState) → Result (Err-verifyAction a i s) (ValidStep (a , i) s)
-  verifyStep a i s = case getSlot a ≟ slot s of λ where
+  verifyStep : (a : Action) → (i : FFDT Out ⊎ BaseT Out ⊎ IOT In) → (s : LeiosState) → Result (Err-verifyStep a i s) (ValidStep (a , i) s)
+  verifyStep a i s = case getSlot a ≟ LeiosState.slot s of λ where
     (yes p) → verifyStep' a i s p
     (no ¬p) → Err (Err-Slot λ p → ⊥-elim (¬p p))
 
@@ -265,7 +286,7 @@ module Defaults
   verifyTrace [] s = Ok (Valid (s ∎) Done)
   verifyTrace ((a , i) ∷ σs) s = do
     σs ← mapErr Err-StepOk (verifyTrace σs s)
-    x  ← mapErr Err-Action (verifyStep a i (getNewState σs))
+    x  ← mapErr Err-Step (verifyStep a i (getNewState σs))
     return (σs Valid∷ʳ x)
     where
       open Monad-Result
