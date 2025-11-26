@@ -1,3 +1,6 @@
+## Linear Leios Trace Verifier
+
+```agda
 open import Leios.Prelude hiding (id; _>>=_; return; _⊗_)
 open import Leios.Config
 open import Leios.SpecStructure using (SpecStructure)
@@ -154,6 +157,9 @@ module Defaults
       → Result (Err-verifyStep (getAction σ) i s) (ValidStep (getAction σ , i) s)
   Ok' a = Ok (Valid _ (FromAction _ a))
 
+```
+<!--
+```agda
   -- TODO: Move code related to Roles₂-promises into a separate module `Leios.Linear.Premises`
   just≢nothing : ∀ {ℓ} {A : Type ℓ} {x} → (Maybe A ∋ just x) ≡ nothing → ⊥
   just≢nothing = λ ()
@@ -219,7 +225,9 @@ module Defaults
 
   open import Prelude.STS.GenPremises
   unquoteDecl Roles₂-premises = genPremises Roles₂-premises (quote Roles₂)
-
+```
+-->
+```agda
   verifyStep' : (a : Action) →
     (i : FFDT Out ⊎ BaseT Out ⊎ IOT In) →
     (s : LeiosState) → getSlot a ≡ LeiosState.slot s →
@@ -296,3 +304,4 @@ module Defaults
       open Monad-Result
       _Valid∷ʳ_ : ∀ {e es s} → (σs : ValidTrace es s) → ValidStep e (getNewState σs) → ValidTrace (e ∷ es) s
       Valid tr x Valid∷ʳ Valid (ActionStep as) (FromAction a _) = Valid (_ —→⟨ ActionStep as ⟩ tr) (FromAction a x as)
+```
