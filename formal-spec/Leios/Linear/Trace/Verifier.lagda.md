@@ -15,8 +15,8 @@ open import Data.Product.Properties
 ```
 -->
 ```agda
-module Leios.Linear.Trace.Verifier
-  (params : Params) (⋯ : SpecStructure 1) (let open SpecStructure ⋯)
+module Leios.Linear.Trace.Verifier (⋯ : SpecStructure 1) (let open SpecStructure ⋯)
+  (params : Params)
   (Lhdr Lvote Ldiff : ℕ)
   (splitTxs : List Tx → List Tx × List Tx)
   (validityCheckTime : EndorserBlock → ℕ)

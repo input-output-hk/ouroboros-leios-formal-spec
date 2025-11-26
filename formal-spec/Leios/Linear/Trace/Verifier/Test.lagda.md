@@ -51,7 +51,7 @@ module _ where
     validityCheckTime eb = 6
 
     open Params params
-    open import Leios.Linear.Trace.Verifier params d-SpecStructure Lhdr Lvote Ldiff splitTxs validityCheckTime
+    open import Leios.Linear.Trace.Verifier d-SpecStructure params Lhdr Lvote Ldiff splitTxs validityCheckTime
     open GenFFD
     open Types params
 
