@@ -213,7 +213,8 @@ Errors when verifying a trace
   instance
     Dec-↝ : ∀ {s u} → (∃[ s'×i ] (s ↝ s'×i × (u ∷ LeiosState.Upkeep s) ≡ LeiosState.Upkeep (proj₁ s'×i))) ⁇
     Dec-↝ {s} {EB-Role} .dec
-      with toProposeEB s _ in eq₁
+      with toProposeEB s _ in eq₁ -- with Leios.Defaults, VrfPF = ⊤ and therefore π = tt can be inferred.
+                                  -- TODO: generic case, see module parameters
     ... | nothing = no λ where (_ , EB-Role (p , _) , _) → nothing≢just (trans (sym eq₁) p)
     ... | just eb
       with ¿ canProduceEB (LeiosState.slot s) sk-EB (stake s) _ ¿
