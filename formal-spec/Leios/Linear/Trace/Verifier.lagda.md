@@ -1,5 +1,5 @@
 ## Linear Leios Trace Verifier
-
+<!--
 ```agda
 open import Leios.Prelude hiding (id; _>>=_; return; _⊗_)
 open import Leios.Config
@@ -13,6 +13,7 @@ open import Data.List.Properties
 open import Data.Maybe.Properties
 open import Data.Product.Properties
 ```
+-->
 ```agda
 module Leios.Linear.Trace.Verifier (params : Params) where
 
@@ -33,7 +34,7 @@ module Defaults
   open GenFFD
   open Types params
 ```
-### An `Action` provides input to the relational semantics
+An `Action` provides input to the relational semantics
 ```agda
   data Action : Type where
     EB-Role-Action    : ℕ → EndorserBlock → Action
@@ -46,7 +47,7 @@ module Defaults
     No-EB-Role-Action : ℕ → Action
     No-VT-Role-Action : ℕ → Action
 ```
-### A `TestTrace` is a list of actions togther with channels related to the other functionalities
+A `TestTrace` is a list of actions togther with channels related to the other functionalities
 ```agda
   TestTrace = List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
 ```
@@ -131,7 +132,8 @@ NOTE: this goes backwards, from the current state to the initial state
   data ValidTrace (es : TestTrace) (s : LeiosState) : Type where
     Valid : (tr : s′ —↠ s) → es ≈ tr → ValidTrace es s
 ```
-### Errors that occur when verifying a step
+### Error handling
+Errors that occur when verifying a step
 ```agda
   getNewState : ∀ {es s} → ValidTrace es s → LeiosState
   getNewState (Valid {s′ = s} _ _) = s
@@ -160,7 +162,7 @@ NOTE: this goes backwards, from the current state to the initial state
     Err-BaseUpkeep : ¬ (LeiosState.needsUpkeep s Base) → Err-verifyStep σ i s
     Err-Invalid : Err-verifyStep σ i s -- TODO: drop generic constructor
 ```
-### Errors when verifying a trace
+Errors when verifying a trace
 ```agda
   data Err-verifyTrace : TestTrace → LeiosState → Type where
     Err-StepOk : Err-verifyTrace σs s → Err-verifyTrace ((σ , i) ∷ σs) s
