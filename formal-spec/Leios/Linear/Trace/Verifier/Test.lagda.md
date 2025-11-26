@@ -5,7 +5,9 @@ open import Prelude.Result
 open import Leios.Prelude hiding (id)
 open import Leios.Config
 open import Leios.SpecStructure using (SpecStructure)
-
+```
+-->
+```agda
 module Leios.Linear.Trace.Verifier.Test where
 ```
 ```agda
