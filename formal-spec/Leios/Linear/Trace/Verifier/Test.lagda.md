@@ -41,8 +41,9 @@ module _ where
     Lvote = 2
     Ldiff = 0
 
-    open import Leios.Defaults params using (d-SpecStructure; isb; hpe)
-    open SpecStructure d-SpecStructure hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified)
+    -- TODO: why does Hashable-EndorserBlock not work instead of hpe...?
+    open import Leios.Defaults params using (d-SpecStructure; hpe)
+    open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 
     splitTxs : List Tx → List Tx × List Tx
     splitTxs l = [] , l
