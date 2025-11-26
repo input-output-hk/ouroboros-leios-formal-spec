@@ -4,6 +4,7 @@ open import Leios.SpecStructure using (SpecStructure)
 
 open import Prelude.Result
 open import CategoricalCrypto hiding (id; _∘_)
+open import CategoricalCrypto.Channel.Selection
 
 open import Data.List.Properties
 open import Data.Maybe.Properties
@@ -27,6 +28,7 @@ module Defaults
   open GenFFD
   open Types params
 
+  -- An `Action` provides input to the relational semantics
   data Action : Type where
     EB-Role-Action    : ℕ → EndorserBlock → Action
     VT-Role-Action    : ℕ → EndorserBlock → ℕ → Action
@@ -38,6 +40,7 @@ module Defaults
     No-EB-Role-Action : ℕ → Action
     No-VT-Role-Action : ℕ → Action
 
+  -- A `TestTrace` is a list of actions togther with channels related to the other functionalities
   TestTrace = List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
 
   private variable
@@ -59,7 +62,7 @@ module Defaults
   getAction (Base₂ {s} _)                                      = Base₂-Action (LeiosState.slot s)
   getAction (Roles₁ (EB-Role {s} {eb = eb} _))                 = EB-Role-Action (LeiosState.slot s) eb
   getAction (Roles₁ (VT-Role {s} {eb = eb} {slot' = slot'} _)) = VT-Role-Action (LeiosState.slot s) eb slot'
-  getAction (Roles₂ {u = Base} (_ , _ , x))                    = ⊥-elim (x refl) -- Roles₂ excludes the Base role
+  getAction (Roles₂ {u = Base} (_ , _ , x))                    = ⊥-elim (x refl) -- Roles₂ excludes the `Base` role
   getAction (Roles₂ {s} {u = EB-Role} _)                       = No-EB-Role-Action (LeiosState.slot s)
   getAction (Roles₂ {s} {u = VT-Role} _)                       = No-VT-Role-Action (LeiosState.slot s)
 
@@ -83,7 +86,6 @@ module Defaults
         s′ —→ s
 
   open import Prelude.Closures _—→_
-  open import CategoricalCrypto.Channel.Selection
 
   toRcvType : FFDT Out ⊎ BaseT Out ⊎ IOT In → Channel.inType ((FFD ⊗ BaseC) ⊗ ((IO ⊗ Adv) ᵀ))
   toRcvType (inj₁ i) = (ϵ ⊗R) ⊗R ↑ᵢ i
