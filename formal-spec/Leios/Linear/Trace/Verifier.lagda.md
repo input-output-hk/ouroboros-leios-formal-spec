@@ -23,7 +23,6 @@ module Leios.Linear.Trace.Verifier
   where
 
 open import Leios.Linear ⋯ params Lhdr Lvote Ldiff splitTxs validityCheckTime public
-open import Leios.Linear.Premises ⋯ params Lhdr Lvote Ldiff splitTxs validityCheckTime
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
 open Types params
