@@ -41,9 +41,8 @@ module _ where
     Lvote = 2
     Ldiff = 0
 
-    open Params params
-    open import Leios.Linear.Trace.Verifier params
-    open GenFFD
+    open import Leios.Defaults params using (d-SpecStructure; isb; hpe)
+    open SpecStructure d-SpecStructure hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified)
 
     splitTxs : List Tx → List Tx × List Tx
     splitTxs l = [] , l
@@ -51,7 +50,9 @@ module _ where
     validityCheckTime : EndorserBlock → ℕ
     validityCheckTime eb = 6
 
-    open Defaults Lhdr Lvote Ldiff splitTxs validityCheckTime
+    open Params params
+    open import Leios.Linear.Trace.Verifier params d-SpecStructure Lhdr Lvote Ldiff splitTxs validityCheckTime
+    open GenFFD
     open Types params
 
     opaque
