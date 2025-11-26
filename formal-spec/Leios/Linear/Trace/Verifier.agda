@@ -11,6 +11,7 @@ open import Data.Product.Properties
 
 module Leios.Linear.Trace.Verifier (params : Params) where
 
+-- TODO: Use module parameters, do not depend on `Leios.Defaults`
 -- SpecStructure is not a module parameter, as the type for VrfPf needs to be known
 open import Leios.Defaults params using (d-SpecStructure; isb; hpe) public
 open SpecStructure d-SpecStructure hiding (Hashable-IBHeader; Hashable-EndorserBlock; isVoteCertified) public
@@ -151,6 +152,7 @@ module Defaults
       → Result (Err-verifyStep (getAction σ) i s) (ValidStep (getAction σ , i) s)
   Ok' a = Ok (Valid _ (FromAction _ a))
 
+  -- TODO: Move code related to Roles₂-promises into a separate module `Leios.Linear.Premises`
   just≢nothing : ∀ {ℓ} {A : Type ℓ} {x} → (Maybe A ∋ just x) ≡ nothing → ⊥
   just≢nothing = λ ()
 
