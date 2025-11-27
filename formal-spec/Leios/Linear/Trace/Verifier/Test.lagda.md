@@ -73,24 +73,33 @@ For the test trace, we rely on the implementation provided in `Leios.Defaults`.
     unfolding isValid?
 ```
 -->
-Starting at slot 100
+EndorserBlocks that will be used in the test trace
 ```agda
     eb₀ eb₁ eb₂ : EndorserBlock
     eb₀ = mkEB 102 id tt (EB , tt) (3 ∷ 4 ∷ 5 ∷ []) [] []
     eb₁ = mkEB 100 (fsuc fzero) tt (EB , tt) (6 ∷ []) [] []
     eb₂ = mkEB 100 id tt (EB , tt) (0 ∷ 1 ∷ 2 ∷ []) [] []
-
-    rb₀ rb₁ rb₂ : RankingBlock
-    rb₀ = record { txs = 3 ∷ 4 ∷ 5 ∷ [] ; announcedEB = nothing ; ebCert = nothing }
-    rb₁ = record { txs = [] ; announcedEB = just (hash eb₁) ; ebCert = nothing }
-    rb₂ = record { txs = [] ; announcedEB = nothing ; ebCert = just (6 ∷ []) }
-
+```
+Checking `hash` of EndorserBlocks
+```agda
     verify-eb₀-hash : hash eb₀ ≡ 3 ∷ 4 ∷ 5 ∷ []
     verify-eb₀-hash = refl
 
     verify-eb₁-hash : hash eb₁ ≡ 6 ∷ []
     verify-eb₁-hash = refl
 
+    verify-eb₂-hash : hash eb₂ ≡ 0 ∷ 1 ∷ 2 ∷ []
+    verify-eb₂-hash = refl
+```
+RankingBlocks that will be used in the test trace
+```agda
+    rb₀ rb₁ rb₂ : RankingBlock
+    rb₀ = record { txs = 3 ∷ 4 ∷ 5 ∷ [] ; announcedEB = nothing ; ebCert = nothing }
+    rb₁ = record { txs = [] ; announcedEB = just (hash eb₁) ; ebCert = nothing }
+    rb₂ = record { txs = [] ; announcedEB = nothing ; ebCert = just (6 ∷ []) }
+```
+Starting at slot 100
+```agda
     s₁₀₀ : LeiosState
     s₁₀₀ = record s₀
              { slot = 100
@@ -101,7 +110,7 @@ Starting at slot 100
         s₀ : LeiosState
         s₀ = initLeiosState tt stakeDistribution ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
 ```
-Checking a simple trace
+### Verify a test trace
 ```agda
     test₁ : IsOk (verifyTrace (L.reverse $
 ```
