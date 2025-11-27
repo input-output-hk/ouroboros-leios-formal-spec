@@ -1,4 +1,4 @@
-## Trace verification examples
+## Trace verification with sample trace
 <!--
 ```agda
 open import Prelude.Result
@@ -12,7 +12,8 @@ module Leios.Linear.Trace.Verifier.Test where
 private
 ```
 #### Params
-A test setup requires parameters, which are bundled in the `Params` record.
+A test setup requires parameters, which are bundled in the `Params` record. There are the network parameters, the identifier for the system under test (SUT)
+and there are the schedules for block production and voting in the field `winning-slots`. Note, in Linear Leios EB are produced optionaly together with an RB.
 ```agda
   params : Params
   params =
@@ -40,9 +41,9 @@ A test setup requires parameters, which are bundled in the `Params` record.
 #### Additional Linear Leios parameters
 Linear Leios has the following three protocol parameters
 ```agda
-  Lhdr = 2
+  Lhdr  = 2
   Lvote = 2
-  Ldiff = 0
+  Ldiff = 1
 ```
 #### SpecStructure
 In order to build a test trace, an implementation for the `SpecStructure` needs to be specified.
