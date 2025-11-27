@@ -111,9 +111,10 @@ Starting at slot 100
         s₀ : LeiosState
         s₀ = initLeiosState tt stakeDistribution ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
 ```
-### Verify a test trace
+### Build a test trace
 ```agda
-    test₁ : IsOk (verifyTrace (L.reverse $
+    test-trace : TestTrace
+    test-trace =
 ```
 #### Slot 100
 ```agda
@@ -171,6 +172,23 @@ Starting at slot 100
 ```agda
                  ∷ (Base₂-Action      107 , inj₁ SLOT)
                  ∷ (Slot₂-Action      107 , inj₂ (inj₁ (BASE-LDG [ rb₂ ])))
-                 ∷ []) s₁₀₀)
+                 ∷ []
+```
+#### Verify the test-trace
+```agda
+    test₁ : IsOk (verifyTrace (L.reverse test-trace) s₁₀₀)
     test₁ = _
+```
+### Test error handling
+```agda
+    open import Prelude.Errors
+
+    retValue : String
+    retValue =
+      case verifyTrace (L.reverse test-trace) s₁₀₀ of λ where
+        (Ok _) → "ok"
+        (Err e) → errorDoc e
+
+    test₂ : retValue ≡ "ok"
+    test₂ = refl
 ```
