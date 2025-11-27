@@ -125,7 +125,7 @@ d-BaseFunctionality =
 open import Leios.FFD public
 
 instance
-  isb : IsBlock (List ⊤)
+  isb : IsBlock (List Vote)
   isb =
     record
       { slotNumber = λ _ → 0
@@ -133,10 +133,10 @@ instance
       ; lotteryPf  = λ _ → tt
       }
 
-  hhs : Hashable PreIBHeader (List ℕ)
+  hhs : Hashable PreIBHeader Hash
   hhs .hash = IBHeaderOSig.bodyHash
 
-  hpe : Hashable PreEndorserBlock (List ℕ)
+  hpe : Hashable PreEndorserBlock Hash
   hpe .hash = EndorserBlockOSig.txs
 
 record FFDBuffers : Type where
@@ -285,5 +285,3 @@ d-SpecStructure-2 = record
       ; va                        = d-VotingAbstract-2
       ; getEBCert                 = λ _ → []
       }
-
--- open import Leios.Short d-SpecStructure public
