@@ -9,9 +9,11 @@ open import Leios.SpecStructure using (SpecStructure)
 -->
 ```agda
 module Leios.Linear.Trace.Verifier.Test where
-```
-```agda
 private
+```
+#### Params
+A test setup requires parameters, which are bundled in the `Params` record.
+```agda
   params : Params
   params =
     record
@@ -34,30 +36,43 @@ private
         (EB , 108) ∷ (VT , 108) ∷
         []
     }
-
+```
+#### Additional Linear Leios parameters
+Linear Leios has the following three protocol parameters
+```agda
   Lhdr = 2
   Lvote = 2
   Ldiff = 0
-
+```
+#### SpecStructure
+In order to build a test trace, an implementation for the `SpecStructure` needs to be specified.
+For the test trace, we rely on the implementation provided in `Leios.Defaults`.
+```agda
   -- TODO: why does Hashable-EndorserBlock not work instead of hpe...?
   open import Leios.Defaults params using (d-SpecStructure; hpe)
   open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
-
+```
+#### TraceVerifier
+```agda
   splitTxs : List Tx → List Tx × List Tx
   splitTxs l = [] , l
 
   validityCheckTime : EndorserBlock → ℕ
   validityCheckTime eb = 6
 
-  open Params params
   open import Leios.Linear.Trace.Verifier d-SpecStructure params Lhdr Lvote Ldiff splitTxs validityCheckTime
-  open GenFFD
+```
+<!--
+```agda
+  open Params params
   open Types params
+  open GenFFD
 
   opaque
     unfolding List-Model
     unfolding isValid?
 ```
+-->
 Starting at slot 100
 ```agda
     eb₀ eb₁ eb₂ : EndorserBlock
