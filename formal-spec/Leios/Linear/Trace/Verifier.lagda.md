@@ -246,3 +246,19 @@ verifyTrace ((a , i) ∷ σs) s = do
     _Valid∷ʳ_ : ∀ {e es s} → (σs : ValidTrace es s) → ValidStep e (getNewState σs) → ValidTrace (e ∷ es) s
     Valid tr x Valid∷ʳ Valid (ActionStep as) (FromAction a _) = Valid (_ —→⟨ ActionStep as ⟩ tr) (FromAction a x as)
 ```
+```agda
+open import Prelude.Errors
+
+instance
+  iErr-verifyStep : ∀ {s} → IsError (λ σ  → Err-verifyStep σ i s)
+  iErr-verifyStep .errorDoc (Err-Slot x)             = "Err-Slot"
+  iErr-verifyStep .errorDoc (Err-EB-Role-premises x) = "Err-EB-Role-premises"
+  iErr-verifyStep .errorDoc (Err-VT-Role-premises x) = "Err-VT-Role-premises"
+  iErr-verifyStep .errorDoc (Err-AllDone x)          = "Err-AllDone"
+  iErr-verifyStep .errorDoc (Err-BaseUpkeep x)       = "Err-BaseUpkeep"
+  iErr-verifyStep .errorDoc Err-Invalid              = "Err-Invalid"
+
+  iErr-verifyTrace : ∀ {s} → IsError (λ t → Err-verifyTrace t s)
+  iErr-verifyTrace .errorDoc (Err-StepOk x) = errorDoc x
+  iErr-verifyTrace .errorDoc (Err-Step x)   = errorDoc x
+```
