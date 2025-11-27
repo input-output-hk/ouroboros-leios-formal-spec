@@ -8,6 +8,6 @@ open import Data.String
 
 record IsError {A : Type} (E : A → Type) : Type where
   field
-    errorDoc : ∀ {x} → E x → String -- Doc
+    errorDoc : ∀ {x} → E x → String -- TODO: Doc
 
 open IsError ⦃...⦄ public

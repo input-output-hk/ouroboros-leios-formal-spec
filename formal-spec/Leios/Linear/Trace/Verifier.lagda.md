@@ -246,17 +246,27 @@ verifyTrace ((a , i) ∷ σs) s = do
     _Valid∷ʳ_ : ∀ {e es s} → (σs : ValidTrace es s) → ValidStep e (getNewState σs) → ValidTrace (e ∷ es) s
     Valid tr x Valid∷ʳ Valid (ActionStep as) (FromAction a _) = Valid (_ —→⟨ ActionStep as ⟩ tr) (FromAction a x as)
 ```
+#### Error handling
 ```agda
 open import Prelude.Errors
+open import Text.Printf
 
 instance
   iErr-verifyStep : ∀ {s} → IsError (λ σ  → Err-verifyStep σ i s)
-  iErr-verifyStep .errorDoc (Err-Slot x)             = "Err-Slot"
-  iErr-verifyStep .errorDoc (Err-EB-Role-premises x) = "Err-EB-Role-premises"
-  iErr-verifyStep .errorDoc (Err-VT-Role-premises x) = "Err-VT-Role-premises"
-  iErr-verifyStep .errorDoc (Err-AllDone x)          = "Err-AllDone"
-  iErr-verifyStep .errorDoc (Err-BaseUpkeep x)       = "Err-BaseUpkeep"
-  iErr-verifyStep .errorDoc Err-Invalid              = "Err-Invalid"
+  iErr-verifyStep {i} {s} .errorDoc {EB-Role-Action _ _} (Err-Slot _)   = printf "%u : Err-Slot / EB-Role-Action" (LeiosState.slot s)
+  iErr-verifyStep {i} {s} .errorDoc {VT-Role-Action _ _ _} (Err-Slot _) = printf "%u : Err-Slot / VT-Role-Action" (LeiosState.slot s)
+  iErr-verifyStep {i} {s} .errorDoc {Ftch-Action _} (Err-Slot _)        = printf "%u : Err-Slot / Ftch-Action" (LeiosState.slot s)
+  iErr-verifyStep {i} {s} .errorDoc {Slot₁-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Slot₁-Action" (LeiosState.slot s)
+  iErr-verifyStep {i} {s} .errorDoc {Slot₂-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Slot₂-Action" (LeiosState.slot s)
+  iErr-verifyStep {i} {s} .errorDoc {Base₁-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Base₁-Action" (LeiosState.slot s)
+  iErr-verifyStep {i} {s} .errorDoc {Base₂-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Base₂-Action" (LeiosState.slot s)
+  iErr-verifyStep {i} {s} .errorDoc {No-EB-Role-Action _} (Err-Slot _)  = printf "%u : Err-Slot / No-EB-Role-Action" (LeiosState.slot s)
+  iErr-verifyStep {i} {s} .errorDoc {No-VT-Role-Action _} (Err-Slot _)  = printf "%u : Err-Slot / No-VT-Role-Action" (LeiosState.slot s)
+  iErr-verifyStep {i} {s} .errorDoc (Err-EB-Role-premises _)            = printf "%u : Err-EB-Role-premises" (LeiosState.slot s)
+  iErr-verifyStep {i} {s} .errorDoc (Err-VT-Role-premises _)            = printf "%u : Err-VT-Role-premises" (LeiosState.slot s)
+  iErr-verifyStep {i} {s} .errorDoc (Err-AllDone _)                     = printf "%u : Err-AllDone" (LeiosState.slot s)
+  iErr-verifyStep {i} {s} .errorDoc (Err-BaseUpkeep _)                  = printf "%u : Err-BaseUpkeep" (LeiosState.slot s)
+  iErr-verifyStep {i} {s} .errorDoc Err-Invalid                         = printf "%u : Err-Invalid" (LeiosState.slot s)
 
   iErr-verifyTrace : ∀ {s} → IsError (λ t → Err-verifyTrace t s)
   iErr-verifyTrace .errorDoc (Err-StepOk x) = errorDoc x
