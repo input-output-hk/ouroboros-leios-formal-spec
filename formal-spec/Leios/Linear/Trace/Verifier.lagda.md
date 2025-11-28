@@ -251,24 +251,64 @@ verifyTrace ((a , i) ∷ σs) s = do
 open import Prelude.Errors
 open import Text.Printf
 
-instance
-  iErr-verifyStep : ∀ {s} → IsError (λ σ  → Err-verifyStep σ i s)
-  iErr-verifyStep {i} {s} .errorDoc {EB-Role-Action _ _} (Err-Slot _)   = printf "%u : Err-Slot / EB-Role-Action" (LeiosState.slot s)
-  iErr-verifyStep {i} {s} .errorDoc {VT-Role-Action _ _ _} (Err-Slot _) = printf "%u : Err-Slot / VT-Role-Action" (LeiosState.slot s)
-  iErr-verifyStep {i} {s} .errorDoc {Ftch-Action _} (Err-Slot _)        = printf "%u : Err-Slot / Ftch-Action" (LeiosState.slot s)
-  iErr-verifyStep {i} {s} .errorDoc {Slot₁-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Slot₁-Action" (LeiosState.slot s)
-  iErr-verifyStep {i} {s} .errorDoc {Slot₂-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Slot₂-Action" (LeiosState.slot s)
-  iErr-verifyStep {i} {s} .errorDoc {Base₁-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Base₁-Action" (LeiosState.slot s)
-  iErr-verifyStep {i} {s} .errorDoc {Base₂-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Base₂-Action" (LeiosState.slot s)
-  iErr-verifyStep {i} {s} .errorDoc {No-EB-Role-Action _} (Err-Slot _)  = printf "%u : Err-Slot / No-EB-Role-Action" (LeiosState.slot s)
-  iErr-verifyStep {i} {s} .errorDoc {No-VT-Role-Action _} (Err-Slot _)  = printf "%u : Err-Slot / No-VT-Role-Action" (LeiosState.slot s)
-  iErr-verifyStep {i} {s} .errorDoc (Err-EB-Role-premises _)            = printf "%u : Err-EB-Role-premises" (LeiosState.slot s)
-  iErr-verifyStep {i} {s} .errorDoc (Err-VT-Role-premises _)            = printf "%u : Err-VT-Role-premises" (LeiosState.slot s)
-  iErr-verifyStep {i} {s} .errorDoc (Err-AllDone _)                     = printf "%u : Err-AllDone" (LeiosState.slot s)
-  iErr-verifyStep {i} {s} .errorDoc (Err-BaseUpkeep _)                  = printf "%u : Err-BaseUpkeep" (LeiosState.slot s)
-  iErr-verifyStep {i} {s} .errorDoc Err-Invalid                         = printf "%u : Err-Invalid" (LeiosState.slot s)
+module _
+  ⦃ Show-Hash : Show Hash ⦄
+  where
 
-  iErr-verifyTrace : ∀ {s} → IsError (λ t → Err-verifyTrace t s)
-  iErr-verifyTrace .errorDoc (Err-StepOk x) = errorDoc x
-  iErr-verifyTrace .errorDoc (Err-Step x)   = errorDoc x
+  instance
+    iErr-verifyStep : ∀ {s} → IsError (λ σ  → Err-verifyStep σ i s)
+    iErr-verifyStep {i} {s} .errorDoc {EB-Role-Action _ _} (Err-Slot _)   = printf "%u : Err-Slot / EB-Role-Action" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorDoc {VT-Role-Action _ _ _} (Err-Slot _) = printf "%u : Err-Slot / VT-Role-Action" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorDoc {Ftch-Action _} (Err-Slot _)        = printf "%u : Err-Slot / Ftch-Action" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorDoc {Slot₁-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Slot₁-Action" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorDoc {Slot₂-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Slot₂-Action" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorDoc {Base₁-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Base₁-Action" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorDoc {Base₂-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Base₂-Action" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorDoc {No-EB-Role-Action _} (Err-Slot _)  = printf "%u : Err-Slot / No-EB-Role-Action" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorDoc {No-VT-Role-Action _} (Err-Slot _)  = printf "%u : Err-Slot / No-VT-Role-Action" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorDoc (Err-EB-Role-premises _)            = printf "%u : Err-EB-Role-premises" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorDoc (Err-AllDone _)                     = printf "%u : Err-AllDone" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorDoc (Err-BaseUpkeep _)                  = printf "%u : Err-BaseUpkeep" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorDoc Err-Invalid                         = printf "%u : Err-Invalid" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorDoc (Err-VT-Role-premises {eb = eb} {ebHash = ebHash} {slot' = slot'} _)
+      with ¿ getCurrentEBHash s ≡ just ebHash ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises-1" (LeiosState.slot s)
+    ... | yes p
+      with ¿ find (λ (_ , eb') → hash eb' ≟ ebHash) (LeiosState.EBs' s) ≡ just (slot' , eb) ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises-2, ebHash=%s" (LeiosState.slot s) (show ebHash)
+    ... | yes p
+      with ¿ hash eb ∉ (LeiosState.VotedEBs s) ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises-3" (LeiosState.slot s)
+    ... | yes p
+      with ¿ ¬ isEquivocated s eb ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises-41" (LeiosState.slot s)
+    ... | yes p
+      with ¿ isValid s (inj₁ (ebHeader eb)) ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises-5" (LeiosState.slot s)
+    ... | yes p
+      with ¿ slot' ≤ slotNumber eb + Lhdr ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises-6" (LeiosState.slot s)
+    ... | yes p
+      with ¿ slotNumber eb + 3 * Lhdr ≤ (LeiosState.slot s) ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises-7" (LeiosState.slot s)
+    ... | yes p
+      with ¿ (LeiosState.slot s) ≡ slotNumber eb + validityCheckTime eb ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises-8" (LeiosState.slot s)
+    ... | yes p
+      with ¿ validityCheckTime eb ≤ 3 * Lhdr + Lvote ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises-9" (LeiosState.slot s)
+    ... | yes p
+      with ¿ EndorserBlockOSig.txs eb ≢ [] ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises-10" (LeiosState.slot s)
+    ... | yes p
+      with ¿ LeiosState.needsUpkeep s VT-Role ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises-11" (LeiosState.slot s)
+    ... | yes p
+      with ¿ canProduceV (slotNumber eb) sk-VT (stake s) ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises-12" (LeiosState.slot s)
+    ... | yes p = printf "%u : Impossible!" (LeiosState.slot s)
+
+    iErr-verifyTrace : ∀ {s} → IsError (λ t → Err-verifyTrace t s)
+    iErr-verifyTrace .errorDoc (Err-StepOk x) = errorDoc x
+    iErr-verifyTrace .errorDoc (Err-Step x)   = errorDoc x
 ```
