@@ -35,7 +35,7 @@ and there are the schedules for block production and voting in the field `winnin
                      (VT , 104) ∷
                      (VT , 105) ∷
                      (VT , 106) ∷
-        (EB , 107) ∷ (VT , 107) ∷
+                     (VT , 107) ∷
         (EB , 108) ∷ (VT , 108) ∷
         []
     }
@@ -45,7 +45,7 @@ Linear Leios has the following three protocol parameters
 ```agda
   Lhdr  = 1
   Lvote = 2
-  Ldiff = 1
+  Ldiff = 2
 ```
 #### SpecStructure
 In order to build a test trace, an implementation for the `SpecStructure` needs to be specified.
@@ -79,19 +79,27 @@ For the test trace, we rely on the implementation provided in `Leios.Defaults`.
 EndorserBlocks that will be used in the test trace.
 ```agda
     EB₁ : EndorserBlock
-    EB₁ = mkEB 100 (fsuc fzero) tt (EB , tt) (3 ∷ 4 ∷ 5 ∷ []) [] []
+    EB₁ = mkEB 100 (fsuc fzero) tt (EB , tt) (1 ∷ 2 ∷ 3 ∷ []) [] []
+
+    EB₂ : EndorserBlock
+    EB₂ = mkEB 108 fzero tt (EB , tt) (3 ∷ 4 ∷ 5 ∷ []) [] []
 ```
 Checking `hash` of EndorserBlocks
 ```agda
-    verify-EB₁-hash : hash EB₁ ≡ 3 ∷ 4 ∷ 5 ∷ []
+    verify-EB₁-hash : hash EB₁ ≡ 1 ∷ 2 ∷ 3 ∷ []
     verify-EB₁-hash = refl
 ```
 RankingBlocks that will be used in the test trace
 ```agda
     RB₀ RB₁ RB₂ : RankingBlock
-    RB₀ = record { txs = 3 ∷ 4 ∷ 5 ∷ [] ; announcedEB = nothing ; ebCert = nothing }
+    RB₀ = record { txs = 0 ∷ [] ; announcedEB = nothing ; ebCert = nothing }
     RB₁ = record { txs = [] ; announcedEB = just (hash EB₁) ; ebCert = nothing }
-    RB₂ = record { txs = [] ; announcedEB = nothing ; ebCert = just (hash EB₁) }
+    RB₂ = record { txs = [] ; announcedEB = just (hash EB₂) ; ebCert = just (hash EB₁) }
+```
+Votes
+```agda
+    VT₁ : List Vote
+    VT₁ = tt ∷ []
 ```
 Starting at slot 100
 ```agda
@@ -111,19 +119,23 @@ Starting at slot 100
     test-trace =
 ```
 <pre>
-slot: 100 101 102 103 104 105 106 107
+slot: 100 101 102 103 104 105 106 107 108 109
 
-            3* Lhdr    Lvote
-          <---------> <-----> <->
-  ___|___|___|___|___|___|___|___|___|___
+            3* Lhdr    Lvote   Ldiff
+          <---------> <-----> <------>
+  ___|___|___|___|___|___|___|___|___|___|___
 
                      +---+
-                     |VT₁|
+                     |VT₀|
                      +---+
-     +---+             |         +---+
-     |RB₁|             |         |RB₂|
-     |EB₁| <-----------+---------|CRT|
-     +---+                       +---+
+     +---+             |             +---+
+  <--|RB₁| <-----------+-------------|RB₂|<--
+     |EB₁| <-----------+---+---------|CRT|
+     +---+                 |         +---+
+                           |
+                         +---+
+                         |VT₁|
+                         +---+
 </pre>
 #### Slot 100
 Submitting transactions, Receiving RB₀
@@ -167,11 +179,12 @@ The SUT is voting for EB₁ in this slot
                  ∷ (Slot₁-Action      104 , inj₁ (FFD-OUT []))
 ```
 #### Slot 105
+Another vote is received
 ```agda
                  ∷ (Base₂-Action      105 , inj₁ SLOT)
                  ∷ (No-EB-Role-Action 105 , inj₁ SLOT)
                  ∷ (No-VT-Role-Action 105 , inj₁ SLOT)
-                 ∷ (Slot₁-Action      105 , inj₁ (FFD-OUT []))
+                 ∷ (Slot₁-Action      105 , inj₁ (FFD-OUT (inj₁ (vtHeader VT₁) ∷ [])))
 ```
 #### Slot 106
 ```agda
@@ -183,7 +196,22 @@ The SUT is voting for EB₁ in this slot
 #### Slot 107
 ```agda
                  ∷ (Base₂-Action      107 , inj₁ SLOT)
-                 ∷ (Slot₂-Action      107 , inj₂ (inj₁ (BASE-LDG [ RB₂ ])))
+                 ∷ (No-EB-Role-Action 107 , inj₁ SLOT)
+                 ∷ (No-VT-Role-Action 107 , inj₁ SLOT)
+                 ∷ (Slot₁-Action      107 , inj₁ (FFD-OUT []))
+```
+#### Slot 108
+SUT is slot leader: create and EB and RB
+```agda
+                 ∷ (Base₂-Action      108 , inj₁ SLOT)
+                 ∷ (EB-Role-Action    108 EB₂ , inj₁ SLOT)
+                 ∷ (No-VT-Role-Action 108 , inj₁ SLOT)
+                 ∷ (Slot₂-Action      108 , inj₂ (inj₁ (BASE-LDG [ RB₂ ])))
+                 ∷ (Slot₁-Action      108 , inj₁ (FFD-OUT []))
+```
+#### Slot 109
+```agda
+                 ∷ (Base₂-Action      109 , inj₁ SLOT)
                  ∷ []
 ```
 #### Verify the test-trace
