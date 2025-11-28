@@ -91,10 +91,9 @@ Checking `hash` of EndorserBlocks
 ```
 RankingBlocks that will be used in the test trace
 ```agda
-    RB₀ RB₁ RB₂ : RankingBlock
+    RB₀ RB₁ : RankingBlock
     RB₀ = record { txs = 0 ∷ [] ; announcedEB = nothing ; ebCert = nothing }
     RB₁ = record { txs = [] ; announcedEB = just (hash EB₁) ; ebCert = nothing }
-    RB₂ = record { txs = [] ; announcedEB = just (hash EB₂) ; ebCert = just (hash EB₁) }
 ```
 Votes
 ```agda
@@ -201,12 +200,11 @@ Another vote is received
                  ∷ (Slot₁-Action      107 , inj₁ (FFD-OUT []))
 ```
 #### Slot 108
-SUT is slot leader: create and EB and RB
+SUT is slot leader: create and EB and RB (implicit in Base₂-Action)
 ```agda
-                 ∷ (Base₂-Action      108 , inj₁ SLOT)
                  ∷ (EB-Role-Action    108 EB₂ , inj₁ SLOT)
                  ∷ (No-VT-Role-Action 108 , inj₁ SLOT)
-                 ∷ (Slot₂-Action      108 , inj₂ (inj₁ (BASE-LDG [ RB₂ ])))
+                 ∷ (Base₂-Action      108 , inj₁ SLOT)
                  ∷ (Slot₁-Action      108 , inj₁ (FFD-OUT []))
 ```
 #### Slot 109
