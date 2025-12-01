@@ -223,7 +223,7 @@ SUT is slot leader: create and EB and RB (implicit in Base₂-Action)
     retValue =
       case verifyTrace (L.reverse test-trace) s₁₀₀ of λ where
         (Ok _) → "ok"
-        (Err e) → errorDoc e
+        (Err e) → errorMsg e
 
     test₂ : retValue ≡ "ok"
     test₂ = refl
