@@ -190,7 +190,7 @@ Note: Submitted data to the base chain is only taken into account
 ```agda
   Base₁   :
           ───────────────────────────────────────────────────────────────────────────
-          s -⟦ L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ SubmitTxs txs / nothing ⟧⇀ record s { ToPropose = txs }
+          s -⟦ L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ SubmitTxs txs / nothing ⟧⇀ record s { ToPropose = txs }
 ```
 ```agda
   Base₂   : let open LeiosState s
