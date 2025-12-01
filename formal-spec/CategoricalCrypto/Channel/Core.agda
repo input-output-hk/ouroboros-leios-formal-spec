@@ -67,58 +67,62 @@ _ᵀ : Fun₁ Channel
 
 infix 4 _[_]⇒[_]_
 
-_[_]⇒[_]_ : Channel → Mode → Mode → Channel → Type
-A [ m₁ ]⇒[ m₂ ] B = modeType m₁ A → modeType m₂ B
+opaque
+  _[_]⇒[_]_ : Channel → Mode → Mode → Channel → Type
+  A [ m₁ ]⇒[ m₂ ] B = modeType m₁ A → modeType m₂ B
 
-⇒-trans : ∀ {A B C m m₁ m₂} → A [ m ]⇒[ m₁ ] B → B [ m₁ ]⇒[ m₂ ] C → A [ m ]⇒[ m₂ ] C
-⇒-trans p q = q ∘ p
+  app : ∀ {A B m₁ m₂} → A [ m₁ ]⇒[ m₂ ] B → modeType m₁ A → modeType m₂ B
+  app f = f
 
-infixr 10 _⇒ₜ_
+  ⇒-trans : ∀ {A B C m m₁ m₂} → A [ m ]⇒[ m₁ ] B → B [ m₁ ]⇒[ m₂ ] C → A [ m ]⇒[ m₂ ] C
+  ⇒-trans p q = q ∘ p
 
-_⇒ₜ_ = ⇒-trans 
+  _⇒ₜ_ : ∀ {A B C m m₁ m₂} → A [ m ]⇒[ m₁ ] B → B [ m₁ ]⇒[ m₂ ] C → A [ m ]⇒[ m₂ ] C
+  _⇒ₜ_ = ⇒-trans
 
-⇒-refl' : ∀ {m A B} → A ≡ B → A [ m ]⇒[ m ] B
-⇒-refl' refl = id
+  infixr 10 _⇒ₜ_
+  
+  ⇒-refl' : ∀ {m A B} → A ≡ B → A [ m ]⇒[ m ] B
+  ⇒-refl' refl = id
 
-⇒-refl : ∀ {m A} → A [ m ]⇒[ m ] A
-⇒-refl = ⇒-refl' refl
+  ⇒-refl : ∀ {m A} → A [ m ]⇒[ m ] A
+  ⇒-refl = ⇒-refl' refl
 
 ----------------------------------
 -- Forwarding and transposition --
 ----------------------------------
 
-⇒-double-transpose-left : ∀ {m A} → A ᵀ ᵀ [ m ]⇒[ m ] A
-⇒-double-transpose-left {A = A} rewrite ᵀ-idempotent {A} = ⇒-refl
+  ⇒-double-transpose-left : ∀ {m A} → A ᵀ ᵀ [ m ]⇒[ m ] A
+  ⇒-double-transpose-left {A = A} rewrite ᵀ-idempotent {A} = ⇒-refl
 
-⇒-double-transpose-right : ∀ {m A} → A [ m ]⇒[ m ] A ᵀ ᵀ
-⇒-double-transpose-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-refl
+  ⇒-double-transpose-right : ∀ {m A} → A [ m ]⇒[ m ] A ᵀ ᵀ
+  ⇒-double-transpose-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-refl
 
-⇒-double-negate-left : ∀ {m A} → A [ ¬ₘ ¬ₘ m ]⇒[ m ] A
-⇒-double-negate-left {m} rewrite (¬ₘ-idempotent {m}) = ⇒-refl
+  ⇒-double-negate-left : ∀ {m A} → A [ ¬ₘ ¬ₘ m ]⇒[ m ] A
+  ⇒-double-negate-left {m} rewrite (¬ₘ-idempotent {m}) = ⇒-refl
 
-⇒-double-negate-right : ∀ {m A} → A [ m ]⇒[ ¬ₘ ¬ₘ m ] A
-⇒-double-negate-right {m} rewrite (¬ₘ-idempotent {m}) = ⇒-refl
+  ⇒-double-negate-right : ∀ {m A} → A [ m ]⇒[ ¬ₘ ¬ₘ m ] A
+  ⇒-double-negate-right {m} rewrite (¬ₘ-idempotent {m}) = ⇒-refl
 
-⇒-negate-transpose-right : ∀ {m A} → A [ m ]⇒[ ¬ₘ m ] A ᵀ
-⇒-negate-transpose-right {Out} = id
-⇒-negate-transpose-right {In} = id
+  ⇒-negate-transpose-right : ∀ {m A} → A [ m ]⇒[ ¬ₘ m ] A ᵀ
+  ⇒-negate-transpose-right {Out} = id
+  ⇒-negate-transpose-right {In} = id
 
-⇒-negate-transpose-left : ∀ {m A} → A ᵀ [ ¬ₘ m ]⇒[ m ] A
-⇒-negate-transpose-left = ⇒-negate-transpose-right ⇒ₜ ⇒-double-negate-left
+  ⇒-negate-transpose-left : ∀ {m A} → A ᵀ [ ¬ₘ m ]⇒[ m ] A
+  ⇒-negate-transpose-left = ⇒-negate-transpose-right ⇒ₜ ⇒-double-negate-left
 
-⇒-transpose-left-negate-right : ∀ {m A} → A ᵀ [ m ]⇒[ ¬ₘ m ] A
-⇒-transpose-left-negate-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-negate-transpose-right {A = A ᵀ}
+  ⇒-transpose-left-negate-right : ∀ {m A} → A ᵀ [ m ]⇒[ ¬ₘ m ] A
+  ⇒-transpose-left-negate-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-negate-transpose-right {A = A ᵀ}
 
-⇒-negate-left-transpose-right : ∀ {m A} → A [ ¬ₘ m ]⇒[ m ] A ᵀ
-⇒-negate-left-transpose-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-negate-transpose-left {A = A ᵀ}
+  ⇒-negate-left-transpose-right : ∀ {m A} → A [ ¬ₘ m ]⇒[ m ] A ᵀ
+  ⇒-negate-left-transpose-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-negate-transpose-left {A = A ᵀ}
 
 -----------------------------------
 -- Tensorial product on Channels --
 -----------------------------------
 
-infixr 9 _⊗_
+  infixr 9 _⊗_
 
-opaque
   _⊗_ : Fun₂ Channel
   (receive₁ ⇿ send₁) ⊗ (receive₂ ⇿ send₂) = (receive₁ ⊎ receive₂) ⇿ (send₁ ⊎ send₂)
 

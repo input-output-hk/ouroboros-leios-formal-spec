@@ -16,6 +16,7 @@ open import Tactic.Derive.HsType
 
 open import Class.Convertible
 open import Class.Decidable.Instances
+open import Class.Convertible.Foreign
 open import Class.HasHsType
 
 open import Leios.Foreign.HsTypes as F
@@ -32,14 +33,14 @@ instance
 
   -- * Unit and empty
 
-  HsTy-⊥ = MkHsType ⊥ F.Empty
+  HsTy-⊥ = mkHsType ⊥ F.Empty
   Conv-⊥ = autoConvert ⊥
 
-  HsTy-⊤ = MkHsType ⊤ ⊤
+  HsTy-⊤ = mkHsType ⊤ ⊤
 
   -- * Rational numbers
 
-  HsTy-Rational = MkHsType ℚ F.Rational
+  HsTy-Rational = mkHsType ℚ F.Rational
   Conv-Rational : HsConvertible ℚ
   Conv-Rational = λ where
     .to (mkℚ n d _)       → n F., suc d
@@ -49,7 +50,7 @@ instance
   -- * Maps and Sets
 
   HsTy-HSSet : ∀ {A} → ⦃ HasHsType A ⦄ → HasHsType (ℙ A)
-  HsTy-HSSet {A} = MkHsType _ (F.HSSet (HsType A))
+  HsTy-HSSet {A} = mkHsType _ (F.HSSet (HsType A))
 
   Conv-HSSet : ∀ {A} ⦃ _ : HasHsType A ⦄
              → ⦃ HsConvertible A ⦄
@@ -71,7 +72,7 @@ instance
     .from → fromListᵐ ∘ map from
 
   HsTy-Map : ∀ {A B} → ⦃ HasHsType A ⦄ → ⦃ HasHsType B ⦄ → HasHsType (A ⇀ B)
-  HsTy-Map {A} {B} = MkHsType _ (F.HSMap (HsType A) (HsType B))
+  HsTy-Map {A} {B} = mkHsType _ (F.HSMap (HsType A) (HsType B))
 
   Conv-HSMap : ∀ {A B} ⦃ _ : HasHsType A ⦄ ⦃ _ : HasHsType B ⦄
     → ⦃ DecEq A ⦄
@@ -94,7 +95,7 @@ instance
            (no p) → error "Expected total map"
 
   HsTy-TotalMap : ∀ {A B} → ⦃ HasHsType A ⦄ → ⦃ HasHsType B ⦄ → HasHsType (TotalMap A B)
-  HsTy-TotalMap {A} {B} = MkHsType _ (F.HSMap (HsType A) (HsType B))
+  HsTy-TotalMap {A} {B} = mkHsType _ (F.HSMap (HsType A) (HsType B))
 
   Conv-HSTotalMap : ∀ {A B} ⦃ _ : HasHsType A ⦄ ⦃ _ : HasHsType B ⦄
     → ⦃ DecEq A ⦄
@@ -113,7 +114,7 @@ instance
   HsTy-ComputationResult : ∀ {l} {Err} {A : Type l}
                            → ⦃ HasHsType Err ⦄ → ⦃ HasHsType A ⦄
                            → HasHsType (C.ComputationResult Err A)
-  HsTy-ComputationResult {Err = Err} {A} = MkHsType _ (F.ComputationResult (HsType Err) (HsType A))
+  HsTy-ComputationResult {Err = Err} {A} = mkHsType _ (F.ComputationResult (HsType Err) (HsType A))
 
   Conv-ComputationResult : ConvertibleType C.ComputationResult F.ComputationResult
   Conv-ComputationResult = autoConvertible

@@ -19,6 +19,6 @@ define agdaToHs
       | sed "s#^$(HS_DIST)/#        #;s#\.hs##;s#/#.#g"\
       >> $(HS_DIR)/$(CABAL_FILE)
 endef
-HS_LEIOS=$(HS_DIST)/$(MALONZO_DIR)/Everything.hs
-$(HS_LEIOS): Everything.agda
+HS_LEIOS=$(HS_DIST)/$(MALONZO_DIR)/formal-spec.hs
+$(HS_LEIOS): formal-spec.agda
 	$(call agdaToHs,leios-spec)
