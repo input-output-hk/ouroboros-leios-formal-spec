@@ -1,46 +1,92 @@
 {
-  description = "Ouroboros Leios";
-
+  description = "Ouroboros Leios specification";
 
   inputs = {
-    iogx = {
-      url = "github:input-output-hk/iogx";
+    nixpkgs.url = "github:NixOS/nixpkgs";
+
+    flake-utils.url = "github:numtide/flake-utils";
+
+    agda-nix = {
+      url = "github:input-output-hk/agda.nix";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
-
-    # Agda version 2.7
-    agda-nixpkgs.url = "github:NixOS/nixpkgs?ref=7438ebd9431243aa0b01502fae89c022e4facb0c";
-
   };
 
+  outputs =
+    inputs@{
+      self,
+      nixpkgs,
+      flake-utils,
+      ...
+    }:
+    let
+      inherit (nixpkgs) lib;
+    in
+    flake-utils.lib.eachDefaultSystem (
+      system:
+      let
+        pkgs = import nixpkgs {
+          inherit system;
+          overlays = [
+            inputs.agda-nix.overlays.default
+          ];
+        };
 
-  outputs = inputs: inputs.iogx.lib.mkFlake {
+        deps = with pkgs.agdaPackages; [
+          standard-library
+          standard-library-classes
+          standard-library-meta
+          abstract-set-theory
+          agda-categories
+          iog-prelude
+        ];
 
-    inherit inputs;
+        leiosSpec = pkgs.agdaPackages.mkDerivation {
+          pname = "leios-spec";
+          version = "0.1";
+          src = ./formal-spec;
+          meta = { };
+          libraryFile = "leios-spec.agda-lib";
+          everythingFile = "formal-spec.agda";
+          buildPhase = ''
+            OUT_DIR=$out make
+          '';
+          buildInputs = deps;
+        };
 
-    repoRoot = ./.;
+        agdaWithPkgs = pkgs.agda.withPackages { pkgs = deps; ghc = pkgs.ghc; };
 
-    outputs = import ./nix/outputs.nix;
+        leiosDocs = pkgs.stdenv.mkDerivation {
+          pname = "leios-docs";
+          version = "0.1";
+          src = ./formal-spec;
+          meta = { };
+          buildInputs = [ agdaWithPkgs pkgs.pandoc ];
+          buildPhase = ''
+            agda --html --html-highlight=auto formal-spec.agda
+            pandoc -s -c Agda.css html/Leios.Linear.md -o html/Leios.Linear.html
+          '';
+          installPhase = ''
+            mkdir "$out"
+            cp -r html "$out"
+          '';
+        };
 
-    # systems = [ "x86_64-linux" "x86_64-darwin" "aarch64-darwin" "aarch64-linux" ];
-
-    # debug = false;
-
-    # nixpkgsArgs = {
-    #   config = {};
-    #   overlays = [];
-    # };
-
-    # flake = { repoRoot, inputs }: {};
-  };
-
-
-  nixConfig = {
-    extra-substituters = [
-      "https://cache.iog.io"
-    ];
-    extra-trusted-public-keys = [
-      "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
-    ];
-    allow-import-from-derivation = true;
-  };
+      in
+      {
+        packages = {
+          leiosSpec = leiosSpec;
+          leiosDocs = leiosDocs;
+          agdaWithPkgs = agdaWithPkgs;
+          default = leiosSpec;
+        };
+        devShells.default = pkgs.mkShell {
+          packages = [
+            (pkgs.agdaPackages.agda.withPackages (
+              builtins.filter (p: p ? isAgdaDerivation) leiosSpec.buildInputs
+            ))
+          ];
+        };
+      }
+    );
 }

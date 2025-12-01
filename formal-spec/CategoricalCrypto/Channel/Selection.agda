@@ -40,8 +40,11 @@ _↑ : ∀ {m m' A B} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ] B
 (x ᵗ¹) ↑ = (x ↑) ⇒ₜ ⇒-negate-transpose-right
 (x ᵗ²) ↑ = (x ↑) ⇒ₜ ⇒-negate-transpose-left
 
-_↑ᵢ_ = _↑ {In}
-_↑ₒ_ = _↑ {Out}
+_↑ᵢ_ : ∀ {m' A B} → A [ In ]⇒[ m' ]ᵍ B → modeType In A → modeType m' B
+_↑ᵢ_ p = app (_↑ {In} p)
+
+_↑ₒ_ : ∀ {m' A B} → A [ Out ]⇒[ m' ]ᵍ B → modeType Out A → modeType m' B
+_↑ₒ_ p = app (_↑ {Out} p)
 
 instance _ = Functor-M ⦃ Class.Monad.Monad-TC ⦄
 
@@ -138,3 +141,22 @@ module _ ⦃ _ : TCOptions ⦄ where
   ⇒-solver-tactic = initTac ⇒-solver-tactic'
   macro
     ⇒-solver = ⇒-solver-tactic
+
+private
+  instance
+    defaultTCOptionsI = record
+      { debug = record defaultDebugOptions
+        { prefix = '┃'
+        ; filter = Filter.⊤
+        }
+      ; fuel  = ("reduceDec/constrs" , 5) ∷ []
+      }
+
+  test₁ : ∀ {A B C m} → (A ⊗ B) ⊗ C [ m ]⇒[ m ] (A ⊗ B ᵀ) ⊗ ((B ⊗ C ᵀ) ᵀ) ⊗ B
+  test₁ = ⇒-solver
+
+  test₂ : ∀ {A B m} → (B ᵀ) ⊗ ((A ᵀ) ᵀ) [ m ]⇒[ m ] A ⊗ (B ᵀ)
+  test₂ = ⇒-solver
+
+  test₃ : ∀ {A B} → A ⊗ B ᵀ [ In ]⇒[ Out ] A ᵀ ⊗ B
+  test₃ = ⇒-solver
