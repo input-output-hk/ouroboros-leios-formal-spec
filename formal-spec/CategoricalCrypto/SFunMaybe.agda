@@ -3,14 +3,17 @@ module CategoricalCrypto.SFunMaybe where
 
 open import Level renaming (zero to ℓ0)
 
-open import abstract-set-theory.Prelude hiding (id; _∘_; _⊗_; lookup; Dec; ⊤; ⊥; Functor; Bifunctor; [_]; head; tail; _++_; take)
+open import abstract-set-theory.Prelude hiding (id; _∘_; _⊗_; lookup; Dec; ⊤; ⊥; Functor; Bifunctor; [_]; head; tail; _++_; take ; drop)
 import abstract-set-theory.Prelude as P
 open import Data.Vec hiding (init)
+open import Data.Vec.Properties
 open import Data.Nat using (_+_)
+open import Data.Nat.Properties
 open import Data.Maybe as Maybe using (map)
 open import Relation.Binary
 open import Categories.Category
 open import Categories.Category.Helper
+import Relation.Binary.HeterogeneousEquality as H
 
 -- M = id, Maybe, Powerset (relation), Giry (probability)
 -- SFunType A B S = S × A → M (S × B)
@@ -36,7 +39,7 @@ take-trace : ∀ {m n} {f : SFunType A B State} {s} {as : Vec A (n + m)}
            → take n (trace f s as) ≡ trace f s (take n as)
 take-trace {n = zero} = refl
 take-trace {n = suc _} {f} {s} {a ∷ _} with f (s , a)
-... | just x = cong (just _ ∷_) take-trace
+... | just _  = cong (just _  ∷_) take-trace
 ... | nothing = cong (nothing ∷_) take-trace
 
 -- implicit state
@@ -50,7 +53,7 @@ record SFunⁱ (A B : Type) : Type where
 
   fun₁ : A → Maybe B
   fun₁ a = head (fun [ a ])
-  
+
   take-tail : {m n : ℕ} {a : A} {as : Vec A (m + n)} → take m (tail (fun (a ∷ as))) ≡ tail (fun (a ∷ take m as))
   take-tail {m} {a = a} {as} = begin
     take m (tail (fun (a ∷ as)))         ≡⟨ take-suc {v = fun (a ∷ as)} ⟩
@@ -61,10 +64,17 @@ record SFunⁱ (A B : Type) : Type where
       open ≡-Reasoning
       take-suc : ∀ {m n} {v : Vec (Maybe B) (ℕ.suc (m + n))} → take m (tail v) ≡ tail (take (ℕ.suc m) v)
       take-suc {v = _ ∷ _} = refl
-        
+
+  tail-fun : {n : ℕ} {a : A} {as : Vec A (n + 0)} → fun as H.≅ tail (fun (a ∷ as))
+  tail-fun {n} {a} {as} = let open H.≅-Reasoning in begin
+    fun as                       ≅⟨ {!!} ⟩
+    take n (fun as) ≅⟨ {!!} ⟩
+    tail (fun (a ∷ take n as)) ≅⟨ {!!} ⟩
+    tail (fun (a ∷ as))          ∎
+
   -- the function on traces after making one fixed step
   apply₁ : A → SFunⁱ A B
-  apply₁ a = record { fun = λ as → tail (fun (a ∷ as)) ; take-fun = take-tail  }
+  apply₁ a = record { fun = λ as → tail (fun (a ∷ as)) ; take-fun = take-tail }
   
 module _ where
   open SFunⁱ
@@ -104,12 +114,9 @@ f ≈ᵉ g = eval f ≈ⁱ eval g
 eval∘resume≡id : ∀ {f : SFunⁱ A B} → eval (resume f) ≈ⁱ f
 eval∘resume≡id {f = f} [] with SFunⁱ.fun f []
 ... | [] = refl
-eval∘resume≡id {f = f} (a ∷ as) = ? -- begin
-  -- head (fun f (a ∷ [])) ∷ fun (eval (resume (apply₁ f a))) as ≡⟨ cong (_ ∷_) (eval∘resume≡id as) ⟩
-  -- fun₁ f a ∷ fun (apply₁ f a) as                              ≡⟨ sym (fun-∷ {f = f}) ⟩
-  -- fun f (a ∷ as)                                              ∎
-  where open ≡-Reasoning
-        open SFunⁱ
+eval∘resume≡id {f = f} (a ∷ as) with SFunⁱ.fun₁ f a in fa≡
+... | just x = trans (cong₂ _∷_ (sym fa≡) (eval∘resume≡id as)) (sym (fun-∷ {f = f}))
+... | nothing = trans (cong₂ _∷_ (sym fa≡) (trans (eval∘resume≡id as) {!!})) (sym (fun-∷ {f = f}))
 
 resume∘eval≡id : ∀ {f : SFunᵉ A B} → resume (eval f) ≈ᵉ f
 resume∘eval≡id {f = f} {n} = eval∘resume≡id {f = eval f}
