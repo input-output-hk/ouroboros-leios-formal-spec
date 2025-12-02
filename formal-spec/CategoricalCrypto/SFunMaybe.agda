@@ -68,7 +68,7 @@ record SFunⁱ (A B : Type) : Type where
   tail-fun : {n : ℕ} {a : A} {as : Vec A (n + 0)} → fun as H.≅ tail (fun (a ∷ as))
   tail-fun {n} {a} {as} = let open H.≅-Reasoning in begin
     fun as                       ≅⟨ {!!} ⟩
-    take n (fun as) ≅⟨ {!!} ⟩
+    take n (tail (fun (a ∷ as))) ≅⟨ {!!} ⟩
     tail (fun (a ∷ take n as)) ≅⟨ {!!} ⟩
     tail (fun (a ∷ as))          ∎
 
@@ -95,7 +95,7 @@ module _ where
     head (fun f (take 1 (a ∷ as))) ≡⟨ cong head (take-fun f) ⟨
     head (take 1 (fun f (a ∷ as))) ≡⟨ take₁ {as = fun f (a ∷ as)} ⟩
     head (fun f (a ∷ as))          ∎
-    
+
 eval : SFunᵉ A B → SFunⁱ A B
 eval f = let open SFunᵉ f in record { fun = trace fun init ; take-fun = take-trace }
 
@@ -116,7 +116,7 @@ eval∘resume≡id {f = f} [] with SFunⁱ.fun f []
 ... | [] = refl
 eval∘resume≡id {f = f} (a ∷ as) with SFunⁱ.fun₁ f a in fa≡
 ... | just x = trans (cong₂ _∷_ (sym fa≡) (eval∘resume≡id as)) (sym (fun-∷ {f = f}))
-... | nothing = trans (cong₂ _∷_ (sym fa≡) (trans (eval∘resume≡id as) {!!})) (sym (fun-∷ {f = f}))
+... | nothing rewrite eval∘resume≡id {f = f} as | fun-∷ {f = f} {a} {as} | fa≡ = cong (_ ∷_) {!!}
 
 resume∘eval≡id : ∀ {f : SFunᵉ A B} → resume (eval f) ≈ᵉ f
 resume∘eval≡id {f = f} {n} = eval∘resume≡id {f = eval f}
