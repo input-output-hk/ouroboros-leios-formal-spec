@@ -4,7 +4,7 @@ open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
 {- Module: Leios.Config
-   
+
    This module defines the configuration parameters for the Leios protocol.
    It includes block type definitions (Input Blocks, Endorser Blocks, Votes)
    and protocol parameters such as party counts, stake distribution,
@@ -31,6 +31,9 @@ record Params : Type where
   field networkParams : NetworkParams
 
   open NetworkParams networkParams public
+
+record TestParams (params : Params) : Type where
+  open Params params
 
   field sutId : Fin numberOfParties
         winning-slots : ℙ (BlockType × ℕ)

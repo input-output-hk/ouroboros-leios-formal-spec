@@ -28,7 +28,9 @@ open Equivalence
 
 -- The module contains very simple implementations for the functionalities
 -- that allow to build examples for traces for the different Leios variants
-module Leios.Defaults (params : Params) (let open Params params) where
+module Leios.Defaults
+  (params : Params) (let open Params params)
+  (testParams : TestParams params) (let open TestParams testParams) where
 
 instance
   htx : Hashable (List ℕ) (List ℕ)

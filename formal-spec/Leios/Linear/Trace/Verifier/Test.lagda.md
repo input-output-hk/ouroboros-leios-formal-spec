@@ -29,7 +29,12 @@ and there are the schedules for block production and voting in the field `winnin
             ; ledgerQuality = 0
             ; lateIBInclusion = false
             }
-      ; sutId = fzero
+      }
+
+  testParams : TestParams params
+  testParams =
+    record
+      { sutId = fzero
       ; winning-slots = fromList $
                      (VT , 100) ∷
                      (VT , 104) ∷
@@ -38,7 +43,7 @@ and there are the schedules for block production and voting in the field `winnin
                      (VT , 107) ∷
         (EB , 108) ∷ (VT , 108) ∷
         []
-    }
+      }
 ```
 #### Additional Linear Leios parameters
 Linear Leios has the following three protocol parameters
@@ -52,7 +57,7 @@ In order to build a test trace, an implementation for the `SpecStructure` needs 
 For the test trace, we rely on the implementation provided in `Leios.Defaults`.
 ```agda
   -- TODO: why does Hashable-EndorserBlock not work instead of hpe...?
-  open import Leios.Defaults params using (d-SpecStructure; hpe)
+  open import Leios.Defaults params testParams using (d-SpecStructure; hpe)
   open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 ```
 #### TraceVerifier
