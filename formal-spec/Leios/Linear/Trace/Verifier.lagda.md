@@ -272,40 +272,40 @@ module _
     iErr-verifyStep {i} {s} .errorMsg Err-Invalid                         = printf "%u : Err-Invalid" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg (Err-VT-Role-premises {eb = eb} {ebHash = ebHash} {slot' = slot'} _)
       with ¿ getCurrentEBHash s ≡ just ebHash ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises-1" (LeiosState.slot s)
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: Current EB hash does not match" (LeiosState.slot s)
     ... | yes p
       with ¿ find (λ (_ , eb') → hash eb' ≟ ebHash) (LeiosState.EBs' s) ≡ just (slot' , eb) ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises-2, ebHash=%s" (LeiosState.slot s) (show ebHash)
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: Hashes mismatch, ebHash=%s" (LeiosState.slot s) (show ebHash)
     ... | yes p
       with ¿ hash eb ∉ (LeiosState.VotedEBs s) ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises-3" (LeiosState.slot s)
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: Already voted" (LeiosState.slot s)
     ... | yes p
       with ¿ ¬ isEquivocated s eb ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises-41" (LeiosState.slot s)
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: Is equivocated" (LeiosState.slot s)
     ... | yes p
       with ¿ isValid s (inj₁ (ebHeader eb)) ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises-5" (LeiosState.slot s)
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: Not valid" (LeiosState.slot s)
     ... | yes p
       with ¿ slot' ≤ slotNumber eb + Lhdr ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises-6" (LeiosState.slot s)
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ (slot' ≤ slotNumber eb + Lhdr)" (LeiosState.slot s)
     ... | yes p
       with ¿ slotNumber eb + 3 * Lhdr ≤ (LeiosState.slot s) ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises-7" (LeiosState.slot s)
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ (slotNumber eb + 3 * Lhdr ≤ (LeiosState.slot s))" (LeiosState.slot s)
     ... | yes p
       with ¿ (LeiosState.slot s) ≡ slotNumber eb + validityCheckTime eb ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises-8" (LeiosState.slot s)
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ ((LeiosState.slot s) ≡ slotNumber eb + validityCheckTime eb)" (LeiosState.slot s)
     ... | yes p
       with ¿ validityCheckTime eb ≤ 3 * Lhdr + Lvote ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises-9" (LeiosState.slot s)
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ (validityCheckTime eb ≤ 3 * Lhdr + Lvote)" (LeiosState.slot s)
     ... | yes p
       with ¿ EndorserBlockOSig.txs eb ≢ [] ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises-10" (LeiosState.slot s)
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: No transactions in EB" (LeiosState.slot s)
     ... | yes p
       with ¿ LeiosState.needsUpkeep s VT-Role ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises-11" (LeiosState.slot s)
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: VT-Role already done" (LeiosState.slot s)
     ... | yes p
       with ¿ canProduceV (slotNumber eb) sk-VT (stake s) ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises-12" (LeiosState.slot s)
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: Can not produce vote" (LeiosState.slot s)
     ... | yes p = printf "%u : Impossible!" (LeiosState.slot s)
 
     iErr-verifyTrace : ∀ {s} → IsError (λ t → Err-verifyTrace t s)
