@@ -228,6 +228,80 @@ ShortLeios : Machine (FFD ⊗ BaseC) (IO ⊗ Adv)
 ShortLeios .Machine.State = LeiosState
 ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 
+record IsBlockchain {A B} (Block : Type) (m : Machine A B) : Type where
+  open Channel
+  open Machine m renaming (stepRel to _-⟦_/_⟧ᵐ⇀_)
+  field getCurrentChainI : B .outType
+        getCurrentChainO : B .inType → Maybe (List Block)
+        correctness : ∀ {s} → ∃[ o ] ∃[ bs ]
+          s -⟦ L⊗ ϵ ↑ᵢ getCurrentChainI / just (L⊗ ϵ ↑ₒ o) ⟧ᵐ⇀ s
+          -- asking for the chain probably shouldn't update the state
+          × getCurrentChainO o ≡ just bs
+
+module _ {A} {B} (m : Machine A B) where
+  module m = Machine m
+  open m using () renaming (stepRel to _-⟦_/_⟧ᵐ⇀_)
+  open Channel (A ⊗ B ᵀ)
+
+  data Trace : m.State → Type where
+    [] : ∀ {s} → Trace s
+    ⟨_,_,_⟩∷_ : ∀ {s} → (i : inType) → (o : Maybe outType)
+      → (Σ[ s' ∈ m.State ] (s -⟦ i / o ⟧ᵐ⇀ s')) → Trace s → Trace s
+
+  finalState : ∀ {s} → Trace s → m.State
+  finalState {s} [] = s
+  finalState (⟨ i , o , x ⟩∷ _) = proj₁ x
+
+  record ComputationalMachine : Type where
+    field compute : inType → m.State → Maybe (outType × State)
+          -- correctness
+          -- TODO: use Computational22
+
+module _
+  (numberOfParties : ℕ) (IO Adv : Channel)
+  (Node : Machine Network (IO ⊗ Adv))
+  (nodesF : (k : Fin numberOfParties) → Machine Network (IO ⊗ Adv))
+  (Computational-Nodes : ∀ {k} → ComputationalMachine (nodesF k))
+  (IsBlockchain-Node : ∀ {k} → IsBlockchain Block (nodesF k))
+  (honestNodes : ℙ (Fin numberOfParties))
+  (honest-Node : ∀ {p} → p ∈ honestNodes → nodesF p ≡ Node)
+  (p : Fin numberOfParties) (honest-p : p ∈ honestNodes)
+  where
+  open import Network.BasicBroadcast numberOfParties NetworkMessage as BB
+    using () renaming (Network to Net)
+
+  nodes : Machine (⨂_ {n = numberOfParties} (const Network)) ((⨂_ {n = numberOfParties} (const IO)) ⊗ (⨂_ {n = numberOfParties} (const Adv)))
+  nodes = ⨂ᴷ nodesF
+
+  network : Machine I ((⨂_ {n = numberOfParties} (const IO)) ⊗ (BB.A ⊗ (⨂_ {n = numberOfParties} (const Adv))))
+  network = nodes ∘ᴷ {!Net!}
+
+  module network = Machine network
+
+  getChain : network.State → Fin numberOfParties → Maybe (List Block)
+  getChain s p = case compute (L⊗ ϵ ↑ᵢ getCurrentChainI) {!!} of λ where -- extract the right state
+      (just (x , _)) → maybe getCurrentChainO nothing {!!} -- project x onto the right channel
+      nothing → nothing
+    where
+      open ComputationalMachine (Computational-Nodes {p})
+      open IsBlockchain (IsBlockchain-Node {p})
+
+  -- similar to `getChain`
+  getCurrentSlot : network.State → Fin numberOfParties → Maybe ℕ
+  getCurrentSlot = {!!}
+
+  safety : Type
+  safety = Σ[ Δ ∈ ℕ ] ∀ (init : network.State) {chain} {s₁ s₂} → getChain init p ≡ just chain
+    -- for all traces that reach `Δ` slots into the future
+    →  ∀ (tr : Trace network init)
+    →  let final = finalState network tr
+    in getCurrentSlot init  p ≡ just s₁
+    →  getCurrentSlot final p ≡ just s₂
+    →  s₂ ≥ s₁ + Δ
+    -- all honest nodes have `chain` as a prefix
+    →  ∀ {p' : Fin numberOfParties} → p' ∈ honestNodes
+    →  ∃[ chain' ] getChain init p ≡ just (chain ++ chain')
+
 open import Prelude.STS.GenPremises
 
 instance
