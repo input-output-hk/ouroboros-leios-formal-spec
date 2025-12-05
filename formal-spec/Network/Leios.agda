@@ -33,19 +33,19 @@ module SingleNode (params : Params) (let open Params params) where
 
       ReceiveNetwork : ∀ {m s}
         → WithState s
-          receive (rcvˡ (-, RcvMessage m))
+          receive ϵ ⊗R ↑ᵢ RcvMessage m
           return nothing
           newState (addToInbox m s)
 
       LeiosStep : ∀ {s i o s'}
         → let b , outbox = collectOutbox s' in SimpleFFD s i o s'
         → WithState s
-          receive rcvˡ (-, Activate)
-          return just (sndˡ (-, SndMessage outbox))
+          receive ϵ ⊗R ↑ᵢ Activate
+          return just (ϵ ⊗R ↑ₒ SndMessage outbox)
           newState b
 
   Node : Machine Network (IO ⊗ Adv)
-  Node = ShortLeios ∘' MkMachine FFDBuffers WithState_receive_return_newState_
+  Node = ShortLeios ∘' MkMachine WithState_receive_return_newState_
 
 module MultiNode (networkParams : NetworkParams) (let open NetworkParams networkParams)
   (winning-slotsF : Fin numberOfParties → ℙ (BlockType × ℕ))
@@ -89,11 +89,12 @@ module MultiNode (networkParams : NetworkParams) (let open NetworkParams network
   constNetworkF : Fin numberOfParties → Channel
   constNetworkF _ = Network
 
-  NetworkF≡constNetworkF : ∀ {k} → NetworkF k ≡ constNetworkF k
-  NetworkF≡constNetworkF = refl
+  NetworkF≡constNetworkF : ∀ {k : Fin numberOfParties} → NetworkF k ≡ constNetworkF k
+  NetworkF≡constNetworkF {0F} = refl
+  NetworkF≡constNetworkF {suc k} = {!refl!} 
 
   NetworkMessage-const : ∀ {k₁ k₂} → NetworkF k₁ ≡ NetworkF k₂
-  NetworkMessage-const = refl
+  NetworkMessage-const = {!refl!} -- refl
 
   -- network consisting only of honest nodes
 
