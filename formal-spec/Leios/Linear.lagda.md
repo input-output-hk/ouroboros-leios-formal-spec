@@ -228,19 +228,31 @@ ShortLeios : Machine (FFD ⊗ BaseC) (IO ⊗ Adv)
 ShortLeios .Machine.State = LeiosState
 ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 
+-- This represents the various elements we are allowed to query from a Machine that is always a BlockChain
+data BlockChainInfo (Block : Type) : Type where
+  chain : BlockChainInfo Block
+  slot  : BlockChainInfo Block
+
+bciQueryType : ∀ {Block} → BlockChainInfo Block → Type
+bciQueryType {B} chain = List B
+bciQueryType slot = ℕ
+
 record IsBlockchain {A B} (Block : Type) (m : Machine A B) : Type where
+
   open Channel
   open Machine m renaming (stepRel to _-⟦_/_⟧ᵐ⇀_)
-  field getCurrentChainI : B .outType                     -- B .outType = B' ⊎ ⊤
-        getCurrentChainO : B .inType → Maybe (List Block) -- B .inType = B'' ⊎ List Block
-        correctness : ∀ {s} → ∃[ o ] ∃[ bs ]
-          s -⟦ L⊗ ϵ ↑ᵢ getCurrentChainI / just (L⊗ ϵ ↑ₒ o) ⟧ᵐ⇀ s
-          -- asking for the chain probably shouldn't update the state
-          × getCurrentChainO o ≡ just bs
+
+  field queryI : BlockChainInfo Block → B .outType
+        queryO : (bci : BlockChainInfo Block) → B .inType → Maybe (bciQueryType bci)
+        correctness : ∀ {bci : BlockChainInfo Block} {s} →
+          ∃[ o ] ∃[ bs ] s -⟦ L⊗ ϵ ↑ᵢ queryI bci / just (L⊗ ϵ ↑ₒ o) ⟧ᵐ⇀ s × queryO bci o ≡ just bs
+
+open import Class.Computational22
+open import Class.Computational
 
 module _ {A} {B} (m : Machine A B) where
   module m = Machine m
-  open m using () renaming (stepRel to _-⟦_/_⟧ᵐ⇀_)
+  open Machine m using () renaming (stepRel to _-⟦_/_⟧ᵐ⇀_)
   open Channel (A ⊗ B ᵀ)
 
   data Trace : m.State → m.State → Type where
@@ -248,64 +260,70 @@ module _ {A} {B} (m : Machine A B) where
     _∷ʳ⟨_,_,_⟩ : ∀ {s s' s''} → (i : inType) → (o : Maybe outType)
       → s' -⟦ i / o ⟧ᵐ⇀ s'' → Trace s s' → Trace s s''
 
-  record ComputationalMachine : Type where
-    field compute : inType → m.State → Maybe (Maybe outType × State)
-          -- correctness
-          -- TODO: use Computational22
+  ComputationalMachine = Computational22 _-⟦_/_⟧ᵐ⇀_ ⊤
+
+module ComputationalMachine = Computational22
 
 module _
-  (numberOfParties : ℕ) (IO Adv : Channel)
-  (Node : Machine Network (IO ⊗ Adv))
-  (nodesF : (k : Fin numberOfParties) → Machine Network (IO ⊗ Adv))
+  (let open Params params)
+  (IO Adv              : Channel)
+  (Node                : Machine Network (IO ⊗ Adv)) -- Spec machine
+  (nodesF              : Fin numberOfParties → Machine Network (IO ⊗ Adv))
   (Computational-Nodes : ∀ {k} → ComputationalMachine (nodesF k))
-  (IsBlockchain-Node : ∀ {k} → IsBlockchain Block (nodesF k))
-  (honestNodes : ℙ (Fin numberOfParties))
+  (IsBlockchain-Node   : ∀ {k} → IsBlockchain Block (nodesF k))
+  (honestNodes         : ℙ (Fin numberOfParties))
+  (honest-Node         : ∀ {p} → p ∈ honestNodes → nodesF p ≡ Node)
   -- Σ_{n ∈ honestNodes} stake n ≥ allStake * 2/3
-  (honest-Node : ∀ {p} → p ∈ honestNodes → nodesF p ≡ Node)
-  where
-  open import Network.BasicBroadcast numberOfParties NetworkMessage as BB
-    using () renaming (Network to Net)
+    where
+
+  open import Network.BasicBroadcast numberOfParties NetworkMessage as BB using () renaming (Network to Net)
 
   nodes : Machine (⨂_ {n = numberOfParties} (const Network)) ((⨂_ {n = numberOfParties} (const IO)) ⊗ (⨂_ {n = numberOfParties} (const Adv)))
   nodes = ⨂ᴷ nodesF
 
   network : Machine I ((⨂_ {n = numberOfParties} (const IO)) ⊗ (BB.A ⊗ (⨂_ {n = numberOfParties} (const Adv))))
-  network = nodes ∘ᴷ {!Net!}
+  network = nodes ∘ᴷ Net
 
   module network = Machine network
 
-  getChain : network.State → Fin numberOfParties → Maybe (List Block)
-  getChain s p = case compute (L⊗ ϵ ↑ᵢ getCurrentChainI) {!!} of λ where -- extract the right state
-      (just (x , _)) → maybe getCurrentChainO nothing {!!} -- project x onto the right channel
-      nothing → nothing
+  query : (bci : BlockChainInfo Block) → network.State → Fin numberOfParties → Maybe (bciQueryType bci)
+  query bci ((_ , (s , tt)) , tt) p =
+    case compute (⨂ᴷ-sub-state p s) (L⊗ ϵ ↑ᵢ queryI bci) of λ where
+      (success (just y , _)) → case destruct-⊗ {m = Out} y of λ where
+        (inj₁ _) → nothing
+        (inj₂ y) → queryO bci y
+      _ → nothing
     where
       open ComputationalMachine (Computational-Nodes {p})
       open IsBlockchain (IsBlockchain-Node {p})
 
-  -- similar to `getChain`
-  getCurrentSlot : network.State → Fin numberOfParties → Maybe ℕ
-  getCurrentSlot = {!!}
+  getChain = query chain
+  getSlot = query slot
 
   safety : ℕ → Type
-  safety Δ = ∀ (p : Fin numberOfParties) (honest-p : p ∈ honestNodes)
-    (init : network.State) {chain} {s₁ s₂} → getChain init p ≡ just chain
-    -- for all traces that reach `Δ` slots into the future
-    → ∀ final (tr : Trace network init final)
-    → getCurrentSlot init  p ≡ just s₁
-    → getCurrentSlot final p ≡ just s₂
-    → s₂ ≥ s₁ + Δ
-    -- all honest nodes have `chain` as a prefix
-    → ∀ (p' : Fin numberOfParties) → p' ∈ honestNodes
-    → ∃[ chain' ] getChain final p ≡ just (chain ++ chain')
+  safety Δ = (p        : Fin numberOfParties)
+             (honest-p : p ∈ honestNodes)
+             (init     : network.State)
+             {chain    : List Block}
+             {s₁ s₂    : ℕ}
+             → getChain init p ≡ just chain
+             -- for all traces that reach `Δ` slots into the future
+             → ∀ final (tr : Trace network init final)
+             → getSlot init  p ≡ just s₁
+             → getSlot final p ≡ just s₂
+             → s₂ ≥ s₁ + Δ
+             -- all honest nodes have `chain` as a prefix
+             → ∀ (p' : Fin numberOfParties) → p' ∈ honestNodes
+             → ∃[ chain' ] getChain final p ≡ just (chain ++ chain')
 
-open import Prelude.STS.GenPremises
+-- open import Prelude.STS.GenPremises
 
-instance
-  Dec-isValid : ∀ {s x} → isValid s x ⁇
-  Dec-isValid {s} {x} = ⁇ isValid? s x
+-- instance
+--   Dec-isValid : ∀ {s x} → isValid s x ⁇
+--   Dec-isValid {s} {x} = ⁇ isValid? s x
 
-unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
-unquoteDecl VT-Role-premises = genPremises VT-Role-premises (quote _↝_.VT-Role)
+-- unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
+-- unquoteDecl VT-Role-premises = genPremises VT-Role-premises (quote _↝_.VT-Role)
 
 unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
 unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
