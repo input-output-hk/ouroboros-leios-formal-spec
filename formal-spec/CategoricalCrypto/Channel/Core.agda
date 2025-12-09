@@ -126,6 +126,10 @@ opaque
   _⊗_ : Fun₂ Channel
   (receive₁ ⇿ send₁) ⊗ (receive₂ ⇿ send₂) = (receive₁ ⊎ receive₂) ⇿ (send₁ ⊎ send₂)
 
+  destruct-⊗ : ∀ {A B m} → modeType m (A ⊗ B) → modeType m A ⊎ modeType m B
+  destruct-⊗ {m = Out} = id
+  destruct-⊗ {m = In} = id
+
   -----------------------------------
   -- Forwarding tensorial products --
   -----------------------------------
