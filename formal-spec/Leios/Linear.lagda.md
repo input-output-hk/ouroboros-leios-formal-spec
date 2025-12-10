@@ -241,14 +241,13 @@ record IsBlockchain {A B} (Block : Type) (m : Machine A B) : Type where
 
   open Channel
   open Machine m renaming (stepRel to _-⟦_/_⟧ᵐ⇀_)
+  module m = Machine m
 
   field queryI : BlockChainInfo Block → B .outType
-        queryO : (bci : BlockChainInfo Block) → B .inType → Maybe (bciQueryType bci)
+        queryO : {bci : BlockChainInfo Block} → bciQueryType bci → B .inType
+        queryCompute : (bci : BlockChainInfo Block) → m.State → bciQueryType bci
         correctness : ∀ {bci : BlockChainInfo Block} {s} →
-          ∃[ o ] ∃[ bs ] s -⟦ L⊗ ϵ ↑ᵢ queryI bci / just (L⊗ ϵ ↑ₒ o) ⟧ᵐ⇀ s × queryO bci o ≡ just bs
-
-open import Class.Computational22
-open import Class.Computational
+          s -⟦ L⊗ ϵ ↑ᵢ queryI bci / just (L⊗ ϵ ↑ₒ queryO (queryCompute bci s)) ⟧ᵐ⇀ s
 
 module _ {A} {B} (m : Machine A B) where
   module m = Machine m
@@ -257,22 +256,23 @@ module _ {A} {B} (m : Machine A B) where
 
   data Trace : m.State → m.State → Type where
     [] : ∀ {s} → Trace s s
-    _∷ʳ⟨_,_,_⟩ : ∀ {s s' s''} → (i : inType) → (o : Maybe outType)
-      → s' -⟦ i / o ⟧ᵐ⇀ s'' → Trace s s' → Trace s s''
+    _∷ʳ⟨_,_,_⟩ : ∀ {s s' s''}
+      → Trace s s' → (i : inType) → (o : Maybe outType) → s' -⟦ i / o ⟧ᵐ⇀ s'' → Trace s s''
 
-  ComputationalMachine = Computational22 _-⟦_/_⟧ᵐ⇀_ ⊤
+prune : {A : Type} → ℕ → List A → List A
+prune k l = take (length l ∸ k) l
 
-module ComputationalMachine = Computational22
+_≼_ : {A : Type} → List A → List A → Type
+l₁ ≼ l = ∃[ l₂ ] l₁ ++ l₂ ≡ l
 
 module _
   (let open Params params)
   (IO Adv              : Channel)
   (Node                : Machine Network (IO ⊗ Adv)) -- Spec machine
   (nodesF              : Fin numberOfParties → Machine Network (IO ⊗ Adv))
-  (Computational-Nodes : ∀ {k} → ComputationalMachine (nodesF k))
-  (IsBlockchain-Node   : ∀ {k} → IsBlockchain Block (nodesF k))
   (honestNodes         : ℙ (Fin numberOfParties))
   (honest-Node         : ∀ {p} → p ∈ honestNodes → nodesF p ≡ Node)
+  (IsBlockchain-Node   : ∀ {k} → k ∈ honestNodes → IsBlockchain Block (nodesF k))
   -- Σ_{n ∈ honestNodes} stake n ≥ allStake * 2/3
     where
 
@@ -286,44 +286,36 @@ module _
 
   module network = Machine network
 
-  query : (bci : BlockChainInfo Block) → network.State → Fin numberOfParties → Maybe (bciQueryType bci)
-  query bci ((_ , (s , tt)) , tt) p =
-    case compute (⨂ᴷ-sub-state p s) (L⊗ ϵ ↑ᵢ queryI bci) of λ where
-      (success (just y , _)) → case destruct-⊗ {m = Out} y of λ where
-        (inj₁ _) → nothing
-        (inj₂ y) → queryO bci y
-      _ → nothing
-    where
-      open ComputationalMachine (Computational-Nodes {p})
-      open IsBlockchain (IsBlockchain-Node {p})
+  query : (bci : BlockChainInfo Block) → network.State
+        → (p : Fin numberOfParties) → (p ∈ honestNodes) → bciQueryType bci
+  query bci ((_ , (s , tt)) , tt) p honest-p = queryCompute bci (⨂ᴷ-sub-state p s)
+    where open IsBlockchain (IsBlockchain-Node {p} honest-p)
 
   getChain = query chain
   getSlot = query slot
 
-  safety : ℕ → Type
-  safety Δ = (p        : Fin numberOfParties)
-             (honest-p : p ∈ honestNodes)
-             (init     : network.State)
-             {chain    : List Block}
-             {s₁ s₂    : ℕ}
-             → getChain init p ≡ just chain
-             -- for all traces that reach `Δ` slots into the future
-             → ∀ final (tr : Trace network init final)
-             → getSlot init  p ≡ just s₁
-             → getSlot final p ≡ just s₂
-             → s₂ ≥ s₁ + Δ
-             -- all honest nodes have `chain` as a prefix
-             → ∀ (p' : Fin numberOfParties) → p' ∈ honestNodes
-             → ∃[ chain' ] getChain final p ≡ just (chain ++ chain')
+  safety : ℕ → ℕ → Type
+  safety k Δ = (p        : Fin numberOfParties)
+               (honest-p : p ∈ honestNodes)
+               (init     : network.State)
+               → ∀ final (tr : Trace network init final)
+               → let chain = getChain init  p honest-p
+                     s₁    = getSlot  init  p honest-p
+                     s₂    = getSlot  final p honest-p
+               -- for all traces that reach `Δ` slots into the future
+               in s₂ ≥ s₁ + Δ
+               -- all honest nodes have `chain` as a prefix
+               → ∀ (p' : Fin numberOfParties) → (honest-p' : p' ∈ honestNodes)
+               → prune k chain ≼ getChain final p' honest-p'
 
--- open import Prelude.STS.GenPremises
+open import Prelude.STS.GenPremises
 
--- instance
---   Dec-isValid : ∀ {s x} → isValid s x ⁇
---   Dec-isValid {s} {x} = ⁇ isValid? s x
+instance
+  Dec-isValid : ∀ {s x} → isValid s x ⁇
+  Dec-isValid {s} {x} = ⁇ isValid? s x
 
--- unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
--- unquoteDecl VT-Role-premises = genPremises VT-Role-premises (quote _↝_.VT-Role)
+unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
+unquoteDecl VT-Role-premises = genPremises VT-Role-premises (quote _↝_.VT-Role)
 
 unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
 unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
