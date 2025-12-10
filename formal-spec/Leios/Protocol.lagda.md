@@ -22,7 +22,7 @@ open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open GenFFD
 ```
 High level structure:
-
+<pre>
                                        Linear Leios
                                        /         |
 +-------------------------------------+          |
@@ -30,6 +30,7 @@ High level structure:
 +-------------------------------------+       Base Protocol
                                        \      /
                                        Network
+</pre>
 ```agda
 data LeiosInput : Type where
   INIT     : VTy → LeiosInput
