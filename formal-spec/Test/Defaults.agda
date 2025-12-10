@@ -202,8 +202,6 @@ d-FFDFunctionality =
     { State         = FFDBuffers
     ; initFFDState  = record { inEBs = []; inVTs = []; outEBs = []; outVTs = [] }
     ; _-⟦_/_⟧⇀_     = SimpleFFD
-    ; Send-total    = send-total
-    ; Fetch-total   = fetch-total
     }
 
 open import Leios.Voting public
