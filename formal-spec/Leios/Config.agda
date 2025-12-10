@@ -21,10 +21,6 @@ unquoteDecl DecEq-BlockType = derive-DecEq ((quote BlockType , DecEq-BlockType) 
 record NetworkParams : Type where
   field numberOfParties   : ℕ
         stakeDistribution : TotalMap (Fin numberOfParties) ℕ
-        stageLength       : ℕ
-        ledgerQuality     : ℕ
-        lateIBInclusion   : Bool
-        ⦃ NonZero-stageLength ⦄ : NonZero stageLength
         ⦃ NonZero-numberOfParties ⦄ : NonZero numberOfParties
 
 record Params : Type where

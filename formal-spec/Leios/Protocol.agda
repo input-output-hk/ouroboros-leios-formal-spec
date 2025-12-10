@@ -47,15 +47,12 @@ record LeiosState : Type where
         SD           : StakeDistr
         RBs          : List RankingBlock
         ToPropose    : List Tx
-        IBs          : List InputBlock
         {- EBs': EBs together with the slot in which we received them
         -}
         EBs'         : List (ℕ × EndorserBlock)
         VotedEBs     : List Hash
         Vs           : List (List Vote)
         slot         : ℕ
-        IBHeaders    : List IBHeader
-        IBBodies     : List IBBody
         Upkeep       : List SlotUpkeep
         Upkeep-Stage : ℙ StageUpkeep
         votingState  : VotingState
@@ -72,17 +69,8 @@ record LeiosState : Type where
   lookupEB : EBRef → Maybe EndorserBlock
   lookupEB r = find (λ b → getEBRef b ≟ r) EBs
 
-  lookupIB : IBRef → Maybe InputBlock
-  lookupIB r = find (λ b → getIBRef b ≟ r) IBs
-
   lookupTxs : EndorserBlock → List Tx
-  lookupTxs eb = do
-    eb′ ← mapMaybe lookupEB $ ebRefs eb
-    ib  ← mapMaybe lookupIB $ ibRefs eb′
-    txs $ body ib
-    where open EndorserBlockOSig hiding (txs)
-          open IBBody
-          open InputBlock
+  lookupTxs eb = let open EndorserBlockOSig eb in txs
 
   lookupTxsC : Hash → List Tx
   lookupTxsC c = maybe lookupTxs [] $ lookupEB c
@@ -122,13 +110,10 @@ initLeiosState V SD pks = record
   ; SD           = SD
   ; RBs          = []
   ; ToPropose    = []
-  ; IBs          = []
   ; EBs'         = []
   ; VotedEBs     = []
   ; Vs           = []
   ; slot         = initSlot V
-  ; IBHeaders    = []
-  ; IBBodies     = []
   ; Upkeep       = []
   ; Upkeep-Stage = ∅
   ; votingState  = initVotingState
@@ -151,36 +136,6 @@ lookupPubKeyAndStake s b =
       L.filter (λ pk → producerID b ≟ poolID pk) (LeiosState.PubKeys s)
 
 module _ (s : LeiosState)  where
-
-  record ibHeaderValid (h : IBHeader) (pk : PubKey) (st : ℕ) : Type where
-    field lotteryPfValid : verify pk (slotNumber h) st (lotteryPf h)
-          signatureValid : verifySig pk (signature h)
-
-  record ibBodyValid (b : IBBody) : Type where
-
-  ibHeaderValid? : (h : IBHeader) (pk : PubKey) (st : ℕ) → Dec (ibHeaderValid h pk st)
-  ibHeaderValid? h pk st
-    with verify? pk (slotNumber h) st (lotteryPf h)
-  ... | no ¬p = no (¬p ∘ ibHeaderValid.lotteryPfValid)
-  ... | yes p
-    with verifySig? pk (signature h)
-  ... | yes q = yes (record { lotteryPfValid = p ; signatureValid = q })
-  ... | no ¬q = no (¬q ∘ ibHeaderValid.signatureValid)
-
-  ibBodyValid? : (b : IBBody) → Dec (ibBodyValid b)
-  ibBodyValid? _ = yes record {}
-
-  ibValid : InputBlock → Type
-  ibValid record { header = h ; body = b }
-    with lookupPubKeyAndStake s h
-  ... | just (pk , pid) = ibHeaderValid h pk (stake'' pk s) × ibBodyValid b
-  ... | nothing = ⊥
-
-  ibValid? : (ib : InputBlock) → Dec (ibValid ib)
-  ibValid? record { header = h ; body = b }
-    with lookupPubKeyAndStake s h
-  ... | just (pk , pid) = ibHeaderValid? h pk (stake'' pk s) ×-dec ibBodyValid? b
-  ... | nothing = no λ x → x
 
   record ebValid (eb : EndorserBlock) (pk : PubKey) (st : ℕ) : Type where
     field lotteryPfValid : verify pk (slotNumber eb) st (lotteryPf eb)
@@ -205,10 +160,6 @@ module _ (s : LeiosState)  where
   vsValid? _ = yes record {}
 
   headerValid : Header → Type
-  headerValid (ibHeader h)
-    with lookupPubKeyAndStake s h
-  ... | just (pk , pid) = ibHeaderValid h pk (stake'' pk s)
-  ... | nothing = ⊥
   headerValid (ebHeader h)
     with lookupPubKeyAndStake s h
   ... | just (pk , pid) = ebValid h pk (stake'' pk s)
@@ -216,10 +167,6 @@ module _ (s : LeiosState)  where
   headerValid (vtHeader h) = vsValid h
 
   headerValid? : (h : Header) → Dec (headerValid h)
-  headerValid? (ibHeader h)
-    with lookupPubKeyAndStake s h
-  ... | just (pk , pid) = ibHeaderValid? h pk (stake'' pk s)
-  ... | nothing = no λ x → x
   headerValid? (ebHeader h)
     with lookupPubKeyAndStake s h
   ... | just (pk , pid) = ebValid? h pk (stake'' pk s)
@@ -227,10 +174,10 @@ module _ (s : LeiosState)  where
   headerValid? (vtHeader h) = vsValid? h
 
   bodyValid : Body → Type
-  bodyValid (ibBody b) = ibBodyValid b
+  bodyValid _ = ⊤
 
   bodyValid? : (b : Body) → Dec (bodyValid b)
-  bodyValid? (ibBody b) = ibBodyValid? b
+  bodyValid? _ = yes tt
 
   opaque
     isValid : Header ⊎ Body → Type
@@ -241,14 +188,6 @@ module _ (s : LeiosState)  where
     isValid? (inj₁ h) = headerValid? h
     isValid? (inj₂ b) = bodyValid? b
 
--- some predicates about EBs
-module _ (s : LeiosState) (eb : EndorserBlock) where
-  open EndorserBlockOSig eb
-  open LeiosState s
-
-  allIBRefsKnown : Type
-  allIBRefsKnown = ∀[ ref ∈ fromList ibRefs ] ref ∈ˡ map getIBRef IBs
-
 module _ (s : LeiosState) where
 
   open LeiosState s
@@ -257,40 +196,16 @@ module _ (s : LeiosState) where
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs' = (slot , eb) ∷ EBs' }
   upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs }
-  upd (inj₁ (ibHeader h)) with Any.any? (matchIB? h) IBBodies
-  ... | yes p =
-    record s
-      { IBs = record { header = h ; body = Any.lookup p } ∷ IBs
-      ; IBBodies = IBBodies Any.─ p
-      }
-  ... | no _ =
-    record s
-      { IBHeaders = h ∷ IBHeaders
-      }
-  upd (inj₂ (ibBody b)) with Any.any? (flip matchIB? b) IBHeaders
-  ... | yes p =
-    record s
-      { IBs = record { header = Any.lookup p ; body = b } ∷ IBs
-      ; IBHeaders = IBHeaders Any.─ p
-      }
-  ... | no _ =
-    record s
-      { IBBodies = b ∷ IBBodies
-      }
+  upd (inj₂ _)             = s
 
 module _ {s s'} where
   open LeiosState s'
 
   upd-preserves-Upkeep : ∀ {x} → LeiosState.Upkeep s ≡ LeiosState.Upkeep s'
                                → LeiosState.Upkeep s ≡ LeiosState.Upkeep (upd s' x)
-  upd-preserves-Upkeep {inj₁ (ibHeader x)} refl with Any.any? (matchIB? x) IBBodies
-  ... | yes p = refl
-  ... | no ¬p = refl
   upd-preserves-Upkeep {inj₁ (ebHeader x)} refl = refl
   upd-preserves-Upkeep {inj₁ (vtHeader x)} refl = refl
-  upd-preserves-Upkeep {inj₂ (ibBody x)} refl with Any.any? (flip matchIB? x) IBHeaders
-  ... | yes p = refl
-  ... | no ¬p = refl
+  upd-preserves-Upkeep {inj₂ _} refl            = refl
 
 infix 25 _↑_
 _↑_ : LeiosState → List (Header ⊎ Body) → LeiosState
@@ -314,7 +229,7 @@ module Types (params : Params) (let open Params params) where
   Participant = Fin numberOfParties
 
   NetworkMessage : Type
-  NetworkMessage = InputBlock ⊎ EndorserBlock ⊎ List Vote ⊎ RankingBlock
+  NetworkMessage = EndorserBlock ⊎ List Vote ⊎ RankingBlock
 
   Network : Channel
   Network = simpleChannel (NetworkT numberOfParties NetworkMessage)

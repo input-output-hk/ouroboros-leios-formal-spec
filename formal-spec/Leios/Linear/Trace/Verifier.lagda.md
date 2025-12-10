@@ -49,7 +49,6 @@ private variable
   s s′ : LeiosState
   σ    : Action
   σs   : TestTrace
-  ib   : InputBlock
   eb   : EndorserBlock
   ebs  : List EndorserBlock
   vt   : List Vote

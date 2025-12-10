@@ -91,7 +91,7 @@ three steps corresponding to the three types of Leios specific blocks.
 toProposeEB : LeiosState → VrfPf → Maybe EndorserBlock
 toProposeEB s π = let open LeiosState s in case proj₂ (splitTxs ToPropose) of λ where
   [] → nothing
-  _ → just $ mkEB slot id π sk-IB ToPropose [] []
+  _ → just $ mkEB slot id π sk-EB ToPropose
 
 getCurrentEBHash : LeiosState → Maybe EBRef
 getCurrentEBHash s = let open LeiosState s in
@@ -155,7 +155,7 @@ open Types params
 
 data _⊢_ : VTy → LeiosState → Type where
   Init :
-       ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
+       ∙ ks K.-⟦ K.INIT pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
        ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
        ────────────────────────────────────────────────────────────────
        V ⊢ initLeiosState V SD pks
