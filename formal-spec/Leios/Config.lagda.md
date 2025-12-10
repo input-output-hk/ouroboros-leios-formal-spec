@@ -4,6 +4,7 @@ This module defines the configuration parameters for the Leios protocol.
 It includes block type definitions (Input Blocks, Endorser Blocks, Votes)
 and protocol parameters such as party counts, stake distribution,
 stage length, and winning slot specifications.
+<!--
 ```agda
 {-# OPTIONS --safe #-}
 ```
