@@ -1,3 +1,4 @@
+```agda
 {- Module: Leios.Network
    
    This module defines the network abstractions and communication channels
@@ -79,3 +80,4 @@ module HeaderDiffusion (a : Abstract) (Peer : Set) (self : Peer) where
 
   Functionality : Machine I C
   Functionality = MkMachine' Step ∘ B.SingleFunctionality
+```

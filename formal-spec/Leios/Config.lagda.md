@@ -1,3 +1,4 @@
+```agda
 {-# OPTIONS --safe #-}
 open import Leios.Prelude
 open import Tactic.Defaults
@@ -33,3 +34,4 @@ record TestParams (params : Params) : Type where
 
   field sutId : Fin numberOfParties
         winning-slots : ℙ (BlockType × ℕ)
+```

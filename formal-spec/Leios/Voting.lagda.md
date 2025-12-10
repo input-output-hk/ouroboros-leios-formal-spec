@@ -1,3 +1,4 @@
+```agda
 {-# OPTIONS --safe #-}
 
 open import Leios.Prelude
@@ -10,3 +11,4 @@ record VotingAbstract (X : Type) : Type₁ where
         isVoteCertified : VotingState → X → Type
 
         ⦃ isVoteCertified⁇ ⦄ : ∀ {vs x} → isVoteCertified vs x ⁇
+```

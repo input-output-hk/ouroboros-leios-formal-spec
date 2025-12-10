@@ -1,3 +1,4 @@
+```agda
 {-# OPTIONS --safe #-}
 
 module Leios.FFD where
@@ -28,3 +29,4 @@ record FFDAbstract : Type₁ where
 
     open Input public
     open Output public
+```

@@ -1,3 +1,4 @@
+```agda
 {-# OPTIONS --safe #-}
 
 open import Leios.Prelude hiding (id; _⊗_)
@@ -264,3 +265,4 @@ module Types (params : Params) (let open Params params) where
 
   BaseC : Channel
   BaseC = simpleChannel BaseT ᵀ
+```
