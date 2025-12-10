@@ -1,13 +1,14 @@
+## Leios.Blocks
+
+This module defines the block structures used in the Leios protocol.
+It provides implementations for Endorser Blocks, Votes,
+and defines a Freshest First Delivery (FFD) for Leios Blocks.
+<!--
 ```agda
 {-# OPTIONS --safe #-}
-
-{- Module: Leios.Blocks
-   
-   This module defines the block structures used in the Leios protocol.
-   It provides implementations for Input Blocks, Endorser Blocks, Votes, 
-   and defines a Freshest First Delivery (FFD) for Leios Blocks.
--}
-
+```
+-->
+```agda
 open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.FFD
@@ -37,11 +38,9 @@ record IsBlock (B : Type) : Type where
 open IsBlock ⦃...⦄ public
 
 EBRef = Hash
-
---------------------------------------------------------------------------------
--- Endorser Blocks
---------------------------------------------------------------------------------
-
+```
+### Endorser Blocks
+```agda
 record EndorserBlockOSig (sig : Type) : Type where
   field slotNumber : ℕ
         producerID : PoolID
@@ -75,12 +74,9 @@ mkEB slot id π pKey txs = record { signature = sign pKey (hash b) ; EndorserBlo
 
 getEBRef : ⦃ Hashable PreEndorserBlock Hash ⦄ → EndorserBlock → EBRef
 getEBRef = hash
-
-
---------------------------------------------------------------------------------
--- FFD for Leios Blocks
---------------------------------------------------------------------------------
-
+```
+### FFD for Leios Blocks
+```agda
 module GenFFD ⦃ _ : IsBlock (List Vote) ⦄ where
   data Header : Type where
     ebHeader : EndorserBlock → Header
