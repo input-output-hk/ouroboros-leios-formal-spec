@@ -1,4 +1,5 @@
 ## Leios.Base
+
 This module defines core components for the base layer of Leios protocol.
 It includes stake distribution, ranking blocks, and base layer abstractions.
 <!--

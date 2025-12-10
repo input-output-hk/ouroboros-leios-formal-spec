@@ -1,6 +1,9 @@
+<!--
 ```agda
 {-# OPTIONS --safe #-}
-
+```
+-->
+```agda
 open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.VRF

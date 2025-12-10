@@ -1,6 +1,9 @@
+<!--
 ```agda
 {-# OPTIONS --safe #-}
-
+```
+-->
+```agda
 module Leios.FFD where
 
 open import Leios.Prelude
