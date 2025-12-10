@@ -1,4 +1,5 @@
 ## Leios.Abstract
+
 This module defines the abstract interface for the Leios protocol,
 specifying the core types and operations required by the implementation.
 It provides type signatures for transactions, pool identifiers, and 

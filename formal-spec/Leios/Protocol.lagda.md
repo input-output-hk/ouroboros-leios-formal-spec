@@ -1,36 +1,36 @@
+## Leios.Protocol
+
+This module defines the core Leios protocol state machine, including:
+- Input/output message types
+- Protocol state representation and operations
+- Block and transaction validation
+- State transition logic for processing headers and block bodies
+  The protocol integrates header/body diffusion with the underlying base protocol.
+<!--
 ```agda
 {-# OPTIONS --safe #-}
-
+```
+-->
+```agda
 open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.FFD
 open import Leios.SpecStructure
 
 module Leios.Protocol {n} (⋯ : SpecStructure n) (let open SpecStructure ⋯) (SlotUpkeep : Type) (StageUpkeep : Type) where
 
-{- Module: Leios.Protocol
-
-   This module defines the core Leios protocol state machine, including:
-   - Input/output message types
-   - Protocol state representation and operations
-   - Block and transaction validation
-   - State transition logic for processing headers and block bodies
-   The protocol integrates header/body diffusion with the underlying base protocol.
--}
-
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open GenFFD
+```
+High level structure:
 
--- High level structure:
-
-
---                                      (simple) Leios
---                                        /         |
--- +-------------------------------------+          |
--- | Header Diffusion     Body Diffusion |          |
--- +-------------------------------------+       Base Protocol
---                                        \      /
---                                        Network
-
+                                       Linear Leios
+                                       /         |
++-------------------------------------+          |
+| Header Diffusion     Body Diffusion |          |
++-------------------------------------+       Base Protocol
+                                       \      /
+                                       Network
+```agda
 data LeiosInput : Type where
   INIT     : VTy → LeiosInput
   SUBMIT   : EndorserBlock ⊎ List Tx → LeiosInput
