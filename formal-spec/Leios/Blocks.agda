@@ -35,65 +35,7 @@ record IsBlock (B : Type) : Type where
 
 open IsBlock ⦃...⦄ public
 
-IBRef = Hash
 EBRef = Hash
-
---------------------------------------------------------------------------------
--- Input Blocks
---------------------------------------------------------------------------------
-
-record IBHeaderOSig (sig : Type) : Type where
-  field slotNumber : ℕ
-        producerID : PoolID
-        lotteryPf  : VrfPf
-        bodyHash   : Hash
-        signature  : sig
-
-IBHeader    = IBHeaderOSig Sig
-PreIBHeader = IBHeaderOSig ⊤
-
-record IBBody : Type where
-  field txs : List Tx
-
-record InputBlock : Type where
-  field header : IBHeader
-        body   : IBBody
-
-  open IBHeaderOSig header public
-
-unquoteDecl DecEq-IBBody DecEq-IBHeaderOSig DecEq-InputBlock =
-  derive-DecEq (
-      (quote IBBody , DecEq-IBBody)
-    ∷ (quote IBHeaderOSig , DecEq-IBHeaderOSig)
-    ∷ (quote InputBlock , DecEq-InputBlock) ∷ [])
-
-instance
-  IsBlock-IBHeader : IsBlock IBHeader
-  IsBlock-IBHeader = record { IBHeaderOSig }
-
-  Hashable-IBBody : Hashable IBBody Hash
-  Hashable-IBBody .hash b = hash (b .IBBody.txs)
-
-  Hashable-IBHeader : ⦃ Hashable PreIBHeader Hash ⦄ → Hashable IBHeader Hash
-  Hashable-IBHeader .hash b = hash {T = PreIBHeader}
-    record { IBHeaderOSig b hiding (signature) ; signature = _ }
-
-  IsBlock-InputBlock : IsBlock InputBlock
-  IsBlock-InputBlock = record { InputBlock }
-
-mkIBHeader : ⦃ Hashable PreIBHeader Hash ⦄ → ℕ → PoolID → VrfPf → PrivKey → List Tx → IBHeader
-mkIBHeader slot id π pKey txs = record { signature = sign pKey (hash h) ; IBHeaderOSig h }
-  where
-    h : IBHeaderOSig ⊤
-    h = record { slotNumber = slot
-               ; producerID = id
-               ; lotteryPf  = π
-               ; bodyHash   = hash txs
-               ; signature  = _
-               }
-
-getIBRef : ⦃ Hashable PreIBHeader Hash ⦄ → InputBlock → IBRef
-getIBRef = hash ∘ InputBlock.header
 
 --------------------------------------------------------------------------------
 -- Endorser Blocks
@@ -104,8 +46,6 @@ record EndorserBlockOSig (sig : Type) : Type where
         producerID : PoolID
         lotteryPf  : VrfPf
         txs        : List Tx
-        ibRefs     : List IBRef
-        ebRefs     : List EBRef
         signature  : sig
 
 EndorserBlock    = EndorserBlockOSig Sig
@@ -121,16 +61,14 @@ instance
 
 unquoteDecl DecEq-EndorserBlockOSig = derive-DecEq ((quote EndorserBlockOSig , DecEq-EndorserBlockOSig) ∷ [])
 
-mkEB : ⦃ Hashable PreEndorserBlock Hash ⦄ → ℕ → PoolID → VrfPf → PrivKey → List Tx → List IBRef → List EBRef → EndorserBlock
-mkEB slot id π pKey txs LI LE = record { signature = sign pKey (hash b) ; EndorserBlockOSig b }
+mkEB : ⦃ Hashable PreEndorserBlock Hash ⦄ → ℕ → PoolID → VrfPf → PrivKey → List Tx → EndorserBlock
+mkEB slot id π pKey txs = record { signature = sign pKey (hash b) ; EndorserBlockOSig b }
   where
     b : PreEndorserBlock
     b = record { slotNumber = slot
                ; producerID = id
                ; lotteryPf  = π
                ; txs        = txs
-               ; ibRefs     = LI
-               ; ebRefs     = LE
                ; signature  = _
                }
 
@@ -144,36 +82,24 @@ getEBRef = hash
 
 module GenFFD ⦃ _ : IsBlock (List Vote) ⦄ where
   data Header : Type where
-    ibHeader : IBHeader → Header
     ebHeader : EndorserBlock → Header
     vtHeader : List Vote → Header
 
-  data Body : Type where
-    ibBody : IBBody → Body
+  Body = ⊤
 
-  unquoteDecl DecEq-Header DecEq-Body =
-    derive-DecEq ((quote Header , DecEq-Header) ∷ (quote Body , DecEq-Body) ∷ [])
+  unquoteDecl DecEq-Header =
+    derive-DecEq ((quote Header , DecEq-Header) ∷ [])
 
   ID : Type
   ID = ℕ × PoolID
 
-  matchIB : IBHeader → IBBody → Type
-  matchIB h b = bodyHash ≡ hash b
-    where open IBHeaderOSig h; open IBBody b
-
-  matchIB? :  ∀ (h : IBHeader) → (b : IBBody) → Dec (matchIB h b)
-  matchIB? h b = bodyHash ≟ hash b
-    where open IBHeaderOSig h; open IBBody b
-
   match : Header → Body → Type
-  match (ibHeader h) (ibBody b) = matchIB h b
   match _ _ = ⊥
 
   -- can we express uniqueness wrt pipelines as a property?
   msgID : Header → ID
-  msgID (ibHeader h) = (slotNumber h , producerID h)
-  msgID (ebHeader h) = (slotNumber h , producerID h) -- NOTE: this isn't in the paper
-  msgID (vtHeader  h) = (slotNumber h , producerID h) -- NOTE: this isn't in the paper
+  msgID (ebHeader h) = (slotNumber h , producerID h)
+  msgID (vtHeader  h) = (slotNumber h , producerID h)
 
 ffdAbstract : ⦃ _ : IsBlock (List Vote) ⦄ → FFDAbstract
 ffdAbstract = record { GenFFD }

@@ -27,7 +27,3 @@ record LeiosAbstract : Type₁ where
         sign : PrivKey → Hash → Sig
         ⦃ Hashable-Txs ⦄ : Hashable (List Tx) Hash
         getEBHash : EBCert → Hash
-        L : ℕ
-        ⦃ NonZero-L ⦄ : NonZero L
-        η : ℕ
-        Late-IB-Inclusion : Bool

@@ -1,6 +1,6 @@
 {-# OPTIONS --safe #-}
-{- Module: Leios.Defaults
-   
+{- Module: Test.Defaults
+
    This module provides simple default implementations for the core components
    and functionalities of the Leios protocol. These defaults are intended for
    building examples and traces for different Leios variants, and include
@@ -28,7 +28,7 @@ open Equivalence
 
 -- The module contains very simple implementations for the functionalities
 -- that allow to build examples for traces for the different Leios variants
-module Leios.Defaults
+module Test.Defaults
   (params : Params) (let open Params params)
   (testParams : TestParams params) (let open TestParams testParams) where
 
@@ -51,9 +51,6 @@ d-Abstract =
     ; Vote              = ⊤
     ; vote              = λ _ _ → tt
     ; sign              = λ _ _ → tt
-    ; L                 = stageLength
-    ; η                 = ledgerQuality
-    ; Late-IB-Inclusion = lateIBInclusion
     }
 
 open LeiosAbstract d-Abstract public
@@ -135,63 +132,48 @@ instance
       ; lotteryPf  = λ _ → tt
       }
 
-  hhs : Hashable PreIBHeader Hash
-  hhs .hash = IBHeaderOSig.bodyHash
-
   hpe : Hashable PreEndorserBlock Hash
   hpe .hash = EndorserBlockOSig.txs
 
 record FFDBuffers : Type where
-  field inIBs : List InputBlock
-        inEBs : List EndorserBlock
+  field inEBs : List EndorserBlock
         inVTs : List (List Vote)
 
-        outIBs : List InputBlock
         outEBs : List EndorserBlock
         outVTs : List (List Vote)
 
 unquoteDecl DecEq-FFDBuffers = derive-DecEq ((quote FFDBuffers , DecEq-FFDBuffers) ∷ [])
 
 open GenFFD.Header
-open GenFFD.Body
 open FFDBuffers
 
 flushIns : FFDBuffers → List (GenFFD.Header ⊎ GenFFD.Body)
-flushIns record { inIBs = ibs ; inEBs = ebs ; inVTs = vts } =
-  flushIBs ibs ++ L.map (inj₁ ∘ ebHeader) ebs ++ L.map (inj₁ ∘ vtHeader) vts
-  where
-    flushIBs : List InputBlock → List (GenFFD.Header ⊎ GenFFD.Body)
-    flushIBs [] = []
-    flushIBs (record {header = h; body = b} ∷ ibs) = inj₁ (ibHeader h) ∷ inj₂ (ibBody b) ∷ flushIBs ibs
+flushIns record { inEBs = ebs ; inVTs = vts } =
+  L.map (inj₁ ∘ ebHeader) ebs ++ L.map (inj₁ ∘ vtHeader) vts
+
 
 data SimpleFFD : FFDBuffers → FFDAbstract.Input ffdAbstract → FFDAbstract.Output ffdAbstract → FFDBuffers → Type where
-  SendIB : ∀ {s h b}    → SimpleFFD s (FFDAbstract.Send (ibHeader h) (just (ibBody b))) FFDAbstract.SendRes (record s { outIBs = record {header = h; body = b} ∷ outIBs s})
   SendEB : ∀ {s eb}     → SimpleFFD s (FFDAbstract.Send (ebHeader eb) nothing) FFDAbstract.SendRes (record s { outEBs = eb ∷ outEBs s})
   SendVS : ∀ {s vs}     → SimpleFFD s (FFDAbstract.Send (vtHeader vs) nothing) FFDAbstract.SendRes (record s { outVTs = vs ∷ outVTs s})
 
-  BadSendIB : ∀ {s h}   → SimpleFFD s (FFDAbstract.Send (ibHeader h) nothing) FFDAbstract.SendRes s
   BadSendEB : ∀ {s h b} → SimpleFFD s (FFDAbstract.Send (ebHeader h) (just b)) FFDAbstract.SendRes s
   BadSendVS : ∀ {s h b} → SimpleFFD s (FFDAbstract.Send (vtHeader h) (just b)) FFDAbstract.SendRes s
 
-  Fetch : ∀ {s}         → SimpleFFD s FFDAbstract.Fetch (FFDAbstract.FetchRes (flushIns s)) (record s { inIBs = [] ; inEBs = [] ; inVTs = [] })
+  Fetch : ∀ {s}         → SimpleFFD s FFDAbstract.Fetch (FFDAbstract.FetchRes (flushIns s)) (record s { inEBs = [] ; inVTs = [] })
 
 send-total : ∀ {s h b} → ∃[ s' ] (SimpleFFD s (FFDAbstract.Send h b) FFDAbstract.SendRes s')
-send-total {s} {ibHeader h} {just (ibBody b)} = record s { outIBs = record {header = h; body = b} ∷ outIBs s} , SendIB
 send-total {s} {ebHeader eb} {nothing}        = record s { outEBs = eb ∷ outEBs s} , SendEB
 send-total {s} {vtHeader vs} {nothing}        = record s { outVTs = vs ∷ outVTs s} , SendVS
 
-send-total {s} {ibHeader h} {nothing} = s , BadSendIB
 send-total {s} {ebHeader eb} {just _} = s , BadSendEB
 send-total {s} {vtHeader vs} {just _} = s , BadSendVS
 
 fetch-total : ∀ {s} → ∃[ x ] (∃[ s' ] (SimpleFFD s FFDAbstract.Fetch (FFDAbstract.FetchRes x) s'))
-fetch-total {s} = flushIns s , (record s { inIBs = [] ; inEBs = [] ; inVTs = [] } , Fetch)
+fetch-total {s} = flushIns s , (record s { inEBs = [] ; inVTs = [] } , Fetch)
 
 send-complete : ∀ {s h b s'} → SimpleFFD s (FFDAbstract.Send h b) FFDAbstract.SendRes s' → s' ≡ proj₁ (send-total {s} {h} {b})
-send-complete SendIB    = refl
 send-complete SendEB    = refl
 send-complete SendVS    = refl
-send-complete BadSendIB = refl
 send-complete BadSendEB = refl
 send-complete BadSendVS = refl
 
@@ -218,7 +200,7 @@ d-FFDFunctionality : FFDAbstract.Functionality ffdAbstract
 d-FFDFunctionality =
   record
     { State         = FFDBuffers
-    ; initFFDState  = record { inIBs = []; inEBs = []; inVTs = []; outIBs = []; outEBs = []; outVTs = [] }
+    ; initFFDState  = record { inEBs = []; inVTs = []; outEBs = []; outVTs = [] }
     ; _-⟦_/_⟧⇀_     = SimpleFFD
     ; Send-total    = send-total
     ; Fetch-total   = fetch-total
@@ -245,15 +227,12 @@ d-VotingAbstract-2 =
 d-SpecStructure : SpecStructure 1
 d-SpecStructure = record
       { a                         = d-Abstract
-      ; Hashable-PreIBHeader      = hhs
       ; Hashable-PreEndorserBlock = hpe
       ; id                        = sutId
       ; FFD'                      = d-FFDFunctionality
       ; vrf'                      = d-VRF
-      ; sk-IB                     = IB , tt
       ; sk-EB                     = EB , tt
       ; sk-VT                     = VT , tt
-      ; pk-IB                     = sutId , tt
       ; pk-EB                     = sutId , tt
       ; pk-VT                     = sutId , tt
       ; B'                        = d-Base
@@ -268,15 +247,12 @@ d-SpecStructure = record
 d-SpecStructure-2 : SpecStructure 2
 d-SpecStructure-2 = record
       { a                         = d-Abstract
-      ; Hashable-PreIBHeader      = hhs
       ; Hashable-PreEndorserBlock = hpe
       ; id                        = sutId
       ; FFD'                      = d-FFDFunctionality
       ; vrf'                      = d-VRF
-      ; sk-IB                     = IB , tt
       ; sk-EB                     = EB , tt
       ; sk-VT                     = VT , tt
-      ; pk-IB                     = sutId , tt
       ; pk-EB                     = sutId , tt
       ; pk-VT                     = sutId , tt
       ; B'                        = d-Base

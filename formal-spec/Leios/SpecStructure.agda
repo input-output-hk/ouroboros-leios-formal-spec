@@ -21,7 +21,6 @@ record SpecStructure (rounds : ℕ) : Type₁ where
   open Leios.Blocks a public
 
   field ⦃ IsBlock-Vote ⦄ : IsBlock (List Vote)
-        ⦃ Hashable-PreIBHeader ⦄ : Hashable PreIBHeader Hash
         ⦃ Hashable-PreEndorserBlock ⦄ : Hashable PreEndorserBlock Hash
         id : PoolID
         FFD' : FFDAbstract.Functionality ffdAbstract
@@ -29,8 +28,8 @@ record SpecStructure (rounds : ℕ) : Type₁ where
 
   open LeiosVRF vrf' public
 
-  field sk-IB sk-EB sk-VT : PrivKey
-        pk-IB pk-EB pk-VT : PubKey
+  field sk-EB sk-VT : PrivKey
+        pk-EB pk-VT : PubKey
 
   open Leios.Base a vrf' public
 
