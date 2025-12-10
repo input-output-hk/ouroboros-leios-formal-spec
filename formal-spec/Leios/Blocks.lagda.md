@@ -1,3 +1,4 @@
+```agda
 {-# OPTIONS --safe #-}
 
 {- Module: Leios.Blocks
@@ -103,3 +104,4 @@ module GenFFD ⦃ _ : IsBlock (List Vote) ⦄ where
 
 ffdAbstract : ⦃ _ : IsBlock (List Vote) ⦄ → FFDAbstract
 ffdAbstract = record { GenFFD }
+```

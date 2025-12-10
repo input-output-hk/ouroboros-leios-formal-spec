@@ -1,3 +1,4 @@
+```agda
 {-# OPTIONS --safe #-}
 
 open import Leios.Prelude
@@ -21,3 +22,4 @@ record KeyRegistrationAbstract : Type₁ where
 
     open Input public
     open Output public
+```

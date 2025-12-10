@@ -1,3 +1,4 @@
+```agda
 {-# OPTIONS --safe #-}
 
 open import Leios.Prelude hiding (id)
@@ -52,3 +53,4 @@ record SpecStructure (rounds : ℕ) : Type₁ where
   open VotingAbstract va public
 
   field getEBCert : ∀ {s r eb} → isVoteCertified s (r , eb) → EBCert
+```

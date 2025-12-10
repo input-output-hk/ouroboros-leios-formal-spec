@@ -1,3 +1,4 @@
+```agda
 {-# OPTIONS --safe #-}
 
 open import Leios.Prelude
@@ -78,3 +79,4 @@ record LeiosVRF : Type₁ where
   Dec-canProduceV2 : ∀ {slot k stake} → Dec (canProduceV2 slot k stake)
   Dec-canProduceV2 {slot} {k} {stake} with eval k (genV2Input slot)
   ... | (val , pf) = ¿ val < stake ¿
+```

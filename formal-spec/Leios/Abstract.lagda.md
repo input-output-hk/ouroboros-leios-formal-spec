@@ -1,3 +1,4 @@
+```agda
 {-# OPTIONS --safe #-}
 
 {- Module: Leios.Abstract
@@ -27,3 +28,4 @@ record LeiosAbstract : Type₁ where
         sign : PrivKey → Hash → Sig
         ⦃ Hashable-Txs ⦄ : Hashable (List Tx) Hash
         getEBHash : EBCert → Hash
+```

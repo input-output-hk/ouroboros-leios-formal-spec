@@ -1,3 +1,4 @@
+```agda
 {-# OPTIONS --safe #-}
 
 {- Module: Leios.Base
@@ -104,3 +105,5 @@ record BaseAbstract : Type₁ where
 
     open Input public
     open Output public
+```
+

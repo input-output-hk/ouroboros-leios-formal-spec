@@ -1,3 +1,4 @@
+```agda
 {-# OPTIONS --safe #-}
 
 module Leios.Prelude where
@@ -134,3 +135,4 @@ instance
 completeFinL : ∀ (n : ℕ) → List (Fin n)
 completeFinL zero = []
 completeFinL (ℕ.suc n) = F.fromℕ n ∷ L.map F.inject₁ (completeFinL n)
+```
