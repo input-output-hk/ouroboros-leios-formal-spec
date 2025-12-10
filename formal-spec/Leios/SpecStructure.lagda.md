@@ -1,3 +1,5 @@
+## Leios.SpecStructure
+<!--
 ```agda
 {-# OPTIONS --safe #-}
 
@@ -12,15 +14,21 @@ import Leios.KeyRegistration
 import Leios.Voting
 
 open import Data.Fin
-
+```
+-->
+```agda
 module Leios.SpecStructure where
-
+```
+```agda
 record SpecStructure (rounds : ℕ) : Type₁ where
+```
+```agda
   field a : LeiosAbstract
 
   open LeiosAbstract a public
   open Leios.Blocks a public
-
+```
+```agda
   field ⦃ IsBlock-Vote ⦄ : IsBlock (List Vote)
         ⦃ Hashable-PreEndorserBlock ⦄ : Hashable PreEndorserBlock Hash
         id : PoolID
@@ -28,18 +36,21 @@ record SpecStructure (rounds : ℕ) : Type₁ where
         vrf' : LeiosVRF a
 
   open LeiosVRF vrf' public
-
+```
+```agda
   field sk-EB sk-VT : PrivKey
         pk-EB pk-VT : PubKey
 
   open Leios.Base a vrf' public
-
+```
+```agda
   field B' : BaseAbstract
         BF : BaseAbstract.Functionality B'
         initBaseState : BaseAbstract.Functionality.State BF
 
   open Leios.KeyRegistration a vrf' public
-
+```
+```agda
   field K' : KeyRegistrationAbstract
         KF : KeyRegistrationAbstract.Functionality K'
 
@@ -48,9 +59,11 @@ record SpecStructure (rounds : ℕ) : Type₁ where
   module FFD = FFDAbstract.Functionality FFD'
 
   open Leios.Voting public
-
+```
+```agda
   field va : VotingAbstract (Fin rounds × EndorserBlock)
   open VotingAbstract va public
-
+```
+```agda
   field getEBCert : ∀ {s r eb} → isVoteCertified s (r , eb) → EBCert
 ```
