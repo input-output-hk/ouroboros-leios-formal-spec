@@ -267,29 +267,28 @@ l₁ ≼ l = ∃[ l₂ ] l₁ ++ l₂ ≡ l
 
 module _
   (let open Params params)
-  (IO Adv              : Channel)
-  (Node                : Machine Network (IO ⊗ Adv)) -- Spec machine
-  (nodesF              : Fin numberOfParties → Machine Network (IO ⊗ Adv))
-  (honestNodes         : ℙ (Fin numberOfParties))
-  (honest-Node         : ∀ {p} → p ∈ honestNodes → nodesF p ≡ Node)
-  (IsBlockchain-Node   : ∀ {k} → k ∈ honestNodes → IsBlockchain Block (nodesF k))
+  (IO Adv NAdv       : Channel)
+  (Node              : Machine Network (IO ⊗ Adv)) -- Spec machine
+  (nodesF            : Fin numberOfParties → Machine Network (IO ⊗ Adv))
+  (honestNodes       : ℙ (Fin numberOfParties))
+  (honest-Node       : ∀ {p} → p ∈ honestNodes → nodesF p ≡ Node)
+  (IsBlockchain-Node : ∀ {k} → k ∈ honestNodes → IsBlockchain Block (nodesF k))
+  (Net               : Machine I ((⨂ const {B = Participant} Network) ⊗ NAdv))
   -- Σ_{n ∈ honestNodes} stake n ≥ allStake * 2/3
     where
-
-  open import Network.BasicBroadcast numberOfParties NetworkMessage as BB using () renaming (Network to Net)
 
   nodes : Machine (⨂_ {n = numberOfParties} (const Network)) ((⨂_ {n = numberOfParties} (const IO)) ⊗ (⨂_ {n = numberOfParties} (const Adv)))
   nodes = ⨂ᴷ nodesF
 
-  network : Machine I ((⨂_ {n = numberOfParties} (const IO)) ⊗ (BB.A ⊗ (⨂_ {n = numberOfParties} (const Adv))))
+  network : Machine I ((⨂_ {n = numberOfParties} (const IO)) ⊗ (NAdv ⊗ (⨂_ {n = numberOfParties} (const Adv))))
   network = nodes ∘ᴷ Net
 
   module network = Machine network
 
   query : (bci : BlockChainInfo Block) → network.State
-        → (p : Fin numberOfParties) → (p ∈ honestNodes) → bciQueryType bci
-  query bci ((_ , (s , tt)) , tt) p honest-p = queryCompute bci (⨂ᴷ-sub-state p s)
-    where open IsBlockchain (IsBlockchain-Node {p} honest-p)
+        → {p : Fin numberOfParties} → p ∈ honestNodes → bciQueryType bci
+  query bci ((_ , (s , tt)) , tt) {p} honest-p = queryCompute bci (⨂ᴷ-sub-state p s)
+    where open IsBlockchain (IsBlockchain-Node honest-p)
 
   getChain = query chain
   getSlot = query slot
@@ -299,14 +298,14 @@ module _
                (honest-p : p ∈ honestNodes)
                (init     : network.State)
                → ∀ final (tr : Trace network init final)
-               → let chain = getChain init  p honest-p
-                     s₁    = getSlot  init  p honest-p
-                     s₂    = getSlot  final p honest-p
+               → let chain = getChain init  honest-p
+                     s₁    = getSlot  init  honest-p
+                     s₂    = getSlot  final honest-p
                -- for all traces that reach `Δ` slots into the future
                in s₂ ≥ s₁ + Δ
                -- all honest nodes have `chain` as a prefix
                → ∀ (p' : Fin numberOfParties) → (honest-p' : p' ∈ honestNodes)
-               → prune k chain ≼ getChain final p' honest-p'
+               → prune k chain ≼ getChain final honest-p'
 
 open import Prelude.STS.GenPremises
 
