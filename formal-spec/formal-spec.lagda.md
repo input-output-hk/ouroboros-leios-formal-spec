@@ -19,7 +19,7 @@ open import Prelude.Errors
 open import Class.Computational22
 ```
 ### Core Protocol Components
-
+Abstract interface, specifing core types and functions
 ```agda
 open import Leios.Abstract
 ```
@@ -31,6 +31,7 @@ Block structure and validation
 ```agda
 open import Leios.Blocks
 ```
+Protocol parameters and configuration
 ```agda
 open import Leios.Config
 ```
@@ -38,9 +39,11 @@ Freshest first delivery abstraction
 ```agda
 open import Leios.FFD
 ```
+Key registration abstraction
 ```agda
 open import Leios.KeyRegistration
 ```
+Project specific prelude
 ```agda
 open import Leios.Prelude
 ```
@@ -48,6 +51,7 @@ Main protocol definition
 ```agda
 open import Leios.Protocol
 ```
+Abstractions bundled
 ```agda
 open import Leios.SpecStructure
 ```
