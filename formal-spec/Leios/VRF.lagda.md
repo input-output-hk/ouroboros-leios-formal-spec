@@ -1,19 +1,21 @@
-{-# OPTIONS --safe #-}
+## Leios.VRF
 
+This module defines the Verifiable Random Function (VRF) interface and
+its use in the Leios protocol. It specifies the types and operations
+for VRF evaluation, verification, and key management, as well as
+predicates for block and vote eligibility based on VRF outputs.
+The module also provides the Leios-specific VRF abstraction and
+utility functions for protocol slot leader selection.
+<!--
+```agda
+{-# OPTIONS --safe #-}
+```
+-->
+```agda
 open import Leios.Prelude
 open import Leios.Abstract
 
 module Leios.VRF (a : LeiosAbstract) (let open LeiosAbstract a) where
-
-{- Module: Leios.VRF
-
-   This module defines the Verifiable Random Function (VRF) interface and
-   its use in the Leios protocol. It specifies the types and operations
-   for VRF evaluation, verification, and key management, as well as
-   predicates for block and vote eligibility based on VRF outputs.
-   The module also provides the Leios-specific VRF abstraction and
-   utility functions for protocol slot leader selection.
--}
 
 record VRF (Dom Range PubKey : Type) : Type₁ where
   field isKeyPair : PubKey → PrivKey → Type
@@ -78,3 +80,4 @@ record LeiosVRF : Type₁ where
   Dec-canProduceV2 : ∀ {slot k stake} → Dec (canProduceV2 slot k stake)
   Dec-canProduceV2 {slot} {k} {stake} with eval k (genV2Input slot)
   ... | (val , pf) = ¿ val < stake ¿
+```
