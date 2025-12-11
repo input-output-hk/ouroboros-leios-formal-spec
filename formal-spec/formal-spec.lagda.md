@@ -84,7 +84,3 @@ open import Leios.Linear.Trace.Verifier
 open import Leios.Linear.Trace.Verifier.Test
 open import Test.Defaults
 ```
-State machine abstractions for protocol verification
-```agda
-open import StateMachine
-```
