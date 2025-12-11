@@ -16,7 +16,7 @@ open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.FFD
 open import Leios.SpecStructure
 
-module Leios.Protocol {n} (⋯ : SpecStructure n) (let open SpecStructure ⋯) (SlotUpkeep : Type) (StageUpkeep : Type) where
+module Leios.Protocol (⋯ : SpecStructure) (let open SpecStructure ⋯) (SlotUpkeep : Type) (StageUpkeep : Type) where
 
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open GenFFD
@@ -90,12 +90,12 @@ record LeiosState : Type where
   Dec-needsUpkeep-Stage : ∀ {u : StageUpkeep} → ⦃ DecEq StageUpkeep ⦄ → needsUpkeep-Stage u ⁇
   Dec-needsUpkeep-Stage {u} .dec = ¬? (u ∈? Upkeep-Stage)
 
-  -- Produces a Vote-k certified block
-  ebsWithCert : Fin n → List (EndorserBlock × EBCert)
-  ebsWithCert k = mapMaybe getCert EBs
+  -- Produces a Vote certified block
+  ebsWithCert : List (EndorserBlock × EBCert)
+  ebsWithCert = mapMaybe getCert EBs
     where
       getCert : EndorserBlock → Maybe (EndorserBlock × EBCert)
-      getCert eb = case ¿ isVoteCertified votingState (k , eb) ¿ of λ where
+      getCert eb = case ¿ isVoteCertified votingState eb ¿ of λ where
         (yes p) → just (eb , getEBCert p)
         (no ¬p) → nothing
 

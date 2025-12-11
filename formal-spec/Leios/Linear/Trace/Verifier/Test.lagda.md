@@ -1,6 +1,8 @@
 ## Trace verification with sample trace
 <!--
 ```agda
+{-# OPTIONS --safe #-}
+
 open import Prelude.Errors
 open import Prelude.Result
 open import Leios.Prelude hiding (id)

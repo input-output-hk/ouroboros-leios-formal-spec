@@ -206,7 +206,7 @@ d-FFDFunctionality =
 
 open import Leios.Voting public
 
-d-VotingAbstract : VotingAbstract (Fin 1 × EndorserBlock)
+d-VotingAbstract : VotingAbstract EndorserBlock
 d-VotingAbstract =
   record
     { VotingState     = ⊤
@@ -214,15 +214,7 @@ d-VotingAbstract =
     ; isVoteCertified = λ _ _ → ⊤
     }
 
-d-VotingAbstract-2 : VotingAbstract (Fin 2 × EndorserBlock)
-d-VotingAbstract-2 =
-  record
-    { VotingState     = ⊤
-    ; initVotingState = tt
-    ; isVoteCertified = λ _ _ → ⊤
-    }
-
-d-SpecStructure : SpecStructure 1
+d-SpecStructure : SpecStructure
 d-SpecStructure = record
       { a                         = d-Abstract
       ; Hashable-PreEndorserBlock = hpe
@@ -239,25 +231,5 @@ d-SpecStructure = record
       ; K'                        = d-KeyRegistration
       ; KF                        = d-KeyRegistrationFunctionality
       ; va                        = d-VotingAbstract
-      ; getEBCert                 = λ _ → []
-      }
-
-d-SpecStructure-2 : SpecStructure 2
-d-SpecStructure-2 = record
-      { a                         = d-Abstract
-      ; Hashable-PreEndorserBlock = hpe
-      ; id                        = sutId
-      ; FFD'                      = d-FFDFunctionality
-      ; vrf'                      = d-VRF
-      ; sk-EB                     = EB , tt
-      ; sk-VT                     = VT , tt
-      ; pk-EB                     = sutId , tt
-      ; pk-VT                     = sutId , tt
-      ; B'                        = d-Base
-      ; BF                        = d-BaseFunctionality
-      ; initBaseState             = tt
-      ; K'                        = d-KeyRegistration
-      ; KF                        = d-KeyRegistrationFunctionality
-      ; va                        = d-VotingAbstract-2
       ; getEBCert                 = λ _ → []
       }
