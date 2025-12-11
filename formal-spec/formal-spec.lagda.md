@@ -15,8 +15,6 @@ TODO: move into iog-agda-prelude
 ```agda
 open import Prelude.Result
 open import Prelude.Errors
-
-open import Class.Computational22
 ```
 ### Core Protocol Components
 Abstract interface, specifing core types and functions
