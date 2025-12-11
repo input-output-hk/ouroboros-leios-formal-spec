@@ -20,7 +20,7 @@ open import Data.Fin
 module Leios.SpecStructure where
 ```
 ```agda
-record SpecStructure (rounds : ℕ) : Type₁ where
+record SpecStructure : Type₁ where
 ```
 ```agda
   field a : LeiosAbstract
@@ -61,9 +61,9 @@ record SpecStructure (rounds : ℕ) : Type₁ where
   open Leios.Voting public
 ```
 ```agda
-  field va : VotingAbstract (Fin rounds × EndorserBlock)
+  field va : VotingAbstract EndorserBlock
   open VotingAbstract va public
 ```
 ```agda
-  field getEBCert : ∀ {s r eb} → isVoteCertified s (r , eb) → EBCert
+  field getEBCert : ∀ {s eb} → isVoteCertified s eb → EBCert
 ```
