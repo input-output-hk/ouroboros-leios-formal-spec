@@ -152,6 +152,10 @@ M₁ ⊗ᴷ M₂ = TotalFunctionMachine' ⇒-solver ⇒-solver ∘ M₁ ⊗' M�
 ⨂ᴷ {zero} M = idᴷ
 ⨂ᴷ {suc n} M = M fzero ⊗ᴷ ⨂ᴷ (M P.∘ fsuc)
 
+⨂ᴷ-sub-state : ∀ {n} {A B E : Fin n → Channel} {f : (k : Fin n) → Machine (A k) (B k ⊗ E k)} → (k : Fin n) → Machine.State (⨂ᴷ f) → Machine.State (f k)
+⨂ᴷ-sub-state fzero ((s , _) , _) = s
+⨂ᴷ-sub-state (fsuc k) ((_ , s) , _) = ⨂ᴷ-sub-state k s
+
 --------------------------------------------------------------------------------
 -- Open adversarial protocols
 
