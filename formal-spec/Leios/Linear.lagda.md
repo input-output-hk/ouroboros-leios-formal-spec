@@ -221,91 +221,10 @@ Note: Submitted data to the base chain is only taken into account
          ∙ u ≢ Base
          ──────────────────────────────────────────────────
          s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s u
-```
-<!--
-```agda
+
 ShortLeios : Machine (FFD ⊗ BaseC) (IO ⊗ Adv)
 ShortLeios .Machine.State = LeiosState
 ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
-
--- This represents the various elements we are allowed to query from a Machine that is always a BlockChain
-data BlockChainInfo (Block : Type) : Type where
-  chain : BlockChainInfo Block
-  slot  : BlockChainInfo Block
-
-bciQueryType : ∀ {Block} → BlockChainInfo Block → Type
-bciQueryType {B} chain = List B
-bciQueryType slot = ℕ
-
-record IsBlockchain {A B} (Block : Type) (m : Machine A B) : Type where
-
-  open Channel
-  open Machine m renaming (stepRel to _-⟦_/_⟧ᵐ⇀_)
-  module m = Machine m
-
-  field queryI : BlockChainInfo Block → B .outType
-        queryO : {bci : BlockChainInfo Block} → bciQueryType bci → B .inType
-        queryCompute : (bci : BlockChainInfo Block) → m.State → bciQueryType bci
-        correctness : ∀ {bci : BlockChainInfo Block} {s} →
-          s -⟦ L⊗ ϵ ↑ᵢ queryI bci / just (L⊗ ϵ ↑ₒ queryO (queryCompute bci s)) ⟧ᵐ⇀ s
-
-module _ {A} {B} (m : Machine A B) where
-  module m = Machine m
-  open Machine m using () renaming (stepRel to _-⟦_/_⟧ᵐ⇀_)
-  open Channel (A ⊗ B ᵀ)
-
-  data Trace : m.State → m.State → Type where
-    [] : ∀ {s} → Trace s s
-    _∷ʳ⟨_,_,_⟩ : ∀ {s s' s''}
-      → Trace s s' → (i : inType) → (o : Maybe outType) → s' -⟦ i / o ⟧ᵐ⇀ s'' → Trace s s''
-
-prune : {A : Type} → ℕ → List A → List A
-prune k l = take (length l ∸ k) l
-
-_≼_ : {A : Type} → List A → List A → Type
-l₁ ≼ l = ∃[ l₂ ] l₁ ++ l₂ ≡ l
-
-module _
-  (let open Params params)
-  (IO Adv NAdv       : Channel)
-  (Node              : Machine Network (IO ⊗ Adv)) -- Spec machine
-  (nodesF            : Fin numberOfParties → Machine Network (IO ⊗ Adv))
-  (honestNodes       : ℙ (Fin numberOfParties))
-  (honest-Node       : ∀ {p} → p ∈ honestNodes → nodesF p ≡ Node)
-  (IsBlockchain-Node : ∀ {k} → k ∈ honestNodes → IsBlockchain Block (nodesF k))
-  (Net               : Machine I ((⨂ const {B = Participant} Network) ⊗ NAdv))
-  -- Σ_{n ∈ honestNodes} stake n ≥ allStake * 2/3
-    where
-
-  nodes : Machine (⨂_ {n = numberOfParties} (const Network)) ((⨂_ {n = numberOfParties} (const IO)) ⊗ (⨂_ {n = numberOfParties} (const Adv)))
-  nodes = ⨂ᴷ nodesF
-
-  network : Machine I ((⨂_ {n = numberOfParties} (const IO)) ⊗ (NAdv ⊗ (⨂_ {n = numberOfParties} (const Adv))))
-  network = nodes ∘ᴷ Net
-
-  module network = Machine network
-
-  query : (bci : BlockChainInfo Block) → network.State
-        → {p : Fin numberOfParties} → p ∈ honestNodes → bciQueryType bci
-  query bci ((_ , (s , tt)) , tt) {p} honest-p = queryCompute bci (⨂ᴷ-sub-state p s)
-    where open IsBlockchain (IsBlockchain-Node honest-p)
-
-  getChain = query chain
-  getSlot = query slot
-
-  safety : ℕ → ℕ → Type
-  safety k Δ = (p        : Fin numberOfParties)
-               (honest-p : p ∈ honestNodes)
-               (init     : network.State)
-               → ∀ final (tr : Trace network init final)
-               → let chain = getChain init  honest-p
-                     s₁    = getSlot  init  honest-p
-                     s₂    = getSlot  final honest-p
-               -- for all traces that reach `Δ` slots into the future
-               in s₂ ≥ s₁ + Δ
-               -- all honest nodes have `chain` as a prefix
-               → ∀ (p' : Fin numberOfParties) → (honest-p' : p' ∈ honestNodes)
-               → prune k chain ≼ getChain final honest-p'
 
 open import Prelude.STS.GenPremises
 
