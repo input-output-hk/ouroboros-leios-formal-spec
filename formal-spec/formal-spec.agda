@@ -32,7 +32,7 @@ The specification is organized into several key areas:
 
 module formal-spec where
 
--- open import CategoricalCrypto
+open import CategoricalCrypto
 open import Class.Computational22
 open import Leios.Abstract
 open import Leios.Base
@@ -51,6 +51,7 @@ open import Leios.Linear.Trace.Verifier.Test
 -- -- open import Leios.Network
 -- open import Leios.Prelude
 -- open import Leios.Protocol
+open import Leios.Safety
 -- open import Leios.Short
 -- -- open import Leios.Short.Deterministic
 -- open import Leios.Short.Trace.Verifier

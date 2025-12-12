@@ -199,6 +199,9 @@ opaque
 ⨂_ {zero} _ = I
 ⨂_ {suc n} f = f fzero ⊗ ⨂ (f ∘ fsuc)
 
+_⨂ⁿ_ : ℕ → Channel → Channel
+n ⨂ⁿ C = ⨂_ {n} (const C)
+
 ⨂≡ : ∀ {n} → {f g : Fin n → Channel} → (∀ k → f k ≡ g k) → ⨂ f ≡ ⨂ g
 ⨂≡ {zero} _ = refl
 ⨂≡ {suc _} p = cong₂ _⊗_ (p fzero) (⨂≡ (p ∘ fsuc))
