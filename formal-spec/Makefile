@@ -20,5 +20,5 @@ define agdaToHs
       >> $(HS_DIR)/$(CABAL_FILE)
 endef
 HS_LEIOS=$(HS_DIST)/$(MALONZO_DIR)/formal-spec.hs
-$(HS_LEIOS): formal-spec.agda
+$(HS_LEIOS): formal-spec.lagda.md
 	$(call agdaToHs,leios-spec)
