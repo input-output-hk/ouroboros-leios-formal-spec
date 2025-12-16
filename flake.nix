@@ -47,7 +47,7 @@
           src = ./formal-spec;
           meta = { };
           libraryFile = "leios-spec.agda-lib";
-          everythingFile = "formal-spec.agda";
+          everythingFile = "formal-spec.lagda.md";
           buildPhase = ''
             OUT_DIR=$out make
           '';
@@ -63,7 +63,7 @@
           meta = { };
           buildInputs = [ agdaWithPkgs pkgs.pandoc ];
           buildPhase = ''
-            agda --html --html-highlight=auto formal-spec.agda
+            agda --html --html-highlight=auto formal-spec.lagda.md
             pandoc -s -c Agda.css html/Leios.Linear.md -o html/Leios.Linear.html
           '';
           installPhase = ''
