@@ -14,7 +14,7 @@ private
 ```
 #### Params
 A test setup requires parameters, which are bundled in the `Params` record. There are the network parameters, the identifier for the system under test (SUT)
-and there are the schedules for block production and voting in the field `winning-slots`. Note, in Linear Leios EB are produced optionaly together with an RB.
+and there are the schedules for block production and voting in the field `winning-slots`. Note, in Linear Leios EBs are produced optionally together with an RB.
 ```agda
   params : Params
   params =
@@ -81,7 +81,7 @@ For the test trace, we rely on the implementation provided in `Leios.Defaults`.
     unfolding isValid?
 ```
 -->
-EndorserBlocks that will be used in the test trace.
+EndorserBlocks that will be used in the test trace
 ```agda
     EB₁ : EndorserBlock
     EB₁ = mkEB 100 (fsuc fzero) tt (EB , tt) (1 ∷ 2 ∷ 3 ∷ []) [] []
@@ -205,7 +205,7 @@ Another vote is received
                  ∷ (Slot₁-Action      107 , inj₁ (FFD-OUT []))
 ```
 #### Slot 108
-SUT is slot leader: create and EB and RB (implicit in Base₂-Action)
+SUT is slot leader: create an EB and RB (implicit in Base₂-Action)
 ```agda
                  ∷ (EB-Role-Action    108 EB₂ , inj₁ SLOT)
                  ∷ (No-VT-Role-Action 108 , inj₁ SLOT)
