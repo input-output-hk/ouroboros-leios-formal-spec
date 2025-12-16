@@ -14,8 +14,8 @@ open import Tactic.Derive.DecEq
 open import CategoricalCrypto hiding (id; _∘_)
 open import CategoricalCrypto.Channel.Selection
 
-module Leios.Linear (⋯ : SpecStructure 1)
-  (let open SpecStructure ⋯ renaming (isVoteCertified to isVoteCertified'))
+module Leios.Linear (⋯ : SpecStructure)
+  (let open SpecStructure ⋯)
   (params : Params)
   (Lhdr Lvote Ldiff : ℕ)
   (splitTxs : List Tx → List Tx × List Tx)
@@ -91,7 +91,7 @@ three steps corresponding to the three types of Leios specific blocks.
 toProposeEB : LeiosState → VrfPf → Maybe EndorserBlock
 toProposeEB s π = let open LeiosState s in case proj₂ (splitTxs ToPropose) of λ where
   [] → nothing
-  _ → just $ mkEB slot id π sk-IB ToPropose [] []
+  _ → just $ mkEB slot id π sk-EB ToPropose
 
 getCurrentEBHash : LeiosState → Maybe EBRef
 getCurrentEBHash s = let open LeiosState s in
@@ -155,7 +155,7 @@ open Types params
 
 data _⊢_ : VTy → LeiosState → Type where
   Init :
-       ∙ ks K.-⟦ K.INIT pk-IB pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
+       ∙ ks K.-⟦ K.INIT pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
        ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
        ────────────────────────────────────────────────────────────────
        V ⊢ initLeiosState V SD pks
@@ -198,8 +198,7 @@ Note: Submitted data to the base chain is only taken into account
   Base₂   : let open LeiosState s
                 currentCertEB = find (λ (eb , _) →
                   ¿ just (hash eb) ≡ getCurrentEBHash s
-                  × slotNumber eb + 3 * Lhdr + Lvote + Ldiff ≤ slot ¿)
-                  (ebsWithCert fzero)
+                  × slotNumber eb + 3 * Lhdr + Lvote + Ldiff ≤ slot ¿) ebsWithCert
                 rb = record
                        { txs = proj₁ (splitTxs ToPropose)
                        ; announcedEB = hash <$> toProposeEB s π

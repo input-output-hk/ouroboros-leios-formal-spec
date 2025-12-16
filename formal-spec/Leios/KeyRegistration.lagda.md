@@ -1,5 +1,9 @@
+<!--
+```agda
 {-# OPTIONS --safe #-}
-
+```
+-->
+```agda
 open import Leios.Prelude
 open import Leios.Abstract
 open import Leios.VRF
@@ -10,7 +14,7 @@ module Leios.KeyRegistration (a : LeiosAbstract) (open LeiosAbstract a)
 record KeyRegistrationAbstract : Type₁ where
 
   data Input : Type₁ where
-    INIT : PubKey → PubKey → PubKey → Input
+    INIT : PubKey → PubKey → Input
 
   data Output : Type where
     PUBKEYS : List PubKey → Output
@@ -21,3 +25,4 @@ record KeyRegistrationAbstract : Type₁ where
 
     open Input public
     open Output public
+```

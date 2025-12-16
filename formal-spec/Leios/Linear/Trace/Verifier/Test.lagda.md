@@ -1,6 +1,8 @@
 ## Trace verification with sample trace
 <!--
 ```agda
+{-# OPTIONS --safe #-}
+
 open import Prelude.Errors
 open import Prelude.Result
 open import Leios.Prelude hiding (id)
@@ -25,9 +27,6 @@ and there are the schedules for block production and voting in the field `winnin
             ; stakeDistribution =
                 let open FunTot (completeFin 2) (maximalFin 2)
                 in Fun⇒TotalMap (const 100000000)
-            ; stageLength = 2
-            ; ledgerQuality = 0
-            ; lateIBInclusion = false
             }
       }
 
@@ -54,10 +53,10 @@ Linear Leios has the following three protocol parameters
 ```
 #### SpecStructure
 In order to build a test trace, an implementation for the `SpecStructure` needs to be specified.
-For the test trace, we rely on the implementation provided in `Leios.Defaults`.
+For the test trace, we rely on the implementation provided in `Test.Defaults`.
 ```agda
   -- TODO: why does Hashable-EndorserBlock not work instead of hpe...?
-  open import Leios.Defaults params testParams using (d-SpecStructure; hpe)
+  open import Test.Defaults params testParams using (d-SpecStructure; hpe)
   open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 ```
 #### TraceVerifier
@@ -84,10 +83,10 @@ For the test trace, we rely on the implementation provided in `Leios.Defaults`.
 EndorserBlocks that will be used in the test trace
 ```agda
     EB₁ : EndorserBlock
-    EB₁ = mkEB 100 (fsuc fzero) tt (EB , tt) (1 ∷ 2 ∷ 3 ∷ []) [] []
+    EB₁ = mkEB 100 (fsuc fzero) tt (EB , tt) (1 ∷ 2 ∷ 3 ∷ [])
 
     EB₂ : EndorserBlock
-    EB₂ = mkEB 108 fzero tt (EB , tt) (3 ∷ 4 ∷ 5 ∷ []) [] []
+    EB₂ = mkEB 108 fzero tt (EB , tt) (3 ∷ 4 ∷ 5 ∷ [])
 ```
 Checking `hash` of EndorserBlocks
 ```agda

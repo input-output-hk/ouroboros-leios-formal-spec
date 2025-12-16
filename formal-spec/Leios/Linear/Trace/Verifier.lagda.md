@@ -1,6 +1,8 @@
 ## Linear Leios Trace Verifier
 <!--
 ```agda
+{-# OPTIONS --safe #-}
+
 open import Leios.Prelude hiding (id; _>>=_; return; _⊗_)
 open import Leios.Config
 open import Leios.SpecStructure using (SpecStructure)
@@ -15,7 +17,7 @@ open import Data.Product.Properties
 ```
 -->
 ```agda
-module Leios.Linear.Trace.Verifier (⋯ : SpecStructure 1) (let open SpecStructure ⋯)
+module Leios.Linear.Trace.Verifier (⋯ : SpecStructure) (let open SpecStructure ⋯)
   (params : Params)
   (Lhdr Lvote Ldiff : ℕ)
   (splitTxs : List Tx → List Tx × List Tx)
@@ -49,7 +51,6 @@ private variable
   s s′ : LeiosState
   σ    : Action
   σs   : TestTrace
-  ib   : InputBlock
   eb   : EndorserBlock
   ebs  : List EndorserBlock
   vt   : List Vote

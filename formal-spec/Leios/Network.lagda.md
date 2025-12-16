@@ -1,12 +1,16 @@
-{- Module: Leios.Network
+## Leios.Network
    
-   This module defines the network abstractions and communication channels
-   for the Leios protocol. It provides generic broadcast and header diffusion
-   mechanisms, including channel types, message formats, and state transition
-   systems for networked message propagation. The abstractions here are used
-   to model peer-to-peer communication and header forwarding in the protocol.
--}
-
+This module defines the network abstractions and communication channels
+for the Leios protocol. It provides generic broadcast and header diffusion
+mechanisms, including channel types, message formats, and state transition
+systems for networked message propagation. The abstractions here are used
+to model peer-to-peer communication and header forwarding in the protocol.
+<!--
+```agda
+{-# OPTIONS --safe #-}
+```
+-->
+```agda
 module Leios.Network where
 
 open import abstract-set-theory.Prelude hiding (_∘_; _⊗_)
@@ -79,3 +83,4 @@ module HeaderDiffusion (a : Abstract) (Peer : Set) (self : Peer) where
 
   Functionality : Machine I C
   Functionality = MkMachine' Step ∘ B.SingleFunctionality
+```
