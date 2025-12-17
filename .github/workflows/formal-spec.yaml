@@ -25,6 +25,9 @@ on:
       - "flake.nix"
       - "formal-spec/**"
       - "nix/**"
+  workflow_dispatch:
+    branches:
+      - main
 
 jobs:
   ################################################################################
@@ -76,8 +79,8 @@ jobs:
     name: "Generate Web Documentation"
     needs: formal-spec-typecheck
     runs-on: ubuntu-22.04
-    # Only run for pushes to main and merged PRs
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
+    # Only run for pushes to main, merged PRs, and manual triggers
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true)
     outputs:
       changed: ${{ steps.check-changes.outputs.changed }}
     steps:
@@ -89,22 +92,33 @@ jobs:
       - name: Check for Agda file changes
         id: check-changes
         run: |
+          # For manual triggers, always generate docs
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual trigger detected, generating docs"
+            echo "changed=true" >> $GITHUB_OUTPUT
           # For main branch pushes, check changed files compared to the previous commit
-          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
             git fetch origin ${{ github.event.before }} --depth=1
             git diff --name-only ${{ github.event.before }} ${{ github.event.after }} > changed_files.txt
+            # Check if any Agda files changed
+            if grep -q "\.agda$\|\.lagda$" changed_files.txt; then
+              echo "Agda file changes detected, generating docs"
+              echo "changed=true" >> $GITHUB_OUTPUT
+            else
+              echo "No Agda file changes detected, skipping docs generation"
+              echo "changed=false" >> $GITHUB_OUTPUT
+            fi
           else
             # For pull requests, check if any .agda or .lagda files changed
             git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} > changed_files.txt
-          fi
-
-          # Check if any Agda files changed
-          if grep -q "\.agda$\|\.lagda$" changed_files.txt; then
-            echo "Agda file changes detected, generating docs"
-            echo "changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "No Agda file changes detected, skipping docs generation"
-            echo "changed=false" >> $GITHUB_OUTPUT
+            # Check if any Agda files changed
+            if grep -q "\.agda$\|\.lagda$" changed_files.txt; then
+              echo "Agda file changes detected, generating docs"
+              echo "changed=true" >> $GITHUB_OUTPUT
+            else
+              echo "No Agda file changes detected, skipping docs generation"
+              echo "changed=false" >> $GITHUB_OUTPUT
+            fi
           fi
 
       - name: 🛠️ Install Nix
