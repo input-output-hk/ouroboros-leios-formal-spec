@@ -41,7 +41,16 @@
           iog-prelude
         ];
 
+        locales = {
+          LANG = "en_US.UTF-8";
+          LC_ALL = "en_US.UTF-8";
+          LOCALE_ARCHIVE = if pkgs.system == "x86_64-linux"
+                   then "${pkgs.glibcLocales}/lib/locale/locale-archive"
+                   else "";
+        };
+
         leiosSpec = pkgs.agdaPackages.mkDerivation {
+          inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
           pname = "leios-spec";
           version = "0.1";
           src = ./formal-spec;
@@ -57,6 +66,7 @@
         agdaWithPkgs = pkgs.agda.withPackages { pkgs = deps; ghc = pkgs.ghc; };
 
         leiosDocs = pkgs.stdenv.mkDerivation {
+          inherit (locales) LANG LC_ALL LOCALE_ARCHIVE;
           pname = "leios-docs";
           version = "0.1";
           src = ./formal-spec;
