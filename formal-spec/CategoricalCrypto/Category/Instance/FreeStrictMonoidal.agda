@@ -34,6 +34,7 @@ open import Relation.Binary.PropositionalEquality as ≡
 open import Relation.Binary hiding (Symmetric)
 open import Relation.Nullary
 open import Data.Sum
+open import Relation.Binary.Rewriting
 
 open import CategoricalCrypto.FreeMonoidal using (Variant; _≤_; FreeMonoidalData; Symm)
 
@@ -93,6 +94,9 @@ module FreeMonoidalHelper (v : Variant) (X : Set) where
       σ : ⦃ Symm ≤ v ⦄ → HomTerm (A ⊗₀ B) (B ⊗₀ A)
 
     private variable f f' g g' h i : HomTerm A B
+
+    _∘⦅_⦆_ : ∀ {B'} → HomTerm B' C → B ≡ B' → HomTerm A B → HomTerm A C
+    g ∘⦅ refl ⦆ f = g ∘ f
 
     data _≈Term_ : HomTerm A B → HomTerm A B → Set where
       idˡ : id ∘ f ≈Term f
@@ -169,8 +173,8 @@ module FreeMonoidalHelper (v : Variant) (X : Set) where
         }
 
 
+    -- Normal forms
     -- [σ, id ⊗ f ⊗ id, σ, id ⊗ g ⊗ id, σ, ..., σ]
-
 
     open import Data.List.Relation.Binary.Prefix.Heterogeneous as Prefix
     open import Data.List.Relation.Binary.Prefix.Homogeneous.Properties as Properties
@@ -192,6 +196,7 @@ module FreeMonoidalHelper (v : Variant) (X : Set) where
               prefix-remainder : ∀ {X Y} → X ≼ Y → ∃[ Z ] X ⊗₀ Z ≡ Y
               ⊗-cancelˡ : ∀ X {Y Z} → X ⊗₀ Y ≡ X ⊗₀ Z → Y ≡ Z
               ≼-IsPartialOrder : IsPartialOrder _≡_ _≼_ -- Pointwise _≡_ ⇔ _≡_
+              _≼?_ : ∀ X Y → Dec (X ≼ Y)
 
     ↑' : ∀ {X Y Z} → X ⊗₀ Y ≼ Z → ObjTerm
     ↑' X⊗Y≼Z = proj₁ (prefix-remainder X⊗Y≼Z)
@@ -202,7 +207,15 @@ module FreeMonoidalHelper (v : Variant) (X : Set) where
     data HomTermⁿ : ObjTerm → ObjTerm → Set where
       [] : HomTermⁿ A A
       id_⊗_∷_ : (offset : B₁ ⊗₀ B₂ ≼ B) → mor B₂ C₂
-               → HomTermⁿ A B → HomTermⁿ A (B₁ ⊗₀ C₂ ⊗₀ (↑' offset))
+               →  (B₁ ⊗₀ C₂ ⊗₀ (↑' offset)) ≡ X → HomTermⁿ A B → HomTermⁿ A X
+               -- maybe try this: → (B₁ ⊗₀ C₂ ⊗₀ (↑' offset)) ≡ X → HomTermⁿ A B → HomTermⁿ A X
+
+    -- -- is this useful?
+    -- data isNF : HomTermⁿ A B → Set where
+    --   isNF₀ : isNF []
+    --   isNF₁ : isNF (id A ⊗ f ∷ [])
+    --   isNF∷ : (A : A₁ ⊗₀ A₂ ≼ X) (B : B₁ ⊗₀ B₂ ≼ Y)
+    --        → ¬ (A₁ ⊗₀ A₂ ≼ B₁) → isNF (id B ⊗ g ∷ h) → isNF (id A ⊗ f ∷ id B ⊗ g ∷ h)
 
     _∘ⁿ_ : HomTermⁿ B C → HomTermⁿ A B → HomTermⁿ A C
     [] ∘ⁿ f = f
@@ -271,14 +284,28 @@ module FreeMonoidalHelper (v : Variant) (X : Set) where
           ≡⟨ cong (λ ∙ → B₁ ⊗₀ Y ⊗₀ ∙) B₃-eq ⟨
         B₁ ⊗₀ Y ⊗₀ B₃ ∎
 
-    -- we'd like to have both arguments of the same type, but it's not quite obvious how to have `redʳ` compatible with that
-    data _→ʳ_ : HomTermⁿ A B → HomTermⁿ C D → Set where
+      X₁≡X₂ : R' ⊗₀ Z ⊗₀ ↑' R'⊗C₂≼X₂ ≡ B₁ ⊗₀ Y ⊗₀ ↑' B₁⊗B₂≼X₁
+      X₁≡X₂ = {!!}
+
+      X₃ = B₁ ⊗₀ Y ⊗₀ R ⊗₀ Z ⊗₀ C₃
+
+      X₁≡X₃ : R' ⊗₀ Z ⊗₀ ↑' R'⊗C₂≼X₂ ≡ X₃
+      X₁≡X₃ = {!!}
+
+      X₂≡X₃ : B₁ ⊗₀ Y ⊗₀ ↑' B₁⊗B₂≼X₁ ≡ X₃
+      X₂≡X₃ = {!!}
+
+      [f,g] [g,f] : HomTermⁿ X X₃
+      [f,g] = subst (HomTermⁿ X) X₂≡X₃ (id B₁⊗B₂≼X₁ ⊗ f ∷ id C₁⊗C₂≼X ⊗ g ∷ [])
+      [g,f] = subst (HomTermⁿ X) X₁≡X₃ (id R'⊗C₂≼X₂ ⊗ g ∷ id B₁⊗B₂≼X ⊗ f ∷ [])
+
+    -- right reduction
+    data _→ʳ_ : HomTermⁿ A B → HomTermⁿ A B → Set where
 
       redʳ : ∀ {X Y Z} (f : mor B₂ Y) (g : mor C₂ Z)
         (C₁⊗C₂≼X : C₁ ⊗₀ C₂ ≼ X) (B₁⊗B₂≼C₁ : B₁ ⊗₀ B₂ ≼ C₁)
         → let open Setup f g C₁⊗C₂≼X B₁⊗B₂≼C₁
-        in (id B₁⊗B₂≼X₁ ⊗ f ∷ id C₁⊗C₂≼X ⊗ g ∷ [])
-        →ʳ (id R'⊗C₂≼X₂ ⊗ g ∷ id B₁⊗B₂≼X ⊗ f ∷ [])
+        in [f,g] →ʳ [g,f]
 
     data _→ʳ*_ : HomTermⁿ A B → HomTermⁿ A B → Set where
       →ʳ*-refl : {f : HomTermⁿ B C} → f →ʳ* f
@@ -286,3 +313,43 @@ module FreeMonoidalHelper (v : Variant) (X : Set) where
       →ʳ*-→ʳ : {f g : HomTermⁿ A B} → f →ʳ g → f →ʳ* g
       →ʳ*-∘ : {f f' : HomTermⁿ B C} {g g' : HomTermⁿ A B}
         → f →ʳ* f' → g →ʳ* g' → (f ∘ⁿ g) →ʳ* (f' ∘ⁿ g')
+
+    →ʳ*-WN : WeaklyNormalizing (_→ʳ*_ {A} {B})
+    →ʳ*-WN = {!!}
+
+    →ʳ*-Det : Deterministic _≡_ (_→ʳ*_ {A} {B})
+    →ʳ*-Det = {!!}
+
+    ⟦_⟧ : HomTermⁿ A B → HomTerm A B
+    ⟦ [] ⟧ = id
+    ⟦ id_⊗_∷_ {B₁ = X} offset x f ⟧ = (id {X} ⊗₁ var x ⊗₁ id {↑' offset})
+      ∘⦅ trans (sym (↑ offset)) ⊗₀-assoc ⦆ ⟦ f ⟧
+
+    →ʳ-step : HomTermⁿ A B → HomTermⁿ A B
+    →ʳ-step f@(id_⊗_∷_ {B₁ = A₁} {A₂} offset x (id_⊗_∷_ {B₁ = B₁} offset' y [])) =
+      case (A₁ ⊗₀ A₂) ≼? B₁ of λ where
+        (yes A₁⊗A₂≼B₁) → let open Setup x y offset' A₁⊗A₂≼B₁ in {![g,f]!}
+        (no _)         → f
+    →ʳ-step f = f
+
+
+    NF : HomTermⁿ A B → HomTermⁿ A B
+    NF = NF-rec 1000000
+      where
+        →ʳ-step' : HomTermⁿ A B → HomTermⁿ A B
+        →ʳ-step' f@[] = f
+        →ʳ-step' (id_⊗_∷_ {B₁ = A₁} {A₂} offset x f) = case f of λ where
+          []                    → (id offset ⊗ x ∷ f)
+          (id_⊗_∷_ {B₁ = B₁} offset' y g) → case (A₁ ⊗₀ A₂) ≼? B₁ of λ where
+            (yes A₁⊗A₂≼B₁) → let open Setup x y offset' A₁⊗A₂≼B₁ in {!id R'⊗C₂≼X₂ ⊗ y ∷ id B₁⊗B₂≼X ⊗ x ∷ []!}
+            (no _)         → id offset ⊗ x ∷ →ʳ-step f
+
+        NF-rec : ℕ → HomTermⁿ A B → HomTermⁿ A B
+        NF-rec zero f = f
+        NF-rec (ℕ.suc k) f = NF-rec k (→ʳ-step' f)
+
+    →ʳ-pres-⟦⟧ : {f g : HomTermⁿ A B} → f →ʳ g → ⟦ f ⟧ ≈Term ⟦ g ⟧
+    →ʳ-pres-⟦⟧ = {!!}
+
+    -- →ʳ-pres-⟦⟧ : {f g : HomTerm A B} → f ≈Term g ⇔
+    -- →ʳ-pres-⟦⟧ = {!!}
