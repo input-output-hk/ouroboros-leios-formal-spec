@@ -15,5 +15,5 @@ or
 ```console
 $ nix develop
 $ cd formal-spec
-$ agda Everything.agda
+$ agda formal-spec.lagda.md
 ```
