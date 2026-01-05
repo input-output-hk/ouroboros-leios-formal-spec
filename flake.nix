@@ -74,7 +74,9 @@
           buildInputs = [ agdaWithPkgs pkgs.pandoc ];
           buildPhase = ''
             agda --html --html-highlight=auto formal-spec.lagda.md
-            pandoc -s -c Agda.css html/Leios.Linear.md -o html/Leios.Linear.html
+            for i in html/Leios.*.md;
+              do pandoc -s -c Agda.css ''$i -o ''${i%.md}.html;
+            done
           '';
           installPhase = ''
             mkdir "$out"
