@@ -10,8 +10,10 @@ open import Data.Nat using (_+_)
 open import Relation.Binary
 open import Categories.Category
 open import Categories.Category.Helper
-open import Data.Maybe using () renaming (map to mmap)
-open import Data.Maybe.Relation.Unary.Any
+open import Class.Monad
+open import Class.Functor
+-- open import Data.Maybe using (just) renaming (map to mmap ; _>>=_ to _m>>=_)
+open import Data.Maybe.Relation.Unary.Any hiding (just)
 
 -- M = id, Maybe, Powerset (relation), Giry (probability)
 -- SFunType A B S = S × A → M (S × B)
@@ -28,7 +30,7 @@ record SFunᵉ (A B : Type) : Type₁ where
 private variable A B C D State : Type
 
 trace : ∀ {n} → SFunType A B State → State → Vec A n → Maybe (Vec B n)
-trace f s [] = just []
+trace _ _ [] = just []
 trace f s (a ∷ as) = do
   (s' , b) ← f (s , a)
   rec ← trace f s' as
@@ -37,56 +39,75 @@ trace f s (a ∷ as) = do
 from-just' : ∀ {a} {A : Type a} {x : Maybe A} → Is-just x → ∃[ y ] x ≡ just y
 from-just' {x = just x} _ = x , refl
 
-is-just-head : ∀ {m n} {f : SFunType A B State} {s} {a} {as : Vec A ((ℕ.suc n) + m)} → Is-just (trace f s (a ∷ as)) → Is-just (f (s , a))
-is-just-head {f = f} {s} {a} {as} p with f (s , a)
-... | just _ = just tt
+take-n : ∀ {m n} {f : SFunType A B State} {s} {as : Vec A (n + m)} {bs}
+  → trace f s as ≡ just bs
+  → trace f s (take n as) ≡ just (take n bs)
+take-n {m = m} {zero} _ = refl
+take-n {m = m} {ℕ.suc n} {f} {s} {as = a ∷ as} {b ∷ bs} p with f (s , a)
+... | just (s' , b') with trace f s' as in q
+take-n {m = m} {ℕ.suc n} {f} {s} {a ∷ as} {b ∷ bs} refl | just (s' , b') | just x rewrite take-n {m = m} {n} {f} {s'} {as} {bs} q = refl
 
-is-just-tail : ∀ {m n} {f : SFunType A B State} {s} {a} {as : Vec A ((ℕ.suc n) + m)} →
-  (p : Is-just (trace f s (a ∷ as))) →
-  Is-just (trace f (proj₁ (proj₁ (from-just' (is-just-head {m = m} {n} {f} {s} {a} {as} p)))) as)
-is-just-tail {m = m} {n} {f} {s} {a} {as = as} p with f (s , a)
-... | just (s' , _) with trace f s' as
-... | just _ = just tt
+take-trace : ∀ {m n} {f : SFunType A B State} {s} {as : Vec A (n + m)}
+  → Is-just (trace f s as)
+  → fmap (take n) (trace f s as) ≡ {!!} -- trace f s (take n as)
+take-trace p = {!!} -- with from-just' p
+-- ... | _ , p' rewrite p' = {!!} -- sym (take-n p')
 
-take-trace : ∀ {m n} {f : SFunType A B State} {s} {as : Vec A (n + m)} → Is-just (trace f s as) → mmap (take n) (trace f s as) ≡ trace f s (take n as)
-take-trace {n = zero} {f} {s} {as} _ with trace f s as
-... | just x = refl
-take-trace {n = suc _} {f} {s} {as = a ∷ as} p with f (s , a) in q
-... | just (s' , b) rewrite q with trace f s' as in r
-... | just x rewrite r = cong (just P.∘ (b ∷ _)) (take-trace {f = f} {s = s'} (is-just-tail {!p!}))
+-- take-suc : ∀ {m n} {v : Vec B (ℕ.suc (m + n))} → take m (tail v) ≡ tail (take (ℕ.suc m) v)
+-- take-suc {v = _ ∷ _} = refl
 
--- implicit state
-record SFunⁱ (A B : Type) : Type where
+-- is-just-fmap : ∀ {a b} {A : Set a} {B : Set b} {f : A → B} {v : Maybe A} → Is-just (fmap f v) → Is-just v
+-- is-just-fmap {v = just _} _ = Any.just tt
 
-  constructor SF
+-- is-just->>= : ∀ {a b} {A : Set a} {B : Set b} {f : A → Maybe B} {v : Maybe A} → Is-just (v >>= f) → Is-just v
+-- is-just->>= {v = just _} _ = Any.just tt
 
-  field
-    fun : ∀ {n} → Vec A n → Maybe (Vec B n)
-    take-fun : ∀ {m n} {as : Vec A (m + n)} → Is-just (fun as) → mmap (take m) (fun as) ≡ fun (take m as)
+-- mfmap : ∀ {a b c} {A : Set a} {B : Set b} {C : Set c} {mv : Maybe A} {g : A → B} {f : B → C}
+--   → fmap f (fmap g mv) ≡ fmap (f P.∘ g) mv
+-- mfmap {mv = just _} = refl
+-- mfmap {mv = nothing} = refl
 
-  fun₁ : A → Maybe B
-  fun₁ a = mmap head (fun [ a ])
+-- -- implicit state
+-- record SFunⁱ (A B : Type) : Type where
+
+--   constructor SF
+
+--   field
+--     fun : ∀ {n} → Vec A n → Maybe (Vec B n)
+--     take-fun : ∀ {m n} {as : Vec A (m + n)} → Is-just (fun as) → fmap (take m) (fun as) ≡ fun (take m as)
+
+--   fun₁ : A → Maybe B
+--   fun₁ a = fmap head (fun [ a ])
   
---   take-tail : {m n : ℕ} {a : A} {as : Vec A (m + n)} → take m (tail (fun (a ∷ as))) ≡ tail (fun (a ∷ take m as))
---   take-tail {m} {a = a} {as} = begin
---     take m (tail (fun (a ∷ as)))         ≡⟨ take-suc {v = fun (a ∷ as)} ⟩
---     tail (take (ℕ.suc m) (fun (a ∷ as))) ≡⟨ cong tail take-fun ⟩
---     tail (fun (take (ℕ.suc m) (a ∷ as))) ≡⟨⟩
---     tail (fun (a ∷ take m as))           ∎
---     where
---       open ≡-Reasoning
---       take-suc : ∀ {m n} {v : Vec B (ℕ.suc (m + n))} → take m (tail v) ≡ tail (take (ℕ.suc m) v)
---       take-suc {v = _ ∷ _} = refl
-        
+--   take-tail : {m n : ℕ} {a : A} {as : Vec A (m + n)}
+--     → Is-just (fun (a ∷ as))
+--     → fmap (take m P.∘ tail) (fun (a ∷ as)) ≡ fmap tail (fun (a ∷ take m as))
+--   take-tail {m = m} p with take-fun {m = ℕ.suc m} p
+--   ... | ≡fun with from-just' p
+--   ... | bs , fun[a∷as]≡bs rewrite fun[a∷as]≡bs | take-suc {m = m} {v = bs} = cong (fmap tail) ≡fun
+
 --   -- the function on traces after making one fixed step
 --   apply₁ : A → SFunⁱ A B
---   apply₁ a = record { fun = λ as → tail (fun (a ∷ as)) ; take-fun = take-tail  }
+--   apply₁ a = record
+--     { fun = λ as → fmap tail (fun (a ∷ as))
+--     ; take-fun = λ {m = m} {n} {as} x →
+--       trans
+--         (mfmap {mv = fun (a ∷ as)} {g = tail} {f = take m} )
+--         (take-tail {m = m} (is-just-fmap {v = fun (a ∷ as)} x)) }
 
 -- idⁱ : SFunⁱ A A
--- idⁱ = SF P.id refl
+-- idⁱ = SF just (const refl)
 
 -- _∘ⁱ_ : ∀ {A B C} → SFunⁱ B C → SFunⁱ A B → SFunⁱ A C
--- _∘ⁱ_ (SF fun take-fun) (SF fun₁ take-fun₁) = SF (fun P.∘ fun₁) (trans take-fun (cong fun take-fun₁))
+-- _∘ⁱ_ {A} {B} {C} (SF fun take-fun) (SF fun₁ take-fun₁) =
+--   SF
+--     ((_>>= fun) P.∘ fun₁)
+--     λ {m = m} {as = as} p → trans (aux as) (cong (_>>= fun) (take-fun₁ {m = m} (is-just->>= p)))
+--   where
+--     aux : ∀ {m} {n} (w : Vec A (m +ℕ n)) → fmap (take m) (fun₁ w >>= fun) ≡ (fmap (take m) (fun₁ w) >>= fun)
+--     aux w with fun₁ w in p
+--     ... | just x = take-fun {!!}
+--     ... | nothing = refl
 
 -- module _ where
 --   open SFunⁱ
