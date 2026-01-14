@@ -146,7 +146,7 @@ data Err-verifyStep (σ : Action) (i : FFDT Out ⊎ BaseT Out ⊎ IOT In) (s : L
     isValid s (inj₁ (ebHeader eb)) ×
     slot' ≤ slotNumber eb + Lhdr ×
     slotNumber eb + 3 * Lhdr ≤ slot ×
-    slot ≡ slotNumber eb + validityCheckTime eb ×
+    slot ≡ slotNumber eb + (3 * Lhdr ⊔ validityCheckTime eb) ×
     validityCheckTime eb ≤ 3 * Lhdr + Lvote ×
     EndorserBlockOSig.txs eb ≢ [] ×
     needsUpkeep VT-Role ×
