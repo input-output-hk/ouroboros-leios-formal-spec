@@ -44,6 +44,8 @@ data LeiosOutput : Type where
   FFD-IN   : FFDAbstract.Input ffdAbstract → LeiosOutput
   EMPTY    : LeiosOutput
 
+Block = RankingBlock ⊎ EndorserBlock
+
 record LeiosState : Type where
   field V            : VTy
         SD           : StakeDistr
@@ -77,9 +79,21 @@ record LeiosState : Type where
   lookupTxsC : Hash → List Tx
   lookupTxsC c = maybe lookupTxs [] $ lookupEB c
 
+  currentChain : List Block
+  currentChain = flip concatMap RBs λ rb →
+    L.fromMaybe (inj₂ <$> (lookupEB =<< getEBHash <$> RankingBlock.ebCert rb))
+    ++ [ inj₁ rb ]
+
   Ledger : List Tx
-  Ledger = flip L.concatMap RBs
-    (λ rb → RankingBlock.txs rb L.++ maybe lookupTxsC [] (getEBHash <$> (RankingBlock.ebCert rb)))
+  Ledger = flip L.concatMap RBs λ rb →
+    RankingBlock.txs rb
+    ++ maybe lookupTxsC [] (getEBHash <$> RankingBlock.ebCert rb)
+
+  hasRB : RankingBlock → Type
+  hasRB = _∈ RBs
+
+  hasTx : Tx → Type
+  hasTx = _∈ Ledger
 
   needsUpkeep : SlotUpkeep → Type
   needsUpkeep = _∉ˡ Upkeep
