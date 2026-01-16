@@ -162,7 +162,7 @@ f ≈ᵉ g = eval f ≈ⁱ eval g
 
 eval∘resume≡id : ∀ {f : SFunⁱ A B} → eval (resume f) ≈ⁱ f
 eval∘resume≡id {f = f} [] = sym (SFunⁱ.fun-unit f)
-eval∘resume≡id {f = f} (a ∷ as) = ?
+eval∘resume≡id {f = f} (a ∷ as) = {!!}
 
 -- -- [] with SFunⁱ.fun f []
 -- -- ... | [] = refl
@@ -225,7 +225,7 @@ Inverse-resume-eval {A} {B} = record { to = resume ; from = eval ; Go }
         eval (resume x) ≈⟨ eval∘resume≡id ⟩
         x               ∎
 
--- sFunCategory : Category _ _ _b
+-- sFunCategory : Category _ _ _
 -- sFunCategory = categoryHelper $ record
 --   { Obj = Type
 --   ; _⇒_ = SFunⁱ
