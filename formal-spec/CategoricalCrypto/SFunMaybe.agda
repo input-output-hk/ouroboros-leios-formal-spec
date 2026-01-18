@@ -165,7 +165,7 @@ eval∘resume≡id = go
   where
     go : ∀ {f : SFunⁱ A B} {n} → (trace resume-fun f) {n} ≗ (SFunⁱ.fun f {n})
     go {f = f} {n} [] = sym (SFunⁱ.fun-unit f)
-    go {f = f} {.suc n} (a ∷ as) = ? -- with SFunⁱ.fun f [ a ]
+    go {f = f} {.suc n} (a ∷ as) = {!!} -- with SFunⁱ.fun f [ a ]
     -- ... | f[a] = {!!}
 
 -- [] with SFunⁱ.fun f []
@@ -253,7 +253,7 @@ sFunCategory = categoryHelper $ record
     ... | just _ = refl
     ... | nothing = refl
 
-    resp' : ∀ {A} {B} {C} {f h : SFunⁱ B C} {g i : SFunⁱ A B} → f ≈ⁱ h → g ≈ⁱ i → (f ∘ⁱ g) ≈ⁱ (h ∘ⁱ i)
+    resp' : {A B C : Type} {f h : SFunⁱ B C} {g i : SFunⁱ A B} → f ≈ⁱ h → g ≈ⁱ i → (f ∘ⁱ g) ≈ⁱ (h ∘ⁱ i)
     resp' {g = g} {i} f≈ⁱh g≈ⁱi v with g≈ⁱi v
     ... | p with SFunⁱ.fun g v | SFunⁱ.fun i v
     ... | nothing | nothing = refl
