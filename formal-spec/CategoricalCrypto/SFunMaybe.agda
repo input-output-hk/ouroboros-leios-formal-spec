@@ -161,17 +161,21 @@ _≈ᵉ_ : SFunᵉ A B → SFunᵉ A B → Type
 f ≈ᵉ g = eval f ≈ⁱ eval g
 
 eval∘resume≡id : ∀ {f : SFunⁱ A B} → eval (resume f) ≈ⁱ f
-eval∘resume≡id {f = f} [] = sym (SFunⁱ.fun-unit f)
-eval∘resume≡id {f = f} (a ∷ as) = {!!}
+eval∘resume≡id = go
+  where
+    go : ∀ {f : SFunⁱ A B} {n} → (trace resume-fun f) {n} ≗ (SFunⁱ.fun f {n})
+    go {f = f} {n} [] = sym (SFunⁱ.fun-unit f)
+    go {f = f} {.suc n} (a ∷ as) = ? -- with SFunⁱ.fun f [ a ]
+    -- ... | f[a] = {!!}
 
--- -- [] with SFunⁱ.fun f []
--- -- ... | [] = refl
--- -- eval∘resume≡id {f = f} (a ∷ as) = begin
--- --   head (fun f (a ∷ [])) ∷ fun (eval (resume (apply₁ f a))) as ≡⟨ cong (_ ∷_) (eval∘resume≡id as) ⟩
--- --   fun-single f a ∷ fun (apply₁ f a) as                              ≡⟨ sym (fun-∷ {f = f}) ⟩
--- --   fun f (a ∷ as)                                              ∎
--- --   where open ≡-Reasoning
--- --         open SFunⁱ
+-- [] with SFunⁱ.fun f []
+-- ... | [] = refl
+-- eval∘resume≡id {f = f} (a ∷ as) = begin
+--   head (fun f (a ∷ [])) ∷ fun (eval (resume (apply₁ f a))) as ≡⟨ cong (_ ∷_) (eval∘resume≡id as) ⟩
+--   fun-single f a ∷ fun (apply₁ f a) as                              ≡⟨ sym (fun-∷ {f = f}) ⟩
+--   fun f (a ∷ as)                                              ∎
+--   where open ≡-Reasoning
+--         open SFunⁱ
 
 resume∘eval≡id : ∀ {f : SFunᵉ A B} → resume (eval f) ≈ᵉ f
 resume∘eval≡id {f = f} = eval∘resume≡id {f = eval f}
@@ -225,34 +229,34 @@ Inverse-resume-eval {A} {B} = record { to = resume ; from = eval ; Go }
         eval (resume x) ≈⟨ eval∘resume≡id ⟩
         x               ∎
 
--- sFunCategory : Category _ _ _
--- sFunCategory = categoryHelper $ record
---   { Obj = Type
---   ; _⇒_ = SFunⁱ
---   ; _≈_ = _≈ⁱ_
---   ; id = idⁱ
---   ; _∘_ = _∘ⁱ_
---   ; assoc = associative'
---   ; identityˡ = identityˡ'
---   ; identityʳ = λ _ → refl
---   ; equiv = IsEquivalence-≈ⁱ
---   ; ∘-resp-≈ = resp'
---   }
---   where
---     associative' : {A B C D : Type} {f : SFunⁱ A B} {g : SFunⁱ B C} {h : SFunⁱ C D} → ((h ∘ⁱ g) ∘ⁱ f) ≈ⁱ (h ∘ⁱ (g ∘ⁱ f))
---     associative' {f = f} {g} {h} v with SFunⁱ.fun f v
---     ... | just _ = refl
---     ... | nothing = refl
+sFunCategory : Category _ _ _
+sFunCategory = categoryHelper $ record
+  { Obj = Type
+  ; _⇒_ = SFunⁱ
+  ; _≈_ = _≈ⁱ_
+  ; id = idⁱ
+  ; _∘_ = _∘ⁱ_
+  ; assoc = λ { {f = f} {g} {h} → associative' {f = f} {g} {h}}
+  ; identityˡ = λ { {f = f} → identityˡ' {f = f}}
+  ; identityʳ = λ _ → refl
+  ; equiv = IsEquivalence-≈ⁱ
+  ; ∘-resp-≈ = λ { {f = f} {h} {g} {i} → resp' {f = f} {h} {g} {i}}
+  }
+  where
+    associative' : {A B C D : Type} {f : SFunⁱ A B} {g : SFunⁱ B C} {h : SFunⁱ C D} → ((h ∘ⁱ g) ∘ⁱ f) ≈ⁱ (h ∘ⁱ (g ∘ⁱ f))
+    associative' {f = f} {g} {h} v with SFunⁱ.fun f v
+    ... | just _ = refl
+    ... | nothing = refl
     
---     identityˡ' : {A B : Type} {f : SFunⁱ A B} → (idⁱ ∘ⁱ f) ≈ⁱ f
---     identityˡ' {f = f} v with SFunⁱ.fun f v
---     ... | just _ = refl
---     ... | nothing = refl
+    identityˡ' : {A B : Type} {f : SFunⁱ A B} → (idⁱ ∘ⁱ f) ≈ⁱ f
+    identityˡ' {f = f} v with SFunⁱ.fun f v
+    ... | just _ = refl
+    ... | nothing = refl
 
---     resp' : ∀ {A} {B} {C} {f h : SFunⁱ B C} {g i : SFunⁱ A B} → f ≈ⁱ h → g ≈ⁱ i → (f ∘ⁱ g) ≈ⁱ (h ∘ⁱ i)
---     resp' {g = g} {i} f≈ⁱh g≈ⁱi v with g≈ⁱi v
---     ... | p with SFunⁱ.fun g v | SFunⁱ.fun i v
---     ... | nothing | nothing = refl
---     ... | just gs | just _ with p
---     ... | refl = f≈ⁱh gs
+    resp' : ∀ {A} {B} {C} {f h : SFunⁱ B C} {g i : SFunⁱ A B} → f ≈ⁱ h → g ≈ⁱ i → (f ∘ⁱ g) ≈ⁱ (h ∘ⁱ i)
+    resp' {g = g} {i} f≈ⁱh g≈ⁱi v with g≈ⁱi v
+    ... | p with SFunⁱ.fun g v | SFunⁱ.fun i v
+    ... | nothing | nothing = refl
+    ... | just gs | just _ with p
+    ... | refl = f≈ⁱh gs
 
