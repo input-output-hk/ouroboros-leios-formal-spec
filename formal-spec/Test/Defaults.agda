@@ -24,6 +24,8 @@ open import Relation.Binary.Structures
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
+open import CategoricalCrypto using (I)
+
 open Equivalence
 
 -- The module contains very simple implementations for the functionalities
@@ -106,20 +108,16 @@ open import Leios.Base d-Abstract d-VRF public
 d-Base : BaseAbstract
 d-Base =
   record
-    { Cert       = ⊤
-    ; VTy        = ⊤
-    ; initSlot   = λ _ → 0
-    ; V-chkCerts = λ _ _ → true
+    { Cert        = ⊤
+    ; VTy         = ⊤
+    ; initSlot    = λ _ → 0
+    ; V-chkCerts  = λ _ _ → true
+    ; BaseNetwork = I
+    ; BaseAdv     = I
     }
 
-d-BaseFunctionality : BaseAbstract.Functionality d-Base
-d-BaseFunctionality =
-  record
-    { State         = ⊤
-    ; _-⟦_/_⟧⇀_     = λ _ _ _ _ → ⊤
-    ; SUBMIT-total  = tt , tt
-    ; FTCH-total    = [] , tt , tt
-    }
+d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
+d-BaseFunctionality = record { m = record { State = ⊤ ; stepRel = λ _ _ _ _ → ⊤ } }
 
 open import Leios.FFD public
 
@@ -226,8 +224,7 @@ d-SpecStructure = record
       ; pk-EB                     = sutId , tt
       ; pk-VT                     = sutId , tt
       ; B'                        = d-Base
-      ; BF                        = d-BaseFunctionality
-      ; initBaseState             = tt
+      ; BM                        = d-BaseFunctionality
       ; K'                        = d-KeyRegistration
       ; KF                        = d-KeyRegistrationFunctionality
       ; va                        = d-VotingAbstract

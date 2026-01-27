@@ -28,6 +28,7 @@ open import Leios.Linear ⋯ params Lhdr Lvote Ldiff splitTxs validityCheckTime 
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
 open Types params
+open BaseAbstract B'
 ```
 An `Action` provides input to the relational semantics
 ```agda
@@ -44,7 +45,7 @@ data Action : Type where
 ```
 A `TestTrace` is a list of actions togther with channels related to the other functionalities
 ```agda
-TestTrace = List (Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In))
+TestTrace = List (Action × (FFDT Out ⊎ BaseIOF In ⊎ IOT In))
 ```
 ```agda
 private variable
@@ -54,7 +55,7 @@ private variable
   eb   : EndorserBlock
   ebs  : List EndorserBlock
   vt   : List Vote
-  i    : FFDT Out ⊎ BaseT Out ⊎ IOT In
+  i    : FFDT Out ⊎ BaseIOF In ⊎ IOT In
   o    : FFDT In
 ```
 ```agda
@@ -94,7 +95,7 @@ data _—→_ : LeiosState → LeiosState → Type where
 open import Prelude.Closures _—→_
 ```
 ```agda
-toRcvType : FFDT Out ⊎ BaseT Out ⊎ IOT In → Channel.inType ((FFD ⊗ BaseC) ⊗ ((IO ⊗ Adv) ᵀ))
+toRcvType : FFDT Out ⊎ BaseIOF In ⊎ IOT In → Channel.inType ((FFD ⊗ BaseIO) ⊗ ((IO ⊗ Adv) ᵀ))
 toRcvType (inj₁ i) = (ϵ ⊗R) ⊗R ↑ᵢ i
 toRcvType (inj₂ (inj₁ i)) = (L⊗ ϵ) ⊗R ↑ᵢ i
 toRcvType (inj₂ (inj₂ i)) = L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ i
@@ -102,14 +103,14 @@ toRcvType (inj₂ (inj₂ i)) = L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ i
 ```agda
 infix 0 _≈_ _≈¹_
 
-data _≈¹_ : Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In) → s′ —→ s → Type where
+data _≈¹_ : Action × (FFDT Out ⊎ BaseIOF In ⊎ IOT In) → s′ —→ s → Type where
 
   FromAction :
     ∀ i {s′ o}
       → (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
       → (getAction σ , i) ≈¹ ActionStep σ
 
-data ValidStep (es : Action × (FFDT Out ⊎ BaseT Out ⊎ IOT In)) (s : LeiosState) : Type where
+data ValidStep (es : Action × (FFDT Out ⊎ BaseIOF In ⊎ IOT In)) (s : LeiosState) : Type where
   Valid : (tr : s′ —→ s) → es ≈¹ tr → ValidStep es s
 ```
 ```agda
@@ -132,7 +133,7 @@ Errors that occur when verifying a step
 getNewState : ∀ {es s} → ValidTrace es s → LeiosState
 getNewState (Valid {s′ = s} _ _) = s
 
-data Err-verifyStep (σ : Action) (i : FFDT Out ⊎ BaseT Out ⊎ IOT In) (s : LeiosState) : Type where
+data Err-verifyStep (σ : Action) (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) (s : LeiosState) : Type where
   Err-Slot : getSlot σ ≢ LeiosState.slot s → Err-verifyStep σ i s
   Err-EB-Role-premises : ∀ {π} → ¬ (
     toProposeEB s π ≡ just eb ×
@@ -169,7 +170,7 @@ Ok' a = Ok (Valid _ (FromAction _ a))
 ```
 ```agda
 verifyStep' : (a : Action) →
-  (i : FFDT Out ⊎ BaseT Out ⊎ IOT In) →
+  (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) →
   (s : LeiosState) → getSlot a ≡ LeiosState.slot s →
   Result (Err-verifyStep a i s) (ValidStep (a , i) s)
 verifyStep' (EB-Role-Action n ebs) (inj₁ SLOT) s refl
@@ -199,8 +200,9 @@ verifyStep' (Slot₁-Action _) (inj₁ (FFD-OUT msgs)) s refl
 ... | no ¬p = Err (Err-AllDone ¬p)
 verifyStep' (Slot₁-Action _) (inj₂ _) _ _        = Err Err-Invalid
 verifyStep' (Slot₂-Action _) (inj₁ _) _ _        = Err Err-Invalid
-verifyStep' (Slot₂-Action _) (inj₂ (inj₂ _)) _ _ = Err Err-Invalid
 verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (BASE-LDG rbs))) s refl = Ok' Slot₂
+verifyStep' (Slot₂-Action _) (inj₂ (inj₁ _)) _ _ = Err Err-Invalid
+verifyStep' (Slot₂-Action _) (inj₂ (inj₂ _)) _ _ = Err Err-Invalid
 
 -- Different IO pattern again
 verifyStep' (Base₁-Action _) (inj₁ _) _ _                = Err Err-Invalid
@@ -230,7 +232,7 @@ verifyStep' (No-VT-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Err Err-Invalid
 verifyStep' (No-VT-Role-Action _) (inj₂ _) _ _           = Err Err-Invalid
 ```
 ```agda
-verifyStep : (a : Action) → (i : FFDT Out ⊎ BaseT Out ⊎ IOT In) → (s : LeiosState) → Result (Err-verifyStep a i s) (ValidStep (a , i) s)
+verifyStep : (a : Action) → (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) → (s : LeiosState) → Result (Err-verifyStep a i s) (ValidStep (a , i) s)
 verifyStep a i s = case getSlot a ≟ LeiosState.slot s of λ where
   (yes p) → verifyStep' a i s p
   (no ¬p) → Err (Err-Slot λ p → ⊥-elim (¬p p))

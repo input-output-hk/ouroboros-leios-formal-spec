@@ -73,6 +73,7 @@ For the test trace, we rely on the implementation provided in `Test.Defaults`.
 ```agda
   open Params params
   open Types params
+  open BaseAbstract B'
   open GenFFD
 
   opaque

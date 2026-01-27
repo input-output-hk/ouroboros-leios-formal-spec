@@ -45,8 +45,7 @@ record SpecStructure : Type₁ where
 ```
 ```agda
   field B' : BaseAbstract
-        BF : BaseAbstract.Functionality B'
-        initBaseState : BaseAbstract.Functionality.State BF
+        BM : BaseAbstract.BaseMachine B'
 
   open Leios.KeyRegistration a vrf' public
 ```
@@ -54,7 +53,7 @@ record SpecStructure : Type₁ where
   field K' : KeyRegistrationAbstract
         KF : KeyRegistrationAbstract.Functionality K'
 
-  module B   = BaseAbstract.Functionality BF
+  module B   = BaseAbstract.BaseMachine BM
   module K   = KeyRegistrationAbstract.Functionality KF
   module FFD = FFDAbstract.Functionality FFD'
 
