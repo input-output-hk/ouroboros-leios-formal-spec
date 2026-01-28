@@ -1,28 +1,28 @@
 {-# OPTIONS --safe #-}
 
 open import abstract-set-theory.Prelude
-
 open import Class.Core
-open import Class.Functor
-open import Class.Monad
-
-import Categories.Monad as C
-open import Categories.Category
-open import Categories.Category.Construction.Kleisli
-open import Categories.Category.Instance.Sets
-open import Categories.Category.SubCategory
-open import Categories.Monad.Construction.Kleisli
+open import Categories.Category.Core
+open import Categories.Category.Helper
+open import Relation.Binary
 
 open import Class.Monad.Ext
+open import LibExt
 
-module CategoricalCrypto.SFunM {M : Type↑} ⦃ Monad-M : Monad M ⦄ ⦃ F-Laws : FunctorLaws M ⦄
-  ⦃ M-Laws : MonadLaws M ⦄ ⦃ M-Extensional : ExtensionalMonad M ⦄ ⦃ M-Comm : CommutativeMonad M ⦄ where
+import Relation.Binary.Construct.On as On
+import Relation.Binary.Reasoning.Setoid as R-Setoid
 
--- relevant examples: M = id, Maybe, Powerset (relation), Giry (probability)
+module CategoricalCrypto.SFunM {M : Type↑}
+  ⦃ Monad-M       : Monad M            ⦄
+  ⦃ F-Laws        : FunctorLaws M      ⦄
+  ⦃ M-Laws        : MonadLaws M        ⦄
+  ⦃ M-Extensional : ExtensionalMonad M ⦄
+  ⦃ M-Comm        : CommutativeMonad M ⦄
+  where
+
 SFunType : Type → Type → Type → Type
 SFunType A B S = S × A → M (S × B)
 
--- explicit state
 record SFunᵉ (A B : Type) : Type₁ where
   field
     State : Type
@@ -37,17 +37,23 @@ idᵉ = record
   ; fun = λ (_ , a) → return (_ , a)
   }
 
-_∘ᵉ'_ : ∀ {A B C State₁ State₂} → SFunType B C State₂ → SFunType A B State₁ → SFunType A C (State₂ × State₁)
+_∘ᵉ'_ : ∀ {A B C State₁ State₂}
+  → SFunType B C State₂
+  → SFunType A B State₁
+  → SFunType A C (State₂ × State₁)
 _∘ᵉ'_ g f ((sg , sf) , a) = do
   (sf , b) ← f (sf , a)
   (sg , c) ← g (sg , b)
   return ((sg , sf) , c)
 
-_∘ᵉ_ : ∀ {A B C} → SFunᵉ B C → SFunᵉ A B → SFunᵉ A C
+_∘ᵉ_ : ∀ {A B C}
+  → SFunᵉ B C
+  → SFunᵉ A B
+  → SFunᵉ A C
 _∘ᵉ_ g f = let module g = SFunᵉ g; module f = SFunᵉ f in record
-  { State = g.State ×  f.State
-  ; init  = g.init  ,  f.init
-  ; fun   = g.fun  ∘ᵉ' f.fun
+  { State = g.State × f.State
+  ; init  = g.init , f.init
+  ; fun   = g.fun ∘ᵉ' f.fun
   } 
 
 trace : SFunType A B State → State → List A → M (List B)
@@ -60,19 +66,15 @@ trace f s (a ∷ as) = do
 eval : SFunᵉ A B → List A → M (List B)
 eval f as = let open SFunᵉ f in trace fun init as
 
-open ≡-Reasoning
-
 id-correct : ∀ {A} → return ≗ eval (idᵉ {A})
 id-correct [] = refl
 id-correct (a ∷ as) = begin
-  return (a ∷ as)
-    ≡⟨ sym >>=-identityˡ ⟩
-  (return as >>= λ as → return (a ∷ as))
-    ≡⟨ id-correct as ⟩>>=⟨refl ⟩
-  (trace (λ (_ , a) → return (tt , a)) tt as >>= λ as → return (a ∷ as))
-    ≡⟨ sym >>=-identityˡ ⟩
+  return (a ∷ as)                                                        ≡⟨ sym >>=-identityˡ ⟩
+  (return as >>= λ as → return (a ∷ as))                                 ≡⟨ id-correct as ⟩>>=⟨refl ⟩
+  (trace (λ (_ , a) → return (tt , a)) tt as >>= λ as → return (a ∷ as)) ≡⟨ sym >>=-identityˡ ⟩
   eval idᵉ (a ∷ as) ∎
-
+  where open ≡-Reasoning
+  
 trace-∘ : ∀ {StateG StateF sg sf} {g : SFunType B C StateG} {f : SFunType A B StateF}
   → trace g sg Kl-M.∘ trace f sf ≗ trace (g ∘ᵉ' f) (sg , sf)
 trace-∘ {sg = sg} {sf} {g} {f} [] = begin
@@ -81,6 +83,7 @@ trace-∘ {sg = sg} {sf} {g} {f} [] = begin
   (return (return []) >>= λ x → x)
     ≡⟨ >>=-identityˡ ⟩
   return [] ∎
+  where open ≡-Reasoning
 trace-∘ {sg = sg} {sf} {g} {f} (a ∷ as) = begin
   (f (sf , a) >>=
     (λ (sf , b) → trace f sf as >>= λ bs → return (b ∷ bs)) >>=
@@ -131,38 +134,64 @@ trace-∘ {sg = sg} {sf} {g} {f} (a ∷ as) = begin
     λ (s , c) → trace (g ∘ᵉ' f) s as >>= λ cs → return (c ∷ cs))
     ≡⟨⟩
   trace (g ∘ᵉ' f) (sg , sf) (a ∷ as) ∎
-
-SFunᵉ-SubCat : SubCat Kl-M Type
-SFunᵉ-SubCat = record
-  { U    = List
-  ; R    = λ f → ∃[ g ] f ≗ eval g
-  ; Rid  = idᵉ , id-correct
-  ; _∘R_ = λ where (g , gpf) (f , fpf) → g ∘ᵉ f , λ as → trans ((gpf Kl-M.HomReasoning.⟩∘⟨ fpf) as) (trace-∘ as)
-  }
-
-SFunᵉ-Category : Category _ _ _
-SFunᵉ-Category = SubCategory Kl-M SFunᵉ-SubCat
-
-module SFunᵉC = Category SFunᵉ-Category
-
-open import Relation.Binary using (Rel; IsEquivalence; Setoid)
-import Relation.Binary.Construct.On as On
+  where open ≡-Reasoning
 
 _≈ᵉ_ : SFunᵉ A B → SFunᵉ A B → Type
 _≈ᵉ_ = _≗_ on eval
 
--- open import Function.Equality
+assoc-∘ᵉ : {A B C D : Type} {f : SFunᵉ A B} {g : SFunᵉ B C} {h : SFunᵉ C D} → ((h ∘ᵉ g) ∘ᵉ f) ≈ᵉ (h ∘ᵉ (g ∘ᵉ f))
+assoc-∘ᵉ {f = f} {g} {h} = begin
+  eval ((h ∘ᵉ g) ∘ᵉ f)         ≈⟨ trace-∘ ⟨ 
+  eval (h ∘ᵉ g) ∘ᵏ eval f      ≈⟨ ∘-resp-≈ (sym ∘ trace-∘) (λ _ → refl) ⟩
+  (eval h ∘ᵏ eval g) ∘ᵏ eval f ≈⟨ assoc {f = eval f} ⟩
+  eval h ∘ᵏ (eval g ∘ᵏ eval f) ≈⟨ ∘-resp-≈ (λ _ → refl) trace-∘ ⟩
+  eval h ∘ᵏ eval (g ∘ᵉ f)      ≈⟨ trace-∘ ⟩
+  eval (h ∘ᵉ (g ∘ᵉ f)) ∎
+  where
+    open Kl-M renaming (_∘_ to _∘ᵏ_)
+    open R-Setoid ≗-setoid
 
-IsEquivalence-≈ᵉ : IsEquivalence (_≈ᵉ_ {A} {B})
-IsEquivalence-≈ᵉ {A} {B} = On.isEquivalence eval {!On.setoid (List A ⟶ M (List B)) eval !}
+identityˡ-∘ᵉ : {f : SFunᵉ A B} → (idᵉ ∘ᵉ f) ≈ᵉ f
+identityˡ-∘ᵉ {f = f} = begin
+  eval (idᵉ ∘ᵉ f)      ≈⟨ trace-∘ ⟨
+  (eval idᵉ ∘ᵏ eval f) ≈⟨ ∘-resp-≈ (sym ∘ id-correct) (λ _ → refl) ⟩
+  (idᵏ ∘ᵏ eval f)      ≈⟨ identityˡ ⟩ 
+  eval f ∎
+  where
+    open Kl-M renaming (_∘_ to _∘ᵏ_ ; id to idᵏ)
+    open R-Setoid ≗-setoid
+    
+identityʳ-∘ᵉ : {f : SFunᵉ A B} → (f ∘ᵉ idᵉ) ≈ᵉ f
+identityʳ-∘ᵉ {f = f} = begin
+  eval (f ∘ᵉ idᵉ)      ≈⟨ trace-∘ ⟨
+  (eval f ∘ᵏ eval idᵉ) ≈⟨ ∘-resp-≈ (λ _ → refl) (sym ∘ id-correct) ⟩
+  (eval f ∘ᵏ idᵏ)      ≈⟨ identityʳ ⟩ 
+  eval f ∎
+  where
+    open Kl-M renaming (_∘_ to _∘ᵏ_ ; id to idᵏ)
+    open R-Setoid ≗-setoid
 
-SFunᵉ-Setoid : Type → Type → Setoid _ _
-SFunᵉ-Setoid A B = record
-  { Carrier = SFunᵉ A B
+∘ᵉ-resp-≈ᵉ : {A B C : Type} {f h : SFunᵉ B C} {g i : SFunᵉ A B} → f ≈ᵉ h → g ≈ᵉ i → (f ∘ᵉ g) ≈ᵉ (h ∘ᵉ i)
+∘ᵉ-resp-≈ᵉ {f = f} {h} {g} {i} p q = begin
+  eval (f ∘ᵉ g)      ≈⟨ trace-∘ ⟨
+  (eval f ∘ᵏ eval g) ≈⟨ ∘-resp-≈ p (λ _ → refl) ⟩
+  (eval h ∘ᵏ eval g) ≈⟨ ∘-resp-≈ (λ _ → refl) q ⟩
+  (eval h ∘ᵏ eval i) ≈⟨ trace-∘ ⟩
+  eval (h ∘ᵉ i) ∎
+  where
+    open Kl-M renaming (_∘_ to _∘ᵏ_ ; id to idᵏ)
+    open R-Setoid ≗-setoid
+    
+SFunᵉ-Category : Category _ _ _
+SFunᵉ-Category = categoryHelper record
+  { Obj = Type
+  ; _⇒_ = SFunᵉ
   ; _≈_ = _≈ᵉ_
-  ; isEquivalence = IsEquivalence-≈ᵉ
+  ; id = idᵉ
+  ; _∘_ = _∘ᵉ_
+  ; assoc = assoc-∘ᵉ
+  ; identityˡ = identityˡ-∘ᵉ
+  ; identityʳ = identityʳ-∘ᵉ
+  ; equiv = On.isEquivalence eval IsEquivalence-≗
+  ; ∘-resp-≈ = ∘ᵉ-resp-≈ᵉ
   }
-
-iso : ∀ {A B} → Inverse (SFunᵉC.hom-setoid {A} {B}) (SFunᵉ-Setoid A B)
-iso = {!On.setoid!} -- mk↔ {to = λ where (f , g , eq) → g} {from = λ g → (eval g , g , (λ _ → refl))}
-  -- ((λ where refl → refl) , λ where {x = (f , g , pf)} refl → refl)

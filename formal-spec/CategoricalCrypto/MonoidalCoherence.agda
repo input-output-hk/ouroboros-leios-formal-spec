@@ -38,7 +38,7 @@ open import Data.Fin using (Fin)
 open import Data.Empty
 
 module CoherenceThm (X : Set) where
-  open FreeMonoidal (record { v = Mon ; X = X ; mor = λ _ _ → ⊥ ; _≈mor_ = λ _ _ → ⊥ })
+  open FreeMonoidal (record { v = Mon ; X = X ; mor = λ _ _ → ⊥ })
 
   open Commutation FreeMonoidal
   open import CategoricalCrypto.Discrete
@@ -204,7 +204,7 @@ module CoherenceThm (X : Set) where
       → iso₁ (B ⊗₀ D , d) ∘ Functor.F₁ F1 (f ⊗₁ g , refl) FM.≈ Functor.F₁ F2 (f ⊗₁ g , refl) ∘ iso₁ (A ⊗₀ C , d)
     natural-⊗ {A} {B} {C} {D} d f g Hf Hg = begin
       (iso₁ (B , ⟦ D ⟧ d) ∘ id ⊗₁ iso₁ (D , d) ∘ α⇒) ∘ (f ⊗₁ g) ⊗₁ id
-        ≈⟨ assoc²' ○ refl⟩∘⟨ refl⟩∘⟨ FM.assoc-commute-from ○ refl⟩∘⟨ ⟺ assoc ⟩
+        ≈⟨ assoc²βε ○ refl⟩∘⟨ refl⟩∘⟨ FM.assoc-commute-from ○ refl⟩∘⟨ ⟺ assoc ⟩
       iso₁ (B , ⟦ D ⟧ d) ∘ (id ⊗₁ iso₁ (D , d) ∘ f ⊗₁ g ⊗₁ id) ∘ α⇒
         ≈⟨ refl⟩∘⟨ ⟺ FM.⊗.homomorphism ⟩∘⟨refl ⟩
       iso₁ (B , ⟦ D ⟧ d) ∘ (id ∘ f) ⊗₁ (iso₁ (D , d) ∘ g ⊗₁ id) ∘ α⇒
@@ -212,7 +212,7 @@ module CoherenceThm (X : Set) where
       iso₁ (B , ⟦ D ⟧ d) ∘ (id ∘ f) ⊗₁ (ι₁ ⟦ (g , refl) ⟧₁ ∘ iso₁ (C , d)) ∘ α⇒
         ≈⟨ refl⟩∘⟨ FM.⊗.homomorphism ⟩∘⟨refl ⟩
       iso₁ (B , ⟦ D ⟧ d) ∘ (id ⊗₁ ι₁ ⟦ (g , refl) ⟧₁ ∘ f ⊗₁ iso₁ (C , d)) ∘ α⇒
-        ≈⟨ assoc²'' ⟩
+        ≈⟨ assoc²δγ ⟩
       (iso₁ (B , ⟦ D ⟧ d) ∘ id ⊗₁ ι₁ ⟦ (g , refl) ⟧₁) ∘ f ⊗₁ iso₁ (C , d) ∘ α⇒
         ≈⟨ iso-comm ⟩∘⟨refl ⟩
       (ι₁ ⟦ (id {B} ⊗₁ g , refl {x = d}) ⟧₁ ∘ iso₁ (B , ⟦ C ⟧ d)) ∘ f ⊗₁ iso₁ (C , d) ∘ α⇒
@@ -226,7 +226,7 @@ module CoherenceThm (X : Set) where
       ι₁ ⟦ (id {B} ⊗₁ g , refl {x = d}) ⟧₁ ∘ (iso₁ (B , ⟦ C ⟧ d) ∘ f ⊗₁ id) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒
         ≈⟨ refl⟩∘⟨ Hf ⟩∘⟨refl ⟩
       ι₁ ⟦ (id {B} ⊗₁ g , refl {x = d}) ⟧₁ ∘ (ι₁ ⟦ (f , refl) ⟧₁ ∘ iso₁ (A , ⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒
-        ≈⟨ assoc²'' ⟩
+        ≈⟨ assoc²δγ ⟩
       (ι₁ ⟦ (id {B} ⊗₁ g , refl {x = d}) ⟧₁ ∘ ι₁ ⟦ (f , refl) ⟧₁) ∘ iso₁ (A , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒
         ≈⟨ ⟺ (ι-∘ d f g) ⟩∘⟨refl ⟩
       ι₁ ⟦ (f ⊗₁ g , refl) ⟧₁ ∘ iso₁ (A , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒ ∎
@@ -298,13 +298,13 @@ module CoherenceThm (X : Set) where
             FM.≈ Functor.F₁ F2 (α⇒ , refl) ∘ iso₁ ((A ⊗₀ B) ⊗₀ C , d)
     natural-α⇒ {A} {B} {C} {d} = begin
       (iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ (iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒) ∘ α⇒ ⊗₁ id
-        ≈⟨ assoc²' ⟩
+        ≈⟨ assoc²βε ⟩
       iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ (iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒ ∘ α⇒ ⊗₁ id
         ≈⟨ refl⟩∘⟨ Functor.homomorphism (A FM.⊗-) ⟩∘⟨refl ⟩
       iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ (id ⊗₁ iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ (id ⊗₁ iso₁ (C , d) ∘ α⇒)) ∘ α⇒ ∘ α⇒ ⊗₁ id
         ≈⟨ (refl⟩∘⟨ (refl⟩∘⟨ Functor.homomorphism (A FM.⊗-)) ⟩∘⟨refl) ⟩
       iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ (id ⊗₁ iso₁ (B , ⟦ C ⟧ d) ∘ (id ⊗₁ id ⊗₁ iso₁ (C , d) ∘ id ⊗₁ α⇒)) ∘ α⇒ ∘ α⇒ ⊗₁ id
-        ≈⟨ refl⟩∘⟨ assoc²' ○ ⟺ assoc ⟩
+        ≈⟨ refl⟩∘⟨ assoc²βε ○ ⟺ assoc ⟩
       (iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d)) ∘ id ⊗₁ id ⊗₁ iso₁ (C , d) ∘ id ⊗₁ α⇒ ∘ α⇒ ∘ α⇒ ⊗₁ id
         ≈⟨ refl⟩∘⟨ refl⟩∘⟨ FM.pentagon ⟩
       (iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d)) ∘ id ⊗₁ id ⊗₁ iso₁ (C , d) ∘ α⇒ ∘ α⇒
@@ -314,7 +314,7 @@ module CoherenceThm (X : Set) where
       (iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d)) ∘ (α⇒ ∘ (id ⊗₁ id) ⊗₁ iso₁ (C , d)) ∘ α⇒
         ≈⟨ refl⟩∘⟨ (refl⟩∘⟨ FM.⊗.identity ⟩⊗⟨refl) ⟩∘⟨refl ⟩
       (iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d)) ∘ (α⇒ ∘ id ⊗₁ iso₁ (C , d)) ∘ α⇒
-        ≈⟨ refl⟩∘⟨ assoc ○ assoc ○ ⟺ assoc²' ○ ⟺ idˡ ⟩
+        ≈⟨ refl⟩∘⟨ assoc ○ assoc ○ ⟺ assoc²βε ○ ⟺ idˡ ⟩
       id ∘ (iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d) ∘ α⇒) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒ ∎
 
     natural-α⇐ : ∀ {A B C d}
@@ -326,7 +326,7 @@ module CoherenceThm (X : Set) where
       (id ∘ ((iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ iso₁ (B , ⟦ C ⟧ d) ∘ α⇒) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒)) ∘ α⇐ ⊗₁ id
         ≈⟨ ⟺ natural-α⇒ ⟩∘⟨refl ⟩
       ((iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ (iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒) ∘ α⇒ ⊗₁ id) ∘ α⇐ ⊗₁ id
-        ≈⟨ assoc ○ assoc²' ⟩
+        ≈⟨ assoc ○ assoc²βε ⟩
       iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ (iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒ ∘ α⇒ ⊗₁ id ∘ α⇐ ⊗₁ id
         ≈⟨ refl⟩∘⟨ refl⟩∘⟨ refl⟩∘⟨ ⟺ (Functor.homomorphism (FM.-⊗ _)) ⟩
       iso₁ (A , ⟦ B ⟧ (⟦ C ⟧ d)) ∘ id ⊗₁ (iso₁ (B , ⟦ C ⟧ d) ∘ id ⊗₁ iso₁ (C , d) ∘ α⇒) ∘ α⇒ ∘ (α⇒ ∘ α⇐) ⊗₁ id
@@ -379,14 +379,13 @@ module Solver (C : MonoidalCategory 0ℓ 0ℓ 0ℓ)
               {n} (vars : V.Vec (C .MonoidalCategory.Obj) n) where
   open MonoidalCategory
   d : FreeMonoidalData
-  d = record { v = Mon ; X = Fin n ; mor = λ _ _ → ⊥ ; _≈mor_ = λ _ _ → ⊥ }
+  d = record { v = Mon ; X = Fin n ; mor = λ _ _ → ⊥ }
   open FreeMonoidal d public
   open CoherenceThm (Fin n) hiding (⟦_⟧₁)
   open FreeFunctor {d = d} record
     { ⟦v⟧ = record { C = C .U ; Monoidal-C = C .monoidal ; Symmetric-C = λ where ⦃ () ⦄ }
     ; ⟦_⟧ᵖ₀ = V.lookup vars
     ; ⟦_⟧ᵖ₁ = λ ()
-    ; ⟦⟧-≈ = λ ()
     }
 
   opaque
