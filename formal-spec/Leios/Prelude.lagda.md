@@ -121,4 +121,10 @@ instance
 completeFinL : ∀ (n : ℕ) → List (Fin n)
 completeFinL zero = []
 completeFinL (ℕ.suc n) = F.fromℕ n ∷ L.map F.inject₁ (completeFinL n)
+
+prune : {A : Type} → ℕ → List A → List A
+prune k l = take (length l ∸ k) l
+
+_≼_ : {A : Type} → List A → List A → Type
+l₁ ≼ l = ∃[ l₂ ] l₁ ++ l₂ ≡ l
 ```
