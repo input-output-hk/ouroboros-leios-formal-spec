@@ -109,14 +109,3 @@ module MultiNode (networkParams : NetworkParams) (let open NetworkParams network
 
   honestNetwork : Machine I (⨂ IOF ⊗ (NetAdv ⊗ ⨂ AdvF))
   honestNetwork = honestNodes' ∘ᴷ NetFunctionality
-
-  -- all nodes eventually agree on a block that was accepted by a single node
-  safety : Type
-  safety = ∀ (p : Fin numberOfParties) (s : State) (b : Block)
-    → b ∈ partyState s p .currentChain
-    → ∀ continuation → ∃[ n ] ∀ p'
-    → b ∈ partyState (continuation n) p' .currentChain
-    where
-      open Machine honestNetwork
-      partyState : State → Fin numberOfParties → LeiosState
-      partyState = ?
