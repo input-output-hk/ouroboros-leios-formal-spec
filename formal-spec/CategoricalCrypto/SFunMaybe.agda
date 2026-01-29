@@ -144,9 +144,13 @@ eval : SFunᵉ A B → SFunⁱ A B
 eval (SFᵉ _ init fun) = SFⁱ (trace fun init) trace-preserving refl
 
 resume-fun : SFunType A B (SFunⁱ A B)
-resume-fun (f , a) with SFunⁱ.fun f [ a ] in p
-... | nothing = nothing
-... | just (b ∷ []) = just (SFunⁱ.apply₁ f p , b)
+resume-fun (f , a) = case SFunⁱ.fun f [ a ] of-≡ λ where
+  (just (b ∷ [])) p → just (SFunⁱ.apply₁ f p , b)
+  nothing         _ → nothing
+
+-- with SFunⁱ.fun f [ a ] in p
+-- ... | nothing = nothing
+-- ... | just (b ∷ []) = just (SFunⁱ.apply₁ f p , b)
 
 resume : SFunⁱ A B → SFunᵉ A B
 resume f = record
@@ -160,13 +164,25 @@ f ≈ⁱ g = ∀ {n} → SFunⁱ.fun f {n} ≗ SFunⁱ.fun g {n}
 _≈ᵉ_ : SFunᵉ A B → SFunᵉ A B → Type
 f ≈ᵉ g = eval f ≈ⁱ eval g
 
+
+
 eval∘resume≡id : ∀ {f : SFunⁱ A B} → eval (resume f) ≈ⁱ f
-eval∘resume≡id = go
+eval∘resume≡id {A} {B} = go
   where
+    test :
+      {f  : SFunⁱ A B}
+      (a  : A)
+      (w  : Maybe (Vec B 1))
+      {n  : ℕ}
+      (as : Vec A n) →
+      (_>>=_ {M = Maybe} {A = SFunⁱ A B × B} ((λ { (just (b ∷ [])) p → just (SFunⁱ.apply₁ f p , b) ; nothing _ → nothing }) w refl)
+      (λ { (s' , b) → trace resume-fun s' as >>= (λ rec → return (b ∷ rec)) }))
+      ≡ SFunⁱ.fun f (a ∷ as)
+    test a w as = {!!}
+
     go : ∀ {f : SFunⁱ A B} {n} → (trace resume-fun f) {n} ≗ (SFunⁱ.fun f {n})
     go {f = f} {n} [] = sym (SFunⁱ.fun-unit f)
-    go {f = f} {.suc n} (a ∷ as) = {!!} -- with SFunⁱ.fun f [ a ]
-    -- ... | f[a] = {!!}
+    go {f = f} {.suc n} (a ∷ as) = test {f = f} a (SFunⁱ.fun f [ a ]) as
 
 -- [] with SFunⁱ.fun f []
 -- ... | [] = refl
