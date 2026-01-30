@@ -59,7 +59,6 @@ open GenFFD
 private variable s s'   : LeiosState
                  ffds'  : FFD.State
                  π      : VrfPf
-                 bs'    : B.State
                  ks ks' : K.State
                  msgs   : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract)
                  i      : FFDAbstract.Input ffdAbstract
@@ -149,19 +148,11 @@ allDone record { Upkeep = u } = VT-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ
 ### Linear Leios transitions
 The relation describing the transition given input and state
 
-#### Initialization
 ```agda
 open Types params
+open BaseAbstract B'
 
-data _⊢_ : VTy → LeiosState → Type where
-  Init :
-       ∙ ks K.-⟦ K.INIT pk-EB pk-VT / K.PUBKEYS pks ⟧⇀ ks'
-       ∙ initBaseState B.-⟦ B.INIT (V-chkCerts pks) / B.STAKE SD ⟧⇀ bs'
-       ────────────────────────────────────────────────────────────────
-       V ⊢ initLeiosState V SD pks
-```
-```agda
-data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseC) (IO ⊗ Adv) LeiosState where
+data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseIO) (IO ⊗ Adv) LeiosState where
 ```
 #### Network and Ledger
 ```agda
@@ -193,8 +184,7 @@ Note: Submitted data to the base chain is only taken into account
   Base₁   :
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ SubmitTxs txs / nothing ⟧⇀ record s { ToPropose = txs }
-```
-```agda
+
   Base₂   : let open LeiosState s
                 currentCertEB = find (λ (eb , _) →
                   ¿ just (hash eb) ≡ getCurrentEBHash s
@@ -221,10 +211,12 @@ Note: Submitted data to the base chain is only taken into account
          ∙ u ≢ Base
          ──────────────────────────────────────────────────
          s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s u
-
-ShortLeios : Machine (FFD ⊗ BaseC) (IO ⊗ Adv)
-ShortLeios .Machine.State = LeiosState
-ShortLeios .Machine.stepRel = _-⟦_/_⟧⇀_
+```
+<!--
+```agda
+LinearLeios : Machine (FFD ⊗ BaseIO) (IO ⊗ Adv)
+LinearLeios .Machine.State = LeiosState
+LinearLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 
 open import Prelude.STS.GenPremises
 

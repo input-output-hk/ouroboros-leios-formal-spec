@@ -8,9 +8,11 @@ It includes stake distribution, ranking blocks, and base layer abstractions.
 ```
 -->
 ```agda
-open import Leios.Prelude
+open import Leios.Prelude hiding (_⊗_)
 open import Leios.Abstract
 open import Leios.VRF
+
+open import CategoricalCrypto hiding (id; _∘_)
 
 module Leios.Base (a : LeiosAbstract) (open LeiosAbstract a) (vrf' : LeiosVRF a)
   (let open LeiosVRF vrf') where
@@ -30,15 +32,16 @@ record BaseAbstract : Type₁ where
         VTy : Type
         initSlot : VTy → ℕ
         V-chkCerts : List PubKey → EndorserBlock × Cert → Bool
+        BaseNetwork BaseAdv : Channel
 ```
-Input data type represents the possible inputs to the base layer functionality.
+Type family for communicating with the base functionality.
 
-The base layer can receive three types of inputs:
-- Initialization with a certificate validation function
-- Submission of ranking blocks for processing
-- Requests to fetch the current ledger state
+The base layer can produce three types of outputs:
+- Stake distribution information
+- Empty response (no meaningful output)
+- Base layer ledger contents
 ```agda
-  data Input : Type where
+  data BaseIOF : Mode → Type where
 ```
 INIT: Initialize the base layer with a certificate validation function.
 
@@ -47,7 +50,7 @@ Parameters:
   whether an endorser block and certificate pair is valid.
   Returns True if the pair is valid, False otherwise.
 ```agda
-    INIT   : (EndorserBlock × Cert → Bool) → Input
+    INIT   : (EndorserBlock × Cert → Bool) → BaseIOF Out
 ```
 SUBMIT: Submit a ranking block to the base layer for processing.
 
@@ -56,24 +59,20 @@ Parameters:
   a list of transactions, or both (using the These type constructor).
   This represents new content to be added to the ledger.
 ```agda
-    SUBMIT : RankingBlock → Input
+    SUBMIT : RankingBlock → BaseIOF Out
 ```
 FTCH-LDG: Request to fetch the current ledger state.
 
 This input has no parameters and is used to query the current
 state of the base layer ledger.
 ```agda
-    FTCH-LDG : Input
+    FTCH-LDG : BaseIOF Out
 ```
-Output data type represents the possible outputs from the base layer functionality.
-
 The base layer can produce three types of outputs:
 - Stake distribution information
 - Empty response (no meaningful output)
 - Base layer ledger contents
-```agda
-  data Output : Type where
-```
+
 STAKE: Output containing the current stake distribution.
 
 Parameters:
@@ -81,14 +80,14 @@ Parameters:
   This represents how stake is distributed across different pools
   in the system.
 ```agda
-    STAKE : StakeDistr → Output
+    STAKE : StakeDistr → BaseIOF In
 ```
 EMPTY: Empty output indicating no meaningful result.
 
 This output is used when an operation completes successfully
 but produces no data that needs to be returned to the caller.
 ```agda
-    EMPTY : Output
+    EMPTY : BaseIOF In
 ```
 BASE-LDG: Output containing the base layer ledger contents.
 
@@ -97,16 +96,16 @@ Parameters:
   the current state of the base layer ledger. Each ranking block
   may contain endorser blocks, transactions, or both.
 ```agda
-    BASE-LDG : List RankingBlock → Output
+    BASE-LDG : List RankingBlock → BaseIOF In
 ```
 ```agda
-  record Functionality : Type₁ where
-    field State : Type
-          _-⟦_/_⟧⇀_ : State → Input → Output → State → Type
-          SUBMIT-total : ∀ {s b} → ∃[ s' ] s -⟦ SUBMIT b / EMPTY ⟧⇀ s'
-          FTCH-total : ∀ {s} → ∃[ r ] (∃[ s' ] (s -⟦ FTCH-LDG / BASE-LDG r ⟧⇀ s'))
-          -- FTCH-unique : ∀ {s s' o} → s -⟦ FTCH-LDG / o ⟧⇀ s' → ∃[ r ] o ≡ BASE-LDG r
+  BaseIO = simpleChannel BaseIOF
 
-    open Input public
-    open Output public
+  record BaseMachine : Type₁ where
+    field m : Machine BaseNetwork (BaseIO ⊗ BaseAdv)
+          -- IsBlockchain-m : IsBlockchain RankingBlock m -- this might be better
+          -- TODO: how do we do this?
+          -- SUBMIT-fun : IsFunction m (SUBMIT b) EMPTY
+          -- FTCH-pfun : IsPureFunction m FTCH-LDG (BASE-LDG r)
+    open Machine m renaming (stepRel to _-⟦_/_⟧⇀_) public
 ```
