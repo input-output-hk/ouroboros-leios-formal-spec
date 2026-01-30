@@ -8,7 +8,7 @@ open import Leios.Config
 open import Leios.SpecStructure using (SpecStructure)
 
 open import Prelude.Result
-open import CategoricalCrypto hiding (id; _∘_)
+open import CategoricalCrypto hiding (id; _∘_; eval)
 open import CategoricalCrypto.Channel.Selection
 
 open import Data.List.Properties

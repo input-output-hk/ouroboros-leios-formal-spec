@@ -11,7 +11,7 @@ open import Leios.Config
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
-open import CategoricalCrypto hiding (id; _∘_)
+open import CategoricalCrypto hiding (id; _∘_; eval)
 open import CategoricalCrypto.Channel.Selection
 
 module Leios.Linear (⋯ : SpecStructure)
