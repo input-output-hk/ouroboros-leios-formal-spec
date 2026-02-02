@@ -112,9 +112,6 @@ Parameters:
           -- FTCH-pfun : IsPureFunction m FTCH-LDG (BASE-LDG r)
     open Machine m renaming (stepRel to _-⟦_/_⟧⇀_) public
 
-  data IsLeft {A : Set} {B : Set} : A ⊎ B → Set where
-    isLeft : ∀ {x} → IsLeft (inj₁ x)
-
   module _
     (numberOfParties    : ℕ)
     (NAdv               : Channel)
