@@ -147,5 +147,4 @@ Parameters:
           Net
           k
           Δ
-
 ```
