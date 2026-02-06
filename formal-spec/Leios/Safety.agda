@@ -4,32 +4,39 @@ open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.Config
 open import CategoricalCrypto hiding (id; _∘_)
 
-module Leios.Safety where
+module Leios.Safety (Block : Type) where
+
+open import CategoricalCrypto.Machine.Constraints
 
 -- Elements we are allowed to query from a BlockChain
-data BlockChainInfo (Block : Type) : Type where
-  chain : BlockChainInfo Block
-  slot  : BlockChainInfo Block
+data BlockChainInfo : Type where
+  chain : BlockChainInfo
+  slot  : BlockChainInfo
 
-bciQueryType : ∀ {Block} → BlockChainInfo Block → Type
-bciQueryType {Block} chain = List Block
-bciQueryType         slot  = ℕ
+bciQueryType : BlockChainInfo → Type
+bciQueryType chain = List Block
+bciQueryType slot  = ℕ
 
-record IsBlockchain
-  {A B   : Channel}
-  (Block : Type)
-  (m     : Machine A B) : Type where
+IsBlockchain : ∀ {A B} → Machine A B → Type₂
+IsBlockchain m =
+  IsConstrainedDet m BlockChainInfo bciQueryType
 
-  open Channel
-  open Machine m renaming (stepRel to _-⟦_/_⟧ᵐ⇀_)
+
+-- record IsBlockchain
+--   {A B   : Channel}
+--   (Block : Type)
+--   (m     : Machine A B) : Type where
+
+--   open Channel
+--   open Machine m renaming (stepRel to _-⟦_/_⟧ᵐ⇀_)
   
-  module m = Machine m
+--   module m = Machine m
 
-  field queryI        : BlockChainInfo Block → B .outType
-        queryO        : {bci : BlockChainInfo Block} → bciQueryType bci → B .inType
-        queryCompute  : (bci : BlockChainInfo Block) → m.State → bciQueryType bci
-        correctness   : {bci : BlockChainInfo Block} {s : m.State} →
-          s -⟦ L⊗ ϵ ↑ᵢ queryI bci / just (L⊗ ϵ ↑ₒ queryO (queryCompute bci s)) ⟧ᵐ⇀ s
+--   field queryI        : BlockChainInfo Block → B .outType
+--         queryO        : {bci : BlockChainInfo Block} → bciQueryType bci → B .inType
+--         queryCompute  : (bci : BlockChainInfo Block) → State → bciQueryType bci
+--         correctness   : {bci : BlockChainInfo Block} {s : State} →
+--           s -⟦ L⊗ ϵ ↑ᵢ queryI bci / just (L⊗ ϵ ↑ₒ queryO (queryCompute bci s)) ⟧ᵐ⇀ s
 
 module _
   {A B : Channel}
@@ -52,7 +59,7 @@ module _
   (nodesF              : Fin n → Machine Network (IO ⊗ Adv)) -- Node machines 
   (honestNodes         : ℙ (Fin n)) -- Nodes behaving like the honest spec 
   (honest-Node         : ∀ {p} → p ∈ honestNodes → nodesF p ≡ HonestSpec) 
-  (IsBlockchain-Node   : ∀ {p} → p ∈ honestNodes → IsBlockchain Block (nodesF p))
+  (IsBlockchain-Node   : ∀ {p} → p ∈ honestNodes → IsBlockchain (nodesF p))
   (Net                 : Machine I (n ⨂ⁿ Network ⊗ NAdv)) -- The whole network
     where
 
@@ -64,13 +71,13 @@ module _
 
   module network = Machine network
 
-  query : (bci : BlockChainInfo Block)
+  query : (bci : BlockChainInfo)
           {p : Fin n}
           → network.State
           → p ∈ honestNodes
           → bciQueryType bci
-  query bci {p} ((_ , (s , tt)) , tt) honest-p = queryCompute bci (⨂ᴷ-sub-state p s)
-    where open IsBlockchain (IsBlockchain-Node honest-p)
+  query bci {p} ((_ , (s , tt)) , tt) honest-p = proj₁ (queryCompute bci (⨂ᴷ-sub-state p s))
+    where open IsConstrainedDet (IsBlockchain-Node honest-p)
 
   getChain = query chain
   getSlot = query slot
