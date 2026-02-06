@@ -117,7 +117,9 @@ d-Base =
     }
 
 d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
-d-BaseFunctionality = record { m = record { State = ⊤ ; stepRel = λ _ _ _ _ → ⊤ } }
+d-BaseFunctionality = record
+  { m = record { State = ⊤ ; stepRel = λ _ _ _ _ → ⊤ } 
+  ; is-blockchain = ?}
 
 open import Leios.FFD public
 

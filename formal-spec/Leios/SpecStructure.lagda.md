@@ -20,7 +20,7 @@ open import Data.Fin
 module Leios.SpecStructure where
 ```
 ```agda
-record SpecStructure : Type₁ where
+record SpecStructure : Type₂ where
 ```
 ```agda
   field a : LeiosAbstract
