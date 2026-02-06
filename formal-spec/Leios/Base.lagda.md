@@ -99,13 +99,44 @@ Parameters:
     BASE-LDG : List RankingBlock → BaseIOF In
 ```
 ```agda
+  open import Leios.Safety
+  open import Data.Fin.Base using (_↑ˡ_)
+
   BaseIO = simpleChannel BaseIOF
 
-  record BaseMachine : Type₁ where
-    field m : Machine BaseNetwork (BaseIO ⊗ BaseAdv)
-          -- IsBlockchain-m : IsBlockchain RankingBlock m -- this might be better
-          -- TODO: how do we do this?
-          -- SUBMIT-fun : IsFunction m (SUBMIT b) EMPTY
-          -- FTCH-pfun : IsPureFunction m FTCH-LDG (BASE-LDG r)
+  record BaseMachine : Type₂ where
+    field m             : Machine BaseNetwork (BaseIO ⊗ BaseAdv)
+          is-blockchain : IsBlockchain RankingBlock m
+
     open Machine m renaming (stepRel to _-⟦_/_⟧⇀_) public
+
+  module _
+    (numberOfParties     : ℕ)
+    (NAdv                : Channel)
+    (honestSpec          : BaseMachine)
+    (allNodes            : Fin numberOfParties → Machine BaseNetwork (BaseIO ⊗ BaseAdv))
+    (honestNodes         : ℙ (Fin numberOfParties))
+    (honest≡spec         : ∀ {p} → p ∈ honestNodes → allNodes p ≡ BaseMachine.m honestSpec)
+    (honestIsBlockchain  : ∀ {p} → p ∈ honestNodes → IsBlockchain RankingBlock (allNodes p))
+    (Net                 : Machine I (numberOfParties ⨂ⁿ BaseNetwork ⊗ NAdv))
+    (k                   : ℕ)
+    (Δ                   : ℕ)
+    (HonestStakeMajority : Type)
+    where
+
+    safetyBase : Type 
+    safetyBase = safety
+          RankingBlock
+          BaseIO
+          BaseAdv
+          NAdv 
+          BaseNetwork
+          (BaseMachine.m honestSpec)
+          allNodes
+          honestNodes
+          honest≡spec
+          honestIsBlockchain
+          Net
+          k
+          Δ
 ```

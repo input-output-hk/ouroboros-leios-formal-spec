@@ -4,32 +4,25 @@ open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.Config
 open import CategoricalCrypto hiding (id; _∘_)
 
-module Leios.Safety where
+module Leios.Safety (Block : Type) where
 
--- Elements we are allowed to query from a BlockChain
-data BlockChainInfo (Block : Type) : Type where
-  chain : BlockChainInfo Block
-  slot  : BlockChainInfo Block
+open import CategoricalCrypto.Machine.Constraints
 
-bciQueryType : ∀ {Block} → BlockChainInfo Block → Type
-bciQueryType {Block} chain = List Block
-bciQueryType         slot  = ℕ
+-- | Type of things we can query from a honest node
+data BlockChainInfo : Type where
+  chain : BlockChainInfo
+  slot  : BlockChainInfo
 
-record IsBlockchain
-  {A B   : Channel}
-  (Block : Type)
-  (m     : Machine A B) : Type where
+-- | Type for responses given a specific query
+bciQueryType : BlockChainInfo → Type
+bciQueryType chain = List Block
+bciQueryType slot  = ℕ
 
-  open Channel
-  open Machine m renaming (stepRel to _-⟦_/_⟧ᵐ⇀_)
-  
-  module m = Machine m
-
-  field queryI        : BlockChainInfo Block → B .outType
-        queryO        : {bci : BlockChainInfo Block} → bciQueryType bci → B .inType
-        queryCompute  : (bci : BlockChainInfo Block) → m.State → bciQueryType bci
-        correctness   : {bci : BlockChainInfo Block} {s : m.State} →
-          s -⟦ L⊗ ϵ ↑ᵢ queryI bci / just (L⊗ ϵ ↑ₒ queryO (queryCompute bci s)) ⟧ᵐ⇀ s
+record IsBlockchain {A B : Channel} (m : Machine A B) : Type₂ where
+  field 
+    isConstrained : IsConstrained m bciQueryType
+    isDet         : IsDet isConstrained
+    isPure        : IsPure isConstrained 
 
 module _
   {A B : Channel}
@@ -45,42 +38,54 @@ module _
     _∷⟨_,_,_⟩ : ∀ {s s' s''} → Trace s s' → (i : inType) → (o : Maybe outType) → s' -⟦ i / o ⟧ᵐ⇀ s'' → Trace s s''
 
 module _
-  (n                   : ℕ) -- Number of involved parties
-  (Block               : Type) -- Types of blocks 
-  (IO Adv NAdv Network : Channel) -- Communication channels 
-  (HonestSpec          : Machine Network (IO ⊗ Adv)) -- Spec machine
-  (nodesF              : Fin n → Machine Network (IO ⊗ Adv)) -- Node machines 
-  (honestNodes         : ℙ (Fin n)) -- Nodes behaving like the honest spec 
-  (honest-Node         : ∀ {p} → p ∈ honestNodes → nodesF p ≡ HonestSpec) 
-  (IsBlockchain-Node   : ∀ {p} → p ∈ honestNodes → IsBlockchain Block (nodesF p))
-  (Net                 : Machine I (n ⨂ⁿ Network ⊗ NAdv)) -- The whole network
+  -- Number of involved nodes
+  {n                       : ℕ}
+  -- Communication channels involved in the network
+  (IO Adv NAdv Network     : Channel)
+  -- Machine describing the behavior of the honest nodes
+  (honest-node-spec        : Machine Network (IO ⊗ Adv))
+  -- All the nodes, including honest nodes and adversaries
+  (all-nodes               : Fin n → Machine Network (IO ⊗ Adv))
+  -- All the honest nodes
+  (honest-nodes            : ℙ (Fin n)) -- Nodes behaving like the honest spec
+  -- Proofs that each of the honest nodes behave like the specification
+  (honest-nodes-≡-spec     : ∀ {p} → p ∈ honest-nodes → all-nodes p ≡ honest-node-spec)
+  -- Proofs that each of the honest nodes is a blockchain (constrained, pure and
+  -- deterministic with respect to bciQuerytype)
+  (honest-nodes-blockchain : ∀ {p} → p ∈ honest-nodes → IsBlockchain (all-nodes p))
+  -- The network machine
+  (network                 : Machine I (n ⨂ⁿ Network ⊗ NAdv))
     where
 
+  -- Combination of all the nodes together
   nodes : Machine (n ⨂ⁿ Network) (n ⨂ⁿ IO ⊗ n ⨂ⁿ Adv)
-  nodes = ⨂ᴷ nodesF
+  nodes = ⨂ᴷ all-nodes
 
-  network : Machine I (n ⨂ⁿ IO ⊗ (NAdv ⊗ n ⨂ⁿ Adv))
-  network = nodes ∘ᴷ Net
+  -- Composition of the nodes and the network
+  protocol : Machine I (n ⨂ⁿ IO ⊗ (NAdv ⊗ n ⨂ⁿ Adv))
+  protocol = nodes ∘ᴷ network
 
-  module network = Machine network
+  module protocol = Machine protocol
 
-  query : (bci : BlockChainInfo Block)
+  query : (bci : BlockChainInfo)
           {p : Fin n}
-          → network.State
-          → p ∈ honestNodes
+          → protocol.State
+          → p ∈ honest-nodes
           → bciQueryType bci
-  query bci {p} ((_ , (s , tt)) , tt) honest-p = queryCompute bci (⨂ᴷ-sub-state p s)
-    where open IsBlockchain (IsBlockchain-Node honest-p)
+  query bci {p} ((_ , (s , tt)) , tt) honest-p = proj₁ (queryCompute bci (⨂ᴷ-sub-state p s))
+    where
+      open IsBlockchain (honest-nodes-blockchain honest-p)
+      open IsDet isDet
 
   getChain = query chain
   getSlot = query slot
 
   safety : ℕ → ℕ → Type
   safety k Δ = (p p'       : Fin n)
-               (honest-p   : p ∈ honestNodes)
-               (honest-p'  : p' ∈ honestNodes)
-               (init final : network.State)
-               (tr         : Trace network init final)
+               (honest-p   : p ∈ honest-nodes)
+               (honest-p'  : p' ∈ honest-nodes)
+               (init final : protocol.State)
+               (tr         : Trace protocol init final)
                -- for all traces that reach `Δ` slots into the future
                → getSlot init honest-p + Δ ≤ getSlot final honest-p
                -- all honest nodes have `chain` as a prefix
