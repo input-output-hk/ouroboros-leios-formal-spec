@@ -135,7 +135,7 @@ instance _ = Functor-M ⦃ Class.Monad.Monad-TC ⦄
   -- otherwise throw error
   ... | _ | _
     = error $  "No solution found, unable to match " ∷ᵈ A
-            ∷ᵈ " with mode " ∷ᵈ m ∷ᵈ " on the right hand side" ∷ᵈ B ∷ᵈ " with mode " ∷ᵈ m' ∷ᵈ []
+            ∷ᵈ " with mode " ∷ᵈ m ∷ᵈ " on the right hand side " ∷ᵈ B ∷ᵈ " with mode " ∷ᵈ m' ∷ᵈ []
 
 module _ ⦃ _ : TCOptions ⦄ where
   ⇒-solver-tactic = initTac ⇒-solver-tactic'

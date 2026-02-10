@@ -9,10 +9,11 @@
    for testing and illustration purposes.
 -}
 
-open import Leios.Prelude
+open import Leios.Prelude hiding (_⊗_)
 open import Leios.Abstract
 open import Leios.Config
 open import Leios.SpecStructure
+open import Leios.Safety
 
 open import Axiom.Set.Properties th
 open import Data.Nat.Show as N
@@ -24,7 +25,8 @@ open import Relation.Binary.Structures
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
-open import CategoricalCrypto using (I)
+open import CategoricalCrypto using (I ; machine-type ; Channel ; _⊗ᵀ_ ; _⊗_)
+open import CategoricalCrypto.Channel.Selection
 
 open Equivalence
 
@@ -116,10 +118,67 @@ d-Base =
     ; BaseAdv     = I
     }
 
+d-BaseState : Type
+d-BaseState = (List RankingBlock × ℕ)
+
+d-BaseChannel : Channel
+d-BaseChannel = I ⊗ᵀ (BaseAbstract.BaseIO d-Base ⊗ BaseAbstract.BaseAdv d-Base)
+
+data d-BaseRel : machine-type d-BaseState d-BaseChannel where
+
+  fetch-blocks :
+    ∀ blocks slot →
+      d-BaseRel
+        (blocks , slot)
+        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-LDG)
+        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks))
+        (blocks , slot)
+
+  fetch-slot :
+    ∀ blocks slot →
+      d-BaseRel
+        (blocks , slot)
+        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-SLOT)
+        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot))
+        (blocks , slot)
+
+  submit-block :
+    ∀ blocks block slot →
+      d-BaseRel
+        (blocks , slot)
+        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.SUBMIT block)
+        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.EMPTY)) -- TODO should be nothing?
+        (block ∷ blocks , slot)
+
+  -- TODO : action to have slots move forward?
+
 d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
-d-BaseFunctionality = record
-  { m = record { State = ⊤ ; stepRel = λ _ _ _ _ → ⊤ } 
-  ; is-blockchain = ?}
+d-BaseFunctionality =
+  record
+    { m =
+        record
+          { State = (List RankingBlock × ℕ)
+          ; stepRel = d-BaseRel
+          } 
+    ; is-blockchain = let open BaseAbstract.BaseIOF in
+        record
+          { isConstrained =
+              record
+                { queryI = (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ_) ∘ (λ {Chain → FTCH-LDG ; Slot → FTCH-SLOT})
+                ; queryO = λ where
+                    {Chain} rankingBlocks → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BASE-LDG rankingBlocks
+                    {Slot}  slot          → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ SLOT     slot
+                ; correctness = λ where
+                     x → {!x!}
+  -- λ where
+                    -- {Chain} {(blocks , slot)} {just x₁} {(blocks' , slot')} x → blocks , {!x!}
+                    -- {Slot} x → {!!}
+                ; completeness = {!!}
+                }
+          ; isDet = {!!}
+          ; isPure = {!!}
+        }
+    }
 
 open import Leios.FFD public
 

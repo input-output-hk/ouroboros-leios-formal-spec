@@ -23,23 +23,20 @@ StakeDistr : Type
 StakeDistr = TotalMap PoolID ℕ
 
 record RankingBlock : Type where
-  field txs : List Tx
+  field txs         : List Tx
         announcedEB : Maybe Hash
-        ebCert : Maybe EBCert
+        ebCert      : Maybe EBCert
+        slot        : ℕ
 
 record BaseAbstract : Type₁ where
-  field Cert : Type
-        VTy : Type
-        initSlot : VTy → ℕ
-        V-chkCerts : List PubKey → EndorserBlock × Cert → Bool
-        BaseNetwork BaseAdv : Channel
+  field Cert        : Type
+        VTy         : Type
+        initSlot    : VTy → ℕ
+        V-chkCerts  : List PubKey → EndorserBlock × Cert → Bool
+        BaseNetwork : Channel 
+        BaseAdv     : Channel
 ```
 Type family for communicating with the base functionality.
-
-The base layer can produce three types of outputs:
-- Stake distribution information
-- Empty response (no meaningful output)
-- Base layer ledger contents
 ```agda
   data BaseIOF : Mode → Type where
 ```
@@ -68,10 +65,18 @@ state of the base layer ledger.
 ```agda
     FTCH-LDG : BaseIOF Out
 ```
-The base layer can produce three types of outputs:
+FTCH-SLOT: Request to fetch the current slot.
+
+This input has no parameters and is used to query the current
+slot of the base layer ledger.
+```agda
+    FTCH-SLOT : BaseIOF Out
+```
+The base layer can produce four types of outputs:
 - Stake distribution information
 - Empty response (no meaningful output)
 - Base layer ledger contents
+- Curreent slot of the base layer
 
 STAKE: Output containing the current stake distribution.
 
@@ -98,6 +103,15 @@ Parameters:
 ```agda
     BASE-LDG : List RankingBlock → BaseIOF In
 ```
+SLOT: Output containing the current slot.
+
+Parameters:
+- ℕ: the current slot of the base machine. Should always be greater
+or equal than the slot of the last processed block
+```agda
+    SLOT : ℕ → BaseIOF In
+```
+
 ```agda
   open import Leios.Safety
   open import Data.Fin.Base using (_↑ˡ_)

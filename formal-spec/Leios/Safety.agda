@@ -10,13 +10,13 @@ open import CategoricalCrypto.Machine.Constraints
 
 -- | Type of things we can query from a honest node
 data BlockChainInfo : Type where
-  chain : BlockChainInfo
-  slot  : BlockChainInfo
+  Chain : BlockChainInfo
+  Slot  : BlockChainInfo
 
 -- | Type for responses given a specific query
 bciQueryType : BlockChainInfo → Type
-bciQueryType chain = List Block
-bciQueryType slot  = ℕ
+bciQueryType Chain = List Block
+bciQueryType Slot  = ℕ
 
 record IsBlockchain {A B : Channel} (m : Machine A B) : Type₂ where
   field 
@@ -75,10 +75,10 @@ module _
   query bci {p} ((_ , (s , tt)) , tt) honest-p = proj₁ (queryCompute bci (⨂ᴷ-sub-state p s))
     where
       open IsBlockchain (honest-nodes-blockchain honest-p)
-      open IsDet isDet
+      open IsConstrained isConstrained
 
-  getChain = query chain
-  getSlot = query slot
+  getChain = query Chain
+  getSlot = query Slot
 
   safety : ℕ → ℕ → Type
   safety k Δ = (p p'       : Fin n)
