@@ -152,6 +152,12 @@ data d-BaseRel : machine-type d-BaseState d-BaseChannel where
 
   -- TODO : action to have slots move forward?
 
+open import LibExt
+
+helper : BlockChainInfo RankingBlock →
+      BaseAbstract.BaseIOF d-Base CategoricalCrypto.Out
+helper = let open BaseAbstract.BaseIOF in λ {Chain → FTCH-LDG ; Slot → FTCH-SLOT}
+
 d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
 d-BaseFunctionality =
   record
@@ -164,12 +170,16 @@ d-BaseFunctionality =
         record
           { isConstrained =
               record
-                { queryI = (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ_) ∘ (λ {Chain → FTCH-LDG ; Slot → FTCH-SLOT})
+                { queryI = (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ_) ∘ helper
                 ; queryO = λ where
                     {Chain} rankingBlocks → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BASE-LDG rankingBlocks
                     {Slot}  slot          → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ SLOT     slot
-                ; correctness = λ where
-                     x → {!x!}
+                ; correctness = λ {query} {s} {response'} {s'} x →
+                    case (d-BaseChannel .Channel.inType ∋ L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ helper query) of-≡ λ
+                      y eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
+                        (fetch-blocks blocks slot) → {!!}
+                        (fetch-slot blocks slot) → {!!}
+                        (submit-block blocks block slot) → {!!}
   -- λ where
                     -- {Chain} {(blocks , slot)} {just x₁} {(blocks' , slot')} x → blocks , {!x!}
                     -- {Slot} x → {!!}
