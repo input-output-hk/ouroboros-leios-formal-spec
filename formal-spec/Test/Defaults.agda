@@ -25,6 +25,8 @@ open import Relation.Binary.Structures
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
+open import LibExt
+
 open import CategoricalCrypto using (I ; machine-type ; Channel ; _⊗ᵀ_ ; _⊗_)
 open import CategoricalCrypto.Channel.Selection
 
@@ -142,20 +144,7 @@ data d-BaseRel : machine-type d-BaseState d-BaseChannel where
         (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot))
         (blocks , slot)
 
-  submit-block :
-    ∀ blocks block slot →
-      d-BaseRel
-        (blocks , slot)
-        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.SUBMIT block)
-        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.EMPTY)) -- TODO should be nothing?
-        (block ∷ blocks , slot)
-
-  -- TODO : action to have slots move forward?
-
-open import LibExt
-
-helper : BlockChainInfo RankingBlock →
-      BaseAbstract.BaseIOF d-Base CategoricalCrypto.Out
+helper : BlockChainInfo RankingBlock → BaseAbstract.BaseIOF d-Base CategoricalCrypto.Out
 helper = let open BaseAbstract.BaseIOF in λ {Chain → FTCH-LDG ; Slot → FTCH-SLOT}
 
 d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
@@ -174,19 +163,28 @@ d-BaseFunctionality =
                 ; queryO = λ where
                     {Chain} rankingBlocks → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BASE-LDG rankingBlocks
                     {Slot}  slot          → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ SLOT     slot
-                ; correctness = λ {query} {s} {response'} {s'} x →
-                    case (d-BaseChannel .Channel.inType ∋ L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ helper query) of-≡ λ
-                      y eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
-                        (fetch-blocks blocks slot) → {!!}
-                        (fetch-slot blocks slot) → {!!}
-                        (submit-block blocks block slot) → {!!}
-  -- λ where
-                    -- {Chain} {(blocks , slot)} {just x₁} {(blocks' , slot')} x → blocks , {!x!}
-                    -- {Slot} x → {!!}
-                ; completeness = {!!}
+                ; correctness = λ where
+                    {Chain} {s} {response'} {s'} x → case (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG) of-≡
+                      λ _ eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
+                        (fetch-blocks blocks _) → blocks , refl
+                        (fetch-slot blocks slot) → case ↑ₒ-injective (L⊗ (ϵ ⊗R) ᵗ¹) eq of λ ()
+                    {Slot}  {s} {response'} {s'} x → case (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-SLOT) of-≡
+                      λ _ eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
+                        (fetch-blocks _ _) → case ↑ₒ-injective (L⊗ (ϵ ⊗R) ᵗ¹) eq of λ ()
+                        (fetch-slot _ slot) → slot , refl
+                ; completeness = λ where
+                    {Chain} {blocks , slot} → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks , (blocks , slot) , fetch-blocks blocks slot
+                    {Slot}  {blocks , slot} → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot , (blocks , slot) , fetch-slot blocks slot 
                 }
-          ; isDet = {!!}
-          ; isPure = {!!}
+          ; isPure = λ where
+              Chain {s} {s'} {response'} x → case (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG) of-≡
+                λ _ eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
+                  (fetch-blocks _ _) → refl
+                  (fetch-slot _ _) → case ↑ₒ-injective (L⊗ (ϵ ⊗R) ᵗ¹) eq of λ ()
+              Slot {s} {s'} {response'} x → case (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-SLOT) of-≡
+                λ _ eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
+                  (fetch-blocks _ _) → case ↑ₒ-injective (L⊗ (ϵ ⊗R) ᵗ¹) eq of λ ()
+                  (fetch-slot _ _) → refl
         }
     }
 

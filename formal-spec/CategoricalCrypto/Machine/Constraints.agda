@@ -73,32 +73,3 @@ IsPure :
   (isConstrained   : IsConstrained m QueryReturnType)
   → Type
 IsPure isConstrained = ∀ query → IsPureOn isConstrained query
-
--- Ensures that a certain constrained machine can only return a single response
--- when receiving a specific constrained query
-IsDetOn :
-  {A B             : Channel}
-  {m               : Machine A B}
-  {Query           : Type}
-  {QueryReturnType : Query → Type}
-  (isConstrained   : IsConstrained m QueryReturnType)
-  (query           : Query)
-  → Type
-IsDetOn {m = m} isConstrained query =
-  let open IsConstrained isConstrained
-      open Machine m renaming (stepRel to _-⟦_/_⟧ᵐ⇀_)
-   in ∀ {s}
-     → ∃! _≡_ λ response'
-     → ∃! _≡_ λ s'
-     → s -⟦ queryI query / response' ⟧ᵐ⇀ s'
-
--- Ensures that a certain constrained machine can only return a single response
--- per constrained queries
-IsDet : 
-  {A B             : Channel}
-  {m               : Machine A B}
-  {Query           : Type}
-  {QueryReturnType : Query → Type}
-  (isConstrained   : IsConstrained m QueryReturnType)
-  → Type
-IsDet isConstrained = ∀ query → IsDetOn isConstrained query

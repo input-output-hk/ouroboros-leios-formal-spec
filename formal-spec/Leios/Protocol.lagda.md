@@ -64,7 +64,7 @@ record LeiosState : Type where
 
   -- ideally we'd require a non-empty list, but this also works for now
   currentRB : RankingBlock
-  currentRB = maybe (λ x → x) (record { txs = [] ; announcedEB = nothing ; ebCert = nothing })
+  currentRB = maybe (λ x → x) (record { txs = [] ; announcedEB = nothing ; ebCert = nothing ; slot = 0})
                 (head RBs)
 
   EBs : List EndorserBlock

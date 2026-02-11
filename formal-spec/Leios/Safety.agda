@@ -21,7 +21,6 @@ bciQueryType Slot  = ℕ
 record IsBlockchain {A B : Channel} (m : Machine A B) : Type₂ where
   field 
     isConstrained : IsConstrained m bciQueryType
-    isDet         : IsDet isConstrained
     isPure        : IsPure isConstrained 
 
 module _

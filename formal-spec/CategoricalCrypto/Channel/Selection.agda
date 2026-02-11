@@ -16,7 +16,9 @@ open import Reflection.Utils.TCI
 open import Class.Monad
 open import Class.Functor
 open import Class.MonadError.Instances
+open import Class.MonadReader.Instances
 open import Class.MonadTC.Instances hiding (_ᵗ)
+open import Function
 
 infix 4 _[_]⇒[_]ᵍ_
 
@@ -40,105 +42,147 @@ _↑ : ∀ {m m' A B} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ] B
 (x ᵗ¹) ↑ = (x ↑) ⇒ₜ ⇒-negate-transpose-right
 (x ᵗ²) ↑ = (x ↑) ⇒ₜ ⇒-negate-transpose-left
 
+opaque
+  unfolding _⊗_
+  
+  -- Injective-app : ∀ {m m' A B} (p : A [ m ]⇒[ m' ] B) → Set
+  -- Injective-app = Injective _≡_ _≡_ ∘ app
+
+  ⊗-right-intro-injective : ∀ {m A B} → Injective _≡_ _≡_ (app (⊗-right-intro {m} {A} {B}))
+  ⊗-right-intro-injective {Out} refl = refl
+  ⊗-right-intro-injective {In} refl = refl
+
+  ⊗-left-intro-injective : ∀ {m A B} → Injective _≡_ _≡_  (app (⊗-left-intro {m} {A} {B}))
+  ⊗-left-intro-injective {Out} refl = refl
+  ⊗-left-intro-injective {In} refl = refl
+
+  ⇒-negate-transpose-right-injective : ∀ {m A} → Injective _≡_ _≡_ (app (⇒-negate-transpose-right {m} {A}))
+  ⇒-negate-transpose-right-injective {Out} = id
+  ⇒-negate-transpose-right-injective {In} = id
+  
+  ⇒-negate-transpose-left-injective : ∀ {m A} → Injective _≡_ _≡_ (app (⇒-negate-transpose-left {m} {A}))
+  ⇒-negate-transpose-left-injective {Out} = id
+  ⇒-negate-transpose-left-injective {In} = id
+  
+  ↑-injective : ∀ {m m' A B} (p : A [ m ]⇒[ m' ]ᵍ B) → Injective _≡_ _≡_ (app (p ↑))
+  ↑-injective ϵ = id
+  ↑-injective (p ⊗R) = ↑-injective p ∘ ⊗-right-intro-injective
+  ↑-injective (L⊗ p) = ↑-injective p ∘ ⊗-left-intro-injective
+  ↑-injective (p ᵗ¹) =  ↑-injective p ∘ ⇒-negate-transpose-right-injective
+  ↑-injective (p ᵗ²) = ↑-injective p ∘ ⇒-negate-transpose-left-injective
+
 _↑ᵢ_ : ∀ {m' A B} → A [ In ]⇒[ m' ]ᵍ B → modeType In A → modeType m' B
 _↑ᵢ_ p = app (_↑ {In} p)
+
+↑ᵢ-injective : ∀ {m' A B} → (p : A [ In ]⇒[ m' ]ᵍ B) → Injective _≡_ _≡_ (p ↑ᵢ_)
+↑ᵢ-injective = ↑-injective
 
 _↑ₒ_ : ∀ {m' A B} → A [ Out ]⇒[ m' ]ᵍ B → modeType Out A → modeType m' B
 _↑ₒ_ p = app (_↑ {Out} p)
 
+↑ₒ-injective : ∀ {m' A B} → (p : A [ Out ]⇒[ m' ]ᵍ B) → Injective _≡_ _≡_ (p ↑ₒ_)
+↑ₒ-injective = ↑-injective
+
 instance _ = Functor-M ⦃ Class.Monad.Monad-TC ⦄
 
 ⇒-solver-tactic' : TC ⊤
-⇒-solver-tactic' = inDebugPath "Auto _[_]⇒[_]_ tactic" $ do
-  holeType' ← goalTy
-  ensureNoMetas holeType'
-  let (args , holeType) = stripPis holeType'
-  inContext args $ do
-    quote _[_]⇒[_]_ ∙⟦ A ∣ m ∣ m' ∣ B ⟧ ← return holeType
-      where _ → error ("Bad type shape: " ∷ᵈ holeType ∷ᵈ [])
-    debugLog ("Attempting to find a solution for problem " ∷ᵈ holeType ∷ᵈ [])
-    -- Reductions must happen on the mode to compute negations when the mode is
-    -- actually known
-    mN ← reduce m
-    m'N ← reduce m'
-    solution ← handle-pattern A mN m'N B
-    debugLog ("Solution: " ∷ᵈ solution ∷ᵈ [])
-    unifyWithGoal $ prependLams (mapₗ (\{(s , arg (arg-info v _) _) → (s , v)}) args) solution
-  where
-  handle-pattern : Term → Term → Term → Term → TC Term
-  handle-pattern A m m' B
-    with isYes (A ≟ B ×-dec m ≟ m')
-  ... | true
-    = return $ quote ⇒-refl ∙
-  ... | false
-  ------------------------
-  -- Inspecting the LHS --
-  ------------------------
-    with A | m
-  -- A ᵀ ᵀ [ m ]⇒[ m' ] B
-  ... | quote _ᵀ ∙⟦ quote _ᵀ ∙⟦ A ⟧ ⟧ | _ = do
-    rec ← handle-pattern A m m' B
-    return $ quote _⇒ₜ_ ∙⟦ quote ⇒-double-transpose-left ∙ ∣ rec ⟧
-  -- A [ ¬ₘ ¬ₘ m ]⇒[ m' ] B
-  ... | _ | quote ¬ₘ_ ∙⟦ quote ¬ₘ_ ∙⟦ m ⟧ ⟧ = do
-    rec ← handle-pattern A m m' B
-    return $ quote _⇒ₜ_ ∙⟦ quote ⇒-double-negate-left ∙ ∣ rec ⟧
-  -- A ᵀ [ ¬ₘ m ]⇒[ m' ] B
-  ... | quote _ᵀ ∙⟦ A ⟧ | quote ¬ₘ_ ∙⟦ m ⟧ = do
-    rec ← handle-pattern A m m' B
-    return $ quote _⇒ₜ_ ∙⟦ quote ⇒-negate-transpose-left ∙ ∣ rec ⟧
-  -- A ᵀ [ m ]⇒[ m' ] B
-  ... | quote _ᵀ ∙⟦ A ⟧ | _ = do
-    m'' ← reduce (quote ¬ₘ_ ∙⟦ m ⟧)
-    rec ← handle-pattern A m'' m' B
-    return $ quote _⇒ₜ_ ∙⟦ quote ⇒-transpose-left-negate-right ∙ ∣ rec ⟧
-  -- A ⊗ C [ m ]⇒[ m' ] B
-  ... | quote _⊗_ ∙⟦ A ∣ C ⟧ | _ = do
-    rec-left ← handle-pattern A m m' B
-    rec-right ← handle-pattern C m m' B
-    return $ quote ⊗-merge ∙⟦ rec-left ∣ rec-right ⟧
-  ... | _ | _
-  ------------------------
-  -- Inspecting the RHS --
-  ------------------------
-    with m' | B
-  -- A [ m ]⇒[ m' ] B ᵀ ᵀ
-  ... | _ | quote _ᵀ ∙⟦ quote _ᵀ ∙⟦ B ⟧ ⟧ = do
-    rec ← handle-pattern A m m' B
-    return $ quote _⇒ₜ_ ∙⟦ rec ∣ quote ⇒-double-transpose-right ∙ ⟧
-  -- A [ m ]⇒[ ¬ₘ ¬ₘ m' ] B
-  ... | quote ¬ₘ_ ∙⟦ quote ¬ₘ_ ∙⟦ m' ⟧ ⟧ | _ = do
-    rec ← handle-pattern A m m' B
-    return $ quote _⇒ₜ_ ∙⟦ rec ∣ quote ⇒-double-negate-right ∙ ⟧
-  -- A [ m ]⇒[ ¬ₘ m' ] B ᵀ
-  ... | quote ¬ₘ_ ∙⟦ m' ⟧ | quote _ᵀ ∙⟦ B ⟧ = do
-    rec ← handle-pattern A m m' B
-    return $ quote _⇒ₜ_ ∙⟦ rec ∣ quote ⇒-negate-transpose-right ∙ ⟧
-  -- A [ m ]⇒[ m' ] B ᵀ
-  ... | _ | quote _ᵀ ∙⟦ B ⟧ = do
-    m'' ← reduce (quote ¬ₘ_ ∙⟦ m' ⟧)
-    rec ← handle-pattern A m m'' B
-    return $ quote _⇒ₜ_ ∙⟦ rec ∣ quote ⇒-negate-left-transpose-right ∙ ⟧
-  -- A [ m ]⇒[ m' ] B ⊗ C
-  ... | _ | quote _⊗_ ∙⟦ B ∣ C ⟧ = do
-    catch
-      (do
-        res-left ← handle-pattern A m m' B
-        catch
-          (do
-            handle-pattern A m m' C
-            error1 "Unique solution required, multiple found.")
-          (const $ return $ quote _⇒ₜ_ ∙⟦ res-left ∣ quote ⊗-right-intro ∙ ⟧))
-      (const $ do
-        res-right ← handle-pattern A m m' C
-        return $ quote _⇒ₜ_ ∙⟦ res-right ∣ quote ⊗-left-intro ∙ ⟧)
-  -- otherwise throw error
-  ... | _ | _
-    = error $  "No solution found, unable to match " ∷ᵈ A
-            ∷ᵈ " with mode " ∷ᵈ m ∷ᵈ " on the right hand side " ∷ᵈ B ∷ᵈ " with mode " ∷ᵈ m' ∷ᵈ []
+⇒-solver-tactic' =
+  inDebugPath "Auto _[_]⇒[_]_ tactic" $
+    local (λ x → record x
+      {reduction = dontReduce
+        (quote _[_]⇒[_]_ ∷ quote Channel ∷ quote _⊗_ ∷ quote _ᵀ ∷ [])
+      }) $ do
+        holeType' ← goalTy
+        ensureNoMetas holeType'
+        let (args , holeType) = stripPis holeType'
+        inContext args $ do
+          quote _[_]⇒[_]_ ∙⟦ A ∣ m ∣ m' ∣ B ⟧ ← return holeType
+            where _ → error ("Bad type shape: " ∷ᵈ holeType ∷ᵈ [])
+          debugLog ("Attempting to find a solution for problem " ∷ᵈ holeType ∷ᵈ [])
+          -- Reductions must happen on the mode to compute negations when the mode is
+          -- actually known
+          mA ← reduce A
+          mB ← reduce B
+          mN ← reduce m
+          m'N ← reduce m'
+          solution ← handle-pattern mA mN m'N mB
+          debugLog ("Solution: " ∷ᵈ solution ∷ᵈ [])
+          unifyWithGoal $ prependLams (mapₗ (\{(s , arg (arg-info v _) _) → (s , v)}) args) solution
+        where
+        handle-pattern : Term → Term → Term → Term → TC Term
+        handle-pattern A m m' B
+          with isYes (A ≟ B ×-dec m ≟ m')
+        ... | true
+          = return $ quote ⇒-refl ∙
+        ... | false
+        ------------------------
+        -- Inspecting the LHS --
+        ------------------------
+          with A | m
+        -- A ᵀ ᵀ [ m ]⇒[ m' ] B
+        ... | quote _ᵀ ∙⟦ quote _ᵀ ∙⟦ A ⟧ ⟧ | _ = do
+          rec ← handle-pattern A m m' B
+          return $ quote _⇒ₜ_ ∙⟦ quote ⇒-double-transpose-left ∙ ∣ rec ⟧
+        -- A [ ¬ₘ ¬ₘ m ]⇒[ m' ] B
+        ... | _ | quote ¬ₘ_ ∙⟦ quote ¬ₘ_ ∙⟦ m ⟧ ⟧ = do
+          rec ← handle-pattern A m m' B
+          return $ quote _⇒ₜ_ ∙⟦ quote ⇒-double-negate-left ∙ ∣ rec ⟧
+        -- A ᵀ [ ¬ₘ m ]⇒[ m' ] B
+        ... | quote _ᵀ ∙⟦ A ⟧ | quote ¬ₘ_ ∙⟦ m ⟧ = do
+          rec ← handle-pattern A m m' B
+          return $ quote _⇒ₜ_ ∙⟦ quote ⇒-negate-transpose-left ∙ ∣ rec ⟧
+        -- A ᵀ [ m ]⇒[ m' ] B
+        ... | quote _ᵀ ∙⟦ A ⟧ | _ = do
+          m'' ← reduce (quote ¬ₘ_ ∙⟦ m ⟧)
+          rec ← handle-pattern A m'' m' B
+          return $ quote _⇒ₜ_ ∙⟦ quote ⇒-transpose-left-negate-right ∙ ∣ rec ⟧
+        -- A ⊗ C [ m ]⇒[ m' ] B
+        ... | quote _⊗_ ∙⟦ A ∣ C ⟧ | _ = do
+          rec-left ← handle-pattern A m m' B
+          rec-right ← handle-pattern C m m' B
+          return $ quote ⊗-merge ∙⟦ rec-left ∣ rec-right ⟧
+        ... | _ | _
+        ------------------------
+        -- Inspecting the RHS --
+        ------------------------
+          with m' | B
+        -- A [ m ]⇒[ m' ] B ᵀ ᵀ
+        ... | _ | quote _ᵀ ∙⟦ quote _ᵀ ∙⟦ B ⟧ ⟧ = do
+          rec ← handle-pattern A m m' B
+          return $ quote _⇒ₜ_ ∙⟦ rec ∣ quote ⇒-double-transpose-right ∙ ⟧
+        -- A [ m ]⇒[ ¬ₘ ¬ₘ m' ] B
+        ... | quote ¬ₘ_ ∙⟦ quote ¬ₘ_ ∙⟦ m' ⟧ ⟧ | _ = do
+          rec ← handle-pattern A m m' B
+          return $ quote _⇒ₜ_ ∙⟦ rec ∣ quote ⇒-double-negate-right ∙ ⟧
+        -- A [ m ]⇒[ ¬ₘ m' ] B ᵀ
+        ... | quote ¬ₘ_ ∙⟦ m' ⟧ | quote _ᵀ ∙⟦ B ⟧ = do
+          rec ← handle-pattern A m m' B
+          return $ quote _⇒ₜ_ ∙⟦ rec ∣ quote ⇒-negate-transpose-right ∙ ⟧
+        -- A [ m ]⇒[ m' ] B ᵀ
+        ... | _ | quote _ᵀ ∙⟦ B ⟧ = do
+          m'' ← reduce (quote ¬ₘ_ ∙⟦ m' ⟧)
+          rec ← handle-pattern A m m'' B
+          return $ quote _⇒ₜ_ ∙⟦ rec ∣ quote ⇒-negate-left-transpose-right ∙ ⟧
+        -- A [ m ]⇒[ m' ] B ⊗ C
+        ... | _ | quote _⊗_ ∙⟦ B ∣ C ⟧ = do
+          catch
+            (do
+              res-left ← handle-pattern A m m' B
+              catch
+                (do
+                  handle-pattern A m m' C
+                  error1 "Unique solution required, multiple found.")
+                (const $ return $ quote _⇒ₜ_ ∙⟦ res-left ∣ quote ⊗-right-intro ∙ ⟧))
+            (const $ do
+              res-right ← handle-pattern A m m' C
+              return $ quote _⇒ₜ_ ∙⟦ res-right ∣ quote ⊗-left-intro ∙ ⟧)
+        -- otherwise throw error
+        ... | _ | _
+          = error $  "No solution found, unable to match " ∷ᵈ A
+                  ∷ᵈ " with mode " ∷ᵈ m ∷ᵈ " on the right hand side " ∷ᵈ B ∷ᵈ " with mode " ∷ᵈ m' ∷ᵈ []
 
 module _ ⦃ _ : TCOptions ⦄ where
-  ⇒-solver-tactic = initTac ⇒-solver-tactic'
+  ⇒-solver-tactic = initTac ⇒-solver-tactic' -- TODO wrap this in dontreduce "withReduceDefs"
   macro
     ⇒-solver = ⇒-solver-tactic
 

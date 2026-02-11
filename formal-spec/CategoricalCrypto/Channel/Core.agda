@@ -27,8 +27,8 @@ infixr 10 ¬ₘ_
 -------------------------------
 -- Channels of communication --
 -------------------------------
-
 infix 10 _⇿_
+
 record Channel : Type₁ where
   constructor _⇿_
   field
@@ -53,7 +53,7 @@ I : Channel
 I = ⊥ ⇿ ⊥
 
 _ᵀ : Fun₁ Channel
-(receive ⇿ send) ᵀ = send ⇿ receive
+A ᵀ = A .outType ⇿ A .inType
 
 ᵀ-identity : I ᵀ ≡ I
 ᵀ-identity = refl
@@ -67,114 +67,110 @@ _ᵀ : Fun₁ Channel
 
 infix 4 _[_]⇒[_]_
 
-opaque
-  _[_]⇒[_]_ : Channel → Mode → Mode → Channel → Type
-  A [ m₁ ]⇒[ m₂ ] B = modeType m₁ A → modeType m₂ B
+record _[_]⇒[_]_ (A : Channel) (mᵢ : Mode) (mₒ : Mode) (B : Channel) : Type where
+  field
+    app : modeType mᵢ A → modeType mₒ B
 
-  app : ∀ {A B m₁ m₂} → A [ m₁ ]⇒[ m₂ ] B → modeType m₁ A → modeType m₂ B
-  app f = f
+open _[_]⇒[_]_ public
 
-  ⇒-trans : ∀ {A B C m m₁ m₂} → A [ m ]⇒[ m₁ ] B → B [ m₁ ]⇒[ m₂ ] C → A [ m ]⇒[ m₂ ] C
-  ⇒-trans p q = q ∘ p
+⇒-trans : ∀ {A B C m m₁ m₂} → A [ m ]⇒[ m₁ ] B → B [ m₁ ]⇒[ m₂ ] C → A [ m ]⇒[ m₂ ] C
+⇒-trans p q = record {app = app q ∘ app p}
 
-  _⇒ₜ_ : ∀ {A B C m m₁ m₂} → A [ m ]⇒[ m₁ ] B → B [ m₁ ]⇒[ m₂ ] C → A [ m ]⇒[ m₂ ] C
-  _⇒ₜ_ = ⇒-trans
+_⇒ₜ_ : ∀ {A B C m m₁ m₂} → A [ m ]⇒[ m₁ ] B → B [ m₁ ]⇒[ m₂ ] C → A [ m ]⇒[ m₂ ] C
+_⇒ₜ_ = ⇒-trans
 
-  infixr 10 _⇒ₜ_
-  
-  ⇒-refl' : ∀ {m A B} → A ≡ B → A [ m ]⇒[ m ] B
-  ⇒-refl' refl = id
+infixr 10 _⇒ₜ_
 
-  ⇒-refl : ∀ {m A} → A [ m ]⇒[ m ] A
-  ⇒-refl = ⇒-refl' refl
+⇒-refl' : ∀ {m A B} → A ≡ B → A [ m ]⇒[ m ] B
+⇒-refl' refl = record { app = id }
+
+⇒-refl : ∀ {m A} → A [ m ]⇒[ m ] A
+⇒-refl = ⇒-refl' refl
 
 ----------------------------------
 -- Forwarding and transposition --
 ----------------------------------
 
-  ⇒-double-transpose-left : ∀ {m A} → A ᵀ ᵀ [ m ]⇒[ m ] A
-  ⇒-double-transpose-left {A = A} rewrite ᵀ-idempotent {A} = ⇒-refl
+⇒-double-transpose-left : ∀ {m A} → A ᵀ ᵀ [ m ]⇒[ m ] A
+⇒-double-transpose-left {A = A} rewrite ᵀ-idempotent {A} = ⇒-refl
 
-  ⇒-double-transpose-right : ∀ {m A} → A [ m ]⇒[ m ] A ᵀ ᵀ
-  ⇒-double-transpose-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-refl
+⇒-double-transpose-right : ∀ {m A} → A [ m ]⇒[ m ] A ᵀ ᵀ
+⇒-double-transpose-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-refl
 
-  ⇒-double-negate-left : ∀ {m A} → A [ ¬ₘ ¬ₘ m ]⇒[ m ] A
-  ⇒-double-negate-left {m} rewrite (¬ₘ-idempotent {m}) = ⇒-refl
+⇒-double-negate-left : ∀ {m A} → A [ ¬ₘ ¬ₘ m ]⇒[ m ] A
+⇒-double-negate-left {m} rewrite (¬ₘ-idempotent {m}) = ⇒-refl
 
-  ⇒-double-negate-right : ∀ {m A} → A [ m ]⇒[ ¬ₘ ¬ₘ m ] A
-  ⇒-double-negate-right {m} rewrite (¬ₘ-idempotent {m}) = ⇒-refl
+⇒-double-negate-right : ∀ {m A} → A [ m ]⇒[ ¬ₘ ¬ₘ m ] A
+⇒-double-negate-right {m} rewrite (¬ₘ-idempotent {m}) = ⇒-refl
 
-  ⇒-negate-transpose-right : ∀ {m A} → A [ m ]⇒[ ¬ₘ m ] A ᵀ
-  ⇒-negate-transpose-right {Out} = id
-  ⇒-negate-transpose-right {In} = id
+⇒-negate-transpose-right : ∀ {m A} → A [ m ]⇒[ ¬ₘ m ] A ᵀ
+⇒-negate-transpose-right {Out} = record { app = id }
+⇒-negate-transpose-right {In} = record { app = id }
 
-  ⇒-negate-transpose-left : ∀ {m A} → A ᵀ [ ¬ₘ m ]⇒[ m ] A
-  ⇒-negate-transpose-left = ⇒-negate-transpose-right ⇒ₜ ⇒-double-negate-left
+⇒-negate-transpose-left : ∀ {m A} → A ᵀ [ ¬ₘ m ]⇒[ m ] A
+⇒-negate-transpose-left = ⇒-negate-transpose-right ⇒ₜ ⇒-double-negate-left
 
-  ⇒-transpose-left-negate-right : ∀ {m A} → A ᵀ [ m ]⇒[ ¬ₘ m ] A
-  ⇒-transpose-left-negate-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-negate-transpose-right {A = A ᵀ}
+⇒-transpose-left-negate-right : ∀ {m A} → A ᵀ [ m ]⇒[ ¬ₘ m ] A
+⇒-transpose-left-negate-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-negate-transpose-right {A = A ᵀ}
 
-  ⇒-negate-left-transpose-right : ∀ {m A} → A [ ¬ₘ m ]⇒[ m ] A ᵀ
-  ⇒-negate-left-transpose-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-negate-transpose-left {A = A ᵀ}
+⇒-negate-left-transpose-right : ∀ {m A} → A [ ¬ₘ m ]⇒[ m ] A ᵀ
+⇒-negate-left-transpose-right {A = A} rewrite ᵀ-idempotent {A} = ⇒-negate-transpose-left {A = A ᵀ}
 
 -----------------------------------
 -- Tensorial product on Channels --
 -----------------------------------
 
-  infixr 9 _⊗_
+infixr 9 _⊗_
 
+opaque 
   _⊗_ : Fun₂ Channel
-  (receive₁ ⇿ send₁) ⊗ (receive₂ ⇿ send₂) = (receive₁ ⊎ receive₂) ⇿ (send₁ ⊎ send₂)
+  A ⊗ B = (inType A ⊎ inType B) ⇿ (outType A ⊎ outType B)
 
   destruct-⊗ : ∀ {A B m} → modeType m (A ⊗ B) → modeType m A ⊎ modeType m B
   destruct-⊗ {m = Out} = id
   destruct-⊗ {m = In} = id
 
-  -----------------------------------
-  -- Forwarding tensorial products --
-  -----------------------------------
+-----------------------------------
+-- Forwarding tensorial products --
+-----------------------------------
 
   ⊗-sym : ∀ {m A B} → A ⊗ B [ m ]⇒[ m ] B ⊗ A
-  ⊗-sym {Out} = swap
-  ⊗-sym {In} = swap
+  ⊗-sym {Out} = record { app = swap }
+  ⊗-sym {In} = record { app = swap }
 
   ⊗-right-assoc : ∀ {m A B C} → (A ⊗ B) ⊗ C [ m ]⇒[ m ] A ⊗ B ⊗ C
-  ⊗-right-assoc {Out} = assocʳ
-  ⊗-right-assoc {In} = assocʳ
+  ⊗-right-assoc {Out} = record { app = assocʳ }
+  ⊗-right-assoc {In} = record { app = assocʳ }
 
   ⊗-left-assoc : ∀ {m A B C} → A ⊗ B ⊗ C [ m ]⇒[ m ] (A ⊗ B) ⊗ C
-  ⊗-left-assoc {Out} = assocˡ
-  ⊗-left-assoc {In} = assocˡ
+  ⊗-left-assoc {Out} = record { app = assocˡ }
+  ⊗-left-assoc {In} = record { app = assocˡ }
 
   ⊗-right-intro : ∀ {m A B} → A [ m ]⇒[ m ] A ⊗ B
-  ⊗-right-intro {Out} = inj₁
-  ⊗-right-intro {In} = inj₁
+  ⊗-right-intro {Out} = record { app = inj₁ }
+  ⊗-right-intro {In} = record { app = inj₁ }
 
   ⊗-ᵀ-distrib : ∀ {m A B} → (A ⊗ B) ᵀ [ m ]⇒[ m ] A ᵀ ⊗ B ᵀ
-  ⊗-ᵀ-distrib {Out} = id
-  ⊗-ᵀ-distrib {In} = id
+  ⊗-ᵀ-distrib {Out} = record { app = id }
+  ⊗-ᵀ-distrib {In} = record { app = id }
 
   ⊗-ᵀ-factor : ∀ {m A B} → A ᵀ ⊗ B ᵀ [ m ]⇒[ m ] (A ⊗ B) ᵀ
-  ⊗-ᵀ-factor {Out} = id
-  ⊗-ᵀ-factor {In} = id
+  ⊗-ᵀ-factor {Out} = record { app = id }
+  ⊗-ᵀ-factor {In} = record { app = id }
 
   ⊗-right-neutral : ∀ {m A} → A ⊗ I [ m ]⇒[ m ] A
-  ⊗-right-neutral {Out} (inj₁ x) = x
-  ⊗-right-neutral {In} (inj₁ x) = x
+  ⊗-right-neutral {Out} = record { app = λ {(inj₁ x) → x} }
+  ⊗-right-neutral {In} = record { app = λ {(inj₁ x) → x} }
 
   ⊗-fusion : ∀ {m A} → A ⊗ A [ m ]⇒[ m ] A
-  ⊗-fusion {Out} = [ id , id ]
-  ⊗-fusion {In} = [ id , id ]
+  ⊗-fusion {Out} = record { app = [ id , id ] }
+  ⊗-fusion {In} = record { app = [ id , id ] }
 
   ⊗-combine : ∀ {m m₁ A B C D} → A [ m ]⇒[ m₁ ] B → C [ m ]⇒[ m₁ ] D → A ⊗ C [ m ]⇒[ m₁ ] B ⊗ D
-  ⊗-combine {Out} {Out} p q (inj₁ x) = inj₁ (p x)
-  ⊗-combine {Out} {Out} p q (inj₂ y) = inj₂ (q y)
-  ⊗-combine {Out} {In} p q (inj₁ x) = inj₁ (p x)
-  ⊗-combine {Out} {In} p q (inj₂ y) = inj₂ (q y)
-  ⊗-combine {In} {Out} p q (inj₁ x) = inj₁ (p x)
-  ⊗-combine {In} {Out} p q (inj₂ y) = inj₂ (q y)
-  ⊗-combine {In} {In} p q (inj₁ x) = inj₁ (p x)
-  ⊗-combine {In} {In} p q (inj₂ y) = inj₂ (q y)
+  ⊗-combine {Out} {Out} p q = record { app = λ { (inj₁ x) → inj₁ (p .app x) ; (inj₂ y) → inj₂ (q .app y)} }
+  ⊗-combine {Out} {In} p q = record { app = λ { (inj₁ x) → inj₁ (p .app x) ; (inj₂ y) → inj₂ (q .app y)} }
+  ⊗-combine {In} {Out} p q = record { app = λ { (inj₁ x) → inj₁ (p .app x) ; (inj₂ y) → inj₂ (q .app y)} }
+  ⊗-combine {In} {In} p q = record { app = λ { (inj₁ x) → inj₁ (p .app x) ; (inj₂ y) → inj₂ (q .app y)} }
 
 ⊗-left-intro : ∀ {m A B} → B [ m ]⇒[ m ] A ⊗ B
 ⊗-left-intro = ⊗-right-intro ⇒ₜ ⊗-sym

@@ -15,7 +15,7 @@ open import Tactic.Defaults
 -- -- Machines, which form the morphisms
 
 machine-type : Type → Channel → Type₁
-machine-type S (inT ⇿ outT) = S → inT → Maybe outT → S → Type
+machine-type S A = let open Channel A in S → inType → Maybe outType → S → Type
 
 _⊗ᵀ_ : Fun₂ Channel
 A ⊗ᵀ B = A ⊗ B ᵀ
@@ -55,7 +55,7 @@ id = TotalFunctionMachine' ⇒-solver ⇒-solver
 
 -- given transformation on the channels, transform the machine
 modifyStepRel : ∀ {A B C D} → (∀ {m} → C ⊗ D ᵀ [ m ]⇒[ m ] A ⊗ B ᵀ) → Machine A B → Machine C D
-modifyStepRel p (MkMachine stepRel) = MkMachine $ \s m m' s' → stepRel s (app {m₁ = In} p m) (app {m₁ = Out} p <$> m') s'
+modifyStepRel p (MkMachine stepRel) = MkMachine $ \s m m' s' → stepRel s (app {mᵢ = In} p m) (app {mₒ = Out} p <$> m') s'
 
 module Tensor {A B C D} (M₁ : Machine A B) (M₂ : Machine C D) where
   open Machine M₁ renaming (State to State₁; stepRel to stepRel₁; machine-channel to machine-channel₁)
@@ -168,7 +168,7 @@ record OAP (A E₁ B E₂ : Channel) : Type₁ where
 -- Environment model
 
 ℰ-Out : Channel
-ℰ-Out = Bool ⇿ ⊥
+ℰ-Out = record {inType = Bool ; outType = ⊥}
 
 -- Presheaf on the category of channels & machines
 -- we just take machines that output a boolean

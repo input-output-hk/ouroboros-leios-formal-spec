@@ -18,7 +18,7 @@ open import abstract-set-theory.Prelude hiding (_⊗_ ; Functor ; Bifunctor)
 
 opaque
   unfolding _⊗_
-
+  
   channel-category                       : Category (sucˡ zeroˡ) zeroˡ zeroˡ
 
   ⊗-bifunctor                           : Bifunctor channel-category channel-category channel-category
@@ -42,7 +42,7 @@ opaque
   channel-category = categoryHelper record
     { Obj = Channel
     ; _⇒_ = λ A B → ∀ {m} → A [ m ]⇒[ m ] B
-    ; _≈_ = λ A⇒B₀ A⇒B₁ → ∀ {m} v → A⇒B₀ {m} v ≡ A⇒B₁ v
+    ; _≈_ = λ A⇒B₀ A⇒B₁ → ∀ {m} v → A⇒B₀ {m} .app v ≡ A⇒B₁ .app v
     ; id = ⇒-refl
     ; _∘_ = λ A⇒B B⇒C → B⇒C ⇒ₜ A⇒B
     ; assoc = λ _ → refl
@@ -54,7 +54,7 @@ opaque
         ; trans = λ A⇒B₀≈A⇒B₁ A⇒B₁≈A⇒B₂ _ → trans (A⇒B₀≈A⇒B₁ _) (A⇒B₁≈A⇒B₂ _)
         }
     ; ∘-resp-≈ = λ where
-        {h = B⇒C} {A⇒B} f≈B⇒C A⇒B≈i _ → trans (f≈B⇒C ∘ A⇒B $ _) (cong B⇒C ∘ A⇒B≈i $ _)
+        {h = B⇒C} {A⇒B} f≈B⇒C A⇒B≈i _ → trans (f≈B⇒C (A⇒B .app _)) (cong (B⇒C .app) (A⇒B≈i _))
     }
 
   ⊗-binary-coproducts = record
@@ -82,8 +82,8 @@ opaque
         { ⊥ = I
         ; ⊥-is-initial = record
             { ! = λ where
-                {m = Out} ()
-                {m = In } ()
+                {m = Out} → record { app = λ () }
+                {m = In } → record { app = λ () }
             ; !-unique = λ where
                 _ {Out} ()
                 _ {In } ()
@@ -120,8 +120,8 @@ opaque
         {m = Out} _ → refl
         {m = In } _ → refl
     ; F-resp-≈ = λ where
-        f≈g {Out} → f≈g ∘ ⇒-transpose-left-negate-right
-        f≈g {In } → f≈g ∘ ⇒-transpose-left-negate-right
+        f≈g {Out} → f≈g
+        f≈g {In } → f≈g
     }
 
   ᵀ-strong-monoidal-functor = record
