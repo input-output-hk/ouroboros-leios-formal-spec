@@ -1,3 +1,5 @@
+{-# OPTIONS --safe #-}
+
 open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import Leios.FFD
 open import Leios.SpecStructure
@@ -19,12 +21,7 @@ open import Leios.Linear ⋯ params Lhdr Lvote Ldiff splitTxs validityCheckTime
 open Types params hiding (Network)
 
 open import Leios.NetworkShim ⋯ params Lhdr Lvote Ldiff splitTxs validityCheckTime
-module B' = BaseAbstract B'
-
-postulate BaseMsg : Type
-          toBaseMsg : B'.BaseNetwork .Channel.outType → List BaseMsg
-          fromBaseMsg : List BaseMsg → B'.BaseNetwork .Channel.inType
-          instance DecEq-BaseMsg : DecEq BaseMsg
+open BaseAbstract B'
 
 LeiosMsg = FFDA.Header ⊎ FFDA.Body
 Message = LeiosMsg ⊎ BaseMsg
@@ -44,19 +41,19 @@ module NetTranslate where
 
   private variable s : State
 
-  data WithState_receive_return_newState_ : MachineType DD.M (Network ⊗ B'.BaseNetwork) State where
+  data WithState_receive_return_newState_ : MachineType DD.M (Network ⊗ BaseNetwork) State where
 
     Receive : ∀ {l} → let (leios , base) = partitionSumsWith proj₂ l in
       WithState record { inBuffer = nothing ; outBuffer = nothing }
       receive ϵ ⊗R ↑ᵢ DD.Deliver l
-      return just (L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ fromBaseMsg base)
+      return just (L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ base)
       newState record { inBuffer = just leios ; outBuffer = nothing }
 
     SendB : ∀ {m leios} →
       WithState record { inBuffer = just leios ; outBuffer = nothing }
       receive L⊗ (L⊗ ϵ) ᵗ¹ ↑ₒ m
       return just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ Activate leios)
-      newState record { inBuffer = nothing ; outBuffer = just (toBaseMsg m) }
+      newState record { inBuffer = nothing ; outBuffer = just m }
 
     SendL : ∀ {m m'} →
       WithState record { inBuffer = nothing ; outBuffer = just m }
@@ -64,11 +61,11 @@ module NetTranslate where
       return just (ϵ ⊗R ↑ₒ DD.Diffuse (map inj₂ m ++ map inj₁ m'))
       newState record { inBuffer = nothing ; outBuffer = nothing }
 
-NetTranslate : Machine DD.M (Network ⊗ B'.BaseNetwork)
+NetTranslate : Machine DD.M (Network ⊗ BaseNetwork)
 NetTranslate .Machine.State = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
-Leios1 : Machine DD.M (IO ⊗ ((I ⊗ B'.BaseAdv) ⊗ Adv))
+Leios1 : Machine DD.M (IO ⊗ ((I ⊗ BaseAdv) ⊗ Adv))
 Leios1 = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ B.m) ∘ NetTranslate
 
 module _ nodesF honestNodes

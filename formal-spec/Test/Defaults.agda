@@ -116,15 +116,16 @@ d-Base =
     ; VTy         = ⊤
     ; initSlot    = λ _ → 0
     ; V-chkCerts  = λ _ _ → true
-    ; BaseNetwork = I
     ; BaseAdv     = I
+    ; BaseMsg     = ⊤
     }
 
 d-BaseState : Type
 d-BaseState = (List RankingBlock × ℕ)
 
 d-BaseChannel : Channel
-d-BaseChannel = I ⊗ᵀ (BaseAbstract.BaseIO d-Base ⊗ BaseAbstract.BaseAdv d-Base)
+d-BaseChannel = BaseNetwork ⊗ᵀ (BaseIO ⊗ BaseAdv)
+  where open BaseAbstract d-Base
 
 data d-BaseRel : machine-type d-BaseState d-BaseChannel where
 
