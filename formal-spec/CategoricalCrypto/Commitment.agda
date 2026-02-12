@@ -1,41 +1,43 @@
 {-# OPTIONS --safe #-}
+
 module CategoricalCrypto.Commitment where
 
 open import abstract-set-theory.Prelude hiding (id; _∘_; _⊗_; lookup; Dec)
-import abstract-set-theory.Prelude as P
+
+open import CategoricalCrypto.Channel.Core
+open import CategoricalCrypto.Channel.Selection
+open import CategoricalCrypto.Machine.Core
 
 open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 
-open import CategoricalCrypto.Base
-
-data CRST : ChannelDir → Type where
+data CRST : Mode → Type where
   Gen : CRST In
   Res : List Bool → CRST Out
 
 CRS : Channel
-CRS = simpleChannel' CRST
+CRS = simpleChannel CRST
 
 module COM where
 
-  data ComT : ChannelDir → Type where
+  data ComT : Mode → Type where
     Commit : Bool → ComT Out
     Open : ComT Out
 
-  Com = simpleChannel' ComT
+  Com = simpleChannel ComT
 
-  data VerT : ChannelDir → Type where
+  data VerT : Mode → Type where
     ReceiveV : VerT In
     RevealV  : Bool → VerT In
 
-  Ver = simpleChannel' VerT
+  Ver = simpleChannel VerT
 
-  data AdvT : ChannelDir → Type where
+  data AdvT : Mode → Type where
     ReceiveA : AdvT In
     RevealA  : Bool → AdvT In
     ReceiveReturn RevealReturn : AdvT Out
 
   Adv : Channel
-  Adv = simpleChannel' AdvT
+  Adv = simpleChannel AdvT
 
   private variable
     b : Bool
@@ -45,26 +47,26 @@ module COM where
 
     Commit₁ :
       WithState nothing
-      receive honestInputI (sndˡ (-, Commit b))
-      return just $ adversarialOutput (-, ReceiveA)
+      receive L⊗ ((ϵ ⊗R) ⊗R) ᵗ¹ ↑ₒ Commit b
+      return just $ L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ ReceiveA
       newState just b
 
     Commit₂ :
       WithState s
-      receive adversarialInput (-, ReceiveReturn)
-      return just (honestOutputO (rcvʳ (-, ReceiveV)))
+      receive L⊗ (L⊗ ϵ) ᵗ¹ ↑ₒ ReceiveReturn
+      return just $ L⊗ ((L⊗ ϵ) ⊗R) ᵗ¹ ↑ᵢ ReceiveV
       newState s
 
     Reveal₁ :
       WithState just b
-      receive honestInputI (sndˡ (-, Open))
-      return just $ adversarialOutput (-, RevealA b)
+      receive L⊗ ((ϵ ⊗R) ⊗R) ᵗ¹ ↑ₒ Open
+      return just $ L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ RevealA b
       newState just b
 
     Reveal₂ :
       WithState just b
-      receive adversarialInput (-, RevealReturn)
-      return just (honestOutputO (rcvʳ (-, RevealV b)))
+      receive L⊗ (L⊗ ϵ) ᵗ¹ ↑ₒ RevealReturn
+      return just $ L⊗ ((L⊗ ϵ) ⊗R) ᵗ¹ ↑ᵢ RevealV b
       newState just b
 
   open Machine

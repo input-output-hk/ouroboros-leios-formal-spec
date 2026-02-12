@@ -1,12 +1,13 @@
 {-# OPTIONS --safe #-}
 
 open import abstract-set-theory.Prelude
+
 open import Class.Core
+open import Class.Monad.Ext
+
 open import Categories.Category.Core
 open import Categories.Category.Helper
-open import Relation.Binary
 
-open import Class.Monad.Ext
 open import LibExt
 
 import Relation.Binary.Construct.On as On

@@ -1,53 +1,37 @@
 {-# OPTIONS --safe #-}
+
 module CategoricalCrypto.MonoidalCoherence where
 
 open import Level renaming (zero to ℓ0)
 
 open import Categories.Category
-open import Categories.Category.Helper
 open import Categories.Category.Monoidal
 open import Categories.Category.Monoidal.Properties
-open import Categories.Functor hiding (id)
+open import Categories.Category.Product
+open import Categories.Functor as F hiding (id)
 open import Categories.Functor.Bifunctor
-open import Categories.Functor.Monoidal
-open import Categories.Functor.Presheaf
-open import Categories.Monad.Graded
 open import Categories.Morphism
-open import Categories.NaturalTransformation hiding (id)
-
-open import Categories.Category.Instance.Sets
-
-open import Categories.Tactic.Category
-
-open import Data.Product
-open import Data.List as L hiding ([_])
-
-open import CategoricalCrypto.NaturalTransformationHelper
-
-open import CategoricalCrypto.FreeMonoidal
-
 open import Categories.NaturalTransformation.NaturalIsomorphism.Properties
 
-open import Categories.Category.Construction.Functors using () renaming (curry to curryF)
-
-open import Categories.Category.Product
+open import CategoricalCrypto.Discrete
+open import CategoricalCrypto.FreeMonoidal
+open import CategoricalCrypto.NaturalTransformationHelper
 open import CategoricalCrypto.Properties
 
-import Data.Vec as V
-open import Data.Fin using (Fin)
 open import Data.Empty
+open import Data.Fin using (Fin)
+open import Data.List hiding ([_] ; lookup)
+open import Data.Product
+open import Data.Vec using (Vec ; lookup)
 
 module CoherenceThm (X : Set) where
   open FreeMonoidal (record { v = Mon ; X = X ; mor = λ _ _ → ⊥ })
 
   open Commutation FreeMonoidal
-  open import CategoricalCrypto.Discrete
   open Discrete (List X)
 
   open import Relation.Binary.PropositionalEquality using (_≡_; refl; trans; cong)
   open import Categories.NaturalTransformation.NaturalIsomorphism as NI hiding (refl; trans; unitorˡ; unitorʳ; associator)
-
-  import Categories.Functor as F
 
   module FM where
     open Category FreeMonoidal public
@@ -360,7 +344,7 @@ module CoherenceThm (X : Set) where
 
   opaque
     unfolding ι
-    Nf≅id : NaturalIsomorphism (ι ∘F Nf) Categories.Functor.id
+    Nf≅id : NaturalIsomorphism (ι ∘F Nf) F.id
     Nf≅id = begin
       ι ∘F Nf ≈⟨ NI.associator (-× []) ⟦_⟧F ι ⟨
       (ι ∘F ⟦_⟧F) ∘F -× [] ≈⟨ ⟦⟧≅⊗ ⓘʳ (-× []) ⟩
@@ -368,7 +352,7 @@ module CoherenceThm (X : Set) where
       FM.⊗ ∘F (F.id ⁂ ι) ∘F (-× []) ≈⟨ FM.⊗ ⓘˡ (⁂-× {C = FreeMonoidal} ι []) ⟩
       FM.⊗ ∘F (-× unit) ≈⟨ NI.refl ⟩
       appʳ FM.⊗ unit ≈⟨ FM.unitorʳ-naturalIsomorphism ⟩
-      Categories.Functor.id ∎
+      F.id ∎
       where open SetoidR (Functor-NI-setoid FreeMonoidal FreeMonoidal)
 
   all-Comm : ∀ {A B} f g → [ A ⇒ B ]⟨ f ≈ g ⟩
@@ -376,7 +360,7 @@ module CoherenceThm (X : Set) where
     where module ι = Functor ι
 
 module Solver (C : MonoidalCategory 0ℓ 0ℓ 0ℓ)
-              {n} (vars : V.Vec (C .MonoidalCategory.Obj) n) where
+              {n} (vars : Vec (C .MonoidalCategory.Obj) n) where
   open MonoidalCategory
   d : FreeMonoidalData
   d = record { v = Mon ; X = Fin n ; mor = λ _ _ → ⊥ }
@@ -384,7 +368,7 @@ module Solver (C : MonoidalCategory 0ℓ 0ℓ 0ℓ)
   open CoherenceThm (Fin n) hiding (⟦_⟧₁)
   open FreeFunctor {d = d} record
     { ⟦v⟧ = record { C = C .U ; Monoidal-C = C .monoidal ; Symmetric-C = λ where ⦃ () ⦄ }
-    ; ⟦_⟧ᵖ₀ = V.lookup vars
+    ; ⟦_⟧ᵖ₀ = lookup vars
     ; ⟦_⟧ᵖ₁ = λ ()
     }
 

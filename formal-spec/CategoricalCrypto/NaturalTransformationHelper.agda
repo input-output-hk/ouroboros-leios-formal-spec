@@ -1,13 +1,13 @@
 {-# OPTIONS --safe --without-K #-}
+
 module CategoricalCrypto.NaturalTransformationHelper where
 
 open import Level
-
+  
 open import Categories.Category
 open import Categories.Functor hiding (id)
 open import Categories.Functor.Bifunctor
-open import Categories.NaturalTransformation.NaturalIsomorphism.Properties
-
+open import Categories.Functor.Bifunctor.Properties
 open import Categories.Tactic.Category
 
 open import Data.Product
@@ -17,10 +17,8 @@ private
     o ℓ e : Level
     C D E : Category o ℓ e
 
-
 module _ (F G : Functor C D) where
   private
-    module C = Category C
     module F = Functor F
     module G = Functor G
 
@@ -40,8 +38,7 @@ module _ (F G : Bifunctor C D E) where
     module G = Functor G
 
   open Category E
-
-  open import Categories.Functor.Bifunctor.Properties
+  open HomReasoning
 
   natural-components : (η : Family F G)
                      → (∀ d → Natural (appʳ F d) (appʳ G d) (λ c → η (c , d)))
@@ -63,4 +60,3 @@ module _ (F G : Bifunctor C D E) where
     (G.F₁ (f₁ , D.id) ∘ G.F₁ (C.id , f₂)) ∘ η X
       ≈⟨ [ G ]-decompose₁ ⟩∘⟨refl ⟨
     G.F₁ (f₁ , f₂) ∘ η X ∎
-    where open HomReasoning

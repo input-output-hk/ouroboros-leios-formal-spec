@@ -1,4 +1,5 @@
---{-# OPTIONS --safe #-}
+-- {-# OPTIONS --safe #-}
+
 module CategoricalCrypto.Category.Instance.FreeStrictMonoidal where
 
 --------------------------------------------------------------------------------
@@ -12,46 +13,23 @@ open import Level renaming (zero to ℓ0)
 open import Categories.Category
 open import Categories.Category.Helper
 open import Categories.Category.Monoidal
-open import Categories.Category.Monoidal.Properties
 open import Categories.Category.Monoidal.Symmetric
-import Categories.Morphism as Morphism
-open import Categories.Functor hiding (id)
-open import Categories.Functor.Monoidal
-open import Categories.NaturalTransformation hiding (id)
 open import Categories.NaturalTransformation.NaturalIsomorphism.Properties
-import Categories.Category.Construction.Core as Core
-import Categories.Morphism.Reasoning
-open import Categories.Functor.Bifunctor
-import Categories.Category.Monoidal.Reasoning as MonReasoning
 
-open import Function hiding (id; _∘_)
-open import Data.Nat using (ℕ; zero; suc; _+_)
-import Data.Nat.Properties as ℕ
 open import Data.List
 open import Data.List.Properties
 open import Data.Product hiding (swap)
-open import Relation.Binary.PropositionalEquality as ≡
+open import Function hiding (id; _∘_)
 open import Relation.Binary hiding (Symmetric)
-open import Relation.Nullary
-open import Data.Sum
+open import Relation.Binary.PropositionalEquality as ≡
 
 open import CategoricalCrypto.FreeMonoidal using (Variant; _≤_; FreeMonoidalData; Symm)
 
-module Het where
-  import Relation.Binary.HeterogeneousEquality as H
-
-  ≡-subst₂-removable : ∀ {A B : Set} (_∼_ : A → B → Set) {x y u v} (eq₁ : x ≡ y) (eq₂ : u ≡ v) (z : x ∼ u) →
-                      subst₂ _∼_ eq₁ eq₂ z H.≅ z
-  ≡-subst₂-removable _ refl refl z = H.refl
-  open H public
-
-open import CategoricalCrypto.NaturalTransformationHelper
-
 module FreeMonoidalHelper (v : Variant) (X : Set) where
+
   infixr 10 _⊗₀_
 
   opaque
-
     ObjTerm : Set
     ObjTerm = List X
 
@@ -59,6 +37,7 @@ module FreeMonoidalHelper (v : Variant) (X : Set) where
 
     _⊗₀_ : ObjTerm → ObjTerm → ObjTerm
     _⊗₀_ = _++_
+    
     ⊗₀-assoc : ∀ {A} {B} {C} → (A ⊗₀ B) ⊗₀ C ≡ A ⊗₀ B ⊗₀ C
     ⊗₀-assoc {A} {B} {C} = ++-assoc A B C
 
@@ -168,14 +147,9 @@ module FreeMonoidalHelper (v : Variant) (X : Set) where
         ; hexagon     = hexagon
         }
 
-
-    -- [σ, id ⊗ f ⊗ id, σ, id ⊗ g ⊗ id, σ, ..., σ]
-
-
     open import Data.List.Relation.Binary.Prefix.Heterogeneous as Prefix
     open import Data.List.Relation.Binary.Prefix.Homogeneous.Properties as Properties
     open import Data.List.Relation.Binary.Pointwise as Pointwise using (Pointwise)
-
 
     infix 4 _≼_
     opaque

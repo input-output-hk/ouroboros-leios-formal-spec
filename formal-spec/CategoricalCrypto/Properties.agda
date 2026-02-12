@@ -1,20 +1,17 @@
 {-# OPTIONS --safe --without-K #-}
+
 module CategoricalCrypto.Properties where
 
 open import Categories.Category
 open import Categories.Category.Product
 open import Categories.Category.Product.Properties
-open import Categories.Functor
+open import Categories.Functor as F
 open import Categories.Functor.Construction.Constant
 open import Categories.Morphism
 open import Categories.Morphism.Properties
 open import Categories.NaturalTransformation.NaturalIsomorphism as NI
-open import Categories.NaturalTransformation.NaturalIsomorphism.Properties
-
-open import Categories.Category.Monoidal
 
 import Relation.Binary.Reasoning.Setoid as SetoidR
-import Categories.Functor as F
 
 module _ {a} {b} {c} where
   ※-distrib₃ : {C D E : Category a b c} → (F : Functor C D) → (G : Functor C E)

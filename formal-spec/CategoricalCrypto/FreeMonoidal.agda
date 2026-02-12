@@ -1,4 +1,5 @@
 {-# OPTIONS --safe --without-K #-}
+
 module CategoricalCrypto.FreeMonoidal where
 
 --------------------------------------------------------------------------------
@@ -12,7 +13,6 @@ open import Level renaming (zero to ℓ0)
 open import Categories.Category
 open import Categories.Category.Helper
 open import Categories.Category.Monoidal
-open import Categories.Category.Monoidal.Properties
 open import Categories.Category.Monoidal.Symmetric
 open import Categories.Functor hiding (id)
 open import Categories.Functor.Monoidal
@@ -20,8 +20,6 @@ open import Categories.NaturalTransformation hiding (id)
 open import Categories.NaturalTransformation.NaturalIsomorphism.Properties
 
 open import Data.Product
-
-open import CategoricalCrypto.NaturalTransformationHelper
 
 data Variant : Set where
   Mon Symm : Variant
@@ -40,6 +38,7 @@ record ⟦_⟧ᵥ (v : Variant) : Set₁ where
     open Monoidal Monoidal-C public
     open import Categories.Category.Monoidal.Utilities Monoidal-C
     open Shorthands public
+
     module _ ⦃ _ : Symm ≤ v ⦄ where
       open Symmetric Symmetric-C using (commutative; hexagon₁; hexagon₂; module braiding) public
       σ : ∀ {X Y} → X ⊗₀ Y ⇒ Y ⊗₀ X
