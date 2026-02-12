@@ -74,6 +74,7 @@ open import CategoricalCrypto
 Basic broadcast networking primitives
 ```agda
 open import Network.BasicBroadcast
+open import Network.Leios
 ```
 ### Verification and Testing
 Trace verification for protocol properties
