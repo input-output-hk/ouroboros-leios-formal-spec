@@ -1,111 +1,80 @@
-open import Leios.Prelude hiding (id; _⊗_)
-open import Leios.Abstract
-
-open import CategoricalCrypto renaming (_∘_ to _∘'_)
+open import Leios.Prelude hiding (id; _⊗_; _∘_)
+open import Leios.FFD
+open import Leios.SpecStructure
 open import Leios.Config
 
-open import Network.BasicBroadcast using (NetworkT; RcvMessage; SndMessage; Activate)
+open import CategoricalCrypto hiding (id)
+open import CategoricalCrypto.Channel.Selection
 
-module Network.Leios where
+open import Leios.Safety
 
-module SingleNode (params : Params) (let open Params params) where
+module Network.Leios (⋯ : SpecStructure)
+  (let open SpecStructure ⋯)
+  (params : Params)
+  (Lhdr Lvote Ldiff : ℕ)
+  (splitTxs : List Tx → List Tx × List Tx)
+  (validityCheckTime : EndorserBlock → ℕ) (Participants : ℕ) (Δ : ℕ) where
 
-  open import Leios.Defaults params using (d-Abstract; d-SpecStructure; FFDBuffers; SimpleFFD)
-  open import Leios.Blocks d-Abstract
-  open import Leios.Short d-SpecStructure params
-  open import Leios.FFD
+open import Leios.Linear ⋯ params Lhdr Lvote Ldiff splitTxs validityCheckTime
+open Types params hiding (Network)
 
-  open Types params
-  open LeiosAbstract d-Abstract
+open import Leios.NetworkShim ⋯ params Lhdr Lvote Ldiff splitTxs validityCheckTime
+module B' = BaseAbstract B'
 
-  addToInbox : NetworkMessage → FFDBuffers → FFDBuffers
-  addToInbox (inj₁ ib)  b              = record b { inIBs = ib ∷ FFDBuffers.inIBs b }
-  addToInbox (inj₂ (inj₁ eb)) b        = record b { inEBs = eb ∷ FFDBuffers.inEBs b }
-  addToInbox (inj₂ (inj₂ (inj₁ vt))) b = record b { inVTs = vt ∷ FFDBuffers.inVTs b }
-  addToInbox (inj₂ (inj₂ (inj₂ rb))) b = b
+postulate BaseMsg : Type
+          toBaseMsg : B'.BaseNetwork .Channel.outType → List BaseMsg
+          fromBaseMsg : List BaseMsg → B'.BaseNetwork .Channel.inType
+          instance DecEq-BaseMsg : DecEq BaseMsg
 
-  collectOutbox : FFDBuffers → FFDBuffers × List NetworkMessage
-  collectOutbox b = let open FFDBuffers b in
-      record b { outIBs = [] ; outEBs = [] ; outVTs = [] }
-    , map inj₁ outIBs ++ map (inj₂ ∘ inj₁) outEBs ++ map (inj₂ ∘ inj₂ ∘ inj₁) outVTs
+LeiosMsg = FFDA.Header ⊎ FFDA.Body
+Message = LeiosMsg ⊎ BaseMsg
 
-  data WithState_receive_return_newState_ : MachineType Network (FFD ⊗ BaseC) FFDBuffers where
+import Network.DelayedDiffuse Participants Message Δ as DD
 
-      ReceiveNetwork : ∀ {m s}
-        → WithState s
-          receive (rcvˡ (-, RcvMessage m))
-          return nothing
-          newState (addToInbox m s)
+liftᴷ : ∀ {A B E} → Machine A B → Machine A (B ⊗ E)
+liftᴷ {E = E} M = (M ⊗ʳ E) ∣ˡ
 
-      LeiosStep : ∀ {s i o s'}
-        → let b , outbox = collectOutbox s' in SimpleFFD s i o s'
-        → WithState s
-          receive rcvˡ (-, Activate)
-          return just (sndˡ (-, SndMessage outbox))
-          newState b
+-- multiplexing the network for the base & leios functionality
+-- this is somewhat awkward because we require a strict order on
+-- the messages going through it
+module NetTranslate where
+  record State : Type where
+    field inBuffer  : Maybe (List LeiosMsg)
+          outBuffer : Maybe (List BaseMsg)
 
-  Node : Machine Network (IO ⊗ Adv)
-  Node = ShortLeios ∘' MkMachine FFDBuffers WithState_receive_return_newState_
+  private variable s : State
 
-module MultiNode (networkParams : NetworkParams) (let open NetworkParams networkParams)
-  (winning-slotsF : Fin numberOfParties → ℙ (BlockType × ℕ))
+  data WithState_receive_return_newState_ : MachineType DD.M (Network ⊗ B'.BaseNetwork) State where
+
+    Receive : ∀ {l} → let (leios , base) = partitionSumsWith proj₂ l in
+      WithState record { inBuffer = nothing ; outBuffer = nothing }
+      receive ϵ ⊗R ↑ᵢ DD.Deliver l
+      return just (L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ fromBaseMsg base)
+      newState record { inBuffer = just leios ; outBuffer = nothing }
+
+    SendB : ∀ {m leios} →
+      WithState record { inBuffer = just leios ; outBuffer = nothing }
+      receive L⊗ (L⊗ ϵ) ᵗ¹ ↑ₒ m
+      return just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ Activate leios)
+      newState record { inBuffer = nothing ; outBuffer = just (toBaseMsg m) }
+
+    SendL : ∀ {m m'} →
+      WithState record { inBuffer = nothing ; outBuffer = just m }
+      receive L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ Done m'
+      return just (ϵ ⊗R ↑ₒ DD.Diffuse (map inj₂ m ++ map inj₁ m'))
+      newState record { inBuffer = nothing ; outBuffer = nothing }
+
+NetTranslate : Machine DD.M (Network ⊗ B'.BaseNetwork)
+NetTranslate .Machine.State = _
+NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
+
+Leios1 : Machine DD.M (IO ⊗ ((I ⊗ B'.BaseAdv) ⊗ Adv))
+Leios1 = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ B.m) ∘ NetTranslate
+
+module _ nodesF honestNodes
+  (honest-Node : {p : Fin Participants} → p ∈ honestNodes → nodesF p ≡ Leios1)
+  (honest-IsBlockchain : {p : Fin Participants} → p ∈ honestNodes → IsBlockchain Block (nodesF p))
   where
-
-  open import Data.Fin
-
-  paramsF : Fin numberOfParties → Params
-  paramsF k = record { networkParams = networkParams
-                     ; sutId = k
-                     ; winning-slots = winning-slotsF k }
-
-  -- TODO: refactor so we don't need this
-  zeroParams : Params
-  zeroParams = paramsF (fromℕ< (>-nonZero⁻¹ numberOfParties))
-
-  -- Technically, all these channel families are identical. Maybe this can be refactored?
-
-  module _ (k : Fin numberOfParties) where
-
-    open import Leios.Defaults (paramsF k) using (d-SpecStructure)
-    open import Leios.Short d-SpecStructure (paramsF k)
-    open Types (paramsF k)
-
-    NetworkF : Channel
-    NetworkF = Network
-
-    IOF : Channel
-    IOF = IO
-
-    AdvF : Channel
-    AdvF = Adv
-
-    NodeF : Machine NetworkF (IOF ⊗ AdvF)
-    NodeF = SingleNode.Node (paramsF k)
-
-  open import Leios.Defaults zeroParams using (d-SpecStructure)
-  open import Leios.Short d-SpecStructure zeroParams
-  open Types zeroParams
-
-  constNetworkF : Fin numberOfParties → Channel
-  constNetworkF _ = Network
-
-  NetworkF≡constNetworkF : ∀ {k} → NetworkF k ≡ constNetworkF k
-  NetworkF≡constNetworkF = refl
-
-  NetworkMessage-const : ∀ {k₁ k₂} → NetworkF k₁ ≡ NetworkF k₂
-  NetworkMessage-const = refl
-
-  -- network consisting only of honest nodes
-
-  honestNodes : Machine (⨂ NetworkF) (⨂ IOF ⊗ ⨂ AdvF)
-  honestNodes = ⨂ᴷ NodeF
-
-  honestNodes' : Machine (⨂ constNetworkF) (⨂ IOF ⊗ ⨂ AdvF)
-  honestNodes' = subst (λ c → Machine c (⨂ IOF ⊗ ⨂ AdvF))
-                       (⨂≡ (λ k → NetworkF≡constNetworkF {k})) honestNodes
-
-  open Network.BasicBroadcast numberOfParties NetworkMessage
-    renaming (A to NetAdv; Network to NetFunctionality)
-
-  honestNetwork : Machine I (⨂ IOF ⊗ (NetAdv ⊗ ⨂ AdvF))
-  honestNetwork = honestNodes' ∘ᴷ NetFunctionality
+  LeiosSafety : Type
+  LeiosSafety = safety Block _ _ _ _
+    Leios1 nodesF honestNodes honest-Node honest-IsBlockchain DD.Network Δ Δ
