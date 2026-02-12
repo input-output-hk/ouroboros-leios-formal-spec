@@ -141,10 +141,6 @@ or equal than the slot of the last processed block
     safetyBase : Type 
     safetyBase = safety
           RankingBlock
-          BaseIO
-          BaseAdv
-          NAdv 
-          BaseNetwork
           (BaseMachine.m honestSpec)
           allNodes
           honestNodes

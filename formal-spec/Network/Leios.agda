@@ -76,5 +76,5 @@ module _ nodesF honestNodes
   (honest-IsBlockchain : {p : Fin Participants} → p ∈ honestNodes → IsBlockchain Block (nodesF p))
   where
   LeiosSafety : Type
-  LeiosSafety = safety Block _ _ _ _
-    Leios1 nodesF honestNodes honest-Node honest-IsBlockchain DD.Network Δ Δ
+  LeiosSafety = safety Block Leios1
+    nodesF honestNodes honest-Node honest-IsBlockchain DD.Network Δ Δ
