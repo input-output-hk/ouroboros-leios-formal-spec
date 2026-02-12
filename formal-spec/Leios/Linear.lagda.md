@@ -192,7 +192,8 @@ Note: Submitted data to the base chain is only taken into account
                 rb = record
                        { txs = proj₁ (splitTxs ToPropose)
                        ; announcedEB = hash <$> toProposeEB s π
-                       ; ebCert = proj₂ <$> currentCertEB }
+                       ; ebCert = proj₂ <$> currentCertEB
+                       ; slot = 0}
           in
           ∙ needsUpkeep Base
           ───────────────────────────────────────────────────────────────────────────

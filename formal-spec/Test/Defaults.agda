@@ -9,10 +9,11 @@
    for testing and illustration purposes.
 -}
 
-open import Leios.Prelude
+open import Leios.Prelude hiding (_⊗_)
 open import Leios.Abstract
 open import Leios.Config
 open import Leios.SpecStructure
+open import Leios.Safety
 
 open import Axiom.Set.Properties th
 open import Data.Nat.Show as N
@@ -24,7 +25,10 @@ open import Relation.Binary.Structures
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
-open import CategoricalCrypto using (I)
+open import LibExt
+
+open import CategoricalCrypto using (I ; machine-type ; Channel ; _⊗ᵀ_ ; _⊗_)
+open import CategoricalCrypto.Channel.Selection
 
 open Equivalence
 
@@ -116,8 +120,73 @@ d-Base =
     ; BaseAdv     = I
     }
 
+d-BaseState : Type
+d-BaseState = (List RankingBlock × ℕ)
+
+d-BaseChannel : Channel
+d-BaseChannel = I ⊗ᵀ (BaseAbstract.BaseIO d-Base ⊗ BaseAbstract.BaseAdv d-Base)
+
+data d-BaseRel : machine-type d-BaseState d-BaseChannel where
+
+  fetch-blocks :
+    ∀ blocks slot →
+      d-BaseRel
+        (blocks , slot)
+        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-LDG)
+        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks))
+        (blocks , slot)
+
+  fetch-slot :
+    ∀ blocks slot →
+      d-BaseRel
+        (blocks , slot)
+        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-SLOT)
+        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot))
+        (blocks , slot)
+
+helper : BlockChainInfo RankingBlock → BaseAbstract.BaseIOF d-Base CategoricalCrypto.Out
+helper = let open BaseAbstract.BaseIOF in λ {Chain → FTCH-LDG ; Slot → FTCH-SLOT}
+
 d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
-d-BaseFunctionality = record { m = record { State = ⊤ ; stepRel = λ _ _ _ _ → ⊤ } }
+d-BaseFunctionality =
+  record
+    { m =
+        record
+          { State = (List RankingBlock × ℕ)
+          ; stepRel = d-BaseRel
+          } 
+    ; is-blockchain = let open BaseAbstract.BaseIOF in
+        record
+          { isConstrained =
+              record
+                { queryI = (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ_) ∘ helper
+                ; queryO = λ where
+                    {Chain} rankingBlocks → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BASE-LDG rankingBlocks
+                    {Slot}  slot          → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ SLOT     slot
+                ; correctness = λ where
+                    {Chain} {s} {response'} {s'} x → case (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG) of-≡
+                      λ _ eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
+                        (fetch-blocks blocks _) → blocks , refl
+                        (fetch-slot blocks slot) → case ↑ₒ-injective (L⊗ (ϵ ⊗R) ᵗ¹) eq of λ ()
+                    {Slot}  {s} {response'} {s'} x → case (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-SLOT) of-≡
+                      λ _ eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
+                        (fetch-blocks _ _) → case ↑ₒ-injective (L⊗ (ϵ ⊗R) ᵗ¹) eq of λ ()
+                        (fetch-slot _ slot) → slot , refl
+                ; completeness = λ where
+                    {Chain} {blocks , slot} → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks , (blocks , slot) , fetch-blocks blocks slot
+                    {Slot}  {blocks , slot} → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot , (blocks , slot) , fetch-slot blocks slot 
+                }
+          ; isPure = λ where
+              Chain {s} {s'} {response'} x → case (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG) of-≡
+                λ _ eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
+                  (fetch-blocks _ _) → refl
+                  (fetch-slot _ _) → case ↑ₒ-injective (L⊗ (ϵ ⊗R) ᵗ¹) eq of λ ()
+              Slot {s} {s'} {response'} x → case (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-SLOT) of-≡
+                λ _ eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
+                  (fetch-blocks _ _) → case ↑ₒ-injective (L⊗ (ϵ ⊗R) ᵗ¹) eq of λ ()
+                  (fetch-slot _ _) → refl
+        }
+    }
 
 open import Leios.FFD public
 
