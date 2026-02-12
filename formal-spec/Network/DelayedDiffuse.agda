@@ -19,8 +19,8 @@ Message' = Participant × Message
 
 record BufferedMessage : Type where
   field sender recipient : Participant
-        m : Message
-        round : ℕ
+        m                : Message
+        round            : ℕ
 
   toMessage' : Message'
   toMessage' = (recipient , m)
@@ -31,7 +31,7 @@ unquoteDecl DecEq-BufferedMessage = derive-DecEq ((quote BufferedMessage , DecEq
 allParticipants : ℙ (Fin Participants)
 allParticipants = fromList (allFin Participants)
 
-Inbox = Participant → List Message'
+Inbox  = Participant → List Message'
 Buffer = ℙ BufferedMessage
 
 data NetworkT : Mode → Type where
@@ -51,8 +51,8 @@ data EnvT : Mode → Type where
 
 Adv Env M Ms : Channel
 Adv = simpleChannel AdvT
-M = simpleChannel NetworkT
-Ms = ⨂ const {B = Participant} M
+M   = simpleChannel NetworkT
+Ms  = ⨂ const {B = Participant} M
 Env = simpleChannel EnvT
 
 record State : Type where
@@ -73,8 +73,8 @@ moveToInbox m s = let open State s; module m = BufferedMessage m in if m ∈ buf
   else s
 
 private variable ms : List Message
-                 p : Participant
-                 s : State
+                 p  : Participant
+                 s  : State
                  bm : BufferedMessage
 
 open State
@@ -118,5 +118,5 @@ data WithState_receive_return_newState_ : MachineType I (Ms ⊗ Env ⊗ Adv) Sta
     newState moveToInbox bm s
 
 Network : Machine I (Ms ⊗ Env ⊗ Adv)
-Network .Machine.State = State
+Network .Machine.State   = State
 Network .Machine.stepRel = WithState_receive_return_newState_

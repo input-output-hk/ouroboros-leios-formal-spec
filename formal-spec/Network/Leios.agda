@@ -24,12 +24,9 @@ open import Leios.NetworkShim ⋯ params Lhdr Lvote Ldiff splitTxs validityCheck
 open BaseAbstract B'
 
 LeiosMsg = FFDA.Header ⊎ FFDA.Body
-Message = LeiosMsg ⊎ BaseMsg
+Message  = LeiosMsg ⊎ BaseMsg
 
 import Network.DelayedDiffuse Participants Message Δ as DD
-
-liftᴷ : ∀ {A B E} → Machine A B → Machine A (B ⊗ E)
-liftᴷ {E = E} M = (M ⊗ʳ E) ∣ˡ
 
 -- multiplexing the network for the base & leios functionality
 -- this is somewhat awkward because we require a strict order on
@@ -62,7 +59,7 @@ module NetTranslate where
       newState record { inBuffer = nothing ; outBuffer = nothing }
 
 NetTranslate : Machine DD.M (Network ⊗ BaseNetwork)
-NetTranslate .Machine.State = _
+NetTranslate .Machine.State   = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
 Leios1 : Machine DD.M (IO ⊗ ((I ⊗ BaseAdv) ⊗ Adv))
