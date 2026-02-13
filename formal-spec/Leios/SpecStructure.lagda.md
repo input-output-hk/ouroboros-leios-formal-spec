@@ -3,9 +3,9 @@
 ```agda
 {-# OPTIONS --safe #-}
 
-open import Leios.Prelude hiding (id)
 open import Leios.Abstract
 open import Leios.FFD
+open import Leios.Prelude hiding (id)
 open import Leios.VRF
 
 import Leios.Base

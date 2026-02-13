@@ -12,11 +12,20 @@ This module defines the core Leios protocol state machine, including:
 ```
 -->
 ```agda
-open import Leios.Prelude hiding (id; _⊗_)
+open import Leios.Abstract
+open import Leios.Config
 open import Leios.FFD
+open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.SpecStructure
 
-module Leios.Protocol (⋯ : SpecStructure) (let open SpecStructure ⋯) (SlotUpkeep : Type) (StageUpkeep : Type) where
+open import CategoricalCrypto hiding (_∘_; id)
+
+open import Network.BasicBroadcast using (NetworkT; RcvMessage; SndMessage; Activate)
+
+module Leios.Protocol
+  (⋯           : SpecStructure) (open SpecStructure ⋯)
+  (SlotUpkeep  : Type         )
+  (StageUpkeep : Type         ) where
 
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open GenFFD
@@ -51,8 +60,7 @@ record LeiosState : Type where
         SD           : StakeDistr
         RBs          : List RankingBlock
         ToPropose    : List Tx
-        {- EBs': EBs together with the slot in which we received them
-        -}
+        {- EBs': EBs together with the slot in which we received them -}
         EBs'         : List (ℕ × EndorserBlock)
         VotedEBs     : List Hash
         Vs           : List (List Vote)
@@ -204,9 +212,7 @@ module _ (s : LeiosState)  where
     isValid? (inj₁ h) = headerValid? h
     isValid? (inj₂ b) = bodyValid? b
 
-module _ (s : LeiosState) where
-
-  open LeiosState s
+module _ (s : LeiosState) (open LeiosState s) where
 
   {- Update the LeiosState upon receiving a message (a header or body) -}
   upd : Header ⊎ Body → LeiosState
@@ -214,8 +220,7 @@ module _ (s : LeiosState) where
   upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs }
   upd (inj₂ _)             = s
 
-module _ {s s'} where
-  open LeiosState s'
+module _ {s s'} (open LeiosState s') where
 
   upd-preserves-Upkeep : ∀ {x} → LeiosState.Upkeep s ≡ LeiosState.Upkeep s'
                                → LeiosState.Upkeep s ≡ LeiosState.Upkeep (upd s' x)
@@ -231,13 +236,6 @@ _↑_ = foldr (flip upd)
 ↑-preserves-Upkeep {x = []} = refl
 ↑-preserves-Upkeep {s = s} {x = x ∷ x₁} =
   upd-preserves-Upkeep {s = s} {x = x} (↑-preserves-Upkeep {x = x₁})
-
-open import Leios.Abstract
-
-open import CategoricalCrypto hiding (_∘_)
-open import Leios.Config
-
-open import Network.BasicBroadcast using (NetworkT; RcvMessage; SndMessage; Activate)
 
 module Types (params : Params) (let open Params params) where
 

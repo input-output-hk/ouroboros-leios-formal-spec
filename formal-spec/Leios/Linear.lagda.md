@@ -2,11 +2,12 @@
 
 <!--
 ```agda
-{-# OPTIONS --safe --no-require-unique-meta-solutions #-}
-open import Leios.Prelude hiding (id; _⊗_)
-open import Leios.FFD
-open import Leios.SpecStructure
+{-# OPTIONS --safe #-}
+
 open import Leios.Config
+open import Leios.FFD
+open import Leios.Prelude hiding (id; _⊗_)
+open import Leios.SpecStructure
 
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
@@ -14,12 +15,19 @@ open import Tactic.Derive.DecEq
 open import CategoricalCrypto hiding (id; _∘_; eval)
 open import CategoricalCrypto.Channel.Selection
 
-module Leios.Linear (⋯ : SpecStructure)
-  (let open SpecStructure ⋯)
-  (params : Params)
-  (Lhdr Lvote Ldiff : ℕ)
-  (splitTxs : List Tx → List Tx × List Tx)
-  (validityCheckTime : EndorserBlock → ℕ) where
+open import Data.List.Properties
+open import Data.Maybe.Properties
+open import Data.Product.Properties
+
+open import Prelude.STS.GenPremises
+
+module Leios.Linear
+  (⋯                 : SpecStructure              ) (open SpecStructure ⋯)
+  (params            : Params                     )
+  (Lhdr Lvote Ldiff  : ℕ                          )
+  (splitTxs          : List Tx → List Tx × List Tx)
+  (validityCheckTime : EndorserBlock → ℕ          )
+  where
 ```
 -->
 
@@ -219,8 +227,6 @@ LinearLeios : Machine (FFD ⊗ BaseIO) (IO ⊗ Adv)
 LinearLeios .Machine.State = LeiosState
 LinearLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 
-open import Prelude.STS.GenPremises
-
 instance
   Dec-isValid : ∀ {s x} → isValid s x ⁇
   Dec-isValid {s} {x} = ⁇ isValid? s x
@@ -238,10 +244,6 @@ just≢nothing = λ ()
 
 nothing≢just : ∀ {ℓ} {A : Type ℓ} {x} → nothing ≡ (Maybe A ∋ just x) → ⊥
 nothing≢just = λ ()
-
-open import Data.List.Properties
-open import Data.Maybe.Properties
-open import Data.Product.Properties
 
 P : EBRef → ℕ × EndorserBlock → Type
 P h (_ , eb) = hash eb ≡ h

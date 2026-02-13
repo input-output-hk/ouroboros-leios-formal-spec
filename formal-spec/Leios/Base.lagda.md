@@ -14,8 +14,10 @@ open import Leios.VRF
 
 open import CategoricalCrypto hiding (id; _∘_)
 
-module Leios.Base (a : LeiosAbstract) (open LeiosAbstract a) (vrf' : LeiosVRF a)
-  (let open LeiosVRF vrf') where
+module Leios.Base
+  (a    : LeiosAbstract) (open LeiosAbstract a) 
+  (vrf' : LeiosVRF a   ) (open LeiosVRF vrf'  )
+  where
 
 open import Leios.Blocks a using (EndorserBlock; EBRef)
 

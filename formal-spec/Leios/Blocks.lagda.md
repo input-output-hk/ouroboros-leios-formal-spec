@@ -15,7 +15,9 @@ open import Leios.FFD
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
-module Leios.Blocks (a : LeiosAbstract) (let open LeiosAbstract a) where
+module Leios.Blocks
+  (a : LeiosAbstract)
+  (open LeiosAbstract a) where
 
 -- IsBlock typeclass (could do a closed-world approach instead)
 -- Q: should votes have an instance of this class?
