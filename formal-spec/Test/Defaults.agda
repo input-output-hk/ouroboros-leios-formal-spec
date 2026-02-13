@@ -27,7 +27,8 @@ open import Tactic.Derive.DecEq
 
 open import LibExt
 
-open import CategoricalCrypto using (I ; machine-type ; Channel ; _⊗ᵀ_ ; _⊗_)
+open import CategoricalCrypto using (I ; Machine ; machine-type ; Channel ; _⊗ᵀ_ ; _⊗_)
+open import CategoricalCrypto.Channel.Core
 open import CategoricalCrypto.Channel.Selection
 
 open Equivalence
@@ -130,7 +131,7 @@ d-BaseChannel = BaseNetwork ⊗ᵀ (BaseIO ⊗ BaseAdv)
 data d-BaseRel : machine-type d-BaseState d-BaseChannel where
 
   fetch-blocks :
-    ∀ blocks slot →
+    ∀ {blocks slot} →
       d-BaseRel
         (blocks , slot)
         (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-LDG)
@@ -138,56 +139,56 @@ data d-BaseRel : machine-type d-BaseState d-BaseChannel where
         (blocks , slot)
 
   fetch-slot :
-    ∀ blocks slot →
+    ∀ {blocks slot} →
       d-BaseRel
         (blocks , slot)
         (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-SLOT)
         (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot))
         (blocks , slot)
 
-helper : BlockChainInfo RankingBlock → BaseAbstract.BaseIOF d-Base CategoricalCrypto.Out
-helper = let open BaseAbstract.BaseIOF in λ {Chain → FTCH-LDG ; Slot → FTCH-SLOT}
 
-d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
-d-BaseFunctionality =
-  record
-    { m =
-        record
-          { State = (List RankingBlock × ℕ)
-          ; stepRel = d-BaseRel
-          } 
-    ; is-blockchain = let open BaseAbstract.BaseIOF in
-        record
-          { isConstrained =
-              record
-                { queryI = (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ_) ∘ helper
-                ; queryO = λ where
-                    {Chain} rankingBlocks → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BASE-LDG rankingBlocks
-                    {Slot}  slot          → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ SLOT     slot
-                ; correctness = λ where
-                    {Chain} {s} {response'} {s'} x → case (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG) of-≡
-                      λ _ eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
-                        (fetch-blocks blocks _) → blocks , refl
-                        (fetch-slot blocks slot) → case ↑ₒ-injective (L⊗ (ϵ ⊗R) ᵗ¹) eq of λ ()
-                    {Slot}  {s} {response'} {s'} x → case (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-SLOT) of-≡
-                      λ _ eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
-                        (fetch-blocks _ _) → case ↑ₒ-injective (L⊗ (ϵ ⊗R) ᵗ¹) eq of λ ()
-                        (fetch-slot _ slot) → slot , refl
-                ; completeness = λ where
-                    {Chain} {blocks , slot} → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks , (blocks , slot) , fetch-blocks blocks slot
-                    {Slot}  {blocks , slot} → L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot , (blocks , slot) , fetch-slot blocks slot 
-                }
-          ; isPure = λ where
-              Chain {s} {s'} {response'} x → case (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG) of-≡
-                λ _ eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
-                  (fetch-blocks _ _) → refl
-                  (fetch-slot _ _) → case ↑ₒ-injective (L⊗ (ϵ ⊗R) ᵗ¹) eq of λ ()
-              Slot {s} {s'} {response'} x → case (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-SLOT) of-≡
-                λ _ eq → case subst (λ i → d-BaseRel s i response' s') eq x of λ where
-                  (fetch-blocks _ _) → case ↑ₒ-injective (L⊗ (ϵ ⊗R) ᵗ¹) eq of λ ()
-                  (fetch-slot _ _) → refl
+d-BaseMachine : Machine I (BaseAbstract.BaseIO d-Base ⊗ I)
+d-BaseMachine = record {State = List RankingBlock × ℕ ; stepRel = d-BaseRel }
+
+module _ where
+  open BaseAbstract.BaseIOF
+  open Machine d-BaseMachine
+  open Channel machine-channel
+
+  d-BaseQueryI : BlockChainInfo RankingBlock → inType
+  d-BaseQueryI Chain = L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-LDG
+  d-BaseQueryI Slot = L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FTCH-SLOT
+
+  d-BaseQueryO : ∀ {query} → bciQueryType RankingBlock query → outType
+  d-BaseQueryO {Chain} rankingBlocks = L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BASE-LDG rankingBlocks
+  d-BaseQueryO {Slot} slot = L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ SLOT slot
+
+  d-BaseCorrectness : ∀ {query} {s} → ∃ λ response' → ∃ {A = State} λ s' → stepRel s (d-BaseQueryI query) (just response') s'
+  d-BaseCorrectness {Chain} {blocks , slot} = L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks , (blocks , slot) , fetch-blocks
+  d-BaseCorrectness {Slot} {blocks , slot} = L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot , (blocks , slot) , fetch-slot
+
+  opaque
+    unfolding
+      _⊗_
+
+    d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
+    d-BaseFunctionality =
+      record
+        { m = d-BaseMachine
+        ; is-blockchain = 
+            record
+              { isConstrained =
+                  record
+                    { queryI = d-BaseQueryI
+                    ; queryO = d-BaseQueryO
+                    ; correctness = λ where {Chain} fetch-blocks → -, refl
+                                            {Slot} fetch-slot → -, refl
+                    ; completeness = λ {query} → d-BaseCorrectness {query} 
+                    }
+              ; isPure = λ where Chain fetch-blocks → refl
+                                 Slot fetch-slot → refl
+            }
         }
-    }
 
 open import Leios.FFD public
 

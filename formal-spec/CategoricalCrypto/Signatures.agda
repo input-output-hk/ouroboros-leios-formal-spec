@@ -14,6 +14,8 @@ open import Data.Nat
 open import Data.List
 open import Data.List.Membership.Propositional
 
+open import Function
+
 module Signatures (VK M S : Set) where
   data SigT : Mode → Type where
     Gen : SigT Out
@@ -97,10 +99,15 @@ module Signatures (VK M S : Set) where
 
   _-⟦_/_⟧⇀_ = WithState_receive_return_newState_
 
-  signTwice : ∀ {s s' m o}   → s  -⟦ L⊗ ((ϵ ⊗R) ⊗R) ᵗ² ↑ₒ Sign m / o  ⟧⇀ s'
-            → ∃[ o' ] ∃[ s'' ] s' -⟦ L⊗ ((ϵ ⊗R) ⊗R) ᵗ² ↑ₒ Sign m / o' ⟧⇀ s''
-  signTwice u = {!u!} -- (Sign₁ s-key≡just-vk) = -, -, Sign₁ s-key≡just-vk
-
   Functionality : Machine I ((Sig ⊗ Ver) ⊗ Adv)
   Functionality .Machine.State   = State
   Functionality .Machine.stepRel = WithState_receive_return_newState_
+
+  opaque
+    unfolding
+      _⊗_
+
+    signTwice : ∀ {s s' m o}
+      → s  -⟦ L⊗ ((ϵ ⊗R) ⊗R) ᵗ² ↑ₒ Sign m / o  ⟧⇀ s' → ∃[ o' ] ∃[ s'' ]
+        s' -⟦ L⊗ ((ϵ ⊗R) ⊗R) ᵗ² ↑ₒ Sign m / o' ⟧⇀ s''
+    signTwice (Sign₁ s-key≡just-vk) = -, -, Sign₁ s-key≡just-vk
