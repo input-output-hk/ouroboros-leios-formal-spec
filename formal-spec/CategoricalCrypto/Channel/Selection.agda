@@ -42,43 +42,11 @@ _↑ : ∀ {m m' A B} → A [ m ]⇒[ m' ]ᵍ B → A [ m ]⇒[ m' ] B
 (x ᵗ¹) ↑ = (x ↑) ⇒ₜ ⇒-negate-transpose-right
 (x ᵗ²) ↑ = (x ↑) ⇒ₜ ⇒-negate-transpose-left
 
-opaque
-  unfolding _⊗_
-
-  ⊗-right-intro-injective : ∀ {m A B} → Injective _≡_ _≡_ (app (⊗-right-intro {m} {A} {B}))
-  ⊗-right-intro-injective {Out} refl = refl
-  ⊗-right-intro-injective {In} refl = refl
-
-  ⊗-left-intro-injective : ∀ {m A B} → Injective _≡_ _≡_  (app (⊗-left-intro {m} {A} {B}))
-  ⊗-left-intro-injective {Out} refl = refl
-  ⊗-left-intro-injective {In} refl = refl
-
-  ⇒-negate-transpose-right-injective : ∀ {m A} → Injective _≡_ _≡_ (app (⇒-negate-transpose-right {m} {A}))
-  ⇒-negate-transpose-right-injective {Out} = id
-  ⇒-negate-transpose-right-injective {In} = id
-  
-  ⇒-negate-transpose-left-injective : ∀ {m A} → Injective _≡_ _≡_ (app (⇒-negate-transpose-left {m} {A}))
-  ⇒-negate-transpose-left-injective {Out} = id
-  ⇒-negate-transpose-left-injective {In} = id
-  
-  ↑-injective : ∀ {m m' A B} (p : A [ m ]⇒[ m' ]ᵍ B) → Injective _≡_ _≡_ (app (p ↑))
-  ↑-injective ϵ = id
-  ↑-injective (p ⊗R) = ↑-injective p ∘ ⊗-right-intro-injective
-  ↑-injective (L⊗ p) = ↑-injective p ∘ ⊗-left-intro-injective
-  ↑-injective (p ᵗ¹) =  ↑-injective p ∘ ⇒-negate-transpose-right-injective
-  ↑-injective (p ᵗ²) = ↑-injective p ∘ ⇒-negate-transpose-left-injective
-
 _↑ᵢ_ : ∀ {m' A B} → A [ In ]⇒[ m' ]ᵍ B → modeType In A → modeType m' B
 _↑ᵢ_ p = app (_↑ {In} p)
 
-↑ᵢ-injective : ∀ {m' A B} → (p : A [ In ]⇒[ m' ]ᵍ B) → Injective _≡_ _≡_ (p ↑ᵢ_)
-↑ᵢ-injective = ↑-injective
-
 _↑ₒ_ : ∀ {m' A B} → A [ Out ]⇒[ m' ]ᵍ B → modeType Out A → modeType m' B
 _↑ₒ_ p = app (_↑ {Out} p)
-
-↑ₒ-injective : ∀ {m' A B} → (p : A [ Out ]⇒[ m' ]ᵍ B) → Injective _≡_ _≡_ (p ↑ₒ_)
-↑ₒ-injective = ↑-injective
 
 instance _ = Functor-M ⦃ Class.Monad.Monad-TC ⦄
 
