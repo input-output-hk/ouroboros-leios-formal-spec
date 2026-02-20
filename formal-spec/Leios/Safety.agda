@@ -1,12 +1,11 @@
 {-# OPTIONS --safe #-}
 
-open import Leios.Prelude hiding (id; _⊗_)
 open import Leios.Config
+open import Leios.Prelude hiding (id; _⊗_)
+
 open import CategoricalCrypto hiding (id; _∘_)
 
 module Leios.Safety (Block : Type) where
-
-open import CategoricalCrypto.Machine.Constraints
 
 -- | Type of things we can query from a honest node
 data BlockChainInfo : Type where
@@ -23,9 +22,8 @@ record IsBlockchain {A B : Channel} (m : Machine A B) : Type₂ where
     isConstrained : IsConstrained m bciQueryType
     isPure        : IsPure isConstrained 
 
-module _
-  {A B : Channel}
-  (m   : Machine A B) where
+module _ {A B}
+  (m : Machine A B) where
   
   open Machine m using () renaming (stepRel to _-⟦_/_⟧ᵐ⇀_)
   open Channel (A ⊗ B ᵀ)

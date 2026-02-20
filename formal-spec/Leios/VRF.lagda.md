@@ -15,18 +15,19 @@ utility functions for protocol slot leader selection.
 open import Leios.Prelude
 open import Leios.Abstract
 
-module Leios.VRF (a : LeiosAbstract) (let open LeiosAbstract a) where
+module Leios.VRF
+  (a : LeiosAbstract) (open LeiosAbstract a) where
 
 record VRF (Dom Range PubKey : Type) : Type₁ where
   field isKeyPair : PubKey → PrivKey → Type
-        eval : PrivKey → Dom → Range × VrfPf
-        verify : PubKey → Dom → Range → VrfPf → Type
-        verify? : (pk : PubKey) → (d : Dom) → (r : Range) → (pf : VrfPf) → Dec (verify pk d r pf)
+        eval      : PrivKey → Dom → Range × VrfPf
+        verify    : PubKey → Dom → Range → VrfPf → Type
+        verify?   : (pk : PubKey) → (d : Dom) → (r : Range) → (pf : VrfPf) → Dec (verify pk d r pf)
 
 record LeiosVRF : Type₁ where
-  field PubKey : Type
-        poolID : PubKey → PoolID
-        verifySig : PubKey → Sig → Type
+  field PubKey     : Type
+        poolID     : PubKey → PoolID
+        verifySig  : PubKey → Sig → Type
         verifySig? : (pk : PubKey) → (sig : Sig) → Dec (verifySig pk sig)
 
         vrf : VRF ℕ ℕ PubKey

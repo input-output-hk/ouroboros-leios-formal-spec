@@ -1,27 +1,21 @@
-{-# OPTIONS --no-require-unique-meta-solutions #-}
 module CategoricalCrypto.Abstract where
 
 open import Level renaming (zero to ℓ0)
 
 open import Categories.Category
 open import Categories.Category.Helper
+open import Categories.Category.Instance.Sets
 open import Categories.Category.Monoidal
 open import Categories.Functor hiding (id)
-open import Categories.Functor.Monoidal
 open import Categories.Functor.Presheaf
 open import Categories.Monad.Graded
-open import Categories.Morphism
 open import Categories.NaturalTransformation hiding (id)
-open import Categories.Category.Monoidal.Properties
-
-open import Categories.Category.Instance.Sets
-
 open import Categories.Tactic.Category
 
-open import Data.Product
 open import Data.Fin
-
+open import Data.Product
 open import Data.Vec using (_∷_; [])
+
 open import CategoricalCrypto.MonoidalCoherence
 
 record UC-model : Set₁ where

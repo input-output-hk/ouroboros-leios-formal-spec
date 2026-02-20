@@ -1,4 +1,4 @@
-{-# OPTIONS --safe --no-require-unique-meta-solutions #-}
+{-# OPTIONS --safe #-}
 
 module CategoricalCrypto.Examples where
 
@@ -7,9 +7,9 @@ import abstract-set-theory.Prelude as P
 
 open import Data.Fin using (Fin) renaming (zero to fzero; suc to fsuc)
 
-open import CategoricalCrypto.Machine.Core
 open import CategoricalCrypto.Channel.Core
 open import CategoricalCrypto.Channel.Selection
+open import CategoricalCrypto.Machine.Core
 
 --------------------------------------------------------------------------------
 -- Example functionalities
