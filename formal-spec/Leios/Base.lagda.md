@@ -33,8 +33,11 @@ record BaseAbstract : Type₁ where
         VTy         : Type
         initSlot    : VTy → ℕ
         V-chkCerts  : List PubKey → EndorserBlock × Cert → Bool
-        BaseNetwork : Channel 
         BaseAdv     : Channel
+        BaseMsg     : Type
+        ⦃ DecEq-BaseMsg ⦄ : DecEq BaseMsg
+
+  BaseNetwork = simpleChannel (λ _ → List BaseMsg)
 ```
 Type family for communicating with the base functionality.
 ```agda
@@ -141,10 +144,6 @@ or equal than the slot of the last processed block
     safetyBase : Type 
     safetyBase = safety
           RankingBlock
-          BaseIO
-          BaseAdv
-          NAdv 
-          BaseNetwork
           (BaseMachine.m honestSpec)
           allNodes
           honestNodes

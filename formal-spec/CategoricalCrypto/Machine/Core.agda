@@ -94,6 +94,9 @@ _∣^ˡ = modifyStepRel ⇒-solver
 _∣^ʳ : ∀ {A B C} → Machine A (B ⊗ C) → Machine A C
 _∣^ʳ = modifyStepRel ⇒-solver
 
+liftᴷ : ∀ {A B E} → Machine A B → Machine A (B ⊗ E)
+liftᴷ {E = E} M = (M ⊗ʳ E) ∣ˡ
+
 -- trace monoidal category?
 -- What happens when you compose with a trace ?
 -- Product of the traces ?

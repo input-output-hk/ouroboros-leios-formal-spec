@@ -40,7 +40,7 @@ module _
   -- Number of involved nodes
   {n                       : ℕ}
   -- Communication channels involved in the network
-  (IO Adv NAdv Network     : Channel)
+  {IO Adv NAdv Network     : Channel}
   -- Machine describing the behavior of the honest nodes
   (honest-node-spec        : Machine Network (IO ⊗ Adv))
   -- All the nodes, including honest nodes and adversaries
