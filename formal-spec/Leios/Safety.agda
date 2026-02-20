@@ -34,25 +34,26 @@ module _ {A B}
     []        : ∀ {s} → Trace s s
     _∷⟨_,_,_⟩ : ∀ {s s' s''} → Trace s s' → (i : inType) → (o : Maybe outType) → s' -⟦ i / o ⟧ᵐ⇀ s'' → Trace s s''
 
-module _
+module Safety
   -- Number of involved nodes
-  {n                       : ℕ}
+  {n                        : ℕ}
   -- Communication channels involved in the network
-  {IO Adv NAdv Network     : Channel}
+  {IO Adv NAdv Network      : Channel}
   -- Machine describing the behavior of the honest nodes
-  (honest-node-spec        : Machine Network (IO ⊗ Adv))
+  (honest-node-spec         : Machine Network (IO ⊗ Adv))
+  -- The spec can be queried in the right ways
+  (spec-IsBlockchain : IsBlockchain honest-node-spec)
   -- All the nodes, including honest nodes and adversaries
-  (all-nodes               : Fin n → Machine Network (IO ⊗ Adv))
+  (all-nodes                : Fin n → Machine Network (IO ⊗ Adv))
   -- All the honest nodes
-  (honest-nodes            : ℙ (Fin n)) -- Nodes behaving like the honest spec
+  (honest-nodes             : ℙ (Fin n)) -- Nodes behaving like the honest spec
   -- Proofs that each of the honest nodes behave like the specification
-  (honest-nodes-≡-spec     : ∀ {p} → p ∈ honest-nodes → all-nodes p ≡ honest-node-spec)
-  -- Proofs that each of the honest nodes is a blockchain (constrained, pure and
-  -- deterministic with respect to bciQuerytype)
-  (honest-nodes-blockchain : ∀ {p} → p ∈ honest-nodes → IsBlockchain (all-nodes p))
+  (honest-nodes-≡-spec      : ∀ {p} → p ∈ honest-nodes → all-nodes p ≡ honest-node-spec)
   -- The network machine
-  (network                 : Machine I (n ⨂ⁿ Network ⊗ NAdv))
+  (network                  : Machine I (n ⨂ⁿ Network ⊗ NAdv))
     where
+  honest-nodes-blockchain : ∀ {p} → p ∈ honest-nodes → IsBlockchain (all-nodes p)
+  honest-nodes-blockchain p-honest rewrite honest-nodes-≡-spec p-honest = spec-IsBlockchain
 
   -- Combination of all the nodes together
   nodes : Machine (n ⨂ⁿ Network) (n ⨂ⁿ IO ⊗ n ⨂ⁿ Adv)
@@ -87,4 +88,3 @@ module _
                → getSlot init honest-p + Δ ≤ getSlot final honest-p
                -- all honest nodes have `chain` as a prefix
                → prune k (getChain init honest-p) ≼ getChain final honest-p'
-

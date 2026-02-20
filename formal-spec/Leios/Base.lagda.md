@@ -136,7 +136,6 @@ or equal than the slot of the last processed block
     (allNodes            : Fin numberOfParties → Machine BaseNetwork (BaseIO ⊗ BaseAdv))
     (honestNodes         : ℙ (Fin numberOfParties))
     (honest≡spec         : ∀ {p} → p ∈ honestNodes → allNodes p ≡ BaseMachine.m honestSpec)
-    (honestIsBlockchain  : ∀ {p} → p ∈ honestNodes → IsBlockchain RankingBlock (allNodes p))
     (Net                 : Machine I (numberOfParties ⨂ⁿ BaseNetwork ⊗ NAdv))
     (k                   : ℕ)
     (Δ                   : ℕ)
@@ -144,13 +143,13 @@ or equal than the slot of the last processed block
     where
 
     safetyBase : Type 
-    safetyBase = safety
+    safetyBase = Safety.safety
           RankingBlock
           (BaseMachine.m honestSpec)
+          (BaseMachine.is-blockchain honestSpec)
           allNodes
           honestNodes
           honest≡spec
-          honestIsBlockchain
           Net
           k
           Δ
