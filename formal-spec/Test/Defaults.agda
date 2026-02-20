@@ -122,33 +122,35 @@ d-Base =
     }
 
 d-BaseState : Type
-d-BaseState = (List RankingBlock × ℕ)
+d-BaseState = List RankingBlock × ℕ
 
-d-BaseChannel : Channel
-d-BaseChannel = BaseNetwork ⊗ᵀ (BaseIO ⊗ BaseAdv)
-  where open BaseAbstract d-Base
+module _ where
+  open BaseAbstract d-Base
 
-data d-BaseRel : machine-type d-BaseState d-BaseChannel where
+  d-BaseChannel : Channel
+  d-BaseChannel = BaseNetwork ⊗ᵀ (BaseIO ⊗ BaseAdv)
 
-  fetch-blocks :
-    ∀ {blocks slot} →
-      d-BaseRel
-        (blocks , slot)
-        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-LDG)
-        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks))
-        (blocks , slot)
+  data d-BaseRel : machine-type d-BaseState d-BaseChannel where
 
-  fetch-slot :
-    ∀ {blocks slot} →
-      d-BaseRel
-        (blocks , slot)
-        (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-SLOT)
-        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot))
-        (blocks , slot)
+    fetch-blocks :
+      ∀ {blocks slot} →
+        d-BaseRel
+          (blocks , slot)
+          (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-LDG)
+          (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.BASE-LDG blocks))
+          (blocks , slot)
+
+    fetch-slot :
+      ∀ {blocks slot} →
+        d-BaseRel
+          (blocks , slot)
+          (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.FTCH-SLOT)
+          (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot))
+          (blocks , slot)
 
 
-d-BaseMachine : Machine I (BaseAbstract.BaseIO d-Base ⊗ I)
-d-BaseMachine = record {State = List RankingBlock × ℕ ; stepRel = d-BaseRel }
+  d-BaseMachine : Machine BaseNetwork (BaseIO ⊗ BaseAdv)
+  d-BaseMachine = record {State = List RankingBlock × ℕ ; stepRel = d-BaseRel }
 
 module _ where
   open BaseAbstract.BaseIOF
@@ -175,7 +177,7 @@ module _ where
     d-BaseFunctionality =
       record
         { m = d-BaseMachine
-        ; is-blockchain = 
+        ; is-blockchain =
             record
               { isConstrained =
                   record
@@ -183,7 +185,7 @@ module _ where
                     ; queryO = d-BaseQueryO
                     ; correctness = λ where {Chain} fetch-blocks → -, refl
                                             {Slot} fetch-slot → -, refl
-                    ; completeness = λ {query} → d-BaseCorrectness {query} 
+                    ; completeness = λ {query} → d-BaseCorrectness {query}
                     }
               ; isPure = λ where Chain fetch-blocks → refl
                                  Slot fetch-slot → refl
