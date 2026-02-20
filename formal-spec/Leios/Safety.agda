@@ -31,8 +31,8 @@ module _ {A B}
   module m = Machine m
 
   data Trace : m.State → m.State → Type where
-    []        : ∀ {s} → Trace s s
-    _∷⟨_,_,_⟩ : ∀ {s s' s''} → Trace s s' → (i : inType) → (o : Maybe outType) → s' -⟦ i / o ⟧ᵐ⇀ s'' → Trace s s''
+    []         : ∀ {s} → Trace s s
+    _∷ʳ⟨_,_,_⟩ : ∀ {s s' s''} → Trace s s' → (i : inType) → (o : Maybe outType) → s' -⟦ i / o ⟧ᵐ⇀ s'' → Trace s s''
 
 module Safety
   -- Number of involved nodes
@@ -42,7 +42,7 @@ module Safety
   -- Machine describing the behavior of the honest nodes
   (honest-node-spec         : Machine Network (IO ⊗ Adv))
   -- The spec can be queried in the right ways
-  (spec-IsBlockchain : IsBlockchain honest-node-spec)
+  (spec-IsBlockchain        : IsBlockchain honest-node-spec)
   -- All the nodes, including honest nodes and adversaries
   (all-nodes                : Fin n → Machine Network (IO ⊗ Adv))
   -- All the honest nodes
@@ -87,4 +87,4 @@ module Safety
                -- for all traces that reach `Δ` slots into the future
                → getSlot init honest-p + Δ ≤ getSlot final honest-p
                -- all honest nodes have `chain` as a prefix
-               → prune k (getChain init honest-p) ≼ getChain final honest-p'
+               → prune k (getChain final honest-p) ≼ getChain final honest-p'

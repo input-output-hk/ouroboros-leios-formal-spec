@@ -15,7 +15,7 @@ module Network.Leios (⋯ : SpecStructure)
   (params : Params)
   (Lhdr Lvote Ldiff : ℕ)
   (splitTxs : List Tx → List Tx × List Tx)
-  (validityCheckTime : EndorserBlock → ℕ) (Participants : ℕ) (Δ : ℕ) where
+  (validityCheckTime : EndorserBlock → ℕ) (Participants : ℕ) (k : ℕ) where
 
 open import Leios.Linear ⋯ params Lhdr Lvote Ldiff splitTxs validityCheckTime
 open Types params hiding (Network)
@@ -63,7 +63,7 @@ NetTranslate .Machine.State   = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
 Leios1 : Machine DD.M (IO ⊗ ((I ⊗ BaseAdv) ⊗ Adv))
-Leios1 = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ B.m) ∘ NetTranslate
+Leios1 = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ B.m) ∘ NetTranslate)
 
 LeiosBlock = RankingBlock × Maybe EndorserBlock
 
@@ -106,10 +106,10 @@ module _ nodesF honestNodes
   getChain-ebHashesCorrect = {!!}
 
   LeiosSafety : Type
-  LeiosSafety = S.safety Δ Δ
+  LeiosSafety = S.safety k k
 
   PraosSafety : Type
-  PraosSafety = safetyBase _ _ BM {!!} honestNodes {!!} {!!} Δ Δ {!!}
+  PraosSafety = safetyBase _ _ BM {!!} honestNodes {!!} {!!} k k {!!}
 
   leiosSafety : LeiosSafety
   leiosSafety p p' honest-p honest-p' init final tr P = {!safetyBase _ _ BM!}
