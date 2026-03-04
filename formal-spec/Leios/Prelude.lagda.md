@@ -125,6 +125,43 @@ completeFinL (ℕ.suc n) = F.fromℕ n ∷ L.map F.inject₁ (completeFinL n)
 prune : {A : Type} → ℕ → List A → List A
 prune k l = take (length l ∸ k) l
 
-_≼_ : {A : Type} → List A → List A → Type
-l₁ ≼ l = ∃[ l₂ ] l₁ ++ l₂ ≡ l
+open import Relation.Binary
+open import Data.List.Properties
+import Relation.Binary.PropositionalEquality
+
+module _ {A : Type} where
+  _≼_ : List A → List A → Type
+  l₁ ≼ l = ∃[ l₂ ] l₁ ++ l₂ ≡ l
+
+  IsPreorder-≼ : IsPreorder _≡_ _≼_
+  IsPreorder-≼ = record
+    { isEquivalence = record { Relation.Binary.PropositionalEquality }
+    ; reflexive = λ where refl → [] , ++-identityʳ _
+    ; trans = λ where (l₁ , refl) (l₂ , refl) → l₁ ++ l₂ , sym (++-assoc _ l₁ l₂)
+    }
+
+  IsPartialOrder-≼ : IsPartialOrder _≡_ _≼_
+  IsPartialOrder-≼ = record
+    { isPreorder = IsPreorder-≼
+    ; antisym = λ where {i} (l₁ , refl) (l₂ , eq₂) → let
+        l₁++l₂≡[] = ++-identityʳ-unique i (trans (sym eq₂) (++-assoc i l₁ l₂))
+        l₁≡[] = ++-conicalˡ l₁ l₂ l₁++l₂≡[]
+        in subst (λ x → i ≡ i ++ x) (sym l₁≡[]) (sym (++-identityʳ _))
+    }
+
+  Poset-≼ : Poset _ _ _
+  Poset-≼ = record
+    { Carrier = List A
+    ; _≈_ = _≡_
+    ; _≤_ = _≼_
+    ; isPartialOrder = IsPartialOrder-≼ }
+
+map-≼ : ∀ {A B : Type} {f : A → B} {l₁ l₂ : List A}
+  → l₁ ≼ l₂ → map f l₁ ≼ map f l₂
+map-≼ {f = f} {l₁} {l₂} (l , eq) = -, trans (sym (map-++ f l₁ l)) (cong (map f) eq)
+
+prune-map : ∀ {A B : Type} {k} {f : A → B} {l : List A}
+  → prune k (map f l) ≡ map f (prune k l)
+prune-map {k = k} {f} {l} =
+  trans (cong (λ n → take (n ∸ k) (map f l)) (length-map f l)) (take-map (length l ∸ k) l)
 ```

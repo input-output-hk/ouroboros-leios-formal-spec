@@ -118,39 +118,40 @@ or equal than the slot of the last processed block
 ```
 
 ```agda
-  open import Leios.Safety
+  open import Leios.Safety RankingBlock
   open import Data.Fin.Base using (_↑ˡ_)
 
   BaseIO = simpleChannel BaseIOF
 
   record BaseMachine : Type₂ where
     field m             : Machine BaseNetwork (BaseIO ⊗ BaseAdv)
-          is-blockchain : IsBlockchain RankingBlock m
+          is-blockchain : IsBlockchain m
 
     open Machine m renaming (stepRel to _-⟦_/_⟧⇀_) public
 
-  module _
-    (numberOfParties     : ℕ)
-    (NAdv                : Channel)
-    (honestSpec          : BaseMachine)
-    (allNodes            : Fin numberOfParties → Machine BaseNetwork (BaseIO ⊗ BaseAdv))
-    (honestNodes         : ℙ (Fin numberOfParties))
-    (honest≡spec         : ∀ {p} → p ∈ honestNodes → allNodes p ≡ BaseMachine.m honestSpec)
-    (Net                 : Machine I (numberOfParties ⨂ⁿ BaseNetwork ⊗ NAdv))
-    (k                   : ℕ)
-    (Δ                   : ℕ)
-    (HonestStakeMajority : Type)
-    where
+--   module _
+--     (numberOfParties     : ℕ)
+--     (NAdv                : Channel)
+--     (honestSpec          : BaseMachine)
+--     (IOF AdvF : Fin numberOfParties → Channel)
+--     (allNodes            : (p : Fin numberOfParties) → Machine BaseNetwork (IOF p ⊗ AdvF p))
+--     (honestNodes         : ℙ (Fin numberOfParties))
+--     (honest≡spec         : ∀ {p} → p ∈ honestNodes → allNodes p ≡ᴹ BaseMachine.m honestSpec)
+--     (Net                 : Machine I (numberOfParties ⨂ⁿ BaseNetwork ⊗ NAdv))
+--     (k                   : ℕ)
+--     (Δ                   : ℕ)
+--     (HonestStakeMajority : Type)
+--     where
 
-    safetyBase : Type 
-    safetyBase = Safety.safety
-          RankingBlock
-          (BaseMachine.m honestSpec)
-          (BaseMachine.is-blockchain honestSpec)
-          allNodes
-          honestNodes
-          honest≡spec
-          Net
-          k
-          Δ
-```
+--     safetyBase : Type₁
+--     safetyBase = Safety.safety
+--           (BaseMachine.m honestSpec)
+--           (BaseMachine.is-blockchain honestSpec)
+--           IOF AdvF
+--           allNodes
+--           honestNodes
+--           honest≡spec
+--           Net
+--           k
+--           Δ
+-- ```

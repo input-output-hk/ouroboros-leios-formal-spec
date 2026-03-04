@@ -1,6 +1,7 @@
 {-# OPTIONS --safe #-}
 
-open import Leios.Prelude hiding (id; _⊗_; _∘_; module L)
+open import Leios.Prelude hiding (id; _⊗_; _∘_; All)
+import Leios.Prelude as PL
 open import Leios.FFD
 open import Leios.SpecStructure
 open import Leios.Config
@@ -23,10 +24,15 @@ open Types params hiding (Network)
 open import Leios.NetworkShim ⋯ params Lhdr Lvote Ldiff splitTxs validityCheckTime
 open BaseAbstract B'
 
+import Relation.Binary.Reasoning.PartialOrder
+open import Relation.Binary using (Poset)
+
+module ≼-Reasoning {A} = Relation.Binary.Reasoning.PartialOrder (Poset-≼ {A})
+
 LeiosMsg = FFDA.Header ⊎ FFDA.Body
 Message  = LeiosMsg ⊎ BaseMsg
 
-import Network.DelayedDiffuse Participants Message Δ as DD
+import Network.DelayedDiffuse Participants Message k as DD
 
 -- multiplexing the network for the base & leios functionality
 -- this is somewhat awkward because we require a strict order on
@@ -65,7 +71,14 @@ NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 Leios1 : Machine DD.M (IO ⊗ ((I ⊗ BaseAdv) ⊗ Adv))
 Leios1 = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ B.m) ∘ NetTranslate)
 
-LeiosBlock = RankingBlock × Maybe EndorserBlock
+HashCorrectB : RankingBlock → Maybe EndorserBlock → Type
+HashCorrectB = {!!}
+
+-- the optional EB is the one determined by the RB, _not_ the one announced by it
+record LeiosBlock : Type where
+  field rb : RankingBlock
+        eb : Maybe EndorserBlock
+        correct : HashCorrectB rb eb
 
 IsBlockchain-Leios : IsBlockchain LeiosBlock Leios1
 IsBlockchain-Leios = {!!}
@@ -73,43 +86,154 @@ IsBlockchain-Leios = {!!}
 IsBlockchain-Praos : IsBlockchain RankingBlock Leios1
 IsBlockchain-Praos = {!!}
 
-module _ nodesF honestNodes
-  (honest-Node : {p : Fin Participants} → p ∈ honestNodes → nodesF p ≡ Leios1)
+module _ (IOF AdvF : Fin Participants → Channel)
+  (nodesF : (p : Fin Participants) → Machine DD.M (IOF p ⊗ AdvF p)) honestNodes
+  (honest-Node : {p : Fin Participants} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
   where
-  module S = Safety LeiosBlock Leios1 IsBlockchain-Leios nodesF honestNodes honest-Node DD.Network
 
-  module P where
-    open Safety RankingBlock Leios1 IsBlockchain-Praos nodesF honestNodes honest-Node DD.Network using (getChain; getSlot) public
+  module LS {Block : Type} (Leios-IsBlockchain : IsBlockchain Block Leios1) where
+    honest-node-spec = Leios1
+    spec-IsBlockchain = Leios-IsBlockchain
+    all-nodes = nodesF
+    honest-nodes = honestNodes
+    network = DD.Network
+    honest-nodes-≡-spec = honest-Node
 
-  module L where
-    open S using (getChain; getSlot) public
+  opaque
+    safetyS : Safety LeiosBlock
+    safetyS = record { LS IsBlockchain-Leios }
 
-  LPSlotLemma : ∀ {s} → {p : Fin Participants} → (p-honest : p ∈ honestNodes)
-    → P.getSlot s p-honest ≡ L.getSlot s p-honest
-  LPSlotLemma = {!!}
+  module S = Safety safetyS
 
-  LPChainLemma : ∀ {s} → {p : Fin Participants} → (p-honest : p ∈ honestNodes)
-    → P.getChain s p-honest ≡ map proj₁ (L.getChain s p-honest)
-  LPChainLemma = {!!}
+  -- module P where
+  --   open Safety record { LS IsBlockchain-Praos } using (getChain) public
 
-  EBHashesCorrect : List LeiosBlock → Type
-  EBHashesCorrect = {!!}
+  opaque
+    unfolding safetyS
+    spec : Machine S.Network ((Network ⊗ BaseIO) ⊗ (I ⊗ BaseAdv))
+    spec = (liftᴷ CategoricalCrypto.id ⊗ᴷ B.m) ∘ NetTranslate
 
-  HashCollision : List LeiosBlock → List LeiosBlock → Type
-  HashCollision = {!!}
+  module Base (p : Fin Participants) where
+    opaque
+      unfolding safetyS
+      -- Reducing `nodesF` to only the `Base` part. We can only do this to honest nodes.
 
-  rbsDetermineEBs : (c₁ c₂ : List LeiosBlock) → map proj₁ c₁ ≡ map proj₁ c₂ → c₁ ≡ c₂ -- TODO: this only hold if there aren't any hash collisions
-  rbsDetermineEBs = {!!}
+      IOFP : Channel
+      IOFP = case p ∈? honestNodes of λ where
+        (yes q) → Network ⊗ BaseIO
+        (no ¬q) → IOF p
 
-  getChain-ebHashesCorrect : ∀ {s} → {p : Fin Participants} → (p-honest : p ∈ honestNodes)
-    → EBHashesCorrect (L.getChain s p-honest)
-  getChain-ebHashesCorrect = {!!}
+      AdvFP : Channel
+      AdvFP = case p ∈? honestNodes of λ where
+        (yes q) → I ⊗ BaseAdv
+        (no ¬q) → AdvF p
 
-  LeiosSafety : Type
-  LeiosSafety = S.safety k k
+      praosNetwork : Machine DD.M (IOFP ⊗ AdvFP)
+      praosNetwork with p ∈? honestNodes
+      ... | (yes q) = spec
+      ... | (no ¬q) = nodesF p
 
-  PraosSafety : Type
-  PraosSafety = safetyBase _ _ BM {!!} honestNodes {!!} {!!} k k {!!}
+      honest-nodes : p ∈ honestNodes → praosNetwork ≡ᴹ spec
+      honest-nodes p∈honestNodes with p ∈? honestNodes
+      ... | (yes q) = ≡ᴹ-refl
+      ... | (no ¬q) = contradiction p∈honestNodes ¬q
 
-  leiosSafety : LeiosSafety
-  leiosSafety p p' honest-p honest-p' init final tr P = {!safetyBase _ _ BM!}
+      honest⇒IOF≡IO : p ∈ honestNodes → IOF p ≡ IO ⊗ I
+      honest⇒IOF≡IO p∈honestNodes = {!_≡ᴹ_.B≡D (honest-nodes p∈honestNodes)!}
+
+      leiosPart : Machine IOFP (IOF p)
+      leiosPart with p ∈? honestNodes
+      ... | (yes q) rewrite honest⇒IOF≡IO q = LinearLeios ∘ (Shim ⊗' CategoricalCrypto.id)
+      ... | (no ¬q) = CategoricalCrypto.id
+
+  opaque
+    unfolding safetyS Base.honest-nodes
+    safetyB : Safety RankingBlock
+    safetyB = record
+      { honest-node-spec = spec
+      ; spec-IsBlockchain = {!!}
+      ; all-nodes = Base.praosNetwork
+      ; honest-nodes = honestNodes
+      ; honest-nodes-≡-spec = Base.honest-nodes _
+      ; network = DD.Network
+      }
+
+  module B' = Safety safetyB
+
+  opaque
+    unfolding safetyB
+
+    safetyB-n : B'.n ≡ Participants
+    safetyB-n = refl
+
+    honest-isoʳᵖ : Fin B'.n → Fin S.n
+    honest-isoʳᵖ = PL.id
+
+    honest-isoʳ : {p : Fin B'.n} → p ∈ B'.honest-nodes → honest-isoʳᵖ p ∈ S.honest-nodes
+    honest-isoʳ = PL.id
+
+    honest-isoˡᵖ : Fin S.n → Fin B'.n
+    honest-isoˡᵖ = PL.id
+
+    honest-isoˡ : {p : Fin S.n} → p ∈ S.honest-nodes → honest-isoˡᵖ p ∈ B'.honest-nodes
+    honest-isoˡ = PL.id
+
+    honest-iso-isoˡ : ∀ p → honest-isoʳᵖ (honest-isoˡᵖ p) ≡ p
+    honest-iso-isoˡ p = refl
+
+  module _ {A : Channel} (E : S.Environment A) where
+    -- this is `E`, but we absorb the Leios part of the honest participants
+    transEnv : B'.Environment A
+    transEnv = {!!}
+
+    -- this is essentially associativity
+    transProtocol : S.protocol E ≡ᴹ B'.protocol transEnv
+    transProtocol = {!!}
+
+    opaque
+      transState : Machine.State (S.protocol E) → Machine.State (B'.protocol transEnv)
+      transState = state-subst transProtocol
+
+      transTrace : {s₁ s₂ : Machine.State (S.protocol E)} → Trace (S.protocol E) s₁ s₂
+        → Trace (B'.protocol transEnv) (transState s₁) (transState s₂)
+      transTrace = Trace-subst transProtocol
+
+    LPChainLemma : ∀ {p : Fin B'.n} {s} (p-honest : p ∈ B'.honest-nodes)
+      → B'.getChain transEnv (transState s) p-honest
+      ≡ map LeiosBlock.rb (S.getChain E s (honest-isoʳ p-honest))
+    LPChainLemma = {!!}
+
+    hashCorrect-≼ : {l₁ l₂ : List LeiosBlock}
+      → map LeiosBlock.rb l₁ ≼ map LeiosBlock.rb l₂ → l₁ ≼ l₂
+    hashCorrect-≼ = {!!}
+
+    module _ (s : Machine.State (S.protocol E)) where
+      open ≼-Reasoning
+      open Equivalence
+
+      safeState-S⇒B' : S.safeState k E s → B'.safeState k transEnv (transState s)
+      safeState-S⇒B' safe hp hp' = begin
+          prune k (B'.getChain transEnv (transState s) hp) ≡⟨ cong (prune k) (LPChainLemma hp) ⟩
+          prune k (map LeiosBlock.rb (S.getChain E s shp)) ≡⟨ prune-map {k = k} ⟩
+          map LeiosBlock.rb (prune k (S.getChain E s shp)) ≤⟨ map-≼ (safe shp shp') ⟩
+          map LeiosBlock.rb (S.getChain E s shp')          ≡⟨ LPChainLemma hp' ⟨
+          B'.getChain transEnv (transState s) hp' ∎
+        where
+          shp  = honest-isoʳ hp
+          shp' = honest-isoʳ hp'
+
+      safeState-B'⇒S : B'.safeState k transEnv (transState s) → S.safeState k E s
+      safeState-B'⇒S safe shp shp' = hashCorrect-≼ $ begin
+          map LeiosBlock.rb (prune k (S.getChain E s shp)) ≡⟨ prune-map {k = k} ⟨
+          prune k (map LeiosBlock.rb (S.getChain E s shp)) ≡⟨ cong (prune k) {!LPChainLemma hp!} ⟩
+          prune k (B'.getChain transEnv (transState s) hp) ≤⟨ safe hp hp' ⟩
+          B'.getChain transEnv (transState s) hp'  ≡⟨ {!LPChainLemma hp'!} ⟩
+          map LeiosBlock.rb (S.getChain E s shp') ∎
+        where
+          hp  = honest-isoˡ shp
+          hp' = honest-isoˡ shp'
+
+  leiosSafety : B'.safety k → S.safety k
+  leiosSafety praosSafety E init final trace safeInit = safeState-B'⇒S E final
+    (praosSafety (transEnv E) (transState E init) (transState E final)
+      (transTrace E trace) (safeState-S⇒B' E init safeInit))
