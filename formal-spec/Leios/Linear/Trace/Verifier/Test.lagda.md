@@ -57,13 +57,10 @@ For the test trace, we rely on the implementation provided in `Test.Defaults`.
 ```
 #### TraceVerifier
 ```agda
-  splitTxs : List Tx → List Tx × List Tx
-  splitTxs l = [] , l
-
   validityCheckTime : EndorserBlock → ℕ
   validityCheckTime eb = 4
 
-  open import Leios.Linear.Trace.Verifier d-SpecStructure params splitTxs validityCheckTime
+  open import Leios.Linear.Trace.Verifier d-SpecStructure params validityCheckTime
 ```
 <!--
 ```agda

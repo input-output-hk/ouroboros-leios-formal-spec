@@ -14,10 +14,9 @@ module Leios.NetworkShim (⋯ : SpecStructure)
   (let open SpecStructure ⋯)
   (params : Params)
   (let open Params params)
-  (splitTxs : List Tx → List Tx × List Tx)
   (validityCheckTime : EndorserBlock → ℕ) where
 
-open import Leios.Linear ⋯ params splitTxs validityCheckTime
+open import Leios.Linear ⋯ params validityCheckTime
 open Types params hiding (Network)
 
 record ShimState : Set where

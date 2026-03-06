@@ -24,7 +24,6 @@ module Leios.Linear (⋯ : SpecStructure)
   (let open SpecStructure ⋯)
   (params : Params)
   (let open Params params)
-  (splitTxs : List Tx → List Tx × List Tx)
   (validityCheckTime : EndorserBlock → ℕ) where
 ```
 -->

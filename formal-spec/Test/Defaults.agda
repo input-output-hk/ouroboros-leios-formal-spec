@@ -58,6 +58,7 @@ d-Abstract =
     ; Vote              = ⊤
     ; vote              = λ _ _ → tt
     ; sign              = λ _ _ → tt
+    ; splitTxs          = λ l → [] , l
     }
 
 open LeiosAbstract d-Abstract public
