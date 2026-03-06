@@ -23,8 +23,7 @@ open import Prelude.STS.GenPremises
 module Leios.Linear (⋯ : SpecStructure)
   (let open SpecStructure ⋯)
   (params : Params)
-  (let open Params params)
-  (validityCheckTime : EndorserBlock → ℕ) where
+  (let open Params params) where
 ```
 -->
 

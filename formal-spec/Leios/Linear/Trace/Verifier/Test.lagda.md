@@ -57,10 +57,7 @@ For the test trace, we rely on the implementation provided in `Test.Defaults`.
 ```
 #### TraceVerifier
 ```agda
-  validityCheckTime : EndorserBlock → ℕ
-  validityCheckTime eb = 4
-
-  open import Leios.Linear.Trace.Verifier d-SpecStructure params validityCheckTime
+  open import Leios.Linear.Trace.Verifier d-SpecStructure params
 ```
 <!--
 ```agda

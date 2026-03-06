@@ -20,10 +20,9 @@ open import Data.Product.Properties
 module Leios.Linear.Trace.Verifier (⋯ : SpecStructure) (let open SpecStructure ⋯)
   (params : Params)
   (let open Params params)
-  (validityCheckTime : EndorserBlock → ℕ)
   where
 
-open import Leios.Linear ⋯ params validityCheckTime public
+open import Leios.Linear ⋯ params public
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
 open Types params

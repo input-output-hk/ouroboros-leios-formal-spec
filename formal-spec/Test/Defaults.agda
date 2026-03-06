@@ -281,4 +281,5 @@ d-SpecStructure = record
       ; KF                        = d-KeyRegistrationFunctionality
       ; va                        = d-VotingAbstract
       ; getEBCert                 = λ _ → []
+      ; validityCheckTime          = λ _ → 4
       }

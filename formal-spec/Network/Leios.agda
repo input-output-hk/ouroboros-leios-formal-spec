@@ -15,16 +15,16 @@ module Network.Leios (⋯ : SpecStructure)
   (let open SpecStructure ⋯)
   (params : Params)
   (let open Params params)
-  (validityCheckTime : EndorserBlock → ℕ) (Participants : ℕ) (k : ℕ)
+  (Participants : ℕ) (k : ℕ)
   (HashCorrectB : RankingBlock → Maybe EndorserBlock → Type)
   (HashCorrect-irrel : ∀ rb eb → Irrelevant (HashCorrectB rb eb))
   (hash-unique : (rb : RankingBlock) → (eb₁ eb₂ : Maybe EndorserBlock)
     → HashCorrectB rb eb₁ → HashCorrectB rb eb₂ → eb₁ ≡ eb₂) where
 
-open import Leios.Linear ⋯ params validityCheckTime
+open import Leios.Linear ⋯ params
 open Types params hiding (Network)
 
-open import Leios.NetworkShim ⋯ params validityCheckTime
+open import Leios.NetworkShim ⋯ params
 open BaseAbstract B'
 
 import Relation.Binary.Reasoning.PartialOrder
