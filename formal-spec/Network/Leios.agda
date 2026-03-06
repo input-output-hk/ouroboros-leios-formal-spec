@@ -16,7 +16,11 @@ module Network.Leios (⋯ : SpecStructure)
   (params : Params)
   (Lhdr Lvote Ldiff : ℕ)
   (splitTxs : List Tx → List Tx × List Tx)
-  (validityCheckTime : EndorserBlock → ℕ) (Participants : ℕ) (k : ℕ) where
+  (validityCheckTime : EndorserBlock → ℕ) (Participants : ℕ) (k : ℕ)
+  (HashCorrectB : RankingBlock → Maybe EndorserBlock → Type)
+  (HashCorrect-irrel : ∀ rb eb → Irrelevant (HashCorrectB rb eb))
+  (hash-unique : (rb : RankingBlock) → (eb₁ eb₂ : Maybe EndorserBlock)
+    → HashCorrectB rb eb₁ → HashCorrectB rb eb₂ → eb₁ ≡ eb₂) where
 
 open import Leios.Linear ⋯ params Lhdr Lvote Ldiff splitTxs validityCheckTime
 open Types params hiding (Network)
@@ -71,20 +75,28 @@ NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 Leios1 : Machine DD.M (IO ⊗ ((I ⊗ BaseAdv) ⊗ Adv))
 Leios1 = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ B.m) ∘ NetTranslate)
 
-HashCorrectB : RankingBlock → Maybe EndorserBlock → Type
-HashCorrectB = {!!}
-
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
 record LeiosBlock : Type where
   field rb : RankingBlock
         eb : Maybe EndorserBlock
         correct : HashCorrectB rb eb
 
+open import Data.Product.Properties
+
+hash-unique' : (rb : RankingBlock) → (eb₁ eb₂ : Maybe EndorserBlock)
+  → (hc₁ : HashCorrectB rb eb₁) → (hc₂ : HashCorrectB rb eb₂) → (eb₁ , hc₁) ≡ (eb₂ , hc₂)
+hash-unique' rb eb₁ eb₂ hc₁ hc₂ =
+  Σ-≡,≡→≡ (hash-unique rb eb₁ eb₂ hc₁ hc₂ , HashCorrect-irrel _ _ _ _)
+
+LeiosBlock-Injective : Injective _≡_ _≡_ LeiosBlock.rb
+LeiosBlock-Injective
+  {record { rb = rb ; eb = eb₁ ; correct = correct₁ }}
+  {record { rb = rb ; eb = eb₂ ; correct = correct₂ }} refl =
+  subst (λ (eb , correct) → _ ≡ record { rb = rb ; eb = eb ; correct = correct })
+    (hash-unique' rb eb₁ eb₂ correct₁ correct₂) refl
+
 IsBlockchain-Leios : IsBlockchain LeiosBlock Leios1
 IsBlockchain-Leios = {!!}
-
-IsBlockchain-Praos : IsBlockchain RankingBlock Leios1
-IsBlockchain-Praos = {!!}
 
 module _ (IOF AdvF : Fin Participants → Channel)
   (nodesF : (p : Fin Participants) → Machine DD.M (IOF p ⊗ AdvF p)) honestNodes
@@ -104,9 +116,6 @@ module _ (IOF AdvF : Fin Participants → Channel)
     safetyS = record { LS IsBlockchain-Leios }
 
   module S = Safety safetyS
-
-  -- module P where
-  --   open Safety record { LS IsBlockchain-Praos } using (getChain) public
 
   opaque
     unfolding safetyS
@@ -205,7 +214,7 @@ module _ (IOF AdvF : Fin Participants → Channel)
 
     hashCorrect-≼ : {l₁ l₂ : List LeiosBlock}
       → map LeiosBlock.rb l₁ ≼ map LeiosBlock.rb l₂ → l₁ ≼ l₂
-    hashCorrect-≼ = {!!}
+    hashCorrect-≼ = inj-map-≼ LeiosBlock-Injective
 
     module _ (s : Machine.State (S.protocol E)) where
       open ≼-Reasoning

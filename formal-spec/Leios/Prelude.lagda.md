@@ -45,11 +45,15 @@ module All where
 open import Data.List.Relation.Unary.Unique.DecPropositional N._≟_ using (Unique) public
 ```
 ```agda
-filter : {A : Set} → (P : A → Type) ⦃ _ : P ⁇¹ ⦄ → List A → List A
+private variable
+  A B : Type
+  l₁ l₂ : List A
+
+filter : (P : A → Type) ⦃ _ : P ⁇¹ ⦄ → List A → List A
 filter P = L.filter ¿ P ¿¹
 
 instance
-  IsSet-List : {A : Set} → IsSet (List A) A
+  IsSet-List : IsSet (List A) A
   IsSet-List .toSet A = fromList A
 
 completeFin : ∀ (n : ℕ) → ℙ (Fin n)
@@ -85,13 +89,13 @@ record Listable (A : Type) : Type where
     listing  : ℙ A
     complete : ∀ {a : A} → a ∈ listing
 
-totalDec : ∀ {A B : Type} → ⦃ DecEq A ⦄ → ⦃ Listable A ⦄ → {R : Rel A B} → Dec (total R)
+totalDec : ⦃ DecEq A ⦄ → ⦃ Listable A ⦄ → {R : Rel A B} → Dec (total R)
 totalDec {A} {B} {R} with all? (_∈? dom R)
 ... | yes p = yes λ {a} → p {a} ((Listable.complete it) {a})
 ... | no ¬p = no λ x → ¬p λ {a} _ → x {a}
 
 instance
-  total? : ∀ {A B : Type} → ⦃ DecEq A ⦄ → ⦃ Listable A ⦄ → {R : Rel A B} → ({a : A} → a ∈ dom R) ⁇
+  total? : ⦃ DecEq A ⦄ → ⦃ Listable A ⦄ → {R : Rel A B} → ({a : A} → a ∈ dom R) ⁇
   total? = ⁇ totalDec
 
   Listable-Fin : ∀ {n} → Listable (Fin n)
@@ -125,13 +129,16 @@ completeFinL (ℕ.suc n) = F.fromℕ n ∷ L.map F.inject₁ (completeFinL n)
 prune : {A : Type} → ℕ → List A → List A
 prune k l = take (length l ∸ k) l
 
-open import Relation.Binary
+open import Relation.Binary hiding (_⇔_)
 open import Data.List.Properties
 import Relation.Binary.PropositionalEquality
 
 module _ {A : Type} where
   _≼_ : List A → List A → Type
   l₁ ≼ l = ∃[ l₂ ] l₁ ++ l₂ ≡ l
+
+  _≼′_ : List A → List A → Type
+  l₁ ≼′ l₂ = ∃[ n ] l₁ ≡ take n l₂
 
   IsPreorder-≼ : IsPreorder _≡_ _≼_
   IsPreorder-≼ = record
@@ -156,12 +163,27 @@ module _ {A : Type} where
     ; _≤_ = _≼_
     ; isPartialOrder = IsPartialOrder-≼ }
 
-map-≼ : ∀ {A B : Type} {f : A → B} {l₁ l₂ : List A}
-  → l₁ ≼ l₂ → map f l₁ ≼ map f l₂
-map-≼ {f = f} {l₁} {l₂} (l , eq) = -, trans (sym (map-++ f l₁ l)) (cong (map f) eq)
+map-≼ : {f : A → B} → l₁ ≼ l₂ → map f l₁ ≼ map f l₂
+map-≼ {l₁ = l₁} {l₂} {f} (l , eq) = -, trans (sym (map-++ f l₁ l)) (cong (map f) eq)
 
-prune-map : ∀ {A B : Type} {k} {f : A → B} {l : List A}
+take-++ˡ : take (length l₁) (l₁ ++ l₂) ≡ l₁
+take-++ˡ {l₁ = []}     = refl
+take-++ˡ {l₁ = a ∷ l₁} = cong (a ∷_) take-++ˡ
+
+≼⇔≼′ : (l₁ ≼ l₂) ⇔ (l₁ ≼′ l₂)
+≼⇔≼′ {l₁ = l₁} {l₂} = mk⇔
+  (λ where (l , refl) → length l₁ , sym take-++ˡ)
+  (λ where (k , refl) → drop k l₂ , take++drop≡id k l₂)
+
+inj-map-≼ : {f : A → B} → Injective _≡_ _≡_ f
+  → map f l₁ ≼ map f l₂ → l₁ ≼ l₂
+inj-map-≼ inj fl₁≼fl₂ = case to ≼⇔≼′ fl₁≼fl₂ of λ where
+    (k , eq) → from ≼⇔≼′ (k , map-injective inj (trans eq (take-map k _)))
+  where open Equivalence
+
+prune-map : ∀ {k} {f : A → B} {l : List A}
   → prune k (map f l) ≡ map f (prune k l)
 prune-map {k = k} {f} {l} =
   trans (cong (λ n → take (n ∸ k) (map f l)) (length-map f l)) (take-map (length l ∸ k) l)
+
 ```
