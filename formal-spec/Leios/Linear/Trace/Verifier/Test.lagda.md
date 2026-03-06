@@ -28,6 +28,9 @@ and there are the schedules for block production and voting in the field `winnin
                 let open FunTot (completeFin 2) (maximalFin 2)
                 in Fun⇒TotalMap (const 100000000)
             }
+      ; Lhdr = 1
+      ; Lvote = 2
+      ; Ldiff = 2
       }
 
   testParams : TestParams params
@@ -43,13 +46,6 @@ and there are the schedules for block production and voting in the field `winnin
         (EB , 108) ∷ (VT , 108) ∷
         []
       }
-```
-#### Additional Linear Leios parameters
-Linear Leios has the following three protocol parameters
-```agda
-  Lhdr  = 1
-  Lvote = 2
-  Ldiff = 2
 ```
 #### SpecStructure
 In order to build a test trace, an implementation for the `SpecStructure` needs to be specified.
@@ -67,7 +63,7 @@ For the test trace, we rely on the implementation provided in `Test.Defaults`.
   validityCheckTime : EndorserBlock → ℕ
   validityCheckTime eb = 4
 
-  open import Leios.Linear.Trace.Verifier d-SpecStructure params Lhdr Lvote Ldiff splitTxs validityCheckTime
+  open import Leios.Linear.Trace.Verifier d-SpecStructure params splitTxs validityCheckTime
 ```
 <!--
 ```agda

@@ -19,12 +19,12 @@ open import Data.Product.Properties
 ```agda
 module Leios.Linear.Trace.Verifier (⋯ : SpecStructure) (let open SpecStructure ⋯)
   (params : Params)
-  (Lhdr Lvote Ldiff : ℕ)
+  (let open Params params)
   (splitTxs : List Tx → List Tx × List Tx)
   (validityCheckTime : EndorserBlock → ℕ)
   where
 
-open import Leios.Linear ⋯ params Lhdr Lvote Ldiff splitTxs validityCheckTime public
+open import Leios.Linear ⋯ params splitTxs validityCheckTime public
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
 open Types params
