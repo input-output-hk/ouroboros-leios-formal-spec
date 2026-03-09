@@ -11,11 +11,10 @@ open import CategoricalCrypto.Channel.Selection
 
 open import Leios.Safety
 
-module Network.Leios (⋯ : SpecStructure)
-  (let open SpecStructure ⋯)
-  (params : Params)
-  (let open Params params)
-  (Participants : ℕ) (k : ℕ)
+module Network.Leios
+  (⋯ : SpecStructure) (let open SpecStructure ⋯)
+  (params : Params) (let open Params params)
+  (k : ℕ)
   (HashCorrectB : RankingBlock → Maybe EndorserBlock → Type)
   (HashCorrect-irrel : ∀ rb eb → Irrelevant (HashCorrectB rb eb))
   (hash-unique : (rb : RankingBlock) → (eb₁ eb₂ : Maybe EndorserBlock)
@@ -35,7 +34,7 @@ module ≼-Reasoning {A} = Relation.Binary.Reasoning.PartialOrder (Poset-≼ {A}
 LeiosMsg = FFDA.Header ⊎ FFDA.Body
 Message  = LeiosMsg ⊎ BaseMsg
 
-import Network.DelayedDiffuse Participants Message k as DD
+import Network.DelayedDiffuse numberOfParties Message k as DD
 
 -- multiplexing the network for the base & leios functionality
 -- this is somewhat awkward because we require a strict order on
@@ -97,9 +96,9 @@ LeiosBlock-Injective
 IsBlockchain-Leios : IsBlockchain LeiosBlock Leios1
 IsBlockchain-Leios = {!!}
 
-module _ (IOF AdvF : Fin Participants → Channel)
-  (nodesF : (p : Fin Participants) → Machine DD.M (IOF p ⊗ AdvF p)) honestNodes
-  (honest-Node : {p : Fin Participants} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
+module _ (IOF AdvF : Participant → Channel)
+  (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗ AdvF p)) honestNodes
+  (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
   where
 
   module LS {Block : Type} (Leios-IsBlockchain : IsBlockchain Block Leios1) where
@@ -121,7 +120,7 @@ module _ (IOF AdvF : Fin Participants → Channel)
     spec : Machine S.Network ((Network ⊗ BaseIO) ⊗ (I ⊗ BaseAdv))
     spec = (liftᴷ CategoricalCrypto.id ⊗ᴷ B.m) ∘ NetTranslate
 
-  module Base (p : Fin Participants) where
+  module Base (p : Participant) where
     opaque
       unfolding safetyS
       -- Reducing `nodesF` to only the `Base` part. We can only do this to honest nodes.
@@ -171,7 +170,7 @@ module _ (IOF AdvF : Fin Participants → Channel)
   opaque
     unfolding safetyB
 
-    safetyB-n : B'.n ≡ Participants
+    safetyB-n : B'.n ≡ numberOfParties
     safetyB-n = refl
 
     honest-isoʳᵖ : Fin B'.n → Fin S.n
