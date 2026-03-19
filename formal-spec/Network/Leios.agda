@@ -8,6 +8,10 @@ open import Leios.Config
 
 open import CategoricalCrypto hiding (id)
 open import CategoricalCrypto.Channel.Selection
+import CategoricalCrypto as CC
+open import Categories.Category
+open import Categories.Category.Helper
+import Categories.Morphism.Reasoning
 
 open import Leios.Safety
 
@@ -70,8 +74,8 @@ NetTranslate : Machine DD.M (Network ⊗ BaseNetwork)
 NetTranslate .Machine.State   = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
-Leios1 : Machine DD.M (IO ⊗ ((I ⊗ BaseAdv) ⊗ Adv))
-Leios1 = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ B.m) ∘ NetTranslate)
+Leios1 : Machine DD.M (IO ⊗ ((I ⊗ I ⊗ BaseAdv) ⊗ Adv))
+Leios1 = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
 record LeiosBlock : Type where
@@ -96,9 +100,137 @@ LeiosBlock-Injective
 IsBlockchain-Leios : IsBlockchain LeiosBlock Leios1
 IsBlockchain-Leios = {!!}
 
+private variable A B C D E E₁ E₂ E₃ : Channel
+
+record ChannelCat : Type₁ where
+  field
+    ⊗-injectiveˡ : A ⊗ B ≡ C ⊗ D → A ≡ C
+    ⊗-injectiveʳ : A ⊗ B ≡ C ⊗ D → B ≡ D
+    ⊗-identityˡ : I ⊗ A ≡ A
+    ⊗-identityʳ : A ⊗ I ≡ A
+    I-helper : ∀ {n} → (⨂_ {n} (const I)) ≡ I
+    ∘-assoc : {M₁ : Machine C D} {M₂ : Machine B C} {M₃ : Machine A B} → (M₁ ∘ M₂) ∘ M₃ ≡ M₁ ∘ M₂ ∘ M₃
+    idᴹ : Machine A A
+    _∘ᴹ_ : Machine B C → Machine A B → Machine A C
+    ∘ᴹ-assoc : {M₃ : Machine A B} {M₂ : Machine B C} {M₁ : Machine C D}
+      → (M₁ ∘ᴹ M₂) ∘ᴹ M₃ ≡ M₁ ∘ᴹ (M₂ ∘ᴹ M₃)
+    ∘ᴹ-identityˡ : {f : Machine A B} → (idᴹ ∘ᴹ f) ≡ f
+    ∘ᴹ-identityʳ : {f : Machine A B} → (f ∘ᴹ idᴹ) ≡ f
+    ∘ᴹ-resp-≡ : {f h : Machine B C} {g i : Machine A B} → f ≡ h → g ≡ i → (f ∘ᴹ g) ≡ (h ∘ᴹ i)
+
+    assoc²γδ : {f : Machine A B} {g : Machine B C} {h : Machine C D} {i : Machine D E}
+      → (i ∘ h) ∘ (g ∘ f) ≡ i ∘ ((h ∘ g) ∘ f)
+
+  MACHINE : Category (sucˡ zeroˡ) (sucˡ zeroˡ) (sucˡ zeroˡ)
+  MACHINE = categoryHelper record
+    { Obj = Channel
+    ; _⇒_ = Machine
+    ; _≈_ = _≡_
+    ; id = idᴹ
+    ; _∘_ = _∘ᴹ_
+    ; assoc = ∘ᴹ-assoc
+    ; identityˡ = ∘ᴹ-identityˡ
+    ; identityʳ = ∘ᴹ-identityʳ
+    ; equiv = record { refl = refl ; sym = sym ; trans = trans }
+    ; ∘-resp-≈ = ∘ᴹ-resp-≡
+    }
+
+  module M = Categories.Morphism.Reasoning MACHINE
+
+  ⊗-identityʳ-helper : B ≡ I → Machine A C → Machine (A ⊗ B) C
+  ⊗-identityʳ-helper {A = A} refl M = M ∘ subst (λ x → Machine x A) (sym ⊗-identityʳ) CategoricalCrypto.id
+
+  σ : Machine (A ⊗ B) (B ⊗ A)
+  σ = {!!}
+
+  α⇒ : Machine ((A ⊗ B) ⊗ C) (A ⊗ (B ⊗ C))
+  α⇒ = {!!}
+
+  α⇐ : Machine (A ⊗ (B ⊗ C)) ((A ⊗ B) ⊗ C)
+  α⇐ = {!!}
+
+  λ⇒ : Machine (I ⊗ A) A
+  λ⇒ {A} = subst (λ x → Machine x A) (sym ⊗-identityˡ) CategoricalCrypto.id
+
+  ρ⇒ : Machine (A ⊗ I) A
+  ρ⇒ {A} = subst (λ x → Machine x A) (sym ⊗-identityʳ) CategoricalCrypto.id
+
+  ρ⇐ : Machine A (A ⊗ I)
+  ρ⇐ {A} = subst (λ x → Machine A x) (sym ⊗-identityʳ) CategoricalCrypto.id
+
+  ⊗id-∘≡∘ : {M₁ : Machine B C} {M₂ : Machine A (B ⊗ E)}
+    → (M₁ ⊗' CategoricalCrypto.id) ∘ M₂ ≡ (ρ⇒ ∘ α⇐) ∘ liftᴷ M₁ ∘ᴷ M₂
+  ⊗id-∘≡∘ = {!!}
+
+  ⊗ᴷ-⊗ : {M₁ : Machine A (B ⊗ E₁)} {M₂ : Machine C (D ⊗ E₂)}
+    → ∃[ π ] M₁ ⊗ᴷ M₂ ≡ π ∘ M₁ ⊗' M₂
+  ⊗ᴷ-⊗ = -, refl
+
+  -- this is a structure iso
+  ⊗ᴷ-⊗₁ : Machine ((A ⊗ B) ⊗ C ⊗ D) ((A ⊗ C) ⊗ B ⊗ D)
+  ⊗ᴷ-⊗₁ = proj₁ (⊗ᴷ-⊗ {M₁ = CategoricalCrypto.id} {CategoricalCrypto.id})
+
+  ⨂ᴷ-⊗-∘ : ∀ {n} {f : Fin n → Machine B C} {g : Fin n → Machine E₁ E₂} {h : Fin n → Machine A (B ⊗ E₁)}
+    → ⨂ᴷ (λ k → (f k ⊗' g k) ∘ h k) ≡ ((⨂₁ f) ⊗' ⨂₁ g) ∘ ⨂ᴷ h
+  ⨂ᴷ-⊗-∘ = {!!}
+
+  ∘ᴷ-assoc : {M₁ : Machine C (D ⊗ E₃)} {M₂ : Machine B (C ⊗ E₂)} {M₃ : Machine A (B ⊗ E₁)}
+    → (M₁ ∘ᴷ M₂) ∘ᴷ M₃ ≡ (CC.id ⊗' α⇒) ∘ (M₁ ∘ᴷ M₂ ∘ᴷ M₃)
+  ∘ᴷ-assoc = {!!}
+
+  ∘ᴷ-assoc' : {M₁ : Machine C (D ⊗ E₃)} {M₂ : Machine B (C ⊗ E₂)} {M₃ : Machine A (B ⊗ E₁)}
+    → M₁ ∘ᴷ M₂ ∘ᴷ M₃ ≡ (CC.id ⊗' α⇐) ∘ ((M₁ ∘ᴷ M₂) ∘ᴷ M₃)
+  ∘ᴷ-assoc' = {!!}
+
+  ⨂-⊗-swap : {n : ℕ} {F₁ F₂ : Fin n → Channel} → Machine ((⨂ F₁) ⊗ (⨂ F₂)) (⨂ (λ k → F₁ k ⊗ F₂ k))
+  ⨂-⊗-swap = {!!}
+
+  ⨂-⊗-swap' : {n : ℕ} {F₁ F₂ : Fin n → Channel} → Machine (⨂ (λ k → F₁ k ⊗ F₂ k)) ((⨂ F₁) ⊗ (⨂ F₂))
+  ⨂-⊗-swap' = {!!}
+
+  ⨂ᴷ-∘ᴷ-⨂ᴷ : ∀ {n} {f : Fin n → Machine A (B ⊗ E₁)} {g : Fin n → Machine B (C ⊗ E₂)}
+    → ⨂ᴷ (λ k → g k ∘ᴷ f k) ≡ (CC.id ⊗' (⨂-⊗-swap {n = n} {F₁ = const E₁} {F₂ = const E₂})) ∘ (⨂ᴷ g ∘ᴷ ⨂ᴷ f)
+  ⨂ᴷ-∘ᴷ-⨂ᴷ = {!!}
+
+  ⨂ᴷ-∘ᴷ-⨂ᴷ' : ∀ {n} {f : Fin n → Machine A (B ⊗ E₁)} {g : Fin n → Machine B (C ⊗ E₂)}
+    → (⨂ᴷ g ∘ᴷ ⨂ᴷ f) ≡ (CC.id ⊗' (⨂-⊗-swap' {n = n} {F₁ = const E₁} {F₂ = const E₂})) ∘ ⨂ᴷ (λ k → g k ∘ᴷ f k)
+  ⨂ᴷ-∘ᴷ-⨂ᴷ' = {!!}
+
+  liftᴷ-∘ᴷ : {f : Machine A (B ⊗ E₁)} {g : Machine B (C ⊗ E₂)}
+    → liftᴷ g ∘ᴷ f ≡ ((CC.id ⊗' ρ⇐) ∘ α⇐ ∘ (CC.id ⊗' σ)) ∘ (g ∘ᴷ f)
+  liftᴷ-∘ᴷ = {!!}
+
+  ⨂-absorb-env-helper : ∀ {n} (D : Fin n → Channel) {E₁ E₂ : Fin n → Channel}
+    → Machine ((⨂ D ⊗ ⨂ E₂) ⊗ E ⊗ (⨂ E₁)) ((⨂ D) ⊗ E ⊗ (⨂ (λ k → E₁ k ⊗ E₂ k)))
+  ⨂-absorb-env-helper = {!!}
+
+  ⨂-absorb-env : ∀ {n} {B C D E₁ E₂ : Fin n → Channel} {F : Channel}
+    (f : (k : Fin n) → Machine (C k) (D k ⊗ E₂ k)) (g : (k : Fin n) → Machine (B k) (C k ⊗ E₁ k)) (h : Machine A (⨂ B ⊗ E))
+    (α : Machine (⨂ D ⊗ E ⊗ ⨂ (λ k → E₁ k ⊗ E₂ k)) F)
+    → α ∘ (⨂ᴷ (λ k → f k ∘ᴷ g k) ∘ᴷ h) ≡ (α ∘ (⨂-absorb-env-helper D) ∘ ⨂ᴷ f ⊗' CC.id) ∘ (⨂ᴷ g ∘ᴷ h)
+  ⨂-absorb-env = {!!}
+
+  ⨂ᴷ-cong : ∀ {n} {A B E : Fin n → Channel} {f g : (k : Fin n) → Machine (A k) (B k ⊗ E k)}
+    → (∀ k → f k ≡ g k) → ⨂ᴷ f ≡ ⨂ᴷ g
+  ⨂ᴷ-cong = {!!}
+
+  ⨂-cong : ∀ {n} {A B : Fin n → Channel} → (∀ k → A k ≡ B k) → Machine (⨂ A) (⨂ B)
+  ⨂-cong = {!!}
+
+  insert-id-helper : ∀ {n} (C : Fin n → Channel)
+    → Machine (A ⊗ B ⊗ (⨂ (λ k → C k ⊗ I))) (A ⊗ B ⊗ (⨂ C))
+  insert-id-helper {n = n} _ = CC.id ⊗' CC.id ⊗' ⨂₁ {n = n} (λ _ → ρ⇒)
+
+  insert-id : ∀ {n} {E₁} {B C E₂ : Fin n → Channel}
+    → (f : (k : Fin n) → Machine (B k) (C k ⊗ E₂ k)) (g : Machine A (⨂ B ⊗ E₁))
+    → (α : Machine (⨂ C ⊗ E₁ ⊗ ⨂ E₂) D)
+    → α ∘ (⨂ᴷ f ∘ᴷ g) ≡ (α ∘ insert-id-helper E₂) ∘ (⨂ᴷ (λ k → idᴷ ∘ᴷ f k) ∘ᴷ g)
+  insert-id = {!!}
+
 module _ (IOF AdvF : Participant → Channel)
   (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗ AdvF p)) honestNodes
   (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
+  (cc : ChannelCat) (let open ChannelCat cc)
   where
 
   module LS {Block : Type} (Leios-IsBlockchain : IsBlockchain Block Leios1) where
@@ -117,8 +249,8 @@ module _ (IOF AdvF : Participant → Channel)
 
   opaque
     unfolding safetyS
-    spec : Machine S.Network ((Network ⊗ BaseIO) ⊗ (I ⊗ BaseAdv))
-    spec = (liftᴷ CategoricalCrypto.id ⊗ᴷ B.m) ∘ NetTranslate
+    spec : Machine S.Network ((Network ⊗ BaseIO) ⊗ (I ⊗ I ⊗ BaseAdv))
+    spec = (idᴷ ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
 
   module Base (p : Participant) where
     opaque
@@ -132,26 +264,43 @@ module _ (IOF AdvF : Participant → Channel)
 
       AdvFP : Channel
       AdvFP = case p ∈? honestNodes of λ where
-        (yes q) → I ⊗ BaseAdv
+        (yes q) → I ⊗ I ⊗ BaseAdv
         (no ¬q) → AdvF p
 
-      praosNetwork : Machine DD.M (IOFP ⊗ AdvFP)
-      praosNetwork with p ∈? honestNodes
+      advTrans : AdvFP ≡ AdvF p
+      advTrans with p ∈? honestNodes
+      ... | (yes q) = trans (sym ⊗-identityʳ) (sym (⊗-injectiveʳ (_≡ᴹ_.B≡D (honest-Node q))))
+      ... | (no ¬q) = refl
+
+      praosNetwork' : Machine DD.M (IOFP ⊗ AdvFP)
+      praosNetwork' with p ∈? honestNodes
       ... | (yes q) = spec
       ... | (no ¬q) = nodesF p
 
+      praosNetwork : Machine DD.M (IOFP ⊗ AdvF p)
+      praosNetwork = subst (λ x → Machine DD.M (IOFP ⊗ x)) advTrans praosNetwork'
+
+      subst-≡ᴹ : ∀ {x y : Channel} {A B : Channel → Channel} → (eq : x ≡ y)
+        → (M : Machine (A x) (B x)) → subst (λ x → Machine (A x) (B x)) eq M ≡ᴹ M
+      subst-≡ᴹ refl _ = ≡ᴹ-refl
+
       honest-nodes : p ∈ honestNodes → praosNetwork ≡ᴹ spec
       honest-nodes p∈honestNodes with p ∈? honestNodes
-      ... | (yes q) = ≡ᴹ-refl
+      ... | (yes q) = subst-≡ᴹ (trans (sym ⊗-identityʳ) (sym (⊗-injectiveʳ (_≡ᴹ_.B≡D (honest-Node q))))) spec
       ... | (no ¬q) = contradiction p∈honestNodes ¬q
 
-      honest⇒IOF≡IO : p ∈ honestNodes → IOF p ≡ IO ⊗ I
-      honest⇒IOF≡IO p∈honestNodes = {!_≡ᴹ_.B≡D (honest-nodes p∈honestNodes)!}
+      honest⇒IOF≡IO : p ∈ honestNodes → IOF p ⊗ I ≡ IO ⊗ (I ⊗ I) ⊗ I
+      honest⇒IOF≡IO p∈honestNodes = begin
+        IOF p ⊗ I ≡⟨ cong (_⊗ I) (⊗-injectiveˡ (_≡ᴹ_.B≡D (honest-Node p∈honestNodes))) ⟩
+        IO ⊗ I ≡⟨ cong (IO ⊗_) (sym ⊗-identityʳ) ⟩
+        IO ⊗ I ⊗ I ≡⟨ cong (IO ⊗_) (cong (_⊗ I) (sym ⊗-identityʳ)) ⟩
+        IO ⊗ (I ⊗ I) ⊗ I ∎
+        where open ≡-Reasoning
 
-      leiosPart : Machine IOFP (IOF p)
+      leiosPart : Machine IOFP (IOF p ⊗ I)
       leiosPart with p ∈? honestNodes
-      ... | (yes q) rewrite honest⇒IOF≡IO q = LinearLeios ∘ (Shim ⊗' CategoricalCrypto.id)
-      ... | (no ¬q) = CategoricalCrypto.id
+      ... | (yes q) rewrite honest⇒IOF≡IO q = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ)
+      ... | (no ¬q) = idᴷ
 
   opaque
     unfolding safetyS Base.honest-nodes
@@ -189,15 +338,38 @@ module _ (IOF AdvF : Participant → Channel)
     honest-iso-isoˡ p = refl
 
   module _ {A : Channel} (E : S.Environment A) where
-    -- this is `E`, but we absorb the Leios part of the honest participants
-    transEnv : B'.Environment A
-    transEnv = {!!}
-
-    -- this is essentially associativity
-    transProtocol : S.protocol E ≡ᴹ B'.protocol transEnv
-    transProtocol = {!!}
-
     opaque
+      unfolding safetyS safetyB
+
+      -- this is a structure isomorphism
+      transId : Machine
+        ((⨂ IOF ⊗ (⨂_ {n = numberOfParties} (const I))) ⊗ (DD.Env ⊗ DD.Adv) ⊗ (⨂ AdvF))
+        (⨂ IOF ⊗ (DD.Env ⊗ DD.Adv) ⊗ (⨂ AdvF))
+      transId = insert-id-helper AdvF ∘ (⨂-absorb-env-helper IOF)
+
+      -- this is `E`, but we absorb the Leios part of the honest participants
+      transEnv : B'.Environment A
+      transEnv = E ∘ transId ∘ ⨂ᴷ Base.leiosPart ⊗' CC.id
+
+      single-protocol-≡-ty : Type₁
+      single-protocol-≡-ty = ∀ p → idᴷ ∘ᴷ S.all-nodes p ≡ Base.leiosPart p ∘ᴷ B'.all-nodes p
+
+      single-protocol-≡ : single-protocol-≡-ty
+      single-protocol-≡ = {!!}
+
+      transProtocol : S.protocol E ≡ᴹ B'.protocol transEnv
+      transProtocol = flip (subst (S.protocol E ≡ᴹ_)) ≡ᴹ-refl $
+        E ∘ (S.nodes ∘ᴷ S.network) ≡⟨ insert-id S.all-nodes S.network E ⟩
+        (E ∘ insert-id-helper AdvF) ∘ (⨂ᴷ (λ p → idᴷ ∘ᴷ S.all-nodes p) ∘ᴷ S.network)
+          ≡⟨ cong (λ x → (E ∘ insert-id-helper AdvF) ∘ x ∘ᴷ S.network) (⨂ᴷ-cong single-protocol-≡) ⟩
+        (E ∘ insert-id-helper AdvF) ∘ (⨂ᴷ (λ p → Base.leiosPart p ∘ᴷ B'.all-nodes p) ∘ᴷ S.network)
+          ≡⟨ ⨂-absorb-env Base.leiosPart B'.all-nodes S.network (E ∘ insert-id-helper AdvF) ⟩
+        ((E ∘ insert-id-helper AdvF) ∘ (⨂-absorb-env-helper IOF) ∘ ⨂ᴷ Base.leiosPart ⊗' CC.id) ∘ ((⨂ᴷ B'.all-nodes) ∘ᴷ S.network)
+          ≡⟨ cong (_∘ (B'.nodes ∘ᴷ S.network)) (assoc²γδ {g = ⨂-absorb-env-helper IOF} {h = insert-id-helper AdvF}) ⟩
+        (E ∘ transId ∘ ⨂ᴷ Base.leiosPart ⊗' CC.id) ∘ (B'.nodes ∘ᴷ B'.network) ∎
+        where
+          open ≡-Reasoning
+
       transState : Machine.State (S.protocol E) → Machine.State (B'.protocol transEnv)
       transState = state-subst transProtocol
 

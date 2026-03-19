@@ -68,6 +68,7 @@ module Tensor {A B C D} (M₁ : Machine A B) (M₂ : Machine C D) where
     Step₁ : ∀ {m m' s s' s₂} → stepRel₁ s m m' s' → CompRel (s , s₂) (ϵ ⊗R ↑ᵢ m) (ϵ ⊗R ↑ₒ_ <$> m') (s' , s₂)
     Step₂ : ∀ {m m' s s' s₁} → stepRel₂ s m m' s' → CompRel (s₁ , s) (L⊗ ϵ ↑ᵢ m) (L⊗ ϵ ↑ₒ_ <$> m') (s₁ , s')
 
+  infixr 9 _⊗'_
   _⊗'_ : Machine (A ⊗ C) (B ⊗ D)
   _⊗'_ = modifyStepRel ⇒-solver machine-inter
     where
@@ -133,8 +134,8 @@ _∘_ {B} M₁ M₂ = tr {C = B} $ modifyStepRel ⇒-solver (M₂ ⊗' M₁)
 ⊗-symₘ : ∀ {A B} → Machine (A ⊗ B) (B ⊗ A)
 ⊗-symₘ = TotalFunctionMachine' ⇒-solver ⇒-solver
 
-idᴷ : Machine I (I ⊗ I)
-idᴷ rewrite ᵀ-identity = TotalFunctionMachine ⇒-solver
+idᴷ : ∀ {A} → Machine A (A ⊗ I)
+idᴷ = liftᴷ id
 
 transpose : ∀ {A B} → Machine A B → Machine (B ᵀ) (A ᵀ)
 transpose = modifyStepRel ⇒-solver
@@ -145,6 +146,12 @@ transpose = modifyStepRel ⇒-solver
 -- cap : Machine (A ᵀ ⊗ A) I
 -- cap {A} = modifyStepRel ⇒-solver (transpose (cup {A})) {!!} {!!}
 
+⨂₁ : ∀ {n} → {A B : Fin n → Channel} → ((k : Fin n) → Machine (A k) (B k)) → Machine (⨂ A) (⨂ B)
+⨂₁ {zero} M = id
+⨂₁ {suc n} M = M fzero ⊗' ⨂₁ (M P.∘ fsuc)
+
+
+infixr 9 _∘ᴷ_
 _∘ᴷ_ : ∀ {A B C E₁ E₂} → Machine B (C ⊗ E₂) → Machine A (B ⊗ E₁) → Machine A (C ⊗ (E₁ ⊗ E₂))
 _∘ᴷ_ {E₁ = E₁} M₂ M₁ = TotalFunctionMachine' ⇒-solver ⇒-solver ∘ (M₂ ⊗ʳ E₁ ∘ M₁)
 
