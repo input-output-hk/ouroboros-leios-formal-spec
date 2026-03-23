@@ -33,6 +33,8 @@ record LeiosAbstract : Type₁ where
         vote      : PrivKey → Hash → Vote
         sign      : PrivKey → Hash → Sig
         getEBHash : EBCert → Hash
+        -- split a mempool into transactions for the RB & EB
+        splitTxs  : List Tx → List Tx × List Tx
 ```
 ```agda
         ⦃ DecEq-Tx ⦄     : DecEq Tx

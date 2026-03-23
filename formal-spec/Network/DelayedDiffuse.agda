@@ -102,7 +102,7 @@ data WithState_receive_return_newState_ : MachineType I (Ms ⊗ Env ⊗ Adv) Sta
     WithState s
     receive L⊗ (L⊗ ϵ ⊗R) ᵗ¹ ↑ₒ NextRound
     return nothing
-    newState record s { done = ∅ } -- reset the state
+    newState record s { done = ∅ ; round = s .round + 1 } -- reset the state
 
   Read-step :
     WithState s

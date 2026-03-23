@@ -17,17 +17,13 @@ open import CategoricalCrypto.Channel.Selection
 
 open import Data.List.Properties
 open import Data.Maybe.Properties
-open import Data.Product.Properties
 
 open import Prelude.STS.GenPremises
 
-module Leios.Linear
-  (⋯                 : SpecStructure              ) (open SpecStructure ⋯)
-  (params            : Params                     )
-  (Lhdr Lvote Ldiff  : ℕ                          )
-  (splitTxs          : List Tx → List Tx × List Tx)
-  (validityCheckTime : EndorserBlock → ℕ          )
-  where
+module Leios.Linear (⋯ : SpecStructure)
+  (let open SpecStructure ⋯)
+  (params : Params)
+  (let open Params params) where
 ```
 -->
 

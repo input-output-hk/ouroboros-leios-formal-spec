@@ -64,5 +64,6 @@ record SpecStructure : Type₂ where
   open VotingAbstract va public
 ```
 ```agda
-  field getEBCert : ∀ {s eb} → isVoteCertified s eb → EBCert
+  field getEBCert         : ∀ {s eb} → isVoteCertified s eb → EBCert
+        validityCheckTime : EndorserBlock → ℕ
 ```

@@ -13,11 +13,9 @@ open import CategoricalCrypto.Channel.Selection
 module Leios.NetworkShim (⋯ : SpecStructure)
   (let open SpecStructure ⋯)
   (params : Params)
-  (Lhdr Lvote Ldiff : ℕ)
-  (splitTxs : List Tx → List Tx × List Tx)
-  (validityCheckTime : EndorserBlock → ℕ) where
+  (let open Params params) where
 
-open import Leios.Linear ⋯ params Lhdr Lvote Ldiff splitTxs validityCheckTime
+open import Leios.Linear ⋯ params
 open Types params hiding (Network)
 
 record ShimState : Set where

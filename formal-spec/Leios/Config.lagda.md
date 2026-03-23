@@ -27,7 +27,8 @@ record NetworkParams : Type where
         ⦃ NonZero-numberOfParties ⦄ : NonZero numberOfParties
 
 record Params : Type where
-  field networkParams : NetworkParams
+  field networkParams    : NetworkParams
+        Lhdr Lvote Ldiff : ℕ
 
   open NetworkParams networkParams public
 
