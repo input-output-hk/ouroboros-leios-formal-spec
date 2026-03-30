@@ -27,7 +27,7 @@ open import Tactic.Derive.DecEq
 
 open import LibExt
 
-open import CategoricalCrypto using (I ; Machine ; machine-type ; Channel ; _⊗ᵀ_ ; _⊗_)
+open import CategoricalCrypto using (I ; Machine ; machine-type ; Channel ; _⊗ᵀ_)
 open import CategoricalCrypto.Channel.Core
 open import CategoricalCrypto.Channel.Selection
 
@@ -126,7 +126,7 @@ d-BaseState : Type
 d-BaseState = List RankingBlock × ℕ
 
 d-BaseChannel : Channel
-d-BaseChannel = BaseNetwork ⊗ᵀ (BaseIO ⊗ BaseAdv)
+d-BaseChannel = BaseNetwork ⊗ᵀ (BaseIO ⊗₀ BaseAdv)
   where open BaseAbstract d-Base
 
 data d-BaseRel : machine-type d-BaseState d-BaseChannel where

@@ -156,7 +156,7 @@ The relation describing the transition given input and state
 open Types params
 open BaseAbstract B'
 
-data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗ BaseIO) (IO ⊗ Adv) LeiosState where
+data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗₀ BaseIO) (IO ⊗₀ Adv) LeiosState where
 ```
 #### Network and Ledger
 ```agda
@@ -219,7 +219,7 @@ Note: Submitted data to the base chain is only taken into account
 ```
 <!--
 ```agda
-LinearLeios : Machine (FFD ⊗ BaseIO) (IO ⊗ Adv)
+LinearLeios : Machine (FFD ⊗₀ BaseIO) (IO ⊗₀ Adv)
 LinearLeios .Machine.State = LeiosState
 LinearLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 

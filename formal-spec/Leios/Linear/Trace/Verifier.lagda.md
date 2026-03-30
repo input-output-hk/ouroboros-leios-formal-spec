@@ -93,7 +93,7 @@ data _—→_ : LeiosState → LeiosState → Type where
 open import Prelude.Closures _—→_
 ```
 ```agda
-toRcvType : FFDT Out ⊎ BaseIOF In ⊎ IOT In → Channel.inType ((FFD ⊗ BaseIO) ⊗ ((IO ⊗ Adv) ᵀ))
+toRcvType : FFDT Out ⊎ BaseIOF In ⊎ IOT In → Channel.inType ((FFD ⊗₀ BaseIO) ⊗₀ ((IO ⊗₀ Adv) ᵀ))
 toRcvType (inj₁ i) = (ϵ ⊗R) ⊗R ↑ᵢ i
 toRcvType (inj₂ (inj₁ i)) = (L⊗ ϵ) ⊗R ↑ᵢ i
 toRcvType (inj₂ (inj₂ i)) = L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ i

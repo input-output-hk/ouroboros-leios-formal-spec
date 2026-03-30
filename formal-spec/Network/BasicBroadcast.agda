@@ -27,7 +27,7 @@ M = simpleChannel NetworkT
 Ms : Channel
 Ms = ⨂ const {B = Participant} M
 
-data WithState_receive_return_newState_ : MachineType I (Ms ⊗ A) (List (Message × Participant)) where
+data WithState_receive_return_newState_ : MachineType I (Ms ⊗₀ A) (List (Message × Participant)) where
 
   Send : WithState buffer
          receive L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ app (⨂⇒ p) (SndMessage ms) -- p wants to send messages ms
@@ -44,6 +44,6 @@ data WithState_receive_return_newState_ : MachineType I (Ms ⊗ A) (List (Messag
               return just $ L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ x -- deliver it
               newState (buffer₁ ++ x ∷ buffer₂) -- state remains unchanged
 
-Network : Machine I (Ms ⊗ A)
+Network : Machine I (Ms ⊗₀ A)
 Network .Machine.State = List (Message × Participant)
 Network .Machine.stepRel = WithState_receive_return_newState_

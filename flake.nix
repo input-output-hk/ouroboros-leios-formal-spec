@@ -39,6 +39,7 @@
           abstract-set-theory
           agda-categories
           iog-prelude
+          categorical-crypto
         ];
 
         locales = {

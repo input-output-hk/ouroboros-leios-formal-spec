@@ -80,7 +80,7 @@ private variable ms : List Message
 open State
 open BufferedMessage
 
-data WithState_receive_return_newState_ : MachineType I (Ms ⊗ Env ⊗ Adv) State where
+data WithState_receive_return_newState_ : MachineType I (Ms ⊗₀ Env ⊗₀ Adv) State where
 
   ActivateE-step :
     p ∉ s .done →
@@ -117,6 +117,6 @@ data WithState_receive_return_newState_ : MachineType I (Ms ⊗ Env ⊗ Adv) Sta
     return just $ L⊗ (L⊗ L⊗ ϵ) ᵗ¹ ↑ᵢ ReturnA
     newState moveToInbox bm s
 
-Network : Machine I (Ms ⊗ Env ⊗ Adv)
+Network : Machine I (Ms ⊗₀ Env ⊗₀ Adv)
 Network .Machine.State   = State
 Network .Machine.stepRel = WithState_receive_return_newState_

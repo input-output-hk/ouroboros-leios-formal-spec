@@ -27,30 +27,30 @@ record Safety : Type₂ where
     -- Communication channels involved in the network
     IO Adv NAdv Network      : Channel
     -- Machine describing the behavior of the honest nodes
-    honest-node-spec         : Machine Network (IO ⊗ Adv)
+    honest-node-spec         : Machine Network (IO ⊗₀ Adv)
     -- The spec can be queried in the right ways
     spec-IsBlockchain        : IsBlockchain honest-node-spec
     -- Channels for all nodes
     IOF AdvF                 : Fin n → Channel
     -- All the nodes, including honest nodes and adversaries
-    all-nodes                : (p : Fin n) → Machine Network (IOF p ⊗ AdvF p)
+    all-nodes                : (p : Fin n) → Machine Network (IOF p ⊗₀ AdvF p)
     -- All the honest nodes
     honest-nodes             : ℙ (Fin n) -- Nodes behaving like the honest spec
     -- Proofs that each of the honest nodes behave like the specification
     honest-nodes-≡-spec      : ∀ {p} → p ∈ honest-nodes → all-nodes p ≡ᴹ honest-node-spec
     -- The network machine
-    network                  : Machine I (n ⨂ⁿ Network ⊗ NAdv)
+    network                  : Machine I (n ⨂ⁿ Network ⊗₀ NAdv)
 
   honest-nodes-blockchain : ∀ {p} → p ∈ honest-nodes → IsBlockchain (all-nodes p)
   honest-nodes-blockchain p-honest =
     ≡ᴹ-subst IsBlockchain (≡ᴹ-sym (honest-nodes-≡-spec p-honest)) spec-IsBlockchain
 
   -- Combination of all the nodes together
-  nodes : Machine (n ⨂ⁿ Network) (⨂ IOF ⊗ ⨂ AdvF)
+  nodes : Machine (n ⨂ⁿ Network) (⨂ IOF ⊗₀ ⨂ AdvF)
   nodes = ⨂ᴷ all-nodes
 
   Environment : Channel → Type₁
-  Environment A = Machine (⨂ IOF ⊗ (NAdv ⊗ ⨂ AdvF)) A
+  Environment A = Machine (⨂ IOF ⊗₀ (NAdv ⊗₀ ⨂ AdvF)) A
 
   -- Composition of the nodes and the network
   protocol : ∀ {A} → Environment A → Machine I A
