@@ -124,7 +124,7 @@ or equal than the slot of the last processed block
   BaseIO = simpleChannel BaseIOF
 
   record BaseMachine : Type₂ where
-    field m             : Machine BaseNetwork (BaseIO ⊗ BaseAdv)
+    field m             : Machine BaseNetwork (BaseIO ⊗₀ BaseAdv)
           is-blockchain : IsBlockchain m
 
     open Machine m renaming (stepRel to _-⟦_/_⟧⇀_) public
