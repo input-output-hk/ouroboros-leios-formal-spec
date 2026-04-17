@@ -13,7 +13,7 @@ open import Leios.Prelude hiding (_⊗_)
 open import Leios.Abstract
 open import Leios.Config
 open import Leios.SpecStructure
-open import Leios.Safety
+open import Blockchain.Safety
 
 open import Axiom.Set.Properties th
 open import Data.Nat.Show as N

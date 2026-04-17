@@ -5,7 +5,7 @@ open import Leios.Prelude hiding (id; _⊗_)
 
 open import CategoricalCrypto hiding (id; _∘_)
 
-module Leios.Safety (Block : Type) where
+module Blockchain.Safety (Block : Type) where
 
 -- | Type of things we can query from a honest node
 data BlockChainInfo : Type where

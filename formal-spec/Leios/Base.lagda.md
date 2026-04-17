@@ -118,7 +118,7 @@ or equal than the slot of the last processed block
 ```
 
 ```agda
-  open import Leios.Safety RankingBlock
+  open import Blockchain.Safety RankingBlock
   open import Data.Fin.Base using (_↑ˡ_)
 
   BaseIO = simpleChannel BaseIOF

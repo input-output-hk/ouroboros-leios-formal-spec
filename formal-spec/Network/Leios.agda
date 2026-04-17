@@ -9,9 +9,9 @@ open import CategoricalCrypto hiding (id)
 open import CategoricalCrypto.Channel.Selection
 import CategoricalCrypto as CC
 
-open import Leios.Safety
+open import Blockchain.Safety
 open import Leios.ChannelCat
-import Leios.Safety.Transfer as Transfer
+import Blockchain.Safety.Transfer as Transfer
 
 module Network.Leios
   (⋯ : SpecStructure) (let open SpecStructure ⋯)

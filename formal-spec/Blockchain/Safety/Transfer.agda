@@ -1,7 +1,7 @@
 {-# OPTIONS --safe #-}
 
 open import Leios.Prelude hiding (id; _⊗_; _∘_)
-open import Leios.Safety
+open import Blockchain.Safety
 open import Leios.ChannelCat
 
 open import CategoricalCrypto hiding (id)
@@ -19,7 +19,7 @@ open import Relation.Binary using (Poset)
 --
 -- The base-side Safety record is derived internally: honest nodes run
 -- `base-spec`, dishonest nodes inherit their original protocol from `ext`.
-module Leios.Safety.Transfer
+module Blockchain.Safety.Transfer
   {BlockExt BlockBase   : Type}
   (getBaseBlock         : BlockExt → BlockBase)
   (getBaseBlock-inj     : Injective _≡_ _≡_ getBaseBlock)
