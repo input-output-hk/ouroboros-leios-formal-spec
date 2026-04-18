@@ -13,7 +13,7 @@ open import Categories.Category
 open import Categories.Category.Helper
 import Categories.Morphism.Reasoning
 
-open import Leios.Safety
+open import Blockchain.Safety
 
 module Network.Leios
   (⋯ : SpecStructure) (let open SpecStructure ⋯)

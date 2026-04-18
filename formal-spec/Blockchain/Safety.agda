@@ -1,19 +1,20 @@
 {-# OPTIONS --safe #-}
 
-open import Leios.Config
 open import Leios.Prelude hiding (id; _⊗_)
 
 open import CategoricalCrypto hiding (id; _∘_)
 
-module Leios.Safety (Block : Type) where
+module Blockchain.Safety (Block : Type) where
 
 -- | Type of things we can query from a honest node
 data BlockChainInfo : Type where
   Chain : BlockChainInfo
+  Slot  : BlockChainInfo
 
 -- | Type for responses given a specific query
 bciQueryType : BlockChainInfo → Type
 bciQueryType Chain = List Block
+bciQueryType Slot  = ℕ
 
 record IsBlockchain {A B : Channel} (m : Machine A B) : Type₂ where
   field 
@@ -68,6 +69,7 @@ record Safety : Type₂ where
       open IsConstrained isConstrained
 
   getChain = query Chain
+  getSlot  = query Slot
 
   safeState : {A : Channel} → ℕ → (E : Environment A) → Machine.State (protocol E) → Type
   safeState k E S =
