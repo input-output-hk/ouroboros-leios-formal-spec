@@ -13,7 +13,7 @@ record Safety : Type₂ where
     -- Number of involved nodes
     n                        : ℕ
 
-  open IsBC Block (Fin n) public
+  open IsBC (Fin n) public
 
   field
     -- Communication channels involved in the network
@@ -21,7 +21,7 @@ record Safety : Type₂ where
     -- Machine describing the behavior of the honest nodes
     honest-node-spec         : Machine Network (IO ⊗₀ Adv)
     -- The spec can be queried in the right ways
-    spec-IsBlockchain        : IsBlockchain honest-node-spec
+    spec-IsBlockchain        : IsBlockchain Block honest-node-spec
     -- Channels for all nodes
     IOF AdvF                 : Fin n → Channel
     -- All the nodes, including honest nodes and adversaries
@@ -35,9 +35,9 @@ record Safety : Type₂ where
 
   open IsBlockchain spec-IsBlockchain public using (producer; slotOf)
 
-  honest-nodes-blockchain : ∀ {p} → p ∈ honest-nodes → IsBlockchain (all-nodes p)
+  honest-nodes-blockchain : ∀ {p} → p ∈ honest-nodes → IsBlockchain Block (all-nodes p)
   honest-nodes-blockchain p-honest =
-    ≡ᴹ-subst IsBlockchain (≡ᴹ-sym (honest-nodes-≡-spec p-honest)) spec-IsBlockchain
+    ≡ᴹ-subst (IsBlockchain Block) (≡ᴹ-sym (honest-nodes-≡-spec p-honest)) spec-IsBlockchain
 
   -- Combination of all the nodes together
   nodes : Machine (n ⨂ⁿ Network) (⨂ IOF ⊗₀ ⨂ AdvF)
@@ -50,7 +50,7 @@ record Safety : Type₂ where
   protocol : ∀ {A} → Environment A → Machine I A
   protocol E = E CategoricalCrypto.∘ (nodes ∘ᴷ network)
 
-  query : (bci : BlockChainInfo)
+  query : (bci : BlockChainInfo Block)
           {p : Fin n} {A : Channel}
           (E : Environment A)
           → Machine.State (protocol E)

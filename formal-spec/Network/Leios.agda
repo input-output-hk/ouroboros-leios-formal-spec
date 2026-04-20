@@ -96,11 +96,11 @@ module _ (IOF AdvF : Participant → Channel)
   (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
   (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
   (cc : ChannelCat) (let open ChannelCat cc)
-  (IsBlockchain-Leios : Blockchain.IsBlockchain.IsBlockchain LeiosBlock Participant Leios1)
+  (IsBlockchain-Leios : Blockchain.IsBlockchain.IsBlockchain Participant LeiosBlock Leios1)
   where
 
   module LS {Block : Type}
-    (Leios-IsBlockchain : Blockchain.IsBlockchain.IsBlockchain Block Participant Leios1) where
+    (Leios-IsBlockchain : Blockchain.IsBlockchain.IsBlockchain Participant Block Leios1) where
     n = numberOfParties
     honest-node-spec = Leios1
     spec-IsBlockchain = Leios-IsBlockchain
@@ -125,13 +125,16 @@ module _ (IOF AdvF : Participant → Channel)
       body : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ ((I ⊗₀ I) ⊗₀ I))
       body = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ)
 
-  module _ (IsBlockchain-spec : Blockchain.IsBlockchain.IsBlockchain RankingBlock Participant spec) where
+  module _ (IsBlockchain-spec : Blockchain.IsBlockchain.IsBlockchain Participant RankingBlock spec)
+           (compat : Blockchain.IsBlockchain.IsBlockchain-compatible
+                       Participant IsBlockchain-spec (Safety.spec-IsBlockchain safetyS))
+           where
 
-    open Blockchain.IsBlockchain RankingBlock Participant using () renaming (IsBlockchain to IsBlockchain-RB)
+    open Blockchain.IsBlockchain.IsBlockchain-compatible compat
 
     private
       module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-        LeiosBlock.rb LeiosBlock-Injective
+        getBaseBlock getBaseBlock-inj
         safetyS
         cc
         (Network ⊗₀ BaseIO) (I ⊗₀ I ⊗₀ BaseAdv)
@@ -149,33 +152,24 @@ module _ (IOF AdvF : Participant → Channel)
                   → Safety.safety Tr.base k → S.safety k
       leiosSafety = TrM.transfer k
 
-      -- Liveness transfer: provided the block-level metadata of the ext spec
-      -- factors through `LeiosBlock.rb`, HCG and ∃CQ transfer from base to ext.
-      module _ (producer-compat : ∀ b → S.producer b
-                                      ≡ IsBlockchain-RB.producer IsBlockchain-spec (LeiosBlock.rb b))
-               (slotOf-compat   : ∀ b → S.slotOf b
-                                      ≡ IsBlockchain-RB.slotOf IsBlockchain-spec (LeiosBlock.rb b))
-        where
+      private
+        module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
+          safetyS
+          cc
+          (Network ⊗₀ BaseIO) (I ⊗₀ I ⊗₀ BaseAdv)
+          spec IsBlockchain-spec
+          compat
+          ⊗-identityʳ
+          ext-spec
 
-        private
-          module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-            LeiosBlock.rb LeiosBlock-Injective
-            safetyS
-            cc
-            (Network ⊗₀ BaseIO) (I ⊗₀ I ⊗₀ BaseAdv)
-            spec IsBlockchain-spec
-            ⊗-identityʳ
-            ext-spec
-            producer-compat slotOf-compat
+        module LTrM = LTr.Main single-protocol-≡
 
-          module LTrM = LTr.Main single-protocol-≡
+      leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+               → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
+               → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
+      leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
 
-        leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-                 → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-                 → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
-        leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
-
-        leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-                 → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-                 → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
-        leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL
+      leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+               → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
+               → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
+      leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL

@@ -127,10 +127,10 @@ or equal than the slot of the last processed block
   record BaseMachine : Type₂ where
     field n : ℕ
 
-    open IsBC RankingBlock (Fin n) public
+    open IsBC (Fin n) public
 
     field m             : Machine BaseNetwork (BaseIO ⊗₀ BaseAdv)
-          is-blockchain : IsBlockchain m
+          is-blockchain : IsBlockchain RankingBlock m
 
     open Machine m renaming (stepRel to _-⟦_/_⟧⇀_) public
 

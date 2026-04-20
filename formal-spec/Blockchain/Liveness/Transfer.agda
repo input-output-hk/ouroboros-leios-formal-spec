@@ -28,25 +28,17 @@ open import Relation.Unary using (Decidable)
 -- across the projection, HCG and ∃CQ transfer from base to ext.
 module Blockchain.Liveness.Transfer
   {BlockExt BlockBase   : Type}
-  (getBaseBlock         : BlockExt → BlockBase)
-  (getBaseBlock-inj     : Injective _≡_ _≡_ getBaseBlock)
   (ext                  : Safety BlockExt)
   (cc                   : ChannelCat)
   (base-IO base-Adv     : Channel)
   (base-spec            : Machine (Safety.Network ext) (base-IO ⊗₀ base-Adv))
-  (base-IsBlockchain    : IsBC.IsBlockchain BlockBase (Fin (Safety.n ext)) base-spec)
+  (base-IsBlockchain    : IsBC.IsBlockchain (Fin (Safety.n ext)) BlockBase base-spec)
+  (compat               : IsBC.IsBlockchain-compatible (Fin (Safety.n ext)) base-IsBlockchain (Safety.spec-IsBlockchain ext))
   (ext-Adv≡base-Adv     : Safety.Adv ext ≡ base-Adv)
   (ext-spec             : Machine base-IO (Safety.IO ext ⊗₀ I))
-  -- Compatibility of the block-level metadata across the projection.  These
-  -- hold by construction whenever the base `producer`/`slotOf` are obtained by
-  -- projecting the ext ones through `getBaseBlock`.
-  (producer-compat      : let open Safety ext renaming (producer to ext-producer) in
-                          let open IsBC.IsBlockchain base-IsBlockchain renaming (producer to base-producer) in
-                            ∀ b → ext-producer b ≡ base-producer (getBaseBlock b))
-  (slotOf-compat        : let open Safety ext renaming (slotOf to ext-slotOf) in
-                          let open IsBC.IsBlockchain base-IsBlockchain renaming (slotOf to base-slotOf) in
-                            ∀ b → ext-slotOf b ≡ base-slotOf (getBaseBlock b))
   where
+
+open IsBC.IsBlockchain-compatible compat
 
 import Blockchain.Safety.Transfer as ST
 module Tr = ST

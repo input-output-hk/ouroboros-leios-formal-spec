@@ -148,9 +148,9 @@ data d-BaseRel : machine-type d-BaseState d-BaseChannel where
         (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot))
         (blocks , slot)
 
-open Blockchain.IsBlockchain RankingBlock (Fin 1)
+open Blockchain.IsBlockchain (Fin 1)
 
-helper : BlockChainInfo → BaseAbstract.BaseIOF d-Base CategoricalCrypto.Out
+helper : BlockChainInfo RankingBlock → BaseAbstract.BaseIOF d-Base CategoricalCrypto.Out
 helper = let open BaseAbstract.BaseIOF in λ where
   Chain → FTCH-LDG
   Slot  → FTCH-SLOT
