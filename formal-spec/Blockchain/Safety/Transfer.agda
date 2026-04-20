@@ -2,6 +2,7 @@
 
 open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import Blockchain.Safety
+import Blockchain.IsBlockchain as IsBC
 open import Leios.ChannelCat
 
 open import CategoricalCrypto hiding (id)
@@ -28,7 +29,7 @@ module Blockchain.Safety.Transfer
   -- Base spec + evidence.
   (base-IO base-Adv     : Channel)
   (base-spec            : Machine (Safety.Network ext) (base-IO ⊗₀ base-Adv))
-  (base-IsBlockchain    : IsBlockchain BlockBase base-spec)
+  (base-IsBlockchain    : IsBC.IsBlockchain BlockBase (Fin (Safety.n ext)) base-spec)
   -- The ext and base adversary channels agree.  Together with
   -- `Ext.honest-nodes-≡-spec` this lets us swap the honest ext node for
   -- `base-spec` on the base side.

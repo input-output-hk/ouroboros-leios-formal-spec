@@ -14,6 +14,7 @@ open import Leios.Abstract
 open import Leios.Config
 open import Leios.SpecStructure
 open import Blockchain.Safety
+import Blockchain.IsBlockchain
 
 open import Axiom.Set.Properties th
 open import Data.Nat.Show as N
@@ -147,7 +148,9 @@ data d-BaseRel : machine-type d-BaseState d-BaseChannel where
         (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot))
         (blocks , slot)
 
-helper : BlockChainInfo RankingBlock → BaseAbstract.BaseIOF d-Base CategoricalCrypto.Out
+open Blockchain.IsBlockchain RankingBlock (Fin 1)
+
+helper : BlockChainInfo → BaseAbstract.BaseIOF d-Base CategoricalCrypto.Out
 helper = let open BaseAbstract.BaseIOF in λ where
   Chain → FTCH-LDG
   Slot  → FTCH-SLOT
@@ -181,7 +184,8 @@ private
 d-BaseFunctionality : BaseAbstract.BaseMachine d-Base
 d-BaseFunctionality =
   record
-    { m =
+    { n = 1
+    ; m =
         record
           { State = (List RankingBlock × ℕ)
           ; stepRel = d-BaseRel
@@ -204,6 +208,8 @@ d-BaseFunctionality =
           ; isPure = λ where
               Chain → isPure-chain
               Slot  → isPure-slot
+          ; producer = λ _ → Fin.zero
+          ; slotOf   = λ _ → 0
           }
     }
 

@@ -119,11 +119,16 @@ or equal than the slot of the last processed block
 
 ```agda
   open import Blockchain.Safety RankingBlock
+  import Blockchain.IsBlockchain as IsBC
   open import Data.Fin.Base using (_↑ˡ_)
 
   BaseIO = simpleChannel BaseIOF
 
   record BaseMachine : Type₂ where
+    field n : ℕ
+
+    open IsBC RankingBlock (Fin n) public
+
     field m             : Machine BaseNetwork (BaseIO ⊗₀ BaseAdv)
           is-blockchain : IsBlockchain m
 

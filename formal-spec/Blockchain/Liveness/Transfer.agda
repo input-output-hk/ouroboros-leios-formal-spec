@@ -2,6 +2,7 @@
 
 open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import Blockchain.Safety
+import Blockchain.IsBlockchain as IsBC
 open import Blockchain.Liveness
 open import Leios.ChannelCat
 
@@ -13,7 +14,7 @@ import Data.Rational as ℚ
 import Data.Rational.Properties as ℚP
 open ℚ using (ℚ)
 
-open import Data.List.Properties using (∷-injective; map-++; length-map)
+open import Data.List.Properties using (∷-injective; map-++; length-map; filter-≐)
 import Data.List.Relation.Unary.Any.Properties as AnyP
 import Data.List as L
 open import Relation.Unary using (Decidable)
@@ -22,10 +23,9 @@ open import Relation.Unary using (Decidable)
 --
 -- Given the same ingredients as `Blockchain.Safety.Transfer` (an extended
 -- blockchain spec `ext`, a chain-projection `getBaseBlock` into a base
--- blockchain spec, and an honest upper layer `ext-spec`) and a `Liveness`
--- record for the derived base spec, we derive a `Liveness` record for the
--- ext spec by pulling back `producer` and `slotOf` along `getBaseBlock`,
--- and show that HCG and ∃CQ transfer from base to ext.
+-- blockchain spec, and an honest upper layer `ext-spec`), plus compatibility
+-- witnesses that `producer` and `slotOf` (now fields of `IsBlockchain`) agree
+-- across the projection, HCG and ∃CQ transfer from base to ext.
 module Blockchain.Liveness.Transfer
   {BlockExt BlockBase   : Type}
   (getBaseBlock         : BlockExt → BlockBase)
@@ -34,9 +34,18 @@ module Blockchain.Liveness.Transfer
   (cc                   : ChannelCat)
   (base-IO base-Adv     : Channel)
   (base-spec            : Machine (Safety.Network ext) (base-IO ⊗₀ base-Adv))
-  (base-IsBlockchain    : IsBlockchain BlockBase base-spec)
+  (base-IsBlockchain    : IsBC.IsBlockchain BlockBase (Fin (Safety.n ext)) base-spec)
   (ext-Adv≡base-Adv     : Safety.Adv ext ≡ base-Adv)
   (ext-spec             : Machine base-IO (Safety.IO ext ⊗₀ I))
+  -- Compatibility of the block-level metadata across the projection.  These
+  -- hold by construction whenever the base `producer`/`slotOf` are obtained by
+  -- projecting the ext ones through `getBaseBlock`.
+  (producer-compat      : let open Safety ext renaming (producer to ext-producer) in
+                          let open IsBC.IsBlockchain base-IsBlockchain renaming (producer to base-producer) in
+                            ∀ b → ext-producer b ≡ base-producer (getBaseBlock b))
+  (slotOf-compat        : let open Safety ext renaming (slotOf to ext-slotOf) in
+                          let open IsBC.IsBlockchain base-IsBlockchain renaming (slotOf to base-slotOf) in
+                            ∀ b → ext-slotOf b ≡ base-slotOf (getBaseBlock b))
   where
 
 import Blockchain.Safety.Transfer as ST
@@ -55,8 +64,7 @@ private
   ℕ→ℚ n = (ℤ.+ n) ℚ./ 1
 
   -- Generic lemma: filtering after mapping equals mapping after filtering
-  -- with the pulled-back predicate. Proof is the standard induction on
-  -- `xs` with case analysis on `P? (f x)`.
+  -- with the pulled-back predicate.
   filter-map : ∀ {A B : Type} {P : B → Type} (P? : Decidable P) (f : A → B)
                (xs : List A)
              → L.filter P? (L.map f xs) ≡ L.map f (L.filter (λ x → P? (f x)) xs)
@@ -91,199 +99,205 @@ private
 module BL = Blockchain.Liveness BlockBase Tr.base
 module EL = Blockchain.Liveness BlockExt   ext
 
--- Given a Liveness for the derived base spec, we derive a Liveness for the
--- ext spec by pulling back `producer` and `slotOf` along `getBaseBlock`.
-module _ (baseLiv : BL.Liveness) where
+module Main (single-protocol-≡ : ∀ p
+                               → idᴷ ∘ᴷ Ext.all-nodes p
+                               ≡ extPart p ∘ᴷ base-all-nodes p) where
 
-  private
-    module LB = BL.Liveness baseLiv
+  module TrM = Tr.Main single-protocol-≡
+  open TrM using (transEnv; transState; transTrace; ChainLemma-ty)
 
-  extLiv : EL.Liveness
-  extLiv = record
-    { producer = λ b → LB.producer (getBaseBlock b)
-    ; slotOf   = λ b → LB.slotOf   (getBaseBlock b)
-    }
+  -- Slot lemma: the base-side slot query agrees with the ext-side slot query.
+  SlotLemma-ty : ∀ {A : Channel} → Ext.Environment A → Type
+  SlotLemma-ty {A} E = ∀ {p : Fin Ext.n} {s} (p-honest : p ∈ Ext.honest-nodes)
+    → Base.getSlot (transEnv E) (transState E s) p-honest
+    ≡ Ext.getSlot E s p-honest
 
-  private
-    module LE = EL.Liveness extLiv
+  -- `recent` commutes with `map getBaseBlock`.  Follows from the generic
+  -- `filter-map` lemma together with `slotOf-compat`.
+  recent-map : ∀ T s (l : List BlockExt)
+    → BL.recent T s (map getBaseBlock l) ≡ map getBaseBlock (EL.recent T s l)
+  recent-map T s l =
+    trans (filter-map ¿ _ ¿¹ getBaseBlock l)
+          (cong (map getBaseBlock)
+            (filter-≐ (λ x → ¿ Base.slotOf (getBaseBlock x) + T ≥ s ¿)
+                      ¿ _ ¿¹
+                      ( (λ {x} p → subst (λ y → y + T ≥ s) (sym (slotOf-compat x)) p)
+                      , (λ {x} q → subst (λ y → y + T ≥ s) (slotOf-compat x) q))
+                      l))
 
-  module Main (single-protocol-≡ : ∀ p
-                                 → idᴷ ∘ᴷ Ext.all-nodes p
-                                 ≡ extPart p ∘ᴷ base-all-nodes p) where
+  module _ {A : Channel} (E : Ext.Environment A)
+           (CL : ChainLemma-ty E) (SL : SlotLemma-ty E)
+           (s : Machine.State (Ext.protocol E)) where
 
-    module TrM = Tr.Main single-protocol-≡
-    open TrM using (transEnv; transState; transTrace; ChainLemma-ty)
+    -- HCG -----------------------------------------------------------------
 
-    -- Slot lemma: the base-side slot query agrees with the ext-side slot query.
-    SlotLemma-ty : ∀ {A : Channel} → Ext.Environment A → Type
-    SlotLemma-ty {A} E = ∀ {p : Fin Ext.n} {s} (p-honest : p ∈ Ext.honest-nodes)
-      → Base.getSlot (transEnv E) (transState E s) p-honest
-      ≡ Ext.getSlot E s p-honest
+    hcgState-ext⇒base : ∀ τ
+      → EL.hcgState τ E s
+      → BL.hcgState τ (transEnv E) (transState E s)
+    hcgState-ext⇒base τ ext-hcg-s {p} hp {pref} {suff} {b} base-eq honest-b =
+      case map-split (Ext.getChain E s hp) pref b suff
+             (trans (sym (CL hp)) base-eq) of λ where
+        (pref' , b' , suff' , ext-eq , _ , fb'≡ , msuff≡) →
+          H.result pref' b' suff' ext-eq fb'≡ msuff≡
+      where
+        module H (pref' : List BlockExt) (b' : BlockExt) (suff' : List BlockExt)
+                 (ext-eq  : Ext.getChain E s hp ≡ pref' ++ b' ∷ suff')
+                 (fb'≡    : getBaseBlock b' ≡ b)
+                 (msuff≡  : map getBaseBlock suff' ≡ suff) where
 
-    -- `recent` commutes with `map getBaseBlock`. Follows from the generic
-    -- `filter-map` lemma together with the fact that `LE.slotOf = LB.slotOf ∘ getBaseBlock`
-    -- (which holds by definition of `extLiv`).
-    recent-map : ∀ T s (l : List BlockExt)
-      → LB.recent T s (map getBaseBlock l) ≡ map getBaseBlock (LE.recent T s l)
-    recent-map T s l = filter-map ¿ _ ¿¹ getBaseBlock l
+          honest-b' : EL.isHonestBlock b'
+          honest-b' = subst (λ x → x ∈ Ext.honest-nodes)
+                            (trans (producer-compat b') (cong Base.producer fb'≡) |> sym)
+                            honest-b
 
-    module _ {A : Channel} (E : Ext.Environment A)
-             (CL : ChainLemma-ty E) (SL : SlotLemma-ty E)
-             (s : Machine.State (Ext.protocol E)) where
+          ext-bound : τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ Ext.slotOf b')
+                    ℚ.≤ ℕ→ℚ (length suff')
+          ext-bound = ext-hcg-s hp ext-eq honest-b'
 
-      -- HCG -----------------------------------------------------------------
+          slot-eq : Ext.getSlot E s hp
+                  ≡ Base.getSlot (transEnv E) (transState E s) hp
+          slot-eq = sym (SL hp)
 
-      hcgState-ext⇒base : ∀ τ
-        → LE.hcgState τ E s
-        → LB.hcgState τ (transEnv E) (transState E s)
-      hcgState-ext⇒base τ ext-hcg-s {p} hp {pref} {suff} {b} base-eq honest-b =
-        case map-split (Ext.getChain E s hp) pref b suff
-               (trans (sym (CL hp)) base-eq) of λ where
-          (pref' , b' , suff' , ext-eq , _ , fb'≡ , msuff≡) →
-            H.result pref' b' suff' ext-eq fb'≡ msuff≡
-        where
-          -- All the per-branch reasoning lives in a helper module so each
-          -- step's type signature is elaborated exactly once with the
-          -- destructured arguments as module parameters, instead of being
-          -- re-elaborated inside a nested `let`.
-          module H (pref' : List BlockExt) (b' : BlockExt) (suff' : List BlockExt)
-                   (ext-eq  : Ext.getChain E s hp ≡ pref' ++ b' ∷ suff')
-                   (fb'≡    : getBaseBlock b' ≡ b)
-                   (msuff≡  : map getBaseBlock suff' ≡ suff) where
+          slotOf-eq : Ext.slotOf b' ≡ Base.slotOf b
+          slotOf-eq = trans (slotOf-compat b') (cong Base.slotOf fb'≡)
 
-            honest-b' : LE.isHonestBlock b'
-            honest-b' = subst (λ x → LB.producer x ∈ Ext.honest-nodes)
-                              (sym fb'≡) honest-b
+          length-eq : length suff' ≡ length suff
+          length-eq = trans (sym (length-map getBaseBlock suff'))
+                            (cong length msuff≡)
 
-            ext-bound : τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ LE.slotOf b')
-                      ℚ.≤ ℕ→ℚ (length suff')
-            ext-bound = ext-hcg-s hp ext-eq honest-b'
+          result : τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
+                               ∸ Base.slotOf b)
+                 ℚ.≤ ℕ→ℚ (length suff)
+          result = let open ℚP.≤-Reasoning in
+            begin
+              τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ Base.slotOf b)
+            ≡⟨ cong (λ x → τ ℚ.* ℕ→ℚ (x ∸ Base.slotOf b)) (sym slot-eq) ⟩
+              τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ Base.slotOf b)
+            ≡⟨ cong (λ y → τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ y)) (sym slotOf-eq) ⟩
+              τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ Ext.slotOf b')
+            ≤⟨ ext-bound ⟩
+              ℕ→ℚ (length suff')
+            ≡⟨ cong ℕ→ℚ length-eq ⟩
+              ℕ→ℚ (length suff)
+            ∎
 
-            slot-eq : Ext.getSlot E s hp
-                    ≡ Base.getSlot (transEnv E) (transState E s) hp
-            slot-eq = sym (SL hp)
+    hcgState-base⇒ext : ∀ τ
+      → BL.hcgState τ (transEnv E) (transState E s)
+      → EL.hcgState τ E s
+    hcgState-base⇒ext τ base-hcg-s {p} hp {pref} {suff} {b} ext-eq honest-b =
+      H.result
+      where
+        module H where
 
-            slotOf-eq : LE.slotOf b' ≡ LB.slotOf b
-            slotOf-eq = cong LB.slotOf fb'≡
+          honest-base-b : Base.producer (getBaseBlock b) ∈ Ext.honest-nodes
+          honest-base-b = subst (λ x → x ∈ Ext.honest-nodes)
+                                 (producer-compat b)
+                                 honest-b
 
-            length-eq : length suff' ≡ length suff
-            length-eq = trans (sym (length-map getBaseBlock suff'))
-                              (cong length msuff≡)
+          base-eq : Base.getChain (transEnv E) (transState E s) hp
+                  ≡ map getBaseBlock pref ++ getBaseBlock b ∷ map getBaseBlock suff
+          base-eq = trans (CL hp)
+                          (trans (cong (map getBaseBlock) ext-eq)
+                                 (map-++ getBaseBlock pref (b ∷ suff)))
 
-            result : τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
-                                 ∸ LB.slotOf b)
-                   ℚ.≤ ℕ→ℚ (length suff)
-            result = let open ℚP.≤-Reasoning in
-              begin
-                τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ LB.slotOf b)
-              ≡⟨ cong (λ x → τ ℚ.* ℕ→ℚ (x ∸ LB.slotOf b)) (sym slot-eq) ⟩
-                τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ LB.slotOf b)
-              ≡⟨ cong (λ y → τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ y)) (sym slotOf-eq) ⟩
-                τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ LE.slotOf b')
-              ≤⟨ ext-bound ⟩
-                ℕ→ℚ (length suff')
-              ≡⟨ cong ℕ→ℚ length-eq ⟩
-                ℕ→ℚ (length suff)
-              ∎
+          bound : τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
+                              ∸ Base.slotOf (getBaseBlock b))
+                ℚ.≤ ℕ→ℚ (length (map getBaseBlock suff))
+          bound = base-hcg-s hp base-eq honest-base-b
 
-      hcgState-base⇒ext : ∀ τ
-        → LB.hcgState τ (transEnv E) (transState E s)
-        → LE.hcgState τ E s
-      hcgState-base⇒ext τ base-hcg-s {p} hp {pref} {suff} {b} ext-eq honest-b =
-        H.result
-        where
-          module H where
+          slot-eq : Base.getSlot (transEnv E) (transState E s) hp
+                  ≡ Ext.getSlot E s hp
+          slot-eq = SL hp
 
-            base-eq : Base.getChain (transEnv E) (transState E s) hp
-                    ≡ map getBaseBlock pref ++ getBaseBlock b ∷ map getBaseBlock suff
-            base-eq = trans (CL hp)
-                            (trans (cong (map getBaseBlock) ext-eq)
-                                   (map-++ getBaseBlock pref (b ∷ suff)))
+          length-eq : length (map getBaseBlock suff) ≡ length suff
+          length-eq = length-map getBaseBlock suff
 
-            bound : τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
-                                ∸ LB.slotOf (getBaseBlock b))
-                  ℚ.≤ ℕ→ℚ (length (map getBaseBlock suff))
-            bound = base-hcg-s hp base-eq honest-b
+          slotOf-eq : Base.slotOf (getBaseBlock b) ≡ Ext.slotOf b
+          slotOf-eq = sym (slotOf-compat b)
 
-            slot-eq : Base.getSlot (transEnv E) (transState E s) hp
-                    ≡ Ext.getSlot E s hp
-            slot-eq = SL hp
+          result : τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ Ext.slotOf b)
+                 ℚ.≤ ℕ→ℚ (length suff)
+          result = subst₂ (λ x y → τ ℚ.* ℕ→ℚ (x ∸ Ext.slotOf b) ℚ.≤ ℕ→ℚ y) slot-eq length-eq
+                 $ subst (λ z → τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ z)
+                                ℚ.≤ ℕ→ℚ (length (map getBaseBlock suff))) slotOf-eq bound
 
-            length-eq : length (map getBaseBlock suff) ≡ length suff
-            length-eq = length-map getBaseBlock suff
+    -- ∃CQ -----------------------------------------------------------------
 
-            result : τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ LE.slotOf b)
-                   ℚ.≤ ℕ→ℚ (length suff)
-            result = subst₂ (λ x y → τ ℚ.* ℕ→ℚ (x ∸ LE.slotOf b) ℚ.≤ ℕ→ℚ y)
-                            slot-eq length-eq bound
+    ∃cqState-ext⇒base : ∀ T
+      → EL.∃cqState T E s
+      → BL.∃cqState T (transEnv E) (transState E s)
+    ∃cqState-ext⇒base T ext-∃cq-s {p} hp =
+      let ext-any = ext-∃cq-s hp
 
-      -- ∃CQ -----------------------------------------------------------------
+          mapped-any = subst (λ x → Any.Any EL.isHonestBlock
+                                       (EL.recent T x (Ext.getChain E s hp)))
+                             (sym (SL hp)) ext-any
 
-      ∃cqState-ext⇒base : ∀ T
-        → LE.∃cqState T E s
-        → LB.∃cqState T (transEnv E) (transState E s)
-      ∃cqState-ext⇒base T ext-∃cq-s {p} hp =
-        let ext-any = ext-∃cq-s hp
+          -- Transport honesty along `producer-compat`.
+          any-base-honest = Any.map
+            (λ {b} hb → subst (λ x → x ∈ Ext.honest-nodes) (producer-compat b) hb)
+            mapped-any
 
-            mapped-any = subst (λ x → Any.Any LE.isHonestBlock
-                                         (LE.recent T x (Ext.getChain E s hp)))
-                               (sym (SL hp)) ext-any
+          -- Push `map getBaseBlock` inside `recent` via `recent-map`.
+          any-on-map = AnyP.map⁺ any-base-honest
 
-            -- Push `map getBaseBlock` inside `recent` via `recent-map`.
-            any-on-map = AnyP.map⁺ mapped-any
+          any-base-recent =
+            subst (Any.Any BL.isHonestBlock)
+                  (sym (recent-map T (Base.getSlot (transEnv E) (transState E s) hp)
+                                   (Ext.getChain E s hp)))
+                  any-on-map
 
-            any-base-recent =
-              subst (Any.Any LB.isHonestBlock)
-                    (sym (recent-map T (Base.getSlot (transEnv E) (transState E s) hp)
-                                     (Ext.getChain E s hp)))
-                    any-on-map
+      in subst (λ cs → Any.Any BL.isHonestBlock
+                         (BL.recent T (Base.getSlot (transEnv E) (transState E s) hp) cs))
+               (sym (CL hp))
+               any-base-recent
 
-        in subst (λ cs → Any.Any LB.isHonestBlock
-                           (LB.recent T (Base.getSlot (transEnv E) (transState E s) hp) cs))
-                 (sym (CL hp))
-                 any-base-recent
+    ∃cqState-base⇒ext : ∀ T
+      → BL.∃cqState T (transEnv E) (transState E s)
+      → EL.∃cqState T E s
+    ∃cqState-base⇒ext T base-∃cq-s {p} hp =
+      let base-any = base-∃cq-s hp
 
-      ∃cqState-base⇒ext : ∀ T
-        → LB.∃cqState T (transEnv E) (transState E s)
-        → LE.∃cqState T E s
-      ∃cqState-base⇒ext T base-∃cq-s {p} hp =
-        let base-any = base-∃cq-s hp
+          -- Rewrite base chain → map getBaseBlock of ext chain.
+          step₁ = subst (λ cs → Any.Any BL.isHonestBlock
+                                  (BL.recent T (Base.getSlot (transEnv E) (transState E s) hp) cs))
+                        (CL hp) base-any
 
-            -- Rewrite base chain → map getBaseBlock of ext chain.
-            step₁ = subst (λ cs → Any.Any LB.isHonestBlock
-                                    (LB.recent T (Base.getSlot (transEnv E) (transState E s) hp) cs))
-                          (CL hp) base-any
+          -- Pull `map getBaseBlock` out of `recent`.
+          step₂ = subst (Any.Any BL.isHonestBlock)
+                        (recent-map T (Base.getSlot (transEnv E) (transState E s) hp)
+                                     (Ext.getChain E s hp))
+                        step₁
 
-            -- Pull `map getBaseBlock` out of `recent`.
-            step₂ = subst (Any.Any LB.isHonestBlock)
-                          (recent-map T (Base.getSlot (transEnv E) (transState E s) hp)
-                                       (Ext.getChain E s hp))
-                          step₁
+          -- Any (P ∘ f) on original list.
+          step₃ = AnyP.map⁻ step₂
 
-            -- Any (P ∘ f) on original list.
-            step₃ = AnyP.map⁻ step₂
-        in subst (λ x → Any.Any LE.isHonestBlock
-                           (LE.recent T x (Ext.getChain E s hp)))
-                 (SL hp) step₃
+          -- Transport honesty back through `producer-compat`.
+          step₄ = Any.map
+            (λ {b} hb → subst (λ x → x ∈ Ext.honest-nodes) (sym (producer-compat b)) hb)
+            step₃
+      in subst (λ x → Any.Any EL.isHonestBlock
+                         (EL.recent T x (Ext.getChain E s hp)))
+               (SL hp) step₄
 
-    -- Transfer the hcg and ∃cq invariants.
+  -- Transfer the hcg and ∃cq invariants.
 
-    hcg-transfer : ∀ τ
-      → (∀ {A} (E : Ext.Environment A) → ChainLemma-ty E)
-      → (∀ {A} (E : Ext.Environment A) → SlotLemma-ty E)
-      → LB.hcg τ → LE.hcg τ
-    hcg-transfer τ CL SL base-hcg E init final trace hcg-init =
-      hcgState-base⇒ext E (CL E) (SL E) final τ
-        (base-hcg (transEnv E) (transState E init) (transState E final)
-                  (transTrace E trace)
-                  (hcgState-ext⇒base E (CL E) (SL E) init τ hcg-init))
+  hcg-transfer : ∀ τ
+    → (∀ {A} (E : Ext.Environment A) → ChainLemma-ty E)
+    → (∀ {A} (E : Ext.Environment A) → SlotLemma-ty E)
+    → BL.hcg τ → EL.hcg τ
+  hcg-transfer τ CL SL base-hcg E init final trace hcg-init =
+    hcgState-base⇒ext E (CL E) (SL E) final τ
+      (base-hcg (transEnv E) (transState E init) (transState E final)
+                (transTrace E trace)
+                (hcgState-ext⇒base E (CL E) (SL E) init τ hcg-init))
 
-    ∃cq-transfer : ∀ T
-      → (∀ {A} (E : Ext.Environment A) → ChainLemma-ty E)
-      → (∀ {A} (E : Ext.Environment A) → SlotLemma-ty E)
-      → LB.∃cq T → LE.∃cq T
-    ∃cq-transfer T CL SL base-∃cq E init final trace ∃cq-init =
-      ∃cqState-base⇒ext E (CL E) (SL E) final T
-        (base-∃cq (transEnv E) (transState E init) (transState E final)
-                  (transTrace E trace)
-                  (∃cqState-ext⇒base E (CL E) (SL E) init T ∃cq-init))
+  ∃cq-transfer : ∀ T
+    → (∀ {A} (E : Ext.Environment A) → ChainLemma-ty E)
+    → (∀ {A} (E : Ext.Environment A) → SlotLemma-ty E)
+    → BL.∃cq T → EL.∃cq T
+  ∃cq-transfer T CL SL base-∃cq E init final trace ∃cq-init =
+    ∃cqState-base⇒ext E (CL E) (SL E) final T
+      (base-∃cq (transEnv E) (transState E init) (transState E final)
+                (transTrace E trace)
+                (∃cqState-ext⇒base E (CL E) (SL E) init T ∃cq-init))

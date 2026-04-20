@@ -10,7 +10,7 @@ open import CategoricalCrypto.Channel.Selection
 import CategoricalCrypto as CC
 
 open import Blockchain.Safety
-open import Blockchain.Liveness as BLiveness using (Liveness)
+import Blockchain.IsBlockchain
 open import Leios.ChannelCat
 import Blockchain.Safety.Transfer as Transfer
 import Blockchain.Liveness.Transfer as LTransfer
@@ -96,10 +96,12 @@ module _ (IOF AdvF : Participant → Channel)
   (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
   (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
   (cc : ChannelCat) (let open ChannelCat cc)
-  (IsBlockchain-Leios : IsBlockchain LeiosBlock Leios1)
+  (IsBlockchain-Leios : Blockchain.IsBlockchain.IsBlockchain LeiosBlock Participant Leios1)
   where
 
-  module LS {Block : Type} (Leios-IsBlockchain : IsBlockchain Block Leios1) where
+  module LS {Block : Type}
+    (Leios-IsBlockchain : Blockchain.IsBlockchain.IsBlockchain Block Participant Leios1) where
+    n = numberOfParties
     honest-node-spec = Leios1
     spec-IsBlockchain = Leios-IsBlockchain
     all-nodes = nodesF
@@ -123,19 +125,12 @@ module _ (IOF AdvF : Participant → Channel)
       body : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ ((I ⊗₀ I) ⊗₀ I))
       body = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ)
 
-  module _ (IsBlockchain-spec : IsBlockchain RankingBlock spec) where
+  module _ (IsBlockchain-spec : Blockchain.IsBlockchain.IsBlockchain RankingBlock Participant spec) where
+
+    open Blockchain.IsBlockchain RankingBlock Participant using () renaming (IsBlockchain to IsBlockchain-RB)
 
     private
       module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-        LeiosBlock.rb LeiosBlock-Injective
-        safetyS
-        cc
-        (Network ⊗₀ BaseIO) (I ⊗₀ I ⊗₀ BaseAdv)
-        spec IsBlockchain-spec
-        ⊗-identityʳ
-        ext-spec
-
-      module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
         LeiosBlock.rb LeiosBlock-Injective
         safetyS
         cc
@@ -154,21 +149,33 @@ module _ (IOF AdvF : Participant → Channel)
                   → Safety.safety Tr.base k → S.safety k
       leiosSafety = TrM.transfer k
 
-      module _ (baseLiv : LTr.BL.Liveness) where
+      -- Liveness transfer: provided the block-level metadata of the ext spec
+      -- factors through `LeiosBlock.rb`, HCG and ∃CQ transfer from base to ext.
+      module _ (producer-compat : ∀ b → S.producer b
+                                      ≡ IsBlockchain-RB.producer IsBlockchain-spec (LeiosBlock.rb b))
+               (slotOf-compat   : ∀ b → S.slotOf b
+                                      ≡ IsBlockchain-RB.slotOf IsBlockchain-spec (LeiosBlock.rb b))
+        where
 
-        private module LTrM = LTr.Main baseLiv single-protocol-≡
+        private
+          module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
+            LeiosBlock.rb LeiosBlock-Injective
+            safetyS
+            cc
+            (Network ⊗₀ BaseIO) (I ⊗₀ I ⊗₀ BaseAdv)
+            spec IsBlockchain-spec
+            ⊗-identityʳ
+            ext-spec
+            producer-compat slotOf-compat
 
-        leiosLiveness : LTr.EL.Liveness
-        leiosLiveness = LTr.extLiv baseLiv
+          module LTrM = LTr.Main single-protocol-≡
 
         leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
                  → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-                 → ∀ τ → LTr.BL.Liveness.hcg baseLiv τ
-                       → LTr.EL.Liveness.hcg leiosLiveness τ
+                 → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
         leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
 
         leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
                  → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-                 → ∀ T → LTr.BL.Liveness.∃cq baseLiv T
-                       → LTr.EL.Liveness.∃cq leiosLiveness T
+                 → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
         leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL
