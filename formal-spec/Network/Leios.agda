@@ -10,8 +10,10 @@ open import CategoricalCrypto.Channel.Selection
 import CategoricalCrypto as CC
 
 open import Blockchain.Safety
+open import Blockchain.Liveness as BLiveness using (Liveness)
 open import Leios.ChannelCat
 import Blockchain.Safety.Transfer as Transfer
+import Blockchain.Liveness.Transfer as LTransfer
 
 module Network.Leios
   (⋯ : SpecStructure) (let open SpecStructure ⋯)
@@ -133,6 +135,15 @@ module _ (IOF AdvF : Participant → Channel)
         ⊗-identityʳ
         ext-spec
 
+      module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
+        LeiosBlock.rb LeiosBlock-Injective
+        safetyS
+        cc
+        (Network ⊗₀ BaseIO) (I ⊗₀ I ⊗₀ BaseAdv)
+        spec IsBlockchain-spec
+        ⊗-identityʳ
+        ext-spec
+
     single-protocol-≡-ty : Type₁
     single-protocol-≡-ty = ∀ p → idᴷ ∘ᴷ S.all-nodes p ≡ Tr.extPart p ∘ᴷ Tr.base-all-nodes p
 
@@ -142,3 +153,26 @@ module _ (IOF AdvF : Participant → Channel)
       leiosSafety : (∀ {A} (E : Safety.Environment safetyS A) → TrM.ChainLemma-ty E)
                   → Safety.safety Tr.base k → Safety.safety safetyS k
       leiosSafety = TrM.transfer k
+
+      -- Liveness transfer: given a Liveness record for the base (ranking-block)
+      -- spec, we derive a Liveness record for the full Leios spec by pulling
+      -- back `producer` and `slotOf` along `LeiosBlock.rb`, and transfer HCG
+      -- and ∃CQ from base to ext.
+      module _ (baseLiv : LTr.BL.Liveness) where
+
+        private module LTrM = LTr.Main baseLiv single-protocol-≡
+
+        leiosLiveness : LTr.EL.Liveness
+        leiosLiveness = LTr.extLiv baseLiv
+
+        leiosHCG : (∀ {A} (E : Safety.Environment safetyS A) → LTrM.TrM.ChainLemma-ty E)
+                 → (∀ {A} (E : Safety.Environment safetyS A) → LTrM.SlotLemma-ty E)
+                 → ∀ τ → BLiveness.Liveness.hcg RankingBlock Tr.base baseLiv τ
+                       → BLiveness.Liveness.hcg LeiosBlock safetyS leiosLiveness τ
+        leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
+
+        leios∃CQ : (∀ {A} (E : Safety.Environment safetyS A) → LTrM.TrM.ChainLemma-ty E)
+                 → (∀ {A} (E : Safety.Environment safetyS A) → LTrM.SlotLemma-ty E)
+                 → ∀ T → BLiveness.Liveness.∃cq RankingBlock Tr.base baseLiv T
+                       → BLiveness.Liveness.∃cq LeiosBlock safetyS leiosLiveness T
+        leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL

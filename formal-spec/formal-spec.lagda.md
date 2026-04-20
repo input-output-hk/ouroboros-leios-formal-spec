@@ -70,6 +70,10 @@ Category-theoretic approach to cryptography
 ```agda
 open import CategoricalCrypto
 ```
+### Blockchain abstractions
+```agda
+import Blockchain.Liveness.Transfer
+```
 ### Network Layer
 Basic broadcast networking primitives
 ```agda
