@@ -151,13 +151,9 @@ module _ (IOF AdvF : Participant → Channel)
       private module TrM = Tr.Main single-protocol-≡
 
       leiosSafety : (∀ {A} (E : Safety.Environment safetyS A) → TrM.ChainLemma-ty E)
-                  → Safety.safety Tr.base k → Safety.safety safetyS k
+                  → Safety.safety Tr.base k → S.safety k
       leiosSafety = TrM.transfer k
 
-      -- Liveness transfer: given a Liveness record for the base (ranking-block)
-      -- spec, we derive a Liveness record for the full Leios spec by pulling
-      -- back `producer` and `slotOf` along `LeiosBlock.rb`, and transfer HCG
-      -- and ∃CQ from base to ext.
       module _ (baseLiv : LTr.BL.Liveness) where
 
         private module LTrM = LTr.Main baseLiv single-protocol-≡
@@ -165,14 +161,14 @@ module _ (IOF AdvF : Participant → Channel)
         leiosLiveness : LTr.EL.Liveness
         leiosLiveness = LTr.extLiv baseLiv
 
-        leiosHCG : (∀ {A} (E : Safety.Environment safetyS A) → LTrM.TrM.ChainLemma-ty E)
-                 → (∀ {A} (E : Safety.Environment safetyS A) → LTrM.SlotLemma-ty E)
+        leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+                 → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
                  → ∀ τ → LTr.BL.Liveness.hcg baseLiv τ
                        → LTr.EL.Liveness.hcg leiosLiveness τ
         leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
 
-        leios∃CQ : (∀ {A} (E : Safety.Environment safetyS A) → LTrM.TrM.ChainLemma-ty E)
-                 → (∀ {A} (E : Safety.Environment safetyS A) → LTrM.SlotLemma-ty E)
+        leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+                 → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
                  → ∀ T → LTr.BL.Liveness.∃cq baseLiv T
                        → LTr.EL.Liveness.∃cq leiosLiveness T
         leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL

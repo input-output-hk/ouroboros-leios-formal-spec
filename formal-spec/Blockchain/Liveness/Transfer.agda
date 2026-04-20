@@ -10,6 +10,7 @@ import CategoricalCrypto as CC
 
 import Data.Integer as ℤ
 import Data.Rational as ℚ
+import Data.Rational.Properties as ℚP
 open ℚ using (ℚ)
 
 open import Data.List.Properties using (∷-injective; map-++; length-map)
@@ -169,25 +170,21 @@ module _ (baseLiv : BL.Liveness) where
             length-eq = trans (sym (length-map getBaseBlock suff'))
                               (cong length msuff≡)
 
-            step₁ : τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ LB.slotOf b)
-                  ℚ.≤ ℕ→ℚ (length suff')
-            step₁ = subst (λ y → τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ y)
-                               ℚ.≤ ℕ→ℚ (length suff'))
-                          slotOf-eq ext-bound
-
-            step₂ : τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
-                                ∸ LB.slotOf b)
-                  ℚ.≤ ℕ→ℚ (length suff')
-            step₂ = subst (λ x → τ ℚ.* ℕ→ℚ (x ∸ LB.slotOf b)
-                               ℚ.≤ ℕ→ℚ (length suff'))
-                          slot-eq step₁
-
             result : τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
                                  ∸ LB.slotOf b)
                    ℚ.≤ ℕ→ℚ (length suff)
-            result = subst (λ y → τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
-                                               ∸ LB.slotOf b) ℚ.≤ ℕ→ℚ y)
-                           length-eq step₂
+            result = let open ℚP.≤-Reasoning in
+              begin
+                τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ LB.slotOf b)
+              ≡⟨ cong (λ x → τ ℚ.* ℕ→ℚ (x ∸ LB.slotOf b)) (sym slot-eq) ⟩
+                τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ LB.slotOf b)
+              ≡⟨ cong (λ y → τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ y)) (sym slotOf-eq) ⟩
+                τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ LE.slotOf b')
+              ≤⟨ ext-bound ⟩
+                ℕ→ℚ (length suff')
+              ≡⟨ cong ℕ→ℚ length-eq ⟩
+                ℕ→ℚ (length suff)
+              ∎
 
       hcgState-base⇒ext : ∀ τ
         → LB.hcgState τ (transEnv E) (transState E s)
