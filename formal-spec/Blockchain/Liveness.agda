@@ -17,12 +17,9 @@ module Blockchain.Liveness
 
 open Safety S
 
-private
-  ℕ→ℚ : ℕ → ℚ
-  ℕ→ℚ n = (ℤ.+ n) ℚ./ 1
+ℕ→ℚ : ℕ → ℚ
+ℕ→ℚ n = (ℤ.+ n) ℚ./ 1
 
--- A block is honest iff its producer (from the `IsBlockchain` witness) is
--- an honest party.
 isHonestBlock : Block → Type
 isHonestBlock b = producer b ∈ honest-nodes
 
@@ -31,8 +28,6 @@ isHonestBlock b = producer b ∈ honest-nodes
 --
 -- For every honest block `b` in an honest party's chain, the number
 -- of blocks that follow `b` is at least τ · (currentSlot ∸ slotOf b).
--- The genesis block (assumed honest) makes this imply a bound on
--- absolute chain length vs. current slot.
 
 hcgState : {A : Channel} → ℚ → (E : Environment A) → Machine.State (protocol E) → Type
 hcgState τ E S₀ =
@@ -49,9 +44,7 @@ hcg τ = ∀ {A} (E : Environment A) → Invariant (protocol E) (hcgState τ E)
 -- (∃CQ) Existential Chain Quality
 --
 -- In every honest party's chain, the suffix of blocks whose slot is
--- within the last T slots contains at least one honest block. The
--- assumed honest genesis block guarantees this list is non-empty
--- during startup.
+-- within the last T slots contains at least one honest block.
 
 recent : ℕ → ℕ → List Block → List Block
 recent T s = filter (λ b → slotOf b + T ≥ s)

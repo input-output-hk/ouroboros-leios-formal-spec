@@ -11,12 +11,10 @@ open import CategoricalCrypto
 -- `n` is the number of nodes.
 module Blockchain.IsBlockchain (Participant : Type) where
 
--- | Type of things we can query from a honest node.
 data BlockChainInfo (Block : Type) : Type where
   Chain : BlockChainInfo Block
   Slot  : BlockChainInfo Block
 
--- | Type for responses given a specific query.
 bciQueryType : ∀ {Block : Type} → BlockChainInfo Block → Type
 bciQueryType {Block = Block} Chain = List Block
 bciQueryType                 Slot  = ℕ

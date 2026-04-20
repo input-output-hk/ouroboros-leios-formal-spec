@@ -3,13 +3,11 @@
 open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import Blockchain.Safety
 import Blockchain.IsBlockchain as IsBC
-open import Blockchain.Liveness
+import Blockchain.Liveness
 open import Leios.ChannelCat
 
 open import CategoricalCrypto hiding (id)
-import CategoricalCrypto as CC
 
-import Data.Integer as ℤ
 import Data.Rational as ℚ
 import Data.Rational.Properties as ℚP
 open ℚ using (ℚ)
@@ -21,11 +19,9 @@ open import Relation.Unary using (Decidable)
 
 -- | Generic liveness transfer.
 --
--- Given the same ingredients as `Blockchain.Safety.Transfer` (an extended
--- blockchain spec `ext`, a chain-projection `getBaseBlock` into a base
--- blockchain spec, and an honest upper layer `ext-spec`), plus compatibility
--- witnesses that `producer` and `slotOf` (now fields of `IsBlockchain`) agree
--- across the projection, HCG and ∃CQ transfer from base to ext.
+-- Given the same ingredients as `Blockchain.Safety.Transfer` plus an
+-- `IsBlockchain-compatible` witness that the ext spec's `producer`/`slotOf`
+-- factor through `getBaseBlock`, HCG and ∃CQ transfer from base to ext.
 module Blockchain.Liveness.Transfer
   {BlockExt BlockBase   : Type}
   (ext                  : Safety BlockExt)
@@ -52,9 +48,6 @@ module Ext  = Tr.Ext
 module Base = Tr.Base
 
 private
-  ℕ→ℚ : ℕ → ℚ
-  ℕ→ℚ n = (ℤ.+ n) ℚ./ 1
-
   -- Generic lemma: filtering after mapping equals mapping after filtering
   -- with the pulled-back predicate.
   filter-map : ∀ {A B : Type} {P : B → Type} (P? : Decidable P) (f : A → B)
@@ -90,6 +83,7 @@ private
 
 module BL = Blockchain.Liveness BlockBase Tr.base
 module EL = Blockchain.Liveness BlockExt   ext
+open BL using (ℕ→ℚ)
 
 module Main (single-protocol-≡ : ∀ p
                                → idᴷ ∘ᴷ Ext.all-nodes p

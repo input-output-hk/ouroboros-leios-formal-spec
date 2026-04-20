@@ -10,7 +10,7 @@ open import CategoricalCrypto.Channel.Selection
 import CategoricalCrypto as CC
 
 open import Blockchain.Safety
-import Blockchain.IsBlockchain
+import Blockchain.IsBlockchain as IsBC
 open import Leios.ChannelCat
 import Blockchain.Safety.Transfer as Transfer
 import Blockchain.Liveness.Transfer as LTransfer
@@ -96,14 +96,14 @@ module _ (IOF AdvF : Participant → Channel)
   (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
   (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
   (cc : ChannelCat) (let open ChannelCat cc)
-  (IsBlockchain-Leios : Blockchain.IsBlockchain.IsBlockchain Participant LeiosBlock Leios1)
+  (IsBlockchain-Leios : IsBC.IsBlockchain Participant LeiosBlock Leios1)
   where
 
   module LS {Block : Type}
-    (Leios-IsBlockchain : Blockchain.IsBlockchain.IsBlockchain Participant Block Leios1) where
+    (IsBlockchain-Block : IsBC.IsBlockchain Participant Block Leios1) where
     n = numberOfParties
     honest-node-spec = Leios1
-    spec-IsBlockchain = Leios-IsBlockchain
+    spec-IsBlockchain = IsBlockchain-Block
     all-nodes = nodesF
     honest-nodes = honestNodes
     network = DD.Network
@@ -125,12 +125,12 @@ module _ (IOF AdvF : Participant → Channel)
       body : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ ((I ⊗₀ I) ⊗₀ I))
       body = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ)
 
-  module _ (IsBlockchain-spec : Blockchain.IsBlockchain.IsBlockchain Participant RankingBlock spec)
-           (compat : Blockchain.IsBlockchain.IsBlockchain-compatible
+  module _ (IsBlockchain-spec : IsBC.IsBlockchain Participant RankingBlock spec)
+           (compat : IsBC.IsBlockchain-compatible
                        Participant IsBlockchain-spec (Safety.spec-IsBlockchain safetyS))
            where
 
-    open Blockchain.IsBlockchain.IsBlockchain-compatible compat
+    open IsBC.IsBlockchain-compatible compat
 
     private
       module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
