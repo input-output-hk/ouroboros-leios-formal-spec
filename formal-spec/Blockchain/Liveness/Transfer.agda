@@ -12,9 +12,10 @@ import Data.Integer as ℤ
 import Data.Rational as ℚ
 open ℚ using (ℚ)
 
-open import Data.List.Properties using (∷-injective; map-++; length-map; filter-accept; filter-reject)
+open import Data.List.Properties using (∷-injective; map-++; length-map)
 import Data.List.Relation.Unary.Any.Properties as AnyP
 import Data.List as L
+open import Relation.Unary using (Decidable)
 
 -- | Generic liveness transfer.
 --
@@ -52,9 +53,20 @@ private
   ℕ→ℚ : ℕ → ℚ
   ℕ→ℚ n = (ℤ.+ n) ℚ./ 1
 
+  -- Generic lemma: filtering after mapping equals mapping after filtering
+  -- with the pulled-back predicate. Proof is the standard induction on
+  -- `xs` with case analysis on `P? (f x)`.
+  filter-map : ∀ {A B : Type} {P : B → Type} (P? : Decidable P) (f : A → B)
+               (xs : List A)
+             → L.filter P? (L.map f xs) ≡ L.map f (L.filter (λ x → P? (f x)) xs)
+  filter-map P? f [] = refl
+  filter-map P? f (x ∷ xs) with P? (f x)
+  ... | yes _ = cong (f x ∷_) (filter-map P? f xs)
+  ... | no  _ = filter-map P? f xs
+
 -- A splitting of `map f l` lifts to a splitting of `l`.
 private
-  map-split : ∀ {A B} {f : A → B} (l : List A) (pref : List B) (b : B) (suff : List B)
+  map-split : ∀ {A B : Type} {f : A → B} (l : List A) (pref : List B) (b : B) (suff : List B)
     → map f l ≡ pref ++ b ∷ suff
     → Σ[ pref' ∈ List A ] Σ[ b' ∈ A ] Σ[ suff' ∈ List A ]
          (l ≡ pref' ++ b' ∷ suff')
@@ -107,31 +119,12 @@ module _ (baseLiv : BL.Liveness) where
       → Base.getSlot (transEnv E) (transState E s) p-honest
       ≡ Ext.getSlot E s p-honest
 
-    -- `recent` commutes with `map getBaseBlock`. The predicate
-    -- `λ b → slotOf b + T ≥ s` is decidable on ℕ and the decidability
-    -- instance used on the ext and base sides agrees up to `getBaseBlock`,
-    -- since `LE.slotOf` is defined as `LB.slotOf ∘ getBaseBlock`.
+    -- `recent` commutes with `map getBaseBlock`. Follows from the generic
+    -- `filter-map` lemma together with the fact that `LE.slotOf = LB.slotOf ∘ getBaseBlock`
+    -- (which holds by definition of `extLiv`).
     recent-map : ∀ T s (l : List BlockExt)
       → LB.recent T s (map getBaseBlock l) ≡ map getBaseBlock (LE.recent T s l)
-    recent-map T s [] = refl
-    recent-map T s (x ∷ xs)
-      with ¿ LB.slotOf (getBaseBlock x) + T ≥ s ¿
-    ... | yes p =
-      let lhs-eq : LB.recent T s (getBaseBlock x ∷ map getBaseBlock xs)
-                 ≡ getBaseBlock x ∷ LB.recent T s (map getBaseBlock xs)
-          lhs-eq = filter-accept ¿ _ ¿¹ p
-          rhs-eq : LE.recent T s (x ∷ xs) ≡ x ∷ LE.recent T s xs
-          rhs-eq = filter-accept ¿ _ ¿¹ p
-      in trans lhs-eq
-               (trans (cong (getBaseBlock x ∷_) (recent-map T s xs))
-                      (cong (map getBaseBlock) (sym rhs-eq)))
-    ... | no ¬p =
-      let lhs-eq : LB.recent T s (getBaseBlock x ∷ map getBaseBlock xs)
-                 ≡ LB.recent T s (map getBaseBlock xs)
-          lhs-eq = filter-reject ¿ _ ¿¹ ¬p
-          rhs-eq : LE.recent T s (x ∷ xs) ≡ LE.recent T s xs
-          rhs-eq = filter-reject ¿ _ ¿¹ ¬p
-      in trans lhs-eq (trans (recent-map T s xs) (cong (map getBaseBlock) (sym rhs-eq)))
+    recent-map T s l = filter-map ¿ _ ¿¹ getBaseBlock l
 
     module _ {A : Channel} (E : Ext.Environment A)
              (CL : ChainLemma-ty E) (SL : SlotLemma-ty E)
@@ -143,50 +136,68 @@ module _ (baseLiv : BL.Liveness) where
         → LE.hcgState τ E s
         → LB.hcgState τ (transEnv E) (transState E s)
       hcgState-ext⇒base τ ext-hcg-s {p} hp {pref} {suff} {b} base-eq honest-b =
-        let mapped-eq : map getBaseBlock (Ext.getChain E s hp) ≡ pref ++ b ∷ suff
-            mapped-eq = trans (sym (CL hp)) base-eq
-        in case map-split (Ext.getChain E s hp) pref b suff mapped-eq of λ where
+        case map-split (Ext.getChain E s hp) pref b suff
+               (trans (sym (CL hp)) base-eq) of λ where
           (pref' , b' , suff' , ext-eq , _ , fb'≡ , msuff≡) →
-            let honest-b' : LE.isHonestBlock b'
-                honest-b' = subst (λ x → LB.producer x ∈ Ext.honest-nodes)
+            H.result pref' b' suff' ext-eq fb'≡ msuff≡
+        where
+          -- All the per-branch reasoning lives in a helper module so each
+          -- step's type signature is elaborated exactly once with the
+          -- destructured arguments as module parameters, instead of being
+          -- re-elaborated inside a nested `let`.
+          module H (pref' : List BlockExt) (b' : BlockExt) (suff' : List BlockExt)
+                   (ext-eq  : Ext.getChain E s hp ≡ pref' ++ b' ∷ suff')
+                   (fb'≡    : getBaseBlock b' ≡ b)
+                   (msuff≡  : map getBaseBlock suff' ≡ suff) where
+
+            honest-b' : LE.isHonestBlock b'
+            honest-b' = subst (λ x → LB.producer x ∈ Ext.honest-nodes)
                               (sym fb'≡) honest-b
 
-                ext-bound : τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ LE.slotOf b')
-                          ℚ.≤ ℕ→ℚ (length suff')
-                ext-bound = ext-hcg-s hp ext-eq honest-b'
-
-                slot-eq : Ext.getSlot E s hp
-                        ≡ Base.getSlot (transEnv E) (transState E s) hp
-                slot-eq = sym (SL hp)
-
-                slotOf-eq : LE.slotOf b' ≡ LB.slotOf b
-                slotOf-eq = cong LB.slotOf fb'≡
-
-                length-eq : length suff' ≡ length suff
-                length-eq = trans (sym (length-map getBaseBlock suff'))
-                                  (cong length msuff≡)
-
-                step₁ : τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ LB.slotOf b)
+            ext-bound : τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ LE.slotOf b')
                       ℚ.≤ ℕ→ℚ (length suff')
-                step₁ = subst (λ y → τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ y)
-                                   ℚ.≤ ℕ→ℚ (length suff'))
-                              slotOf-eq ext-bound
+            ext-bound = ext-hcg-s hp ext-eq honest-b'
 
-                step₂ : τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
-                                    ∸ LB.slotOf b)
-                      ℚ.≤ ℕ→ℚ (length suff')
-                step₂ = subst (λ x → τ ℚ.* ℕ→ℚ (x ∸ LB.slotOf b)
-                                   ℚ.≤ ℕ→ℚ (length suff'))
-                              slot-eq step₁
-            in subst (λ y → τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
-                                        ∸ LB.slotOf b) ℚ.≤ ℕ→ℚ y)
-                     length-eq step₂
+            slot-eq : Ext.getSlot E s hp
+                    ≡ Base.getSlot (transEnv E) (transState E s) hp
+            slot-eq = sym (SL hp)
+
+            slotOf-eq : LE.slotOf b' ≡ LB.slotOf b
+            slotOf-eq = cong LB.slotOf fb'≡
+
+            length-eq : length suff' ≡ length suff
+            length-eq = trans (sym (length-map getBaseBlock suff'))
+                              (cong length msuff≡)
+
+            step₁ : τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ LB.slotOf b)
+                  ℚ.≤ ℕ→ℚ (length suff')
+            step₁ = subst (λ y → τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ y)
+                               ℚ.≤ ℕ→ℚ (length suff'))
+                          slotOf-eq ext-bound
+
+            step₂ : τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
+                                ∸ LB.slotOf b)
+                  ℚ.≤ ℕ→ℚ (length suff')
+            step₂ = subst (λ x → τ ℚ.* ℕ→ℚ (x ∸ LB.slotOf b)
+                               ℚ.≤ ℕ→ℚ (length suff'))
+                          slot-eq step₁
+
+            result : τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
+                                 ∸ LB.slotOf b)
+                   ℚ.≤ ℕ→ℚ (length suff)
+            result = subst (λ y → τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
+                                               ∸ LB.slotOf b) ℚ.≤ ℕ→ℚ y)
+                           length-eq step₂
 
       hcgState-base⇒ext : ∀ τ
         → LB.hcgState τ (transEnv E) (transState E s)
         → LE.hcgState τ E s
       hcgState-base⇒ext τ base-hcg-s {p} hp {pref} {suff} {b} ext-eq honest-b =
-        let base-eq : Base.getChain (transEnv E) (transState E s) hp
+        H.result
+        where
+          module H where
+
+            base-eq : Base.getChain (transEnv E) (transState E s) hp
                     ≡ map getBaseBlock pref ++ getBaseBlock b ∷ map getBaseBlock suff
             base-eq = trans (CL hp)
                             (trans (cong (map getBaseBlock) ext-eq)
@@ -203,8 +214,11 @@ module _ (baseLiv : BL.Liveness) where
 
             length-eq : length (map getBaseBlock suff) ≡ length suff
             length-eq = length-map getBaseBlock suff
-        in subst₂ (λ x y → τ ℚ.* ℕ→ℚ (x ∸ LE.slotOf b) ℚ.≤ ℕ→ℚ y)
-                  slot-eq length-eq bound
+
+            result : τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ LE.slotOf b)
+                   ℚ.≤ ℕ→ℚ (length suff)
+            result = subst₂ (λ x y → τ ℚ.* ℕ→ℚ (x ∸ LE.slotOf b) ℚ.≤ ℕ→ℚ y)
+                            slot-eq length-eq bound
 
       -- ∃CQ -----------------------------------------------------------------
 
@@ -212,27 +226,15 @@ module _ (baseLiv : BL.Liveness) where
         → LE.∃cqState T E s
         → LB.∃cqState T (transEnv E) (transState E s)
       ∃cqState-ext⇒base T ext-∃cq-s {p} hp =
-        let ext-any : Any.Any LE.isHonestBlock
-                        (LE.recent T (Ext.getSlot E s hp) (Ext.getChain E s hp))
-            ext-any = ext-∃cq-s hp
+        let ext-any = ext-∃cq-s hp
 
-            mapped-any : Any.Any LE.isHonestBlock
-                          (LE.recent T (Base.getSlot (transEnv E) (transState E s) hp)
-                                       (Ext.getChain E s hp))
             mapped-any = subst (λ x → Any.Any LE.isHonestBlock
                                          (LE.recent T x (Ext.getChain E s hp)))
                                (sym (SL hp)) ext-any
 
             -- Push `map getBaseBlock` inside `recent` via `recent-map`.
-            any-on-map : Any.Any LB.isHonestBlock
-                          (map getBaseBlock
-                            (LE.recent T (Base.getSlot (transEnv E) (transState E s) hp)
-                                        (Ext.getChain E s hp)))
             any-on-map = AnyP.map⁺ mapped-any
 
-            any-base-recent : Any.Any LB.isHonestBlock
-                                (LB.recent T (Base.getSlot (transEnv E) (transState E s) hp)
-                                             (map getBaseBlock (Ext.getChain E s hp)))
             any-base-recent =
               subst (Any.Any LB.isHonestBlock)
                     (sym (recent-map T (Base.getSlot (transEnv E) (transState E s) hp)
@@ -248,33 +250,20 @@ module _ (baseLiv : BL.Liveness) where
         → LB.∃cqState T (transEnv E) (transState E s)
         → LE.∃cqState T E s
       ∃cqState-base⇒ext T base-∃cq-s {p} hp =
-        let base-any : Any.Any LB.isHonestBlock
-                        (LB.recent T (Base.getSlot (transEnv E) (transState E s) hp)
-                                     (Base.getChain (transEnv E) (transState E s) hp))
-            base-any = base-∃cq-s hp
+        let base-any = base-∃cq-s hp
 
             -- Rewrite base chain → map getBaseBlock of ext chain.
-            step₁ : Any.Any LB.isHonestBlock
-                     (LB.recent T (Base.getSlot (transEnv E) (transState E s) hp)
-                                  (map getBaseBlock (Ext.getChain E s hp)))
             step₁ = subst (λ cs → Any.Any LB.isHonestBlock
                                     (LB.recent T (Base.getSlot (transEnv E) (transState E s) hp) cs))
                           (CL hp) base-any
 
             -- Pull `map getBaseBlock` out of `recent`.
-            step₂ : Any.Any LB.isHonestBlock
-                     (map getBaseBlock
-                       (LE.recent T (Base.getSlot (transEnv E) (transState E s) hp)
-                                   (Ext.getChain E s hp)))
             step₂ = subst (Any.Any LB.isHonestBlock)
                           (recent-map T (Base.getSlot (transEnv E) (transState E s) hp)
                                        (Ext.getChain E s hp))
                           step₁
 
             -- Any (P ∘ f) on original list.
-            step₃ : Any.Any LE.isHonestBlock
-                     (LE.recent T (Base.getSlot (transEnv E) (transState E s) hp)
-                                 (Ext.getChain E s hp))
             step₃ = AnyP.map⁻ step₂
         in subst (λ x → Any.Any LE.isHonestBlock
                            (LE.recent T x (Ext.getChain E s hp)))

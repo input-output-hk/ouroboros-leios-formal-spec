@@ -167,12 +167,12 @@ module _ (IOF AdvF : Participant → Channel)
 
         leiosHCG : (∀ {A} (E : Safety.Environment safetyS A) → LTrM.TrM.ChainLemma-ty E)
                  → (∀ {A} (E : Safety.Environment safetyS A) → LTrM.SlotLemma-ty E)
-                 → ∀ τ → BLiveness.Liveness.hcg RankingBlock Tr.base baseLiv τ
-                       → BLiveness.Liveness.hcg LeiosBlock safetyS leiosLiveness τ
+                 → ∀ τ → LTr.BL.Liveness.hcg baseLiv τ
+                       → LTr.EL.Liveness.hcg leiosLiveness τ
         leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
 
         leios∃CQ : (∀ {A} (E : Safety.Environment safetyS A) → LTrM.TrM.ChainLemma-ty E)
                  → (∀ {A} (E : Safety.Environment safetyS A) → LTrM.SlotLemma-ty E)
-                 → ∀ T → BLiveness.Liveness.∃cq RankingBlock Tr.base baseLiv T
-                       → BLiveness.Liveness.∃cq LeiosBlock safetyS leiosLiveness T
+                 → ∀ T → LTr.BL.Liveness.∃cq baseLiv T
+                       → LTr.EL.Liveness.∃cq leiosLiveness T
         leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL
