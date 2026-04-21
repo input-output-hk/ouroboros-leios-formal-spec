@@ -99,18 +99,26 @@ module _ (IOF AdvF : Participant → Channel)
   (IsBlockchain-Leios : IsBC.IsBlockchain Participant LeiosBlock Leios1)
   where
 
-  module LS {Block : Type}
-    (IsBlockchain-Block : IsBC.IsBlockchain Participant Block Leios1) where
-    n = numberOfParties
-    honest-node-spec = Leios1
-    spec-IsBlockchain = IsBlockchain-Block
-    all-nodes = nodesF
-    honest-nodes = honestNodes
-    network = DD.Network
-    honest-nodes-≡-spec = honest-Node
-
   safetyS : Safety LeiosBlock
-  safetyS = record { LS IsBlockchain-Leios }
+  safetyS = record
+    { n          = numberOfParties
+    ; Network    = _
+    ; spec       = record
+        { IO                = _
+        ; Adv               = _
+        ; honest-node-spec  = Leios1
+        ; spec-IsBlockchain = IsBlockchain-Leios
+        }
+    ; deployment = record
+        { NAdv                = _
+        ; IOF                 = IOF
+        ; AdvF                = AdvF
+        ; all-nodes           = nodesF
+        ; honest-nodes        = honestNodes
+        ; honest-nodes-≡-spec = honest-Node
+        ; network             = DD.Network
+        }
+    }
 
   module S = Safety safetyS
 
@@ -125,22 +133,11 @@ module _ (IOF AdvF : Participant → Channel)
       body : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ ((I ⊗₀ I) ⊗₀ I))
       body = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ)
 
-  module _ (IsBlockchain-spec : IsBC.IsBlockchain Participant RankingBlock spec)
-           (compat : IsBC.IsBlockchain-compatible
-                       Participant IsBlockchain-spec (Safety.spec-IsBlockchain safetyS))
-           where
-
-    open IsBC.IsBlockchain-compatible compat
+  module _ (extension : IsExtension {RankingBlock} (Safety.spec safetyS)) where
 
     private
       module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-        getBaseBlock getBaseBlock-inj
-        safetyS
-        cc
-        (Network ⊗₀ BaseIO) (I ⊗₀ I ⊗₀ BaseAdv)
-        spec IsBlockchain-spec
-        ⊗-identityʳ
-        ext-spec
+        safetyS cc extension
 
     single-protocol-≡-ty : Type₁
     single-protocol-≡-ty = ∀ p → idᴷ ∘ᴷ S.all-nodes p ≡ Tr.extPart p ∘ᴷ Tr.base-all-nodes p
@@ -152,24 +149,30 @@ module _ (IOF AdvF : Participant → Channel)
                   → Safety.safety Tr.base k → S.safety k
       leiosSafety = TrM.transfer k
 
-      private
-        module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-          safetyS
-          cc
-          (Network ⊗₀ BaseIO) (I ⊗₀ I ⊗₀ BaseAdv)
-          spec IsBlockchain-spec
-          compat
-          ⊗-identityʳ
-          ext-spec
+      -- Liveness transfer additionally requires the two block-level
+      -- compatibility witnesses.
+      module _ (producer-compat : ∀ b → S.producer b
+                                      ≡ IsBC.IsBlockchain.producer
+                                          (IsExtension.base-IsBlockchain extension)
+                                          (IsExtension.getBaseBlock extension b))
+               (slotOf-compat   : ∀ b → S.slotOf b
+                                      ≡ IsBC.IsBlockchain.slotOf
+                                          (IsExtension.base-IsBlockchain extension)
+                                          (IsExtension.getBaseBlock extension b))
+        where
 
-        module LTrM = LTr.Main single-protocol-≡
+        private
+          module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
+            safetyS cc extension producer-compat slotOf-compat
 
-      leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-               → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-               → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
-      leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
+          module LTrM = LTr.Main single-protocol-≡
 
-      leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-               → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-               → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
-      leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL
+        leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+                 → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
+                 → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
+        leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
+
+        leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+                 → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
+                 → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
+        leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL

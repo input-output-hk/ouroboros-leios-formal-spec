@@ -13,32 +13,18 @@ open import Relation.Binary using (Poset)
 
 -- | Generic safety transfer.
 --
--- Given an "extended" blockchain spec `ext`, a chain-projection `getBaseBlock`
--- into a "base" blockchain spec (injective), and a honest upper layer
--- witnessing the factoring of each honest ext node through the base spec,
--- safety of the derived base spec implies safety of the ext spec.
---
--- The base-side Safety record is derived internally: honest nodes run
--- `base-spec`, dishonest nodes inherit their original protocol from `ext`.
+-- Given an ext `Safety` and an `IsExtension` witness (the base-side spec,
+-- channel/layer equipment, and block-level projection), safety of the
+-- derived base `Safety` implies safety of the ext `Safety`.
 module Blockchain.Safety.Transfer
-  {BlockExt BlockBase   : Type}
-  (getBaseBlock         : BlockExt → BlockBase)
-  (getBaseBlock-inj     : Injective _≡_ _≡_ getBaseBlock)
-  (ext                  : Safety BlockExt)
-  (cc                   : ChannelCat)
-  -- Base spec + evidence.
-  (base-IO base-Adv     : Channel)
-  (base-spec            : Machine (Safety.Network ext) (base-IO ⊗₀ base-Adv))
-  (base-IsBlockchain    : IsBC.IsBlockchain (Fin (Safety.n ext)) BlockBase base-spec)
-  -- The ext and base adversary channels agree.  Together with
-  -- `Ext.honest-nodes-≡-spec` this lets us swap the honest ext node for
-  -- `base-spec` on the base side.
-  (ext-Adv≡base-Adv     : Safety.Adv ext ≡ base-Adv)
-  -- Honest upper layer: extends the base spec into the ext honest-node spec.
-  (ext-spec             : Machine base-IO (Safety.IO ext ⊗₀ I))
+  {BlockExt BlockBase : Type}
+  (ext                : Safety BlockExt)
+  (cc                 : ChannelCat)
+  (extension          : IsExtension {BlockBase} (Safety.spec ext))
   where
 
 module Ext = Safety ext
+open IsExtension extension
 open ChannelCat cc
 
 -- On honest nodes, the per-participant channels agree with the ext spec's
@@ -55,10 +41,10 @@ base-IOF p = case p ∈? Ext.honest-nodes of λ where
   (yes _) → base-IO
   (no  _) → Ext.IOF p
 
--- Honest nodes are replaced by `base-spec`; dishonest nodes are unchanged.
+-- Honest nodes are replaced by `base-honest-node-spec`; dishonest nodes are unchanged.
 base-all-nodes : (p : Fin Ext.n) → Machine Ext.Network (base-IOF p ⊗₀ Ext.AdvF p)
 base-all-nodes p with p ∈? Ext.honest-nodes
-... | yes hp = subst (λ x → Machine Ext.Network (base-IO ⊗₀ x)) (sym (honest-AdvF hp)) base-spec
+... | yes hp = subst (λ x → Machine Ext.Network (base-IO ⊗₀ x)) (sym (honest-AdvF hp)) base-honest-node-spec
 ... | no  _  = Ext.all-nodes p
 
 private
@@ -66,35 +52,39 @@ private
     → (M : Machine (A x) (B x)) → subst (λ x → Machine (A x) (B x)) eq M ≡ᴹ M
   subst-≡ᴹ refl _ = ≡ᴹ-refl
 
-base-honest-≡-spec : {p : Fin Ext.n} → p ∈ Ext.honest-nodes → base-all-nodes p ≡ᴹ base-spec
+base-honest-≡-spec : {p : Fin Ext.n} → p ∈ Ext.honest-nodes
+                   → base-all-nodes p ≡ᴹ base-honest-node-spec
 base-honest-≡-spec {p} hp with p ∈? Ext.honest-nodes
-... | yes hp' = subst-≡ᴹ (sym (honest-AdvF hp')) base-spec
+... | yes hp' = subst-≡ᴹ (sym (honest-AdvF hp')) base-honest-node-spec
 ... | no ¬hp  = contradiction hp ¬hp
 
--- Derived per-participant extension piece: honest nodes get `ext-spec`
+-- Derived per-participant extension piece: honest nodes get `ext-layer`
 -- (transported from `Ext.IO` to `Ext.IOF p`), dishonest nodes get identity
 -- (with `base-IOF p` definitionally `Ext.IOF p`).
 extPart : (p : Fin Ext.n) → Machine (base-IOF p) (Ext.IOF p ⊗₀ I)
 extPart p with p ∈? Ext.honest-nodes
-... | yes hp = subst (λ x → Machine base-IO (x ⊗₀ I)) (sym (honest-IOF hp)) ext-spec
+... | yes hp = subst (λ x → Machine base-IO (x ⊗₀ I)) (sym (honest-IOF hp)) ext-layer
 ... | no  _  = idᴷ
 
--- The derived base Safety record.
-base : Safety BlockBase
-base = record
-  { n                   = Ext.n
-  ; IO                  = base-IO
-  ; Adv                 = base-Adv
-  ; NAdv                = Ext.NAdv
-  ; Network             = Ext.Network
-  ; honest-node-spec    = base-spec
-  ; spec-IsBlockchain   = base-IsBlockchain
+-- The derived base `SafetyDeployment` (over `base-spec`).
+base-deployment : SafetyDeployment base-spec
+base-deployment = record
+  { NAdv                = Ext.NAdv
   ; IOF                 = base-IOF
   ; AdvF                = Ext.AdvF
   ; all-nodes           = base-all-nodes
   ; honest-nodes        = Ext.honest-nodes
   ; honest-nodes-≡-spec = base-honest-≡-spec
   ; network             = Ext.network
+  }
+
+-- The derived base `Safety` record.
+base : Safety BlockBase
+base = record
+  { n          = Ext.n
+  ; Network    = Ext.Network
+  ; spec       = base-spec
+  ; deployment = base-deployment
   }
 
 module Base = Safety base

@@ -6,25 +6,30 @@ open import CategoricalCrypto hiding (id; _∘_)
 
 import Blockchain.IsBlockchain as IsBC
 
-module Blockchain.Safety (Block : Type) where
+module Blockchain.Safety where
 
-record Safety : Type₂ where
+-- | The single-node blockchain spec: one machine that answers blockchain
+-- queries, plus its `IsBlockchain` evidence.
+record SafetySpec (Block : Type) (n : ℕ) (Network : Channel) : Type₂ where
   field
-    n                        : ℕ
+    IO Adv            : Channel
+    honest-node-spec  : Machine Network (IO ⊗₀ Adv)
+    spec-IsBlockchain : IsBC.IsBlockchain (Fin n) Block honest-node-spec
+  open IsBC.IsBlockchain spec-IsBlockchain public using (producer; slotOf)
 
-  open IsBC (Fin n) public
-
+-- | Deployment of a spec across `n` nodes.  Depends on `SafetySpec` only
+-- via `honest-node-spec` (used in `honest-nodes-≡-spec`).
+record SafetyDeployment {Block : Type} {n : ℕ} {Network : Channel}
+                        (spec : SafetySpec Block n Network) : Type₂ where
+  open SafetySpec spec
+  open IsBC (Fin n)
   field
-    IO Adv NAdv Network      : Channel
-    honest-node-spec         : Machine Network (IO ⊗₀ Adv)
-    spec-IsBlockchain        : IsBlockchain Block honest-node-spec
-    IOF AdvF                 : Fin n → Channel
-    all-nodes                : (p : Fin n) → Machine Network (IOF p ⊗₀ AdvF p)
-    honest-nodes             : ℙ (Fin n)
-    honest-nodes-≡-spec      : ∀ {p} → p ∈ honest-nodes → all-nodes p ≡ᴹ honest-node-spec
-    network                  : Machine I (n ⨂ⁿ Network ⊗₀ NAdv)
-
-  open IsBlockchain spec-IsBlockchain public using (producer; slotOf)
+    NAdv                : Channel
+    IOF AdvF            : Fin n → Channel
+    all-nodes           : (p : Fin n) → Machine Network (IOF p ⊗₀ AdvF p)
+    honest-nodes        : ℙ (Fin n)
+    honest-nodes-≡-spec : ∀ {p} → p ∈ honest-nodes → all-nodes p ≡ᴹ honest-node-spec
+    network             : Machine I (n ⨂ⁿ Network ⊗₀ NAdv)
 
   honest-nodes-blockchain : ∀ {p} → p ∈ honest-nodes → IsBlockchain Block (all-nodes p)
   honest-nodes-blockchain p-honest =
@@ -62,3 +67,39 @@ record Safety : Type₂ where
 
   safety : ℕ → Type₁
   safety k = ∀ {A} (E : Environment A) → Invariant (protocol E) (safeState k E)
+
+-- | Combined single-/multi-node record; kept as the user-facing API.  The
+-- public re-opens below make every old `Safety.X` projection resolve.
+record Safety (Block : Type) : Type₂ where
+  field
+    n          : ℕ
+    Network    : Channel
+    spec       : SafetySpec Block n Network
+    deployment : SafetyDeployment spec
+  open SafetySpec spec public
+  open SafetyDeployment deployment public
+
+-- | Witness that an ext `SafetySpec` extends some base honest-node spec:
+-- bundles the base-side spec, the channel/layer equipment, and the block-level
+-- projection.  Everything both `Safety.Transfer` and `Liveness.Transfer`
+-- need; Liveness additionally takes `producer-compat`/`slotOf-compat` as
+-- extra module parameters.
+record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
+                   (ext-spec : SafetySpec BlockExt n Network) : Type₂ where
+  open SafetySpec ext-spec using (IO; Adv)
+  field
+    base-IO base-Adv      : Channel
+    base-honest-node-spec : Machine Network (base-IO ⊗₀ base-Adv)
+    base-IsBlockchain     : IsBC.IsBlockchain (Fin n) BlockBase base-honest-node-spec
+    ext-Adv≡base-Adv      : Adv ≡ base-Adv
+    ext-layer             : Machine base-IO (IO ⊗₀ I)
+    getBaseBlock          : BlockExt → BlockBase
+    getBaseBlock-inj      : Injective _≡_ _≡_ getBaseBlock
+
+  base-spec : SafetySpec BlockBase n Network
+  base-spec = record
+    { IO                = base-IO
+    ; Adv               = base-Adv
+    ; honest-node-spec  = base-honest-node-spec
+    ; spec-IsBlockchain = base-IsBlockchain
+    }

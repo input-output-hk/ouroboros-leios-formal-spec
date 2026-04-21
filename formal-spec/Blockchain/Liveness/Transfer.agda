@@ -19,28 +19,29 @@ open import Relation.Unary using (Decidable)
 
 -- | Generic liveness transfer.
 --
--- Given the same ingredients as `Blockchain.Safety.Transfer` plus an
--- `IsBlockchain-compatible` witness that the ext spec's `producer`/`slotOf`
--- factor through `getBaseBlock`, HCG and ∃CQ transfer from base to ext.
+-- Same shape as `Blockchain.Safety.Transfer`, plus two extra parameters
+-- (`producer-compat` and `slotOf-compat`) witnessing that the ext spec's
+-- `producer`/`slotOf` factor through `getBaseBlock`.  HCG and ∃CQ transfer
+-- from base to ext.
 module Blockchain.Liveness.Transfer
-  {BlockExt BlockBase   : Type}
-  (ext                  : Safety BlockExt)
-  (cc                   : ChannelCat)
-  (base-IO base-Adv     : Channel)
-  (base-spec            : Machine (Safety.Network ext) (base-IO ⊗₀ base-Adv))
-  (base-IsBlockchain    : IsBC.IsBlockchain (Fin (Safety.n ext)) BlockBase base-spec)
-  (compat               : IsBC.IsBlockchain-compatible (Fin (Safety.n ext)) base-IsBlockchain (Safety.spec-IsBlockchain ext))
-  (ext-Adv≡base-Adv     : Safety.Adv ext ≡ base-Adv)
-  (ext-spec             : Machine base-IO (Safety.IO ext ⊗₀ I))
+  {BlockExt BlockBase : Type}
+  (ext                : Safety BlockExt)
+  (cc                 : ChannelCat)
+  (extension          : IsExtension {BlockBase} (Safety.spec ext))
+  (producer-compat    : ∀ b → Safety.producer ext b
+                            ≡ IsBC.IsBlockchain.producer
+                                (IsExtension.base-IsBlockchain extension)
+                                (IsExtension.getBaseBlock extension b))
+  (slotOf-compat      : ∀ b → Safety.slotOf ext b
+                            ≡ IsBC.IsBlockchain.slotOf
+                                (IsExtension.base-IsBlockchain extension)
+                                (IsExtension.getBaseBlock extension b))
   where
 
-open IsBC.IsBlockchain-compatible compat
+open IsExtension extension
 
 import Blockchain.Safety.Transfer as ST
-module Tr = ST
-  getBaseBlock getBaseBlock-inj ext cc
-  base-IO base-Adv base-spec base-IsBlockchain
-  ext-Adv≡base-Adv ext-spec
+module Tr = ST ext cc extension
 
 open Tr using (extPart; base-all-nodes)
 
