@@ -4,7 +4,7 @@ open import Leios.Prelude hiding (id; _⊗_)
 
 open import CategoricalCrypto hiding (id; _∘_)
 
-open import Blockchain.Safety using (Safety)
+open import Blockchain.Safety using (Deployment)
 
 import Data.Integer as ℤ
 import Data.Rational as ℚ
@@ -12,10 +12,10 @@ open ℚ using (ℚ)
 
 module Blockchain.Liveness
   (Block : Type)
-  (S     : Safety Block)
+  (S     : Deployment Block)
   where
 
-open Safety S
+open Deployment S
 
 ℕ→ℚ : ℕ → ℚ
 ℕ→ℚ n = (ℤ.+ n) ℚ./ 1

@@ -14,16 +14,16 @@ open import Relation.Binary using (Poset)
 
 -- | Generic safety transfer.
 --
--- Given an ext `Safety` and an `IsExtension` witness (the base-side spec,
+-- Given an ext `Deployment` and an `IsExtension` witness (the base-side spec,
 -- channel/layer equipment, and block-level projection), safety of the
--- derived base `Safety` implies safety of the ext `Safety`.
+-- derived base `Deployment` implies safety of the ext `Deployment`.
 module Blockchain.Safety.Transfer
   {BlockExt BlockBase : Type}
-  (ext                : Safety BlockExt)
-  (let module Ext = Safety ext)
+  (ext                : Deployment BlockExt)
+  (let module Ext = Deployment ext)
   (base-spec          : Spec BlockBase Ext.n Ext.Network)
   (cc                 : ChannelCat)
-  (extension          : IsExtension base-spec (Safety.spec ext))
+  (extension          : IsExtension base-spec Ext.spec)
   where
 
 module B = Spec base-spec
@@ -62,9 +62,12 @@ extPart p with p ∈? Ext.honest-nodes
 ... | yes hp = subst (λ x → Machine B.IO (x ⊗₀ I)) (sym (honest-IOF hp)) ext-layer
 ... | no  _  = idᴷ
 
-base-deployment : Deployment base-spec
-base-deployment = record
-  { NAdv                = Ext.NAdv
+base : Deployment BlockBase
+base = record
+  { n                   = Ext.n
+  ; Network             = Ext.Network
+  ; spec                = base-spec
+  ; NAdv                = Ext.NAdv
   ; IOF                 = base-IOF
   ; AdvF                = Ext.AdvF
   ; all-nodes           = base-all-nodes
@@ -73,15 +76,7 @@ base-deployment = record
   ; network             = Ext.network
   }
 
-base : Safety BlockBase
-base = record
-  { n          = Ext.n
-  ; Network    = Ext.Network
-  ; spec       = base-spec
-  ; deployment = base-deployment
-  }
-
-module Base = Safety base
+module Base = Deployment base
 
 single-protocol-≡ : ∀ p → idᴷ ∘ᴷ Ext.all-nodes p ≡ extPart p ∘ᴷ base-all-nodes p
 single-protocol-≡ p with p ∈? Ext.honest-nodes

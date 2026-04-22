@@ -18,10 +18,13 @@ record Spec (Block : Type) (n : ℕ) (Network : Channel) : Type₂ where
 
 -- | Deployment of a spec across `n` nodes. Honest nodes must behave
 -- according to `spec`, others can be completely arbitrary.
-record Deployment {Block : Type} {n : ℕ} {Network : Channel}
-                        (spec : Spec Block n Network) : Type₂ where
-  open Spec spec
-  open IsBC (Fin n)
+record Deployment (Block : Type) : Type₂ where
+  field
+    n       : ℕ
+    Network : Channel
+    spec    : Spec Block n Network
+  open Spec spec public
+  open IsBC (Fin n) public
   field
     NAdv                : Channel
     IOF AdvF            : Fin n → Channel
@@ -66,16 +69,6 @@ record Deployment {Block : Type} {n : ℕ} {Network : Channel}
 
   safety : ℕ → Type₁
   safety k = ∀ {A} (E : Environment A) → Invariant (protocol E) (safeState k E)
-
--- | Bundled `Deployment`
-record Safety (Block : Type) : Type₂ where
-  field
-    n          : ℕ
-    Network    : Channel
-    spec       : Spec Block n Network
-    deployment : Deployment spec
-  open Spec spec public
-  open Deployment deployment public
 
 -- | Witness that one `Spec` extends a given base `Spec`
 record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}

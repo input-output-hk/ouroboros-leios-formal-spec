@@ -24,14 +24,14 @@ open import Relation.Unary using (Decidable)
 -- from base to ext.
 module Blockchain.Liveness.Transfer
   {BlockExt BlockBase : Type}
-  (ext                : Safety BlockExt)
-  (let module Ext = Safety ext)
+  (ext                : Deployment BlockExt)
+  (let module Ext = Deployment ext)
   (base-spec          : Spec BlockBase Ext.n Ext.Network)
   (cc                 : ChannelCat)
-  (extension          : IsExtension base-spec (Safety.spec ext))
-  (producer-compat    : ∀ b → Safety.producer ext b
+  (extension          : IsExtension base-spec Ext.spec)
+  (producer-compat    : ∀ b → Deployment.producer ext b
                             ≡ Spec.producer base-spec (IsExtension.getBaseBlock extension b))
-  (slotOf-compat      : ∀ b → Safety.slotOf ext b
+  (slotOf-compat      : ∀ b → Deployment.slotOf ext b
                             ≡ Spec.slotOf base-spec (IsExtension.getBaseBlock extension b))
   where
 

@@ -125,28 +125,26 @@ module _ (IOF AdvF : Participant → Channel)
     ; slotOf        = λ b → IBB.slotOf   (LeiosBlock.rb b)
     }
 
-  safetyS : Safety LeiosBlock
+  safetyS : Deployment LeiosBlock
   safetyS = record
-    { n          = numberOfParties
-    ; Network    = _
-    ; spec       = record
+    { n                   = numberOfParties
+    ; Network             = _
+    ; spec                = record
         { IO                = _
         ; Adv               = _
         ; honest-node-spec  = Leios1
         ; spec-IsBlockchain = IsBlockchain-Leios
         }
-    ; deployment = record
-        { NAdv                = _
-        ; IOF                 = IOF
-        ; AdvF                = AdvF
-        ; all-nodes           = nodesF
-        ; honest-nodes        = honestNodes
-        ; honest-nodes-≡-spec = honest-Node
-        ; network             = DD.Network
-        }
+    ; NAdv                = _
+    ; IOF                 = IOF
+    ; AdvF                = AdvF
+    ; all-nodes           = nodesF
+    ; honest-nodes        = honestNodes
+    ; honest-nodes-≡-spec = honest-Node
+    ; network             = DD.Network
     }
 
-  module S = Safety safetyS
+  module S = Deployment safetyS
 
   base-spec : Spec RankingBlock S.n S.Network
   base-spec = record
@@ -156,7 +154,7 @@ module _ (IOF AdvF : Participant → Channel)
     ; spec-IsBlockchain = IsBlockchain-base
     }
 
-  extension : IsExtension base-spec (Safety.spec safetyS)
+  extension : IsExtension base-spec (Deployment.spec safetyS)
   extension = record
     { ext-Adv≡base-Adv = ⊗-identityʳ
     ; ext-layer        = ext-spec
@@ -170,8 +168,8 @@ module _ (IOF AdvF : Participant → Channel)
       safetyS base-spec cc extension
     module TrM = Tr.Main
 
-  leiosSafety : (∀ {A} (E : Safety.Environment safetyS A) → TrM.ChainLemma-ty E)
-              → Safety.safety Tr.base k → S.safety k
+  leiosSafety : (∀ {A} (E : Deployment.Environment safetyS A) → TrM.ChainLemma-ty E)
+              → Deployment.safety Tr.base k → S.safety k
   leiosSafety = TrM.transfer k
 
   private
