@@ -204,9 +204,18 @@ module Main (single-protocol-≡ : ∀ p
 
           result : τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ Ext.slotOf b)
                  ℚ.≤ ℕ→ℚ (length suff)
-          result = subst₂ (λ x y → τ ℚ.* ℕ→ℚ (x ∸ Ext.slotOf b) ℚ.≤ ℕ→ℚ y) slot-eq length-eq
-                 $ subst (λ z → τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ z)
-                                ℚ.≤ ℕ→ℚ (length (map getBaseBlock suff))) slotOf-eq bound
+          result = let open ℚP.≤-Reasoning in
+            begin
+              τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ Ext.slotOf b)
+            ≡⟨ cong (λ x → τ ℚ.* ℕ→ℚ (x ∸ Ext.slotOf b)) (sym slot-eq) ⟩
+              τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ Ext.slotOf b)
+            ≡⟨ cong (λ y → τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ y)) (sym slotOf-eq) ⟩
+              τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ Base.slotOf (getBaseBlock b))
+            ≤⟨ bound ⟩
+              ℕ→ℚ (length (map getBaseBlock suff))
+            ≡⟨ cong ℕ→ℚ length-eq ⟩
+              ℕ→ℚ (length suff)
+            ∎
 
     -- ∃CQ -----------------------------------------------------------------
 
