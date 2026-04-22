@@ -79,27 +79,18 @@ record Safety (Block : Type) : Type₂ where
   open Spec spec public
   open Deployment deployment public
 
--- | Witness that an ext `Spec` extends some base honest-node spec:
--- bundles the base-side spec, the channel/layer equipment, and the block-level
--- projection.  Everything both `Safety.Transfer` and `Liveness.Transfer`
--- need; Liveness additionally takes `producer-compat`/`slotOf-compat` as
--- extra module parameters.
+-- | Witness that an ext `Spec` extends a given base `Spec`: bundles the
+-- channel/layer equipment and the block-level projection.  Everything both
+-- `Safety.Transfer` and `Liveness.Transfer` need; Liveness additionally takes
+-- `producer-compat`/`slotOf-compat` as extra module parameters.
 record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
-                   (ext-spec : Spec BlockExt n Network) : Type₂ where
-  open Spec ext-spec using (IO; Adv)
+                   (base-spec : Spec BlockBase n Network)
+                   (ext-spec  : Spec BlockExt  n Network) : Type₂ where
+  private
+    module B = Spec base-spec
+    module E = Spec ext-spec
   field
-    base-IO base-Adv      : Channel
-    base-honest-node-spec : Machine Network (base-IO ⊗₀ base-Adv)
-    base-IsBlockchain     : IsBC.IsBlockchain (Fin n) BlockBase base-honest-node-spec
-    ext-Adv≡base-Adv      : Adv ≡ base-Adv
-    ext-layer             : Machine base-IO (IO ⊗₀ I)
-    getBaseBlock          : BlockExt → BlockBase
-    getBaseBlock-inj      : Injective _≡_ _≡_ getBaseBlock
-
-  base-spec : Spec BlockBase n Network
-  base-spec = record
-    { IO                = base-IO
-    ; Adv               = base-Adv
-    ; honest-node-spec  = base-honest-node-spec
-    ; spec-IsBlockchain = base-IsBlockchain
-    }
+    ext-Adv≡base-Adv : E.Adv ≡ B.Adv
+    ext-layer        : Machine B.IO (E.IO ⊗₀ I)
+    getBaseBlock     : BlockExt → BlockBase
+    getBaseBlock-inj : Injective _≡_ _≡_ getBaseBlock

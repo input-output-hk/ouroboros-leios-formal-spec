@@ -19,11 +19,13 @@ open import Relation.Binary using (Poset)
 module Blockchain.Safety.Transfer
   {BlockExt BlockBase : Type}
   (ext                : Safety BlockExt)
+  (let module Ext = Safety ext)
+  (base-spec          : Spec BlockBase Ext.n Ext.Network)
   (cc                 : ChannelCat)
-  (extension          : IsExtension {BlockBase} (Safety.spec ext))
+  (extension          : IsExtension base-spec (Safety.spec ext))
   where
 
-module Ext = Safety ext
+module B = Spec base-spec
 open IsExtension extension
 open ChannelCat cc
 
@@ -32,19 +34,19 @@ open ChannelCat cc
 honest-IOF : {p : Fin Ext.n} → p ∈ Ext.honest-nodes → Ext.IOF p ≡ Ext.IO
 honest-IOF hp = ⊗-injectiveˡ (_≡ᴹ_.B≡D (Ext.honest-nodes-≡-spec hp))
 
-honest-AdvF : {p : Fin Ext.n} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ base-Adv
+honest-AdvF : {p : Fin Ext.n} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ B.Adv
 honest-AdvF hp = trans (⊗-injectiveʳ (_≡ᴹ_.B≡D (Ext.honest-nodes-≡-spec hp))) ext-Adv≡base-Adv
 
--- Per-participant base IO channel: `base-IO` on honest nodes, else ext IOF.
+-- Per-participant base IO channel: `B.IO` on honest nodes, else ext IOF.
 base-IOF : Fin Ext.n → Channel
 base-IOF p = case p ∈? Ext.honest-nodes of λ where
-  (yes _) → base-IO
+  (yes _) → B.IO
   (no  _) → Ext.IOF p
 
--- Honest nodes are replaced by `base-honest-node-spec`; dishonest nodes are unchanged.
+-- Honest nodes are replaced by `B.honest-node-spec`; dishonest nodes are unchanged.
 base-all-nodes : (p : Fin Ext.n) → Machine Ext.Network (base-IOF p ⊗₀ Ext.AdvF p)
 base-all-nodes p with p ∈? Ext.honest-nodes
-... | yes hp = subst (λ x → Machine Ext.Network (base-IO ⊗₀ x)) (sym (honest-AdvF hp)) base-honest-node-spec
+... | yes hp = subst (λ x → Machine Ext.Network (B.IO ⊗₀ x)) (sym (honest-AdvF hp)) B.honest-node-spec
 ... | no  _  = Ext.all-nodes p
 
 private
@@ -53,9 +55,9 @@ private
   subst-≡ᴹ refl _ = ≡ᴹ-refl
 
 base-honest-≡-spec : {p : Fin Ext.n} → p ∈ Ext.honest-nodes
-                   → base-all-nodes p ≡ᴹ base-honest-node-spec
+                   → base-all-nodes p ≡ᴹ B.honest-node-spec
 base-honest-≡-spec {p} hp with p ∈? Ext.honest-nodes
-... | yes hp' = subst-≡ᴹ (sym (honest-AdvF hp')) base-honest-node-spec
+... | yes hp' = subst-≡ᴹ (sym (honest-AdvF hp')) B.honest-node-spec
 ... | no ¬hp  = contradiction hp ¬hp
 
 -- Derived per-participant extension piece: honest nodes get `ext-layer`
@@ -63,7 +65,7 @@ base-honest-≡-spec {p} hp with p ∈? Ext.honest-nodes
 -- (with `base-IOF p` definitionally `Ext.IOF p`).
 extPart : (p : Fin Ext.n) → Machine (base-IOF p) (Ext.IOF p ⊗₀ I)
 extPart p with p ∈? Ext.honest-nodes
-... | yes hp = subst (λ x → Machine base-IO (x ⊗₀ I)) (sym (honest-IOF hp)) ext-layer
+... | yes hp = subst (λ x → Machine B.IO (x ⊗₀ I)) (sym (honest-IOF hp)) ext-layer
 ... | no  _  = idᴷ
 
 -- The derived base `Deployment` (over `base-spec`).

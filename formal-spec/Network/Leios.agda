@@ -133,11 +133,12 @@ module _ (IOF AdvF : Participant → Channel)
       body : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ ((I ⊗₀ I) ⊗₀ I))
       body = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ)
 
-  module _ (extension : IsExtension {RankingBlock} (Safety.spec safetyS)) where
+  module _ (base-spec : Spec RankingBlock S.n S.Network)
+           (extension : IsExtension base-spec (Safety.spec safetyS)) where
 
     private
       module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-        safetyS cc extension
+        safetyS base-spec cc extension
 
     single-protocol-≡-ty : Type₁
     single-protocol-≡-ty = ∀ p → idᴷ ∘ᴷ S.all-nodes p ≡ Tr.extPart p ∘ᴷ Tr.base-all-nodes p
@@ -152,18 +153,16 @@ module _ (IOF AdvF : Participant → Channel)
       -- Liveness transfer additionally requires the two block-level
       -- compatibility witnesses.
       module _ (producer-compat : ∀ b → S.producer b
-                                      ≡ IsBC.IsBlockchain.producer
-                                          (IsExtension.base-IsBlockchain extension)
+                                      ≡ Spec.producer base-spec
                                           (IsExtension.getBaseBlock extension b))
                (slotOf-compat   : ∀ b → S.slotOf b
-                                      ≡ IsBC.IsBlockchain.slotOf
-                                          (IsExtension.base-IsBlockchain extension)
+                                      ≡ Spec.slotOf base-spec
                                           (IsExtension.getBaseBlock extension b))
         where
 
         private
           module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-            safetyS cc extension producer-compat slotOf-compat
+            safetyS base-spec cc extension producer-compat slotOf-compat
 
           module LTrM = LTr.Main single-protocol-≡
 
