@@ -69,6 +69,7 @@ open import Leios.Linear
 Category-theoretic approach to cryptography
 ```agda
 open import CategoricalCrypto
+import CategoricalCrypto.Ext
 ```
 ### Blockchain abstractions
 ```agda
