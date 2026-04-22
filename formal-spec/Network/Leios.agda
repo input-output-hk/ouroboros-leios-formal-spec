@@ -7,13 +7,14 @@ open import Leios.Config
 
 open import CategoricalCrypto hiding (id)
 open import CategoricalCrypto.Channel.Selection
-import CategoricalCrypto as CC
 
 open import Blockchain.Safety
 import Blockchain.IsBlockchain as IsBC
 open import Leios.ChannelCat
 import Blockchain.Safety.Transfer as Transfer
 import Blockchain.Liveness.Transfer as LTransfer
+
+open import Data.Product.Properties
 
 module Network.Leios
   (⋯ : SpecStructure) (let open SpecStructure ⋯)
@@ -79,8 +80,6 @@ record LeiosBlock : Type where
   field rb : RankingBlock
         eb : Maybe EndorserBlock
         correct : HashCorrectB rb eb
-
-open import Data.Product.Properties
 
 hash-unique' : (rb : RankingBlock) → (eb₁ eb₂ : Maybe EndorserBlock)
   → (hc₁ : HashCorrectB rb eb₁) → (hc₂ : HashCorrectB rb eb₂) → (eb₁ , hc₁) ≡ (eb₂ , hc₂)

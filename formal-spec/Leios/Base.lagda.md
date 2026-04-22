@@ -133,30 +133,4 @@ or equal than the slot of the last processed block
           is-blockchain : IsBlockchain RankingBlock m
 
     open Machine m renaming (stepRel to _-⟦_/_⟧⇀_) public
-
---   module _
---     (numberOfParties     : ℕ)
---     (NAdv                : Channel)
---     (honestSpec          : BaseMachine)
---     (IOF AdvF : Fin numberOfParties → Channel)
---     (allNodes            : (p : Fin numberOfParties) → Machine BaseNetwork (IOF p ⊗ AdvF p))
---     (honestNodes         : ℙ (Fin numberOfParties))
---     (honest≡spec         : ∀ {p} → p ∈ honestNodes → allNodes p ≡ᴹ BaseMachine.m honestSpec)
---     (Net                 : Machine I (numberOfParties ⨂ⁿ BaseNetwork ⊗ NAdv))
---     (k                   : ℕ)
---     (Δ                   : ℕ)
---     (HonestStakeMajority : Type)
---     where
-
---     safetyBase : Type₁
---     safetyBase = Safety.safety
---           (BaseMachine.m honestSpec)
---           (BaseMachine.is-blockchain honestSpec)
---           IOF AdvF
---           allNodes
---           honestNodes
---           honest≡spec
---           Net
---           k
---           Δ
--- ```
+```

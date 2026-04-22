@@ -2,7 +2,6 @@
 
 open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import Blockchain.Safety
-import Blockchain.IsBlockchain as IsBC
 import Blockchain.Liveness
 open import Leios.ChannelCat
 
