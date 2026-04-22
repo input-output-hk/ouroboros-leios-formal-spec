@@ -30,21 +30,17 @@ module B = Spec base-spec
 open IsExtension extension
 open ChannelCat cc
 
--- On honest nodes, the per-participant channels agree with the ext spec's
--- `IO`/`Adv` channels.  Derived from `Ext.honest-nodes-≡-spec`.
 honest-IOF : {p : Fin Ext.n} → p ∈ Ext.honest-nodes → Ext.IOF p ≡ Ext.IO
 honest-IOF hp = ⊗-injectiveˡ (_≡ᴹ_.B≡D (Ext.honest-nodes-≡-spec hp))
 
 honest-AdvF : {p : Fin Ext.n} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ B.Adv
 honest-AdvF hp = trans (⊗-injectiveʳ (_≡ᴹ_.B≡D (Ext.honest-nodes-≡-spec hp))) ext-Adv≡base-Adv
 
--- Per-participant base IO channel: `B.IO` on honest nodes, else ext IOF.
 base-IOF : Fin Ext.n → Channel
 base-IOF p = case p ∈? Ext.honest-nodes of λ where
   (yes _) → B.IO
   (no  _) → Ext.IOF p
 
--- Honest nodes are replaced by `B.honest-node-spec`; dishonest nodes are unchanged.
 base-all-nodes : (p : Fin Ext.n) → Machine Ext.Network (base-IOF p ⊗₀ Ext.AdvF p)
 base-all-nodes p with p ∈? Ext.honest-nodes
 ... | yes hp = subst (λ x → Machine Ext.Network (B.IO ⊗₀ x)) (sym (honest-AdvF hp)) B.honest-node-spec
@@ -61,15 +57,11 @@ base-honest-≡-spec {p} hp with p ∈? Ext.honest-nodes
 ... | yes hp' = subst-≡ᴹ (sym (honest-AdvF hp')) B.honest-node-spec
 ... | no ¬hp  = contradiction hp ¬hp
 
--- Derived per-participant extension piece: honest nodes get `ext-layer`
--- (transported from `Ext.IO` to `Ext.IOF p`), dishonest nodes get identity
--- (with `base-IOF p` definitionally `Ext.IOF p`).
 extPart : (p : Fin Ext.n) → Machine (base-IOF p) (Ext.IOF p ⊗₀ I)
 extPart p with p ∈? Ext.honest-nodes
 ... | yes hp = subst (λ x → Machine B.IO (x ⊗₀ I)) (sym (honest-IOF hp)) ext-layer
 ... | no  _  = idᴷ
 
--- The derived base `Deployment` (over `base-spec`).
 base-deployment : Deployment base-spec
 base-deployment = record
   { NAdv                = Ext.NAdv
@@ -81,7 +73,6 @@ base-deployment = record
   ; network             = Ext.network
   }
 
--- The derived base `Safety` record.
 base : Safety BlockBase
 base = record
   { n          = Ext.n
@@ -92,10 +83,6 @@ base = record
 
 module Base = Safety base
 
--- Every ext node factors as `extPart p ∘ᴷ base-all-nodes p`.  For honest
--- nodes this follows from `is-extension` via `∘ᴷ-cong-≡ᴹ` (a ChannelCat
--- axiom); for dishonest nodes both sides definitionally reduce to the
--- same `idᴷ ∘ᴷ Ext.all-nodes p`.
 single-protocol-≡ : ∀ p → idᴷ ∘ᴷ Ext.all-nodes p ≡ extPart p ∘ᴷ base-all-nodes p
 single-protocol-≡ p with p ∈? Ext.honest-nodes
 ... | no ¬hp = refl
@@ -109,7 +96,6 @@ single-protocol-≡ p with p ∈? Ext.honest-nodes
 
 module Main where
 
-  -- | Translation from extended protocols to base protocols.
   module _ {A : Channel} (E : Ext.Environment A) where
 
     -- this is a structure isomorphism
@@ -118,7 +104,6 @@ module Main where
       (⨂ Ext.IOF ⊗₀ (Ext.NAdv ⊗₀ ⨂ Ext.AdvF))
     transId = insert-id-helper Ext.AdvF ∘ (⨂-absorb-env-helper Ext.IOF)
 
-    -- This is `E`, but we absorb the `extPart` part of each participant.
     transEnv : Base.Environment A
     transEnv = E ∘ transId ∘ ⨂ᴷ extPart ⊗₁ CC.id
 
@@ -142,7 +127,6 @@ module Main where
       → Trace (Base.protocol transEnv) (transState s₁) (transState s₂)
     transTrace = Trace-subst transProtocol
 
-  -- | Chain lemma: the base chain is the `getBaseBlock`-projection of the ext chain.
   ChainLemma-ty : ∀ {A : Channel} → Ext.Environment A → Type
   ChainLemma-ty {A} E = ∀ {p : Fin Ext.n} {s} (p-honest : p ∈ Ext.honest-nodes)
     → Base.getChain (transEnv E) (transState E s) p-honest

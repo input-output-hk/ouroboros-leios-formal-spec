@@ -3,8 +3,7 @@
 open import Leios.Prelude
 open import CategoricalCrypto
 
--- | Generic "the machine answers blockchain queries and blocks carry
--- producer/slot metadata" witness.
+-- | Typeclass for machines that behave like a blockchain
 --
 -- Parameterised over the type of participants (producers).  At use sites,
 -- `Participant` is typically instantiated to `Fin n` where `n` is the number

@@ -45,8 +45,6 @@ open Tr using (extPart; base-all-nodes)
 module Base = Tr.Base
 
 private
-  -- Generic lemma: filtering after mapping equals mapping after filtering
-  -- with the pulled-back predicate.
   filter-map : ∀ {A B : Type} {P : B → Type} (P? : Decidable P) (f : A → B)
                (xs : List A)
              → L.filter P? (L.map f xs) ≡ L.map f (L.filter (λ x → P? (f x)) xs)
@@ -55,8 +53,6 @@ private
   ... | yes _ = cong (f x ∷_) (filter-map P? f xs)
   ... | no  _ = filter-map P? f xs
 
--- A splitting of `map f l` lifts to a splitting of `l`.
-private
   map-split : ∀ {A B : Type} {f : A → B} (l : List A) (pref : List B) (b : B) (suff : List B)
     → map f l ≡ pref ++ b ∷ suff
     → Σ[ pref' ∈ List A ] Σ[ b' ∈ A ] Σ[ suff' ∈ List A ]
@@ -87,14 +83,11 @@ module Main where
   module TrM = Tr.Main
   open TrM using (transEnv; transState; transTrace; ChainLemma-ty)
 
-  -- Slot lemma: the base-side slot query agrees with the ext-side slot query.
   SlotLemma-ty : ∀ {A : Channel} → Ext.Environment A → Type
   SlotLemma-ty {A} E = ∀ {p : Fin Ext.n} {s} (p-honest : p ∈ Ext.honest-nodes)
     → Base.getSlot (transEnv E) (transState E s) p-honest
     ≡ Ext.getSlot E s p-honest
 
-  -- `recent` commutes with `map getBaseBlock`.  Follows from the generic
-  -- `filter-map` lemma together with `slotOf-compat`.
   recent-map : ∀ T s (l : List BlockExt)
     → BL.recent T s (map getBaseBlock l) ≡ map getBaseBlock (EL.recent T s l)
   recent-map T s l =
