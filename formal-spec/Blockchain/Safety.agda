@@ -92,5 +92,13 @@ record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
   field
     ext-Adv≡base-Adv : E.Adv ≡ B.Adv
     ext-layer        : Machine B.IO (E.IO ⊗₀ I)
+    -- The ext honest-node spec factors through the base honest-node spec via
+    -- `ext-layer`, modulo the `Adv`-channel equality.  This is the equational
+    -- core of "ext extends base" and lets `Safety.Transfer` derive
+    -- `single-protocol-≡` from this record rather than asking for it.
+    is-extension : idᴷ ∘ᴷ E.honest-node-spec
+                 ≡ subst (λ A → Machine Network (E.IO ⊗₀ (A ⊗₀ I)))
+                         (sym ext-Adv≡base-Adv)
+                         (ext-layer ∘ᴷ B.honest-node-spec)
     getBaseBlock     : BlockExt → BlockBase
     getBaseBlock-inj : Injective _≡_ _≡_ getBaseBlock

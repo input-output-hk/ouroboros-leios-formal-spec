@@ -92,8 +92,10 @@ base = record
 module Base = Safety base
 
 -- The remaining transfer requires the caller to prove that every ext node
--- factors as `extPart p ∘ᴷ base-all-nodes p`.  Since `extPart` is derived
--- above, this proof is stated in terms of the derived definition.
+-- factors as `extPart p ∘ᴷ base-all-nodes p`.  For honest nodes this follows
+-- from `is-extension` (with some type-bridging work); for dishonest nodes
+-- both sides definitionally reduce to `idᴷ ∘ᴷ Ext.all-nodes p`.  The actual
+-- derivation is deferred to the caller for now.
 module Main (single-protocol-≡ : ∀ p
                                → idᴷ ∘ᴷ Ext.all-nodes p
                                ≡ extPart p ∘ᴷ base-all-nodes p) where
