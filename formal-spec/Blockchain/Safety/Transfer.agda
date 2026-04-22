@@ -66,8 +66,8 @@ extPart p with p ∈? Ext.honest-nodes
 ... | yes hp = subst (λ x → Machine base-IO (x ⊗₀ I)) (sym (honest-IOF hp)) ext-layer
 ... | no  _  = idᴷ
 
--- The derived base `SafetyDeployment` (over `base-spec`).
-base-deployment : SafetyDeployment base-spec
+-- The derived base `Deployment` (over `base-spec`).
+base-deployment : Deployment base-spec
 base-deployment = record
   { NAdv                = Ext.NAdv
   ; IOF                 = base-IOF

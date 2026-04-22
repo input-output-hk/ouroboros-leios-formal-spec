@@ -10,18 +10,18 @@ module Blockchain.Safety where
 
 -- | The single-node blockchain spec: one machine that answers blockchain
 -- queries, plus its `IsBlockchain` evidence.
-record SafetySpec (Block : Type) (n : ℕ) (Network : Channel) : Type₂ where
+record Spec (Block : Type) (n : ℕ) (Network : Channel) : Type₂ where
   field
     IO Adv            : Channel
     honest-node-spec  : Machine Network (IO ⊗₀ Adv)
     spec-IsBlockchain : IsBC.IsBlockchain (Fin n) Block honest-node-spec
   open IsBC.IsBlockchain spec-IsBlockchain public using (producer; slotOf)
 
--- | Deployment of a spec across `n` nodes.  Depends on `SafetySpec` only
+-- | Deployment of a spec across `n` nodes.  Depends on `Spec` only
 -- via `honest-node-spec` (used in `honest-nodes-≡-spec`).
-record SafetyDeployment {Block : Type} {n : ℕ} {Network : Channel}
-                        (spec : SafetySpec Block n Network) : Type₂ where
-  open SafetySpec spec
+record Deployment {Block : Type} {n : ℕ} {Network : Channel}
+                        (spec : Spec Block n Network) : Type₂ where
+  open Spec spec
   open IsBC (Fin n)
   field
     NAdv                : Channel
@@ -74,19 +74,19 @@ record Safety (Block : Type) : Type₂ where
   field
     n          : ℕ
     Network    : Channel
-    spec       : SafetySpec Block n Network
-    deployment : SafetyDeployment spec
-  open SafetySpec spec public
-  open SafetyDeployment deployment public
+    spec       : Spec Block n Network
+    deployment : Deployment spec
+  open Spec spec public
+  open Deployment deployment public
 
--- | Witness that an ext `SafetySpec` extends some base honest-node spec:
+-- | Witness that an ext `Spec` extends some base honest-node spec:
 -- bundles the base-side spec, the channel/layer equipment, and the block-level
 -- projection.  Everything both `Safety.Transfer` and `Liveness.Transfer`
 -- need; Liveness additionally takes `producer-compat`/`slotOf-compat` as
 -- extra module parameters.
 record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
-                   (ext-spec : SafetySpec BlockExt n Network) : Type₂ where
-  open SafetySpec ext-spec using (IO; Adv)
+                   (ext-spec : Spec BlockExt n Network) : Type₂ where
+  open Spec ext-spec using (IO; Adv)
   field
     base-IO base-Adv      : Channel
     base-honest-node-spec : Machine Network (base-IO ⊗₀ base-Adv)
@@ -96,7 +96,7 @@ record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
     getBaseBlock          : BlockExt → BlockBase
     getBaseBlock-inj      : Injective _≡_ _≡_ getBaseBlock
 
-  base-spec : SafetySpec BlockBase n Network
+  base-spec : Spec BlockBase n Network
   base-spec = record
     { IO                = base-IO
     ; Adv               = base-Adv
