@@ -92,11 +92,15 @@ LeiosBlock-Injective
   subst (λ (eb , correct) → _ ≡ record { rb = rb ; eb = eb ; correct = correct })
     (hash-unique' rb eb₁ eb₂ correct₁ correct₂) refl
 
+spec : Machine DD.M ((Network ⊗₀ BaseIO) ⊗₀ (I ⊗₀ I ⊗₀ BaseAdv))
+spec = (idᴷ ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
+
 module _ (IOF AdvF : Participant → Channel)
   (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
   (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
   (cc : ChannelCat) (let open ChannelCat cc)
   (IsBlockchain-Leios : IsBC.IsBlockchain Participant LeiosBlock Leios1)
+  (IsBlockchain-base : IsBC.IsBlockchain Participant RankingBlock spec)
   where
 
   safetyS : Safety LeiosBlock
@@ -122,9 +126,6 @@ module _ (IOF AdvF : Participant → Channel)
 
   module S = Safety safetyS
 
-  spec : Machine S.Network ((Network ⊗₀ BaseIO) ⊗₀ (I ⊗₀ I ⊗₀ BaseAdv))
-  spec = (idᴷ ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
-
   ext-spec : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ I)
   ext-spec = subst (λ x → Machine (Network ⊗₀ BaseIO) (IO ⊗₀ x)) eq body
     where
@@ -133,8 +134,15 @@ module _ (IOF AdvF : Participant → Channel)
       body : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ ((I ⊗₀ I) ⊗₀ I))
       body = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ)
 
-  module _ (base-spec : Spec RankingBlock S.n S.Network)
-           (extension : IsExtension base-spec (Safety.spec safetyS)) where
+  base-spec : Spec RankingBlock S.n S.Network
+  base-spec = record
+    { IO                = _
+    ; Adv               = _
+    ; honest-node-spec  = spec
+    ; spec-IsBlockchain = IsBlockchain-base
+    }
+
+  module _ (extension : IsExtension base-spec (Safety.spec safetyS)) where
 
     private
       module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
