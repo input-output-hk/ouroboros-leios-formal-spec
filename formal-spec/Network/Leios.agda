@@ -108,11 +108,23 @@ ext-spec = subst (λ x → Machine (Network ⊗₀ BaseIO) (IO ⊗₀ x)) eq bod
 module _ (IOF AdvF : Participant → Channel)
   (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
   (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
-  (IsBlockchain-Leios : IsBC.IsBlockchain Participant LeiosBlock Leios1)
+  (isConstrained-Leios : IsConstrained Leios1 (IsBC.bciQueryType Participant {Block = LeiosBlock}))
+  (isPure-Leios        : IsPure isConstrained-Leios)
   (IsBlockchain-base : IsBC.IsBlockchain Participant RankingBlock spec)
   (is-extension-eq :
     idᴷ ∘ᴷ Leios1 ≡ subst (λ A → Machine DD.M (IO ⊗₀ (A ⊗₀ I))) (sym ⊗-identityʳ) (ext-spec ∘ᴷ spec))
     where
+
+  private
+    module IBB = IsBC.IsBlockchain IsBlockchain-base
+
+  IsBlockchain-Leios : IsBC.IsBlockchain Participant LeiosBlock Leios1
+  IsBlockchain-Leios = record
+    { isConstrained = isConstrained-Leios
+    ; isPure        = isPure-Leios
+    ; producer      = λ b → IBB.producer (LeiosBlock.rb b)
+    ; slotOf        = λ b → IBB.slotOf   (LeiosBlock.rb b)
+    }
 
   safetyS : Safety LeiosBlock
   safetyS = record
@@ -163,27 +175,17 @@ module _ (IOF AdvF : Participant → Channel)
               → Safety.safety Tr.base k → S.safety k
   leiosSafety = TrM.transfer k
 
-  -- Liveness transfer additionally requires the two block-level
-  -- compatibility witnesses.
-  module _ (producer-compat : ∀ b → S.producer b
-                                  ≡ Spec.producer base-spec
-                                      (IsExtension.getBaseBlock extension b))
-           (slotOf-compat   : ∀ b → S.slotOf b
-                                  ≡ Spec.slotOf base-spec
-                                      (IsExtension.getBaseBlock extension b))
-    where
+  private
+    module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
+      safetyS base-spec cc extension (λ _ → refl) (λ _ → refl)
+    module LTrM = LTr.Main
 
-    private
-      module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-        safetyS base-spec cc extension producer-compat slotOf-compat
-      module LTrM = LTr.Main
+  leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+           → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
+           → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
+  leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
 
-    leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-             → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-             → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
-    leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
-
-    leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-             → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-             → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
-    leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL
+  leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+           → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
+           → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
+  leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL
