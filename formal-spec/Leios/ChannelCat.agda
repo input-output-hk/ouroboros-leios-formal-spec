@@ -72,6 +72,12 @@ record ChannelCat : Type₁ where
 
     ⨂-cong : ∀ {n} {A B : Fin n → Channel} → (∀ k → A k ≡ B k) → Machine (⨂ A) (⨂ B)
 
+    -- Congruence of Kleisli composition under heterogeneous machine equality.
+    ∘ᴷ-cong-≡ᴹ : ∀ {A₁ A₂ B₁ B₂ C₁ C₂ E₁₁ E₁₂ E₂₁ E₂₂}
+                  {M : Machine B₁ (C₁ ⊗₀ E₂₁)} {M' : Machine B₂ (C₂ ⊗₀ E₂₂)}
+                  {N : Machine A₁ (B₁ ⊗₀ E₁₁)} {N' : Machine A₂ (B₂ ⊗₀ E₁₂)}
+                → M ≡ᴹ M' → N ≡ᴹ N' → (M ∘ᴷ N) ≡ᴹ (M' ∘ᴷ N')
+
   insert-id-helper : ∀ {n} (C : Fin n → Channel)
     → Machine (A ⊗₀ B ⊗₀ (⨂ (λ k → C k ⊗₀ I))) (A ⊗₀ B ⊗₀ (⨂ C))
   insert-id-helper {n = n} _ = CC.id ⊗₁ CC.id ⊗₁ ⨂₁ {n = n} (λ _ → ρ⇒)

@@ -83,11 +83,9 @@ module BL = Blockchain.Liveness BlockBase Tr.base
 module EL = Blockchain.Liveness BlockExt   ext
 open BL using (ℕ→ℚ)
 
-module Main (single-protocol-≡ : ∀ p
-                               → idᴷ ∘ᴷ Ext.all-nodes p
-                               ≡ extPart p ∘ᴷ base-all-nodes p) where
+module Main where
 
-  module TrM = Tr.Main single-protocol-≡
+  module TrM = Tr.Main
   open TrM using (transEnv; transState; transTrace; ChainLemma-ty)
 
   -- Slot lemma: the base-side slot query agrees with the ext-side slot query.

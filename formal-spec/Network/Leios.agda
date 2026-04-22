@@ -139,39 +139,33 @@ module _ (IOF AdvF : Participant → Channel)
     private
       module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
         safetyS base-spec cc extension
+      module TrM = Tr.Main
 
-    single-protocol-≡-ty : Type₁
-    single-protocol-≡-ty = ∀ p → idᴷ ∘ᴷ S.all-nodes p ≡ Tr.extPart p ∘ᴷ Tr.base-all-nodes p
+    leiosSafety : (∀ {A} (E : Safety.Environment safetyS A) → TrM.ChainLemma-ty E)
+                → Safety.safety Tr.base k → S.safety k
+    leiosSafety = TrM.transfer k
 
-    module _ (single-protocol-≡ : single-protocol-≡-ty) where
-      private module TrM = Tr.Main single-protocol-≡
+    -- Liveness transfer additionally requires the two block-level
+    -- compatibility witnesses.
+    module _ (producer-compat : ∀ b → S.producer b
+                                    ≡ Spec.producer base-spec
+                                        (IsExtension.getBaseBlock extension b))
+             (slotOf-compat   : ∀ b → S.slotOf b
+                                    ≡ Spec.slotOf base-spec
+                                        (IsExtension.getBaseBlock extension b))
+      where
 
-      leiosSafety : (∀ {A} (E : Safety.Environment safetyS A) → TrM.ChainLemma-ty E)
-                  → Safety.safety Tr.base k → S.safety k
-      leiosSafety = TrM.transfer k
+      private
+        module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
+          safetyS base-spec cc extension producer-compat slotOf-compat
+        module LTrM = LTr.Main
 
-      -- Liveness transfer additionally requires the two block-level
-      -- compatibility witnesses.
-      module _ (producer-compat : ∀ b → S.producer b
-                                      ≡ Spec.producer base-spec
-                                          (IsExtension.getBaseBlock extension b))
-               (slotOf-compat   : ∀ b → S.slotOf b
-                                      ≡ Spec.slotOf base-spec
-                                          (IsExtension.getBaseBlock extension b))
-        where
+      leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+               → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
+               → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
+      leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
 
-        private
-          module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-            safetyS base-spec cc extension producer-compat slotOf-compat
-
-          module LTrM = LTr.Main single-protocol-≡
-
-        leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-                 → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-                 → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
-        leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
-
-        leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-                 → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-                 → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
-        leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL
+      leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+               → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
+               → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
+      leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL

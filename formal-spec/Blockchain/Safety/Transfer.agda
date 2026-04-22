@@ -8,6 +8,7 @@ open import Leios.ChannelCat
 open import CategoricalCrypto hiding (id)
 import CategoricalCrypto as CC
 
+import Relation.Binary.HeterogeneousEquality as H
 import Relation.Binary.Reasoning.PartialOrder
 open import Relation.Binary using (Poset)
 
@@ -91,14 +92,52 @@ base = record
 
 module Base = Safety base
 
--- The remaining transfer requires the caller to prove that every ext node
--- factors as `extPart p ∘ᴷ base-all-nodes p`.  For honest nodes this follows
--- from `is-extension` (with some type-bridging work); for dishonest nodes
--- both sides definitionally reduce to `idᴷ ∘ᴷ Ext.all-nodes p`.  The actual
--- derivation is deferred to the caller for now.
-module Main (single-protocol-≡ : ∀ p
-                               → idᴷ ∘ᴷ Ext.all-nodes p
-                               ≡ extPart p ∘ᴷ base-all-nodes p) where
+private
+  -- Transitivity of `_≡ᴹ_`.
+  ≡ᴹ-trans : ∀ {A₁ A₂ A₃ B₁ B₂ B₃}
+             {M₁ : Machine A₁ B₁} {M₂ : Machine A₂ B₂} {M₃ : Machine A₃ B₃}
+           → M₁ ≡ᴹ M₂ → M₂ ≡ᴹ M₃ → M₁ ≡ᴹ M₃
+  ≡ᴹ-trans record { A≡C = refl ; B≡D = refl ; M₁≡M₂ = H.refl }
+           record { A≡C = refl ; B≡D = refl ; M₁≡M₂ = H.refl }
+    = ≡ᴹ-refl
+
+  -- When both sides already have the same type, `_≡ᴹ_` collapses to `_≡_`.
+  ≡ᴹ→≡ : ∀ {A B} {M₁ M₂ : Machine A B} → M₁ ≡ᴹ M₂ → M₁ ≡ M₂
+  ≡ᴹ→≡ record { A≡C = refl ; B≡D = refl ; M₁≡M₂ = H.refl } = refl
+
+  -- Inclusion `_≡_ → _≡ᴹ_` at matching types.
+  ≡→≡ᴹ : ∀ {A B} {M₁ M₂ : Machine A B} → M₁ ≡ M₂ → M₁ ≡ᴹ M₂
+  ≡→≡ᴹ refl = ≡ᴹ-refl
+
+  -- `subst` along a channel equality preserves the machine up to `_≡ᴹ_`
+  -- (variant of `subst-≡ᴹ` where the channel equation affects only the
+  -- output type).
+  subst-≡ᴹ-out : ∀ {x y} {A : Channel} {B : Channel → Channel}
+               → (eq : x ≡ y) (M : Machine A (B x))
+               → subst (λ c → Machine A (B c)) eq M ≡ᴹ M
+  subst-≡ᴹ-out refl _ = ≡ᴹ-refl
+
+  -- `idᴷ` instantiated at different (but propositionally equal) channels
+  -- are `_≡ᴹ_`.
+  idᴷ-cong-≡ᴹ : ∀ {A B} → A ≡ B → _≡ᴹ_ (idᴷ {A = A}) (idᴷ {A = B})
+  idᴷ-cong-≡ᴹ refl = ≡ᴹ-refl
+
+-- Every ext node factors as `extPart p ∘ᴷ base-all-nodes p`.  For honest
+-- nodes this follows from `is-extension` via `∘ᴷ-cong-≡ᴹ` (a ChannelCat
+-- axiom); for dishonest nodes both sides definitionally reduce to the
+-- same `idᴷ ∘ᴷ Ext.all-nodes p`.
+single-protocol-≡ : ∀ p → idᴷ ∘ᴷ Ext.all-nodes p ≡ extPart p ∘ᴷ base-all-nodes p
+single-protocol-≡ p with p ∈? Ext.honest-nodes
+... | no ¬hp = refl
+... | yes hp = ≡ᴹ→≡
+  (≡ᴹ-trans (∘ᴷ-cong-≡ᴹ (idᴷ-cong-≡ᴹ (honest-IOF hp))
+                        (Ext.honest-nodes-≡-spec hp))
+  (≡ᴹ-trans (≡→≡ᴹ is-extension)
+  (≡ᴹ-trans (subst-≡ᴹ-out (sym ext-Adv≡base-Adv) _)
+            (∘ᴷ-cong-≡ᴹ (≡ᴹ-sym (subst-≡ᴹ (sym (honest-IOF hp)) ext-layer))
+                        (≡ᴹ-sym (subst-≡ᴹ (sym (honest-AdvF hp)) B.honest-node-spec))))))
+
+module Main where
 
   -- | Translation from extended protocols to base protocols.
   module _ {A : Channel} (E : Ext.Environment A) where
