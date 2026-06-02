@@ -72,7 +72,7 @@ record LeiosState : Type where
 
   -- ideally we'd require a non-empty list, but this also works for now
   currentRB : RankingBlock
-  currentRB = maybe (λ x → x) (record { txs = [] ; announcedEB = nothing ; ebCert = nothing ; slot = 0})
+  currentRB = maybe (λ x → x) (record { txsOrEbCert = inj₁ [] ; announcedEB = nothing ; slot = 0})
                 (head RBs)
 
   EBs : List EndorserBlock
@@ -87,15 +87,10 @@ record LeiosState : Type where
   lookupTxsC : Hash → List Tx
   lookupTxsC c = maybe lookupTxs [] $ lookupEB c
 
-  currentChain : List Block
-  currentChain = flip concatMap RBs λ rb →
-    L.fromMaybe (inj₂ <$> (lookupEB =<< getEBHash <$> RankingBlock.ebCert rb))
-    ++ [ inj₁ rb ]
-
   Ledger : List Tx
-  Ledger = flip L.concatMap RBs λ rb →
-    RankingBlock.txs rb
-    ++ maybe lookupTxsC [] (getEBHash <$> RankingBlock.ebCert rb)
+  Ledger = flip L.concatMap RBs λ rb → case RankingBlock.txsOrEbCert rb of λ where
+    (inj₁ txs) → txs
+    (inj₂ ebCert) → lookupTxsC (getEBHash ebCert)
 
   hasRB : RankingBlock → Type
   hasRB = _∈ RBs

@@ -194,9 +194,10 @@ Note: Submitted data to the base chain is only taken into account
                   ¿ just (hash eb) ≡ getCurrentEBHash s
                   × slotNumber eb + 3 * Lhdr + Lvote + Ldiff ≤ slot ¿) ebsWithCert
                 rb = record
-                       { txs = proj₁ (splitTxs ToPropose)
-                       ; announcedEB = hash <$> toProposeEB s π
-                       ; ebCert = proj₂ <$> currentCertEB
+                       { announcedEB = hash <$> toProposeEB s π
+                       ; txsOrEbCert = case currentCertEB of λ where
+                           (just (_ , cert)) → inj₂ cert
+                           nothing → inj₁ (proj₁ (splitTxs ToPropose))
                        ; slot = 0}
           in
           ∙ needsUpkeep Base
