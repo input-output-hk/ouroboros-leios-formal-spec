@@ -198,7 +198,7 @@ Note: Submitted data to the base chain is only taken into account
                        ; txsOrEbCert = case currentCertEB of λ where
                            (just (_ , cert)) → inj₂ cert
                            nothing → inj₁ (proj₁ (splitTxs ToPropose))
-                       ; slot = 0}
+                       }
           in
           ∙ needsUpkeep Base
           ───────────────────────────────────────────────────────────────────────────

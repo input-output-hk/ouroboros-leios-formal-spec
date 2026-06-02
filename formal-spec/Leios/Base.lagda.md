@@ -27,7 +27,6 @@ StakeDistr = TotalMap PoolID ℕ
 record RankingBlock : Type where
   field announcedEB : Maybe Hash
         txsOrEbCert : List Tx ⊎ EBCert
-        slot        : ℕ
 
 record BaseAbstract : Type₁ where
   field Cert        : Type

@@ -87,8 +87,8 @@ Checking `hash` of EndorserBlocks
 RankingBlocks that will be used in the test trace
 ```agda
     RB₀ RB₁ : RankingBlock
-    RB₀ = record { txsOrEbCert = inj₁ (0 ∷ []) ; announcedEB = nothing ; slot = 0}
-    RB₁ = record { txsOrEbCert = inj₁ [] ; announcedEB = just (hash EB₁) ; slot = 0}
+    RB₀ = record { txsOrEbCert = inj₁ (0 ∷ []) ; announcedEB = nothing }
+    RB₁ = record { txsOrEbCert = inj₁ [] ; announcedEB = just (hash EB₁) }
 ```
 Votes
 ```agda
