@@ -67,6 +67,24 @@ record TraceCat : Type₂ where
     ⊗₁-resp-≈ : ∀ {A B C D} {M M' : Machine A B} {N N' : Machine C D}
               → M ≈ M' → N ≈ N' → (M ⊗₁ N) ≈ (M' ⊗₁ N')
 
+    -- structure isomorphisms: morphisms + ≈-inverse laws (the ≈-analogue of the
+    -- ChannelCat σ/α/λ/ρ fields, minus the FALSE propositional channel
+    -- equalities ⊗-identityˡ/ʳ; supplied by the explicit category).
+    σ  : ∀ {A B}   → Machine (A ⊗₀ B) (B ⊗₀ A)
+    α⇒ : ∀ {A B C} → Machine ((A ⊗₀ B) ⊗₀ C) (A ⊗₀ (B ⊗₀ C))
+    α⇐ : ∀ {A B C} → Machine (A ⊗₀ (B ⊗₀ C)) ((A ⊗₀ B) ⊗₀ C)
+    ρ⇒ : ∀ {A}     → Machine (A ⊗₀ I) A
+    ρ⇐ : ∀ {A}     → Machine A (A ⊗₀ I)
+    λ⇒ : ∀ {A}     → Machine (I ⊗₀ A) A
+    λ⇐ : ∀ {A}     → Machine A (I ⊗₀ A)
+    α-isoˡ : ∀ {A B C} → (α⇒ {A} {B} {C} ∘ α⇐) ≈ id
+    α-isoʳ : ∀ {A B C} → (α⇐ {A} {B} {C} ∘ α⇒) ≈ id
+    ρ-isoˡ : ∀ {A}     → (ρ⇒ {A} ∘ ρ⇐) ≈ id
+    ρ-isoʳ : ∀ {A}     → (ρ⇐ {A} ∘ ρ⇒) ≈ id
+    λ-isoˡ : ∀ {A}     → (λ⇒ {A} ∘ λ⇐) ≈ id
+    λ-isoʳ : ∀ {A}     → (λ⇐ {A} ∘ λ⇒) ≈ id
+    σ-iso  : ∀ {A B}   → (σ {A} {B} ∘ σ) ≈ id
+
     -- "observation o is exposed at some reachable state of the closed machine P"
     Reachable : ∀ {A} {Block : Type} → Machine I A → Obs Block → Type
     -- THE new transport primitive (replaces state-subst / Trace-subst):
