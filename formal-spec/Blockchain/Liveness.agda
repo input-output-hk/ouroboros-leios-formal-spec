@@ -29,16 +29,9 @@ isHonestBlock b = producer b ∈ honest-nodes
 -- For every honest block `b` in an honest party's chain, the number
 -- of blocks that follow `b` is at least τ · (currentSlot ∸ slotOf b).
 
-hcgState : {A : Channel} → ℚ → (E : Environment A) → Machine.State (protocol E) → Type
-hcgState τ E S₀ =
-    {p : Fin n} (hp : p ∈ honest-nodes)
-    {pref suff : List Block} {b : Block}
-  → getChain E S₀ hp ≡ pref ++ (b ∷ suff)
-  → isHonestBlock b
-  → τ ℚ.* ℕ→ℚ (getSlot E S₀ hp ∸ slotOf b) ℚ.≤ ℕ→ℚ (length suff)
-
-hcg : ℚ → Type₁
-hcg τ = ∀ {A} (E : Environment A) → Invariant (protocol E) (hcgState τ E)
+-- NOTE: the state-`Invariant` formulation (`hcgState`/`hcg`, `∃cqState`/`∃cq`)
+-- has been retired in favour of the observation-based `LiveHCG`/`Live∃CQ` of the
+-- trace-equivalence rework (`Blockchain.Liveness.TransferTrace`).
 
 -- --------------------------------------------------------------------
 -- (∃CQ) Existential Chain Quality
@@ -48,11 +41,3 @@ hcg τ = ∀ {A} (E : Environment A) → Invariant (protocol E) (hcgState τ E)
 
 recent : ℕ → ℕ → List Block → List Block
 recent T s = filter (λ b → slotOf b + T ≥ s)
-
-∃cqState : {A : Channel} → ℕ → (E : Environment A) → Machine.State (protocol E) → Type
-∃cqState T E S₀ =
-    {p : Fin n} (hp : p ∈ honest-nodes)
-  → Any.Any isHonestBlock (recent T (getSlot E S₀ hp) (getChain E S₀ hp))
-
-∃cq : ℕ → Type₁
-∃cq T = ∀ {A} (E : Environment A) → Invariant (protocol E) (∃cqState T E)

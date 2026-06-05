@@ -31,6 +31,11 @@ record Deployment (Block : Type) : Type₂ where
     all-nodes           : (p : Fin n) → Machine Network (IOF p ⊗₀ AdvF p)
     honest-nodes        : ℙ (Fin n)
     honest-nodes-≡-spec : ∀ {p} → p ∈ honest-nodes → all-nodes p ≡ᴹ honest-node-spec
+    -- honest parties carry the spec's I/O and adversary channels (supplied
+    -- directly, so consumers need not decompose `honest-nodes-≡-spec`'s
+    -- codomain equality via channel injectivity)
+    honest-IOF≡         : ∀ {p} → p ∈ honest-nodes → IOF p ≡ IO
+    honest-AdvF≡        : ∀ {p} → p ∈ honest-nodes → AdvF p ≡ Adv
     network             : Machine I (n ⨂ⁿ Network ⊗₀ NAdv)
 
   honest-nodes-blockchain : ∀ {p} → p ∈ honest-nodes → IsBlockchain Block (all-nodes p)
@@ -60,30 +65,11 @@ record Deployment (Block : Type) : Type₂ where
   getChain = query Chain
   getSlot  = query Slot
 
-  safeState : {A : Channel} → ℕ → (E : Environment A) → Machine.State (protocol E) → Type
-  safeState k E S =
-    {p p'       : Fin n}
-    (honest-p   : p  ∈ honest-nodes)
-    (honest-p'  : p' ∈ honest-nodes)
-    → prune k (getChain E S honest-p) ≼ getChain E S honest-p'
+  -- NOTE: the state-`Invariant` formulation of safety (`safeState`/`safety`)
+  -- has been retired in favour of the observation-based `Safe` of the
+  -- trace-equivalence rework (`Blockchain.Safety.TransferTrace`).
 
-  safety : ℕ → Type₁
-  safety k = ∀ {A} (E : Environment A) → Invariant (protocol E) (safeState k E)
-
--- | Witness that one `Spec` extends a given base `Spec`
-record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
-                   (base-spec : Spec BlockBase n Network)
-                   (ext-spec  : Spec BlockExt  n Network) : Type₂ where
-  private
-    module B = Spec base-spec
-    module E = Spec ext-spec
-  field
-    ext-layer        : Machine B.IO (E.IO ⊗₀ I)
-    getBaseBlock     : BlockExt → BlockBase
-
-    ext-Adv≡base-Adv : E.Adv ≡ B.Adv
-    getBaseBlock-inj : Injective _≡_ _≡_ getBaseBlock
-    is-extension : idᴷ ∘ᴷ E.honest-node-spec
-                 ≡ subst (λ A → Machine Network (E.IO ⊗₀ (A ⊗₀ I)))
-                         (sym ext-Adv≡base-Adv)
-                         (ext-layer ∘ᴷ B.honest-node-spec)
+-- | Witness that one `Spec` extends a given base `Spec`: see the reworked
+-- `Blockchain.Safety.TransferTrace.Transfer.IsExtension≈` (trace-equivalence,
+-- with a Machine iso `adv-iso` in place of the propositional `E.Adv ≡ B.Adv`).
+-- The legacy `≡ᴹ`-based `IsExtension` record was retired with this rework.

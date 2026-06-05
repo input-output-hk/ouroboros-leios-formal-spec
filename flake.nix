@@ -9,6 +9,7 @@
     agda-nix = {
       url = "github:input-output-hk/agda.nix";
       inputs.nixpkgs.follows = "nixpkgs";
+      # inputs.categorical-crypto.url = "github:input-output-hk/categorical-crypto/0c73c9539ea3638a2e22cd81cb9c4fc00f2d2308";
     };
   };
 

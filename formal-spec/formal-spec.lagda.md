@@ -73,7 +73,9 @@ import CategoricalCrypto.Ext
 ```
 ### Blockchain abstractions
 ```agda
-import Blockchain.Liveness.Transfer
+import Leios.ChannelCat
+import Blockchain.Safety.ProtocolEquiv
+import Blockchain.Liveness.TransferTraceDischarge
 ```
 ### Network Layer
 Basic broadcast networking primitives

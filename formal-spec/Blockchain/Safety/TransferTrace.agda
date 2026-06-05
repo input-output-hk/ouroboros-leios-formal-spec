@@ -23,7 +23,10 @@
 -- ============================================================================
 
 open import Leios.Prelude hiding (id; _⊗_; _∘_)
-open import CategoricalCrypto hiding (_∘ᴷ_)
+-- `α-isoˡ`/… are also names in `CategoricalCrypto.SFunM.Monoidal`; hide them so
+-- the `TraceCat` field names below don't clash.
+open import CategoricalCrypto hiding (_∘ᴷ_; α-isoˡ; α-isoʳ; ρ-isoˡ; ρ-isoʳ; λ-isoˡ; λ-isoʳ)
+import CategoricalCrypto as CC
 open import Blockchain.Safety using (Spec)
 
 module Blockchain.Safety.TransferTrace (n : ℕ) where
@@ -66,6 +69,44 @@ record TraceCat : Type₂ where
               → M ≈ M' → N ≈ N' → (M ∘ N) ≈ (M' ∘ N')
     ⊗₁-resp-≈ : ∀ {A B C D} {M M' : Machine A B} {N N' : Machine C D}
               → M ≈ M' → N ≈ N' → (M ⊗₁ N) ≈ (M' ⊗₁ N')
+
+    -- left identity at `≈` (the categorical law that is FALSE at `≈ℰ`/`≡ᴹ` by
+    -- state-counting, but TRUE at trace equivalence; discharged by `MACHINE`).
+    -- Used for the dishonest nodes in the `≈`-native `single-protocol`.
+    ∘-identityˡ : ∀ {A B} {M : Machine A B} → (id ∘ M) ≈ M
+
+    -- env-absorb: the protocol respects per-node factoring at `≈`.  Given each
+    -- ext node factors as `lay ∘ baseN` (the `single-protocol-≈` consequence of
+    -- `is-extension≈`), the ext-node protocol equals — up to `≈` — the base-node
+    -- protocol under a transformed environment `Env'`.  THIS is the ⨂/network
+    -- congruence `ChainLemmaDischarge` flags as "beyond the minimal TraceCat":
+    -- discharged by `MACHINE` via the explicit category's constructive
+    -- `insert-id`/`⨂-absorb-env` (decomposable into those + `⊗₁`-interchange +
+    -- the `∘ᴷ` laws; packaged here as one obligation for the `≈-protocol` step).
+    env-absorb : ∀ {n} {A Network NAdv : Channel} {B E B' E' : Fin n → Channel}
+      (Env   : Machine (⨂ B' ⊗₀ (NAdv ⊗₀ ⨂ E')) A)
+      (extN  : (p : Fin n) → Machine Network (B' p ⊗₀ E' p))
+      (lay   : (p : Fin n) → Machine (B p ⊗₀ E p) (B' p ⊗₀ E' p))
+      (baseN : (p : Fin n) → Machine Network (B p ⊗₀ E p))
+      (net   : Machine I (n ⨂ⁿ Network ⊗₀ NAdv))
+      → (∀ p → extN p ≈ (lay p ∘ baseN p))
+      → Σ[ Env' ∈ Machine (⨂ B ⊗₀ (NAdv ⊗₀ ⨂ E)) A ]
+           ((Env ∘ CC._∘ᴷ_ (⨂ᴷ extN) net) ≈ (Env' ∘ CC._∘ᴷ_ (⨂ᴷ baseN) net))
+
+    -- congruence of the n-fold Kleisli tensor `⨂ᴷ` (used to lift the per-node
+    -- `is-extension≈` over all parties in the `≈-protocol` derivation).  It is
+    -- derivable from `∘-resp-≈`/`⊗₁-resp-≈` by induction, but kept as a field so
+    -- the `≈-protocol` mechanisation needn't re-derive it.
+    ⨂ᴷ-cong-≈ : ∀ {n} {A B E : Fin n → Channel}
+                {f g : (k : Fin n) → Machine (A k) (B k ⊗₀ E k)}
+              → (∀ k → f k ≈ g k) → ⨂ᴷ f ≈ ⨂ᴷ g
+
+    -- associativity: the ≈-analogue of the `assoc²γδ` step at
+    -- `Safety/Transfer.agda:115`.  Discharged by the explicit MACHINE category
+    -- (`Leios.ChannelCat.MachineCat.assoc²γδ` = `Reasoning.assoc²γδ`); consumed
+    -- by the `≈-protocol` derivation (ChainLemmaDischarge obligation (I)).
+    assoc²γδ : ∀ {A B C D E} {f : Machine A B} {g : Machine B C} {h : Machine C D} {i : Machine D E}
+             → ((i ∘ h) ∘ (g ∘ f)) ≈ (i ∘ ((h ∘ g) ∘ f))
 
     -- structure isomorphisms: morphisms + ≈-inverse laws (the ≈-analogue of the
     -- ChannelCat σ/α/λ/ρ fields, minus the FALSE propositional channel
