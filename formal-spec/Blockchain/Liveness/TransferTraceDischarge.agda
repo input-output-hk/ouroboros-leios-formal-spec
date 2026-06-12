@@ -24,7 +24,7 @@ open import Data.Bool using (true; false)
 module Blockchain.Liveness.TransferTraceDischarge (n : ℕ) where
 
 import Blockchain.Safety.TransferTrace as STT
-open STT n using (Obs; mapObs; TraceCat; module Transfer)
+open STT n using (Obs; mapObs; module Transfer)
 import Blockchain.Liveness.TransferTrace as LTT
 open LTT n using (LiveHCG; Live∃CQ; hcg-transfer; ∃cq-transfer)
 
@@ -33,7 +33,8 @@ open LTT n using (LiveHCG; Live∃CQ; hcg-transfer; ∃cq-transfer)
 recent : ∀ {Block : Type} → (Block → ℕ) → ℕ → ℕ → List Block → List Block
 recent slot T s = L.filter (λ b → s N.≤? (slot b N.+ T))
 
-module _ (tc : TraceCat) {A : Channel} {BlockExt BlockBase : Type}
+module _ (Reachable : ∀ {A} {Block : Type} → Machine I A → Obs Block → Type)
+         {A : Channel} {BlockExt BlockBase : Type}
          {gB : BlockExt → BlockBase}
          {producerₑ : BlockExt → Fin n} {producer-b : BlockBase → Fin n}
          (honest : ℙ (Fin n))
@@ -41,7 +42,7 @@ module _ (tc : TraceCat) {A : Channel} {BlockExt BlockBase : Type}
          (producer-compat : ∀ b → producerₑ b ≡ producer-b (gB b))
          (slot-compat     : ∀ b → slotₑ b ≡ slot-b (gB b))
          {Pₑ P-b : Machine I A}
-         (chainLemma : Transfer.ChainLemma tc gB Pₑ P-b)   -- from ChainLemmaDischarge
+         (chainLemma : Transfer.ChainLemma Reachable gB Pₑ P-b)   -- from ChainLemmaDischarge
   where
 
   -- (new obligation) naturality of the recent window under getBaseBlock,
@@ -61,19 +62,19 @@ module _ (tc : TraceCat) {A : Channel} {BlockExt BlockBase : Type}
   -- (`LiveHCG`/`ChainLemma` are defined functions, so the block-projection
   --  implicits must be passed by name — they appear only as `f (gB b)`.)
   live-hcg : ∀ {τ}
-           → LiveHCG tc producer-b honest slot-b  τ P-b
-           → LiveHCG tc producerₑ honest slotₑ τ Pₑ
+           → LiveHCG Reachable producer-b honest slot-b  τ P-b
+           → LiveHCG Reachable producerₑ honest slotₑ τ Pₑ
   live-hcg {τ} base-live =
-    hcg-transfer tc {gB = gB} {producerₑ = producerₑ} {producer-b = producer-b}
+    hcg-transfer Reachable {gB = gB} {producerₑ = producerₑ} {producer-b = producer-b}
                     {honest = honest} {slotₑ = slotₑ} {slot-b = slot-b}
                     producer-compat slot-compat {Pₑ = Pₑ} {P-b = P-b}
                     chainLemma {τ = τ} base-live
 
   live-∃cq : ∀ {T}
-           → Live∃CQ tc producer-b honest (recent slot-b) T P-b
-           → Live∃CQ tc producerₑ honest (recent slotₑ) T Pₑ
+           → Live∃CQ Reachable producer-b honest (recent slot-b) T P-b
+           → Live∃CQ Reachable producerₑ honest (recent slotₑ) T Pₑ
   live-∃cq {T} base-live =
-    ∃cq-transfer tc {gB = gB} {producerₑ = producerₑ} {producer-b = producer-b}
+    ∃cq-transfer Reachable {gB = gB} {producerₑ = producerₑ} {producer-b = producer-b}
                     {honest = honest} {slotₑ = slotₑ} {slot-b = slot-b}
                     producer-compat slot-compat {Pₑ = Pₑ} {P-b = P-b}
                     chainLemma

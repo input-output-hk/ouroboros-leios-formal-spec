@@ -73,7 +73,7 @@ import CategoricalCrypto.Ext
 ```
 ### Blockchain abstractions
 ```agda
-import Leios.ChannelCat
+import CategoricalCrypto.IsoExt
 import Blockchain.Safety.ProtocolEquiv
 import Blockchain.Liveness.TransferTraceDischarge
 ```

@@ -6,7 +6,13 @@ open import Leios.SpecStructure
 open import Leios.Config
 
 open import CategoricalCrypto hiding (id; α-isoˡ; α-isoʳ; ρ-isoˡ; ρ-isoʳ; λ-isoˡ; λ-isoʳ)
+import CategoricalCrypto as CC
 open import CategoricalCrypto.Channel.Selection
+open import CategoricalCrypto.Machine.Iso using (_≅ᴹ_)
+open import Class.Core
+open import Class.Monad.Ext using (ExtensionalMonad; CommutativeMonad)
+open import Class.Monad.Iterative using (IterativeMonad)
+open import Class.Monad.OfRel using (MonadOfRel)
 
 open import Blockchain.Safety
 import Blockchain.IsBlockchain as IsBC
@@ -96,6 +102,15 @@ LeiosBlock-Injective
 spec : Machine DD.M ((Network ⊗₀ BaseIO) ⊗₀ (I ⊗₀ I ⊗₀ BaseAdv))
 spec = (idᴷ ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
 
+-- Right-unitor forwarding machines: they bridge `E.Adv = B.Adv ⊗₀ I ≅ B.Adv`
+-- in `adv-iso` below; their `≅ᴹ` inverse laws are open obligations
+-- (parameters of the transfer module).
+ρ⇒ : ∀ {A} → Machine (A ⊗₀ I) A
+ρ⇒ = TotalFunctionMachine' ⊗-right-neutral ⊗-right-intro
+
+ρ⇐ : ∀ {A} → Machine A (A ⊗₀ I)
+ρ⇐ = TotalFunctionMachine' ⊗-right-intro ⊗-right-neutral
+
 module _ (IOF AdvF : Participant → Channel)
   (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
   (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
@@ -151,26 +166,50 @@ module _ (IOF AdvF : Participant → Channel)
     ; spec-IsBlockchain = IsBlockchain-base
     }
 
-  -- ── Trace-equivalence (observation-based) transfer, via the explicit Machine
-  --    category.  `tc` is the categorical obligation bundle (TraceCat),
-  --    `is-extension≈` the protocol-specific leios-extends-praos fact at `≈`
-  --    (the `≈`-analogue of the retired `is-extension-eq`), and `reindex` the
-  --    protocol backbone-projection obligation; cf. the legacy `leiosSafety`/….
-  module _ (tc : STT.TraceCat numberOfParties)
-           (let open STT.TraceCat tc using (_≈_; ρ⇒; ρ⇐; ρ-isoˡ; ρ-isoʳ))
-           (is-extension≈ : Leios1 ≈ ((ext-layer ⊗₁ ρ⇐) ∘ spec))
-           where
-    open STT numberOfParties using (Obs; mapObs)
-    module STr = STT.Transfer numberOfParties tc
+  -- ── Observation-based transfer at the machine isomorphism `_≅ᴹ_`,
+  --    consuming the library `MachineCategory` directly (in `ProtocolEquiv` —
+  --    hence the monad telescope).  The parameters below are exactly the OPEN
+  --    obligations:
+  --    `env-absorb` (the ⨂/network congruence), the right-unitor inverse
+  --    laws (for `adv-iso`), the observation semantics
+  --    (`Reachable`/`≈-Reachable`), `is-extension≈` (the protocol-specific
+  --    leios-extends-praos fact, the `≅ᴹ`-analogue of the retired
+  --    `is-extension-eq`), and `reindex` (the protocol backbone-projection
+  --    obligation); cf. the legacy `leiosSafety`/….
+  module _
+    {Mon : Type↑}
+    ⦃ Monad-M       : Monad Mon            ⦄
+    ⦃ M-Laws        : MonadLaws Mon        ⦄
+    ⦃ M-Extensional : ExtensionalMonad Mon ⦄
+    ⦃ M-Comm        : CommutativeMonad Mon ⦄
+    ⦃ M-Iter        : IterativeMonad Mon   ⦄
+    ⦃ M-OfRel       : MonadOfRel Mon       ⦄
+    (Reachableᵐ   : ∀ {A} {Block : Type} → Machine I A → STT.Obs numberOfParties Block → Type)
+    (≅ᴹ-Reachable : ∀ {A} {Block} {P Q : Machine I A} → P ≅ᴹ Q
+                  → ∀ {o : STT.Obs numberOfParties Block} → Reachableᵐ P o → Reachableᵐ Q o)
+    (env-absorbᵐ : ∀ {m} {A Net NAdv : Channel} {B E B' E' : Fin m → Channel}
+         (Env   : Machine (⨂ B' ⊗₀ (NAdv ⊗₀ ⨂ E')) A)
+         (extN  : (p : Fin m) → Machine Net (B' p ⊗₀ E' p))
+         (lay   : (p : Fin m) → Machine (B p ⊗₀ E p) (B' p ⊗₀ E' p))
+         (baseN : (p : Fin m) → Machine Net (B p ⊗₀ E p))
+         (net   : Machine I (m ⨂ⁿ Net ⊗₀ NAdv))
+         → (∀ p → extN p ≅ᴹ (lay p ∘ baseN p))
+         → Σ[ Env' ∈ Machine (⨂ B ⊗₀ (NAdv ⊗₀ ⨂ E)) A ]
+              ((Env ∘ ((⨂ᴷ extN) ∘ᴷ net)) ≅ᴹ (Env' ∘ ((⨂ᴷ baseN) ∘ᴷ net))))
+    (ρ-isoˡᵐ : ∀ {A} → (ρ⇒ {A} ∘ ρ⇐) ≅ᴹ CC.id)
+    (ρ-isoʳᵐ : ∀ {A} → (ρ⇐ {A} ∘ ρ⇒) ≅ᴹ CC.id)
+    (is-extension≈ : Leios1 ≅ᴹ ((ext-layer ⊗₁ ρ⇐) ∘ spec))
+    where
+    open STT numberOfParties using (Obs; mapObs; _≅_; IsExtension≈)
+    module STr = STT.Transfer numberOfParties Reachableᵐ
     open STr using (Safe; transfer)
-    open STT.TraceCat tc using (Reachable)
 
     -- adv-iso: `E.Adv = B.Adv ⊗₀ I ≅ B.Adv` via the right unitor (replaces the
     -- old `ext-Adv≡base-Adv = ⊗-identityʳ` propositional channel equality).
-    adv-iso : STr._≅_ (Spec.Adv (Deployment.spec safetyS)) (Spec.Adv base-spec)
-    adv-iso = record { to = ρ⇒ ; from = ρ⇐ ; to-from = ρ-isoˡ ; from-to = ρ-isoʳ }
+    adv-iso : Spec.Adv (Deployment.spec safetyS) ≅ Spec.Adv base-spec
+    adv-iso = record { to = ρ⇒ ; from = ρ⇐ ; to-from = ρ-isoˡᵐ ; from-to = ρ-isoʳᵐ }
 
-    extension≈ : STr.IsExtension≈ base-spec (Deployment.spec safetyS)
+    extension≈ : IsExtension≈ base-spec (Deployment.spec safetyS)
     extension≈ = record
       { ext-layer        = ext-layer
       ; getBaseBlock     = LeiosBlock.rb
@@ -179,13 +218,13 @@ module _ (IOF AdvF : Participant → Channel)
       ; is-extension     = is-extension≈
       }
 
-    module PEt = PE safetyS base-spec tc extension≈
+    module PEt = PE safetyS base-spec Reachableᵐ ≅ᴹ-Reachable env-absorbᵐ extension≈
 
     -- the per-E backbone-projection obligation (II), kept abstract
     reindexᵗ : ∀ {A} → S.Environment A → Type
     reindexᵗ E = ∀ {o : Obs LeiosBlock}
-               → Reachable (PEt.Base.protocol (PEt.transEnv E)) o
-               → Reachable (PEt.Base.protocol (PEt.transEnv E)) (mapObs LeiosBlock.rb o)
+               → Reachableᵐ (PEt.Base.protocol (PEt.transEnv E)) o
+               → Reachableᵐ (PEt.Base.protocol (PEt.transEnv E)) (mapObs LeiosBlock.rb o)
 
     leiosSafetyᵗ :
         (∀ {A} (E : S.Environment A) → reindexᵗ E)
@@ -198,19 +237,19 @@ module _ (IOF AdvF : Participant → Channel)
     module LTTn = LTT numberOfParties
 
     leiosHCGᵗ : (∀ {A} (E : S.Environment A) → reindexᵗ E) → ∀ {τ}
-              → (∀ {A} (E : S.Environment A) → LTTn.LiveHCG tc PEt.Base.producer S.honest-nodes PEt.Base.slotOf τ (PEt.Base.protocol (PEt.transEnv E)))
-              → (∀ {A} (E : S.Environment A) → LTTn.LiveHCG tc S.producer       S.honest-nodes S.slotOf       τ (S.protocol E))
+              → (∀ {A} (E : S.Environment A) → LTTn.LiveHCG Reachableᵐ PEt.Base.producer S.honest-nodes PEt.Base.slotOf τ (PEt.Base.protocol (PEt.transEnv E)))
+              → (∀ {A} (E : S.Environment A) → LTTn.LiveHCG Reachableᵐ S.producer       S.honest-nodes S.slotOf       τ (S.protocol E))
     leiosHCGᵗ reindex {τ} base-live E =
-      LDn.live-hcg tc {gB = LeiosBlock.rb} {producerₑ = S.producer} {producer-b = PEt.Base.producer}
+      LDn.live-hcg Reachableᵐ {gB = LeiosBlock.rb} {producerₑ = S.producer} {producer-b = PEt.Base.producer}
                    S.honest-nodes {slotₑ = S.slotOf} {slot-b = PEt.Base.slotOf}
                    (λ _ → refl) (λ _ → refl)
                    (PEt.chainLemma E (reindex E)) {τ = τ} (base-live E)
 
     leios∃CQᵗ : (∀ {A} (E : S.Environment A) → reindexᵗ E) → ∀ {T}
-              → (∀ {A} (E : S.Environment A) → LTTn.Live∃CQ tc PEt.Base.producer S.honest-nodes (LDn.recent PEt.Base.slotOf) T (PEt.Base.protocol (PEt.transEnv E)))
-              → (∀ {A} (E : S.Environment A) → LTTn.Live∃CQ tc S.producer       S.honest-nodes (LDn.recent S.slotOf)       T (S.protocol E))
+              → (∀ {A} (E : S.Environment A) → LTTn.Live∃CQ Reachableᵐ PEt.Base.producer S.honest-nodes (LDn.recent PEt.Base.slotOf) T (PEt.Base.protocol (PEt.transEnv E)))
+              → (∀ {A} (E : S.Environment A) → LTTn.Live∃CQ Reachableᵐ S.producer       S.honest-nodes (LDn.recent S.slotOf)       T (S.protocol E))
     leios∃CQᵗ reindex {T} base-live E =
-      LDn.live-∃cq tc {gB = LeiosBlock.rb} {producerₑ = S.producer} {producer-b = PEt.Base.producer}
+      LDn.live-∃cq Reachableᵐ {gB = LeiosBlock.rb} {producerₑ = S.producer} {producer-b = PEt.Base.producer}
                    S.honest-nodes {slotₑ = S.slotOf} {slot-b = PEt.Base.slotOf}
                    (λ _ → refl) (λ _ → refl)
                    (PEt.chainLemma E (reindex E)) {T = T} (base-live E)

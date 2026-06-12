@@ -37,17 +37,16 @@ import Data.List.Relation.Unary.Any.Properties as AnyP
 
 module Blockchain.Liveness.TransferTrace (n : ℕ) where
 
--- reuse Obs / mapObs / TraceCat / Transfer from the safety rework
+-- reuse Obs / mapObs / Transfer from the safety rework
 import Blockchain.Safety.TransferTrace as STT
-open STT n using (Obs; mapObs; TraceCat; module Transfer)
+open STT n using (Obs; mapObs; module Transfer)
 open Obs
 
 ℕ→ℚ : ℕ → ℚ
 ℕ→ℚ k = (ℤ.+ k) ℚ./ 1
 
-module _ (tc : TraceCat) where
-  open TraceCat tc
-  open Transfer tc using (ChainLemma)        -- same ChainLemma as safety
+module _ (Reachable : ∀ {A} {Block : Type} → Machine I A → Obs Block → Type) where
+  open Transfer Reachable using (ChainLemma)  -- same ChainLemma as safety
 
   -- shared shape of the two block-level liveness predicates, generic over the
   -- block type and its producer/slot projections (cf. Liveness.agda:32,52)
