@@ -177,13 +177,6 @@ module _ (IOF AdvF : Participant → Channel)
   --    `is-extension-eq`), and `reindex` (the protocol backbone-projection
   --    obligation); cf. the legacy `leiosSafety`/….
   module _
-    {Mon : Type↑}
-    ⦃ Monad-M       : Monad Mon            ⦄
-    ⦃ M-Laws        : MonadLaws Mon        ⦄
-    ⦃ M-Extensional : ExtensionalMonad Mon ⦄
-    ⦃ M-Comm        : CommutativeMonad Mon ⦄
-    ⦃ M-Iter        : IterativeMonad Mon   ⦄
-    ⦃ M-OfRel       : MonadOfRel Mon       ⦄
     (Reachableᵐ   : ∀ {A} {Block : Type} → Machine I A → STT.Obs numberOfParties Block → Type)
     (≅ᴹ-Reachable : ∀ {A} {Block} {P Q : Machine I A} → P ≅ᴹ Q
                   → ∀ {o : STT.Obs numberOfParties Block} → Reachableᵐ P o → Reachableᵐ Q o)

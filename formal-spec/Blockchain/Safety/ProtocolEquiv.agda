@@ -33,13 +33,6 @@ module Blockchain.Safety.ProtocolEquiv
   (ext                : Deployment BlockExt)
   (let module Ext = Deployment ext)
   (base-spec          : Spec BlockBase Ext.n Ext.Network)
-  {Mon : Type↑}
-  ⦃ Monad-M       : Monad Mon            ⦄
-  ⦃ M-Laws        : MonadLaws Mon        ⦄
-  ⦃ M-Extensional : ExtensionalMonad Mon ⦄
-  ⦃ M-Comm        : CommutativeMonad Mon ⦄
-  ⦃ M-Iter        : IterativeMonad Mon   ⦄
-  ⦃ M-OfRel       : MonadOfRel Mon       ⦄
   (Reachable   : ∀ {A} {Block : Type} → Machine I A → STT.Obs Ext.n Block → Type)
   (≈-Reachable : ∀ {A} {Block} {P Q : Machine I A} → P ≅ᴹ Q
                → ∀ {o : STT.Obs Ext.n Block} → Reachable P o → Reachable Q o)
