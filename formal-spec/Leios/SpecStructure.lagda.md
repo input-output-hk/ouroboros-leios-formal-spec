@@ -60,7 +60,7 @@ record SpecStructure : Type₂ where
   open Leios.Voting public
 ```
 ```agda
-  field va : VotingAbstract EndorserBlock
+  field va : VotingAbstract Vote EndorserBlock
   open VotingAbstract va public
 ```
 ```agda

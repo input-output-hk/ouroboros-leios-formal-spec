@@ -212,7 +212,7 @@ module _ (s : LeiosState) (open LeiosState s) where
   {- Update the LeiosState upon receiving a message (a header or body) -}
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs' = (slot , eb) ∷ EBs' }
-  upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs }
+  upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs ; votingState = L.foldl addVote votingState vs }
   upd (inj₂ _)             = s
 
 module _ {s s'} (open LeiosState s') where

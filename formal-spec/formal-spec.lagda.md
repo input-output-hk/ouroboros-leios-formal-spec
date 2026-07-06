@@ -56,6 +56,8 @@ open import Leios.SpecStructure
 Voting mechanism specification
 ```agda
 open import Leios.Voting
+import Leios.Voting.Ideal
+import Leios.Voting.Real
 ```
 Verifiable Random Function implementation
 ```agda

@@ -90,10 +90,11 @@ RankingBlocks that will be used in the test trace
     RB₀ = record { txsOrEbCert = inj₁ (0 ∷ []) ; announcedEB = nothing }
     RB₁ = record { txsOrEbCert = inj₁ [] ; announcedEB = just (hash EB₁) }
 ```
-Votes
+Votes: a vote is a pair of the voter and the hash of the endorser block it
+endorses. `VT₁` is a vote by the other party (party 1) for `EB₁`.
 ```agda
     VT₁ : List Vote
-    VT₁ = tt ∷ []
+    VT₁ = (fsuc fzero , hash EB₁) ∷ []
 ```
 Starting at slot 100
 ```agda
@@ -222,4 +223,17 @@ SUT is slot leader: create an EB and RB (implicit in Base₂-Action)
 
     test₂ : retValue ≡ "ok"
     test₂ = refl
+```
+### The certificate fires
+After the trace, the voting state has recorded both the node's own vote
+(`VT-Role` at slot 104, via `rememberVote`) and the received vote `VT₁`
+(slot 105), so `EB₁` is vote-certified in the final state.
+```agda
+    final : LeiosState
+    final = case verifyTrace (L.reverse test-trace) s₁₀₀ of λ where
+      (Ok vt) → getNewState vt
+      (Err _) → s₁₀₀
+
+    test₃ : ¿ isVoteCertified (LeiosState.votingState final) EB₁ ¿ᵇ ≡ true
+    test₃ = refl
 ```

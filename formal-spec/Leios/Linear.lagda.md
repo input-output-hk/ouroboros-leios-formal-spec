@@ -104,7 +104,8 @@ isEquivocated : LeiosState → EndorserBlock → Type
 isEquivocated s eb = Any (areEquivocated eb) (toSet (LeiosState.EBs s))
 
 rememberVote : LeiosState → EndorserBlock → LeiosState
-rememberVote s@(record { VotedEBs = vebs }) eb = record s { VotedEBs = hash eb ∷ vebs }
+rememberVote s@(record { VotedEBs = vebs ; votingState = vst }) eb =
+  record s { VotedEBs = hash eb ∷ vebs ; votingState = addVote vst (vote sk-VT (hash eb)) }
 
 data _↝_ : LeiosState → LeiosState × FFDAbstract.Input ffdAbstract → Type where
 ```
