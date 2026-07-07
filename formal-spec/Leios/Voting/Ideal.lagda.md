@@ -1,7 +1,14 @@
-## An ideal model of the Leios voting scheme (first cut)
+## An ideal model of the Leios voting scheme
 
-This module is a first step towards
-[#689 "Formalize correctness of certificates"](https://github.com/input-output-hk/ouroboros-leios/issues/689).
+This module covers tasks 2–4 of
+[#689 "Formalize correctness of certificates"](https://github.com/input-output-hk/ouroboros-leios/issues/689):
+it defines the correctness property, gives the ideal model, and proves the
+property (the real side and its transfer live in `Leios.Voting.Real`). Task 1 —
+the composable-state-machine refactor — lives in `Leios.Voting.Machine`, where the
+`Step` relations below are recast as `CategoricalCrypto` machines and the protocol
+drives the real voting machine through a machine-backed `VotingAbstract`. What
+remains of #689 is the UC-level statement `Real ≤'UC Ideal`, for which the library
+lacks a workable `≈ℰ` proof principle — see the note in `Leios.Voting.Real`.
 
 It gives an *ideal* model of voting as a small state machine and states — and
 proves — the central correctness property:
@@ -16,12 +23,16 @@ voters. As long as the adversary controls fewer than `threshold` parties, any
 certifying set must contain an honest voter, whose recorded vote carries the
 validation evidence — so the property holds by construction of the ideal.
 
-Compared to the opaque `isVoteCertified` field of `Leios.Voting.VotingAbstract`,
-here the certificate predicate (`Certified`) is *derived* from the recorded votes
-and an explicit `threshold`. Folding this refinement back into the shared
-`VotingAbstract` (which `SpecStructure`/`Protocol`/`Blockchain.Safety` depend on)
-is the follow-up "composable state machine" refactor and is intentionally left out
-of this first cut to avoid destabilising the rest of the build.
+Here the certificate predicate (`Certified`) is *derived* from the recorded votes
+and an explicit `threshold`, rather than being the opaque `isVoteCertified` field of
+`Leios.Voting.VotingAbstract`. The correctness property below (`cert-correct`) has
+since been folded back into that shared `VotingAbstract` (which
+`SpecStructure`/`Protocol`/`Blockchain.Safety` depend on) as a `cert-correct`
+proof obligation next to `isVoteCertified`: the abstraction now guarantees that a
+certificate implies an honest voter validated the block. That obligation is
+discharged via this ideal model — see `Leios.Voting.Real` (`real-cert-correct`) and
+the machine-backed instance built by `Leios.Voting.Machine.RealMachine.Realize`,
+where `isVoteCertified` is realised from the vote log and `threshold`.
 
 <!--
 ```agda

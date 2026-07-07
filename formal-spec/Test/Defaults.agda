@@ -297,116 +297,14 @@ d-FFDFunctionality =
     }
 
 open import Leios.Voting public
-open import Class.DecEq.Instances
-open import Data.List.Membership.Propositional.Properties using (∈-map⁻; ∈-filter⁻; ∈-deduplicate⁻)
-import Data.List.Relation.Unary.All as All
-import Data.List.Relation.Unary.Unique.DecPropositional.Properties as UDP′
-import Leios.Voting.Ideal
+import Leios.Voting.Machine
 
--- Voting instance (issue #689): the ideal quorum certificate, realised via
--- `Leios.Voting.Realize`.  Votes are (voter , EB hash) pairs, so the ideal
--- model runs over `Hash` and is re-indexed to `EndorserBlock` via
--- `mapVotingAbstract hash`.  For these defaults everyone is honest, every
--- vote is valid, no party is corrupt, and the quorum threshold is 1.
-d-Party : Type
-d-Party = PoolID
-
-d-honest : d-Party → Type
-d-honest _ = ⊤
-
-d-Validated : d-Party → Hash → Type
-d-Validated _ _ = ⊤
-
-d-Valid : Vote → Type
-d-Valid _ = ⊤
-
-d-bound : 0 Leios.Prelude.N.< 1
-d-bound = Leios.Prelude.N.s≤s Leios.Prelude.N.z≤n
-
-module VotingRealize
-  (Party      : Type) ⦃ _ : DecEq Party ⦄
-  (EBRef      : Type) ⦃ _ : DecEq EBRef ⦄
-  (honest     : Party → Type) ⦃ _ : honest ⁇¹ ⦄
-  (Validated  : Party → EBRef → Type)
-  (threshold  : ℕ)
-  (corrupt    : List Party)
-  (bound      : length corrupt Leios.Prelude.N.< threshold)
-  (Vote       : Type)
-  (voter      : Vote → Party)
-  (forEB      : Vote → EBRef)
-  (Valid      : Vote → Type) ⦃ _ : Valid ⁇¹ ⦄
-  (validated-if-honest : ∀ v → Valid v → honest (voter v) → Validated (voter v) (forEB v))
-  (corrupt-covers      : ∀ v → Valid v → ¬ honest (voter v) → voter v ∈ˡ corrupt)
-  where
-
-  module I = Leios.Voting.Ideal Party EBRef honest Validated threshold
-
-  _≟ₚ_ : ∀ (x y : Party) → Dec (x ≡ y)
-  _≟ₚ_ = _≟_
-
-  module UDP = UDP′ _≟ₚ_
-
-  log : I.IdealState → List (Party × EBRef)
-  log = I.IdealState.voteLog
-
-  rawVoters : I.IdealState → EBRef → List Party
-  rawVoters st eb = L.map proj₁ (L.filter (λ pe → proj₂ pe ≟ eb) (log st))
-
-  votersFor : I.IdealState → EBRef → List Party
-  votersFor st eb = L.deduplicate _≟ₚ_ (rawVoters st eb)
-
-  isCert : I.IdealState → EBRef → Type
-  isCert st eb = threshold Leios.Prelude.N.≤ length (votersFor st eb)
-
-  buildCert : ∀ {st eb} → isCert st eb → I.Certified st eb
-  buildCert {st} {eb} h = record
-    { voters = votersFor st eb
-    ; unique = UDP.deduplicate-! (rawVoters st eb)
-    ; voted  = All.tabulate voted?
-    ; quorum = h
-    }
-    where
-      voted? : ∀ {p} → p ∈ˡ votersFor st eb → I.Voted p eb st
-      voted? {p} p∈ with ∈-deduplicate⁻ _≟ₚ_ (rawVoters st eb) p∈
-      ... | p∈raw with ∈-map⁻ proj₁ p∈raw
-      ... | pe , pe∈filter , p≡ with ∈-filter⁻ (λ pe → proj₂ pe ≟ eb) pe∈filter
-      ... | pe∈log , pf = subst (_∈ˡ log st) (cong₂ _,_ (sym p≡) pf) pe∈log
-
-  record VState : Type where
-    field
-      st  : I.IdealState
-      wf  : I.WF st
-      cov : ∀ {p eb} → I.Voted p eb st → ¬ honest p → p ∈ˡ corrupt
-
-  addVoteV : VState → Vote → VState
-  addVoteV vs v with ¿ Valid v ¿
-  ... | no  _   = vs
-  ... | yes val = record
-    { st  = I.⟨ (voter v , forEB v) ∷ log (VState.st vs) ⟩
-    ; wf  = λ where (here refl) h  → validated-if-honest v val h
-                    (there x)   h  → VState.wf vs x h
-    ; cov = λ where (here refl) ¬h → corrupt-covers v val ¬h
-                    (there x)   ¬h → VState.cov vs x ¬h
-    }
-
-  votingAbstract : VotingAbstract Vote EBRef
-  votingAbstract = record
-    { VotingState     = VState
-    ; initVotingState = record { st = I.init ; wf = I.wf-init ; cov = λ () }
-    ; addVote         = addVoteV
-    ; isVoteCertified = λ vs eb → isCert (VState.st vs) eb
-    ; isVoteCertified⁇ = λ {vs} {eb} → record { dec = threshold Leios.Prelude.N.≤? length (votersFor (VState.st vs) eb) }
-    ; Voter           = Party
-    ; HonestVoter     = honest
-    ; ValidatedBy     = Validated
-    ; cert-correct    = λ {vs} {eb} h →
-        I.cert-correct (VState.wf vs) corrupt (λ v ¬h → VState.cov vs v ¬h) bound (buildCert h)
-    }
-
-module RV = VotingRealize
-  d-Party Hash d-honest d-Validated 1 [] d-bound
-  Vote proj₁ proj₂ d-Valid
-  (λ _ _ _ → tt) (λ _ _ ¬h → ⊥-elim (¬h tt))
+-- For the Voting instance, everybody is honest here,
+-- vote is valid, no party is corrupt and the quorum threshold is 1
+module VM = Leios.Voting.Machine PoolID Hash (λ _ → ⊤) (λ _ _ → ⊤) 1
+module RM = VM.RealMachine Vote proj₁ proj₂ (λ _ → ⊤)
+module RV = RM.Realize [] (Leios.Prelude.N.s≤s Leios.Prelude.N.z≤n)
+              (λ _ _ _ → tt) (λ _ _ ¬h → ⊥-elim (¬h tt))
 
 d-VotingAbstract : VotingAbstract Vote EndorserBlock
 d-VotingAbstract = mapVotingAbstract (hash ⦃ Hashable-EndorserBlock ⦃ hpe ⦄ ⦄) RV.votingAbstract
