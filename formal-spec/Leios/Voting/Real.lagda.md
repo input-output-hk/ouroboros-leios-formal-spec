@@ -2,25 +2,11 @@
 
 The real scheme collects concrete votes. A vote carries no honesty/validation
 evidence, it is just a signature. An adversary may submit any vote it can
-produce. We relate it to the ideal model of `Leios.Voting.Ideal` by a **forward
-simulation**: an abstraction `α : RealState → IdealState` that keeps the valid
-votes, and under which the real certificate predicate refines the ideal one. The
-correctness property then transfers: *a real certificate implies an honest node
-validated the block.*
-
-The single cryptographic/protocol assumption is isolated as an explicit hypothesis
-`validated-if-honest`: a valid vote whose voter is honest was really produced by
-that honest party, who (per the protocol) had validated the block. This bundles
-signature unforgeability (EUF-CMA) with the honest voting rule.
-
-**On the library-level UC statement.** The ultimate goal is
-`Real ≤'UC Ideal` in the sense of `CategoricalCrypto.Machine.Core`
-(`R ≤'UC I = ∃[ S ] R ≈ℰ (B ⊗ˡ S ∘ I)`). That relation is *perfect* behavioural
-equality (`≈ℰ` is propositional equality of the environment-composed machines), for
-which the library does not yet provide a workable proof principle; a
-trace/simulation-based equivalence is still being developed. The forward simulation
-below is the tractable substitute and already yields the security-relevant
-consequence.
+produce. We relate it to the ideal model by a **forward simulation**:
+an abstraction `α : RealState → IdealState` that keeps the valid votes, and
+under which the real certificate predicate refines the ideal one. The
+correctness property then transfers: a real certificate implies an honest node
+validated the block.
 
 <!--
 ```agda

@@ -11,7 +11,7 @@ voter validated the block (for honest parties) or that the voter is dishonest (f
 adversarial parties). A *certificate* is a quorum of `threshold`-many distinct
 voters. As long as the adversary controls fewer than `threshold` parties, any
 certifying set must contain an honest voter, whose recorded vote carries the
-validation evidence, therefore the property holds by construction of the ideal.
+validation evidence and therefore the property holds by construction.
 
 TODO: What remains is the UC-level statement `Real ≤'UC Ideal`, for which the
 library lacks a workable `≈ℰ` proof principle.
@@ -38,15 +38,7 @@ module Leios.Voting.Ideal
   (Validated  : Party → Subject → Type)
   (threshold  : ℕ)
   where
-```
 
-### A combinatorial pigeonhole lemma
-
-A duplicate-free list contained in another list is no longer than it. This is the
-counting core of the correctness argument: a quorum of distinct voters cannot fit
-inside a strictly smaller set of corrupt parties.
-
-```agda
 private
   ∈-remove : ∀ {A : Type} {z x : A} (ys zs : List A)
            → z ∈ˡ ys ++ x ∷ zs → z ≢ x → z ∈ˡ ys ++ zs
@@ -88,8 +80,10 @@ Voted : Party → Subject → IdealState → Type
 Voted p x st = (p , x) ∈ˡ voteLog st
 
 data Step : IdealState → IdealState → Type where
+
   CastHonest : ∀ {st p x} → honest p → Validated p x
              → Step st ⟨ (p , x) ∷ voteLog st ⟩
+
   CastAdv    : ∀ {st p x} → ¬ honest p
              → Step st ⟨ (p , x) ∷ voteLog st ⟩
 ```
