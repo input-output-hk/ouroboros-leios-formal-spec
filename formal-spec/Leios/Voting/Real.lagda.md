@@ -1,11 +1,7 @@
 ## The real voting scheme and its refinement of the ideal model
 
-This module continues
-[#689 "Formalize correctness of certificates"](https://github.com/input-output-hk/ouroboros-leios/issues/689),
-covering steps 3 (a *real* voting functionality) and 4 (real emulates ideal).
-
 The real scheme collects concrete votes. A vote carries no honesty/validation
-evidence — it is just a signature — so an adversary may submit any vote it can
+evidence, it is just a signature. An adversary may submit any vote it can
 produce. We relate it to the ideal model of `Leios.Voting.Ideal` by a **forward
 simulation**: an abstraction `α : RealState → IdealState` that keeps the valid
 votes, and under which the real certificate predicate refines the ideal one. The

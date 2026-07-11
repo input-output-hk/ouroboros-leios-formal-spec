@@ -1,20 +1,11 @@
 ## The Leios voting scheme as a composable state machine
 
-This module recasts the ideal and real voting functionalities of
-`Leios.Voting.Ideal` / `Leios.Voting.Real` as `CategoricalCrypto` machines, so
-that voting becomes a *composable* object in the same category as the rest of the
-Leios network models (`Network.*`). This is task 1 of
-[#689](https://github.com/input-output-hk/ouroboros-leios/issues/689).
+This module recasts the ideal and real voting functionalities as
+`CategoricalCrypto` machines, so that voting becomes a *composable*
+object in the same category as the rest of the Leios network models.
 
 The functionalities are morphisms `Machine I C`: the machine has no proper input
-channel (`I`) and exposes a channel `C` on which parties *cast* votes. The ideal
-functionality separates an honest channel from an adversarial one, exactly
-mirroring the two constructors of `Leios.Voting.Ideal.Step`; each cast is an `Out`
-message from the caster and the functionality answers with `nothing`, i.e. it only
-records the vote. Certification stays a predicate on the machine state, so the
-`cert-correct` proof of the ideal model transfers verbatim once we show the
-machine's step relation coincides with `Step`.
-
+channel (`I`) and exposes a channel `C` on which parties *cast* votes.
 <!--
 ```agda
 {-# OPTIONS --safe --no-require-unique-meta-solutions #-}
@@ -48,9 +39,8 @@ open Ideal.IdealState using (voteLog)
 
 ### Channels
 
-An honest party casts `(party , block)` on the honest channel; the adversary casts
-on its own channel. Both are `Out` messages: the caster emits, the functionality
-receives.
+An honest party casts a vote on the honest channel; the adversary casts
+on its own channel.
 
 ```agda
 data HonestT : Mode → Type where
@@ -103,9 +93,9 @@ step⇒machine (Ideal.CastHonest hp val) = -, CastHonest hp val
 step⇒machine (Ideal.CastAdv ¬hp)       = -, CastAdv ¬hp
 ```
 
-In particular well-formedness — every recorded honest vote is backed by a
-validation — is an *invariant* of the machine, and the certificate correctness
-property holds in every state reachable from `init`.
+In particular well-formedness is an invariant of the machine,
+i.e. every recorded honest vote is backed by a validation.
+The certificate correctness property holds in every state reachable from `init`.
 
 ```agda
 wf-invariant : Invariant IdealFunctionality Ideal.WF

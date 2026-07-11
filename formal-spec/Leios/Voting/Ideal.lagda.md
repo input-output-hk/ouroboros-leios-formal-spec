@@ -1,39 +1,20 @@
 ## An ideal model of the Leios voting scheme
 
-This module covers tasks 2–4 of
-[#689 "Formalize correctness of certificates"](https://github.com/input-output-hk/ouroboros-leios/issues/689):
-it defines the correctness property, gives the ideal model, and proves the
-property (the real side and its transfer live in `Leios.Voting.Real`). Task 1 —
-the composable-state-machine refactor — lives in `Leios.Voting.Machine`, where the
-`Step` relations below are recast as `CategoricalCrypto` machines and the protocol
-drives the real voting machine through a machine-backed `VotingAbstract`. What
-remains of #689 is the UC-level statement `Real ≤'UC Ideal`, for which the library
-lacks a workable `≈ℰ` proof principle — see the note in `Leios.Voting.Real`.
+This gives an ideal model of voting as a small state machine and proves
+the central correctness property:
 
-It gives an *ideal* model of voting as a small state machine and states — and
-proves — the central correctness property:
-
-> **If a certificate for a block exists, then at least one honest node has
-> validated that block.**
+> If a certificate for a block exists, then at least one honest node has
+> validated that block.
 
 The ideal functionality records a vote for a block only under the premise that the
 voter validated the block (for honest parties) or that the voter is dishonest (for
 adversarial parties). A *certificate* is a quorum of `threshold`-many distinct
 voters. As long as the adversary controls fewer than `threshold` parties, any
 certifying set must contain an honest voter, whose recorded vote carries the
-validation evidence — so the property holds by construction of the ideal.
+validation evidence, therefore the property holds by construction of the ideal.
 
-Here the certificate predicate (`Certified`) is *derived* from the recorded votes
-and an explicit `threshold`, rather than being the opaque `isVoteCertified` field of
-`Leios.Voting.VotingAbstract`. The correctness property below (`cert-correct`) has
-since been folded back into that shared `VotingAbstract` (which
-`SpecStructure`/`Protocol`/`Blockchain.Safety` depend on) as a `cert-correct`
-proof obligation next to `isVoteCertified`: the abstraction now guarantees that a
-certificate implies an honest voter validated the block. That obligation is
-discharged via this ideal model — see `Leios.Voting.Real` (`real-cert-correct`) and
-the machine-backed instance built by `Leios.Voting.Machine.RealMachine.Realize`,
-where `isVoteCertified` is realised from the vote log and `threshold`.
-
+TODO: What remains is the UC-level statement `Real ≤'UC Ideal`, for which the
+library lacks a workable `≈ℰ` proof principle.
 <!--
 ```agda
 {-# OPTIONS --safe #-}
@@ -49,17 +30,12 @@ import Data.List.Relation.Unary.AllPairs as AllPairs
 open import Data.List.Properties using (length-++)
 ```
 -->
-
-The model is parameterised over an abstract notion of party, block reference, a
-(decidable) honesty predicate, a validation predicate, and the certificate
-threshold.
-
 ```agda
 module Leios.Voting.Ideal
   (Party      : Type)
-  (EBRef      : Type)
+  (Subject    : Type)
   (honest     : Party → Type) ⦃ _ : honest ⁇¹ ⦄
-  (Validated  : Party → EBRef → Type)
+  (Validated  : Party → Subject → Type)
   (threshold  : ℕ)
   where
 ```
@@ -94,39 +70,38 @@ private
 
 ### The ideal functionality
 
-The state is just the log of votes cast so far.
 
 ```agda
+Vote : Type
+Vote = Party × Subject
+
 record IdealState : Type where
   constructor ⟨_⟩
-  field voteLog : List (Party × EBRef)
+  field voteLog : List Vote
 
 open IdealState
 
 init : IdealState
 init = ⟨ [] ⟩
 
-Voted : Party → EBRef → IdealState → Type
-Voted p eb st = (p , eb) ∈ˡ voteLog st
-```
+Voted : Party → Subject → IdealState → Type
+Voted p x st = (p , x) ∈ˡ voteLog st
 
-A step either records an honest vote — only permitted once the voter has validated
-the block — or an adversarial vote from a dishonest party.
-
-```agda
 data Step : IdealState → IdealState → Type where
-  CastHonest : ∀ {st p eb} → honest p → Validated p eb
-             → Step st ⟨ (p , eb) ∷ voteLog st ⟩
-  CastAdv    : ∀ {st p eb} → ¬ honest p
-             → Step st ⟨ (p , eb) ∷ voteLog st ⟩
+  CastHonest : ∀ {st p x} → honest p → Validated p x
+             → Step st ⟨ (p , x) ∷ voteLog st ⟩
+  CastAdv    : ∀ {st p x} → ¬ honest p
+             → Step st ⟨ (p , x) ∷ voteLog st ⟩
 ```
 
 The functionality maintains the invariant that every honest recorded vote is backed
 by a validation. This is what makes the ideal model *ideal*.
 
+### Well-formed
+
 ```agda
 WF : IdealState → Type
-WF st = ∀ {p eb} → Voted p eb st → honest p → Validated p eb
+WF st = ∀ {p x} → Voted p x st → honest p → Validated p x
 
 wf-init : WF init
 wf-init ()
@@ -144,11 +119,11 @@ A certificate is a quorum of `threshold`-many *distinct* parties that have all v
 for the block.
 
 ```agda
-record Certified (st : IdealState) (eb : EBRef) : Type where
+record Certified (st : IdealState) (x : Subject) : Type where
   field
     voters : List Party
     unique : Unique voters
-    voted  : All.All (λ p → Voted p eb st) voters
+    voted  : All.All (λ p → Voted p x st) voters
     quorum : threshold N.≤ length voters
 ```
 
@@ -170,19 +145,19 @@ voters must be honest.
 ```
 
 The main property: a certificate implies an honest node validated the block. The
-adversary is modelled by a list `corrupt` of parties it controls, assumed smaller
-than the quorum threshold (this is the honest-participation assumption); every
-dishonest voter must be one of them.
+adversary is modelled by a list of parties it controls, assumed smaller than the
+quorum threshold (this is the honest-participation assumption); every dishonest
+voter must be one of them.
 
 ```agda
-cert-correct : ∀ {st eb}
+cert-correct : ∀ {st x}
   → WF st
   → (corrupt : List Party)
-  → (∀ {p} → Voted p eb st → ¬ honest p → p ∈ˡ corrupt)
+  → (∀ {p} → Voted p x st → ¬ honest p → p ∈ˡ corrupt)
   → length corrupt N.< threshold
-  → Certified st eb
-  → ∃[ p ] (honest p × Validated p eb)
-cert-correct {st} {eb} wf corrupt corrupt-covers bound cert =
+  → Certified st x
+  → ∃[ p ] (honest p × Validated p x)
+cert-correct {st} {x} wf corrupt corrupt-covers bound cert =
   let open Certified cert
       (p , p∈voters , hp) =
         ∃honestVoter voters unique corrupt (N.<-≤-trans bound quorum)
