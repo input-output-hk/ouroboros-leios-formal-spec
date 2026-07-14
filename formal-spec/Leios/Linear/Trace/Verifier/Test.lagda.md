@@ -96,6 +96,12 @@ endorses. `VT₁` is a vote by the other party (party 1) for `EB₁`.
     VT₁ : List Vote
     VT₁ = (fsuc fzero , hash EB₁) ∷ []
 ```
+The certificate for `EB₁`, as delivered by the voting functionality once the
+votes for `EB₁` reach a quorum.
+```agda
+    crt₁ : EBCert
+    crt₁ = hash EB₁
+```
 Starting at slot 100
 ```agda
     s₁₀₀ : LeiosState
@@ -136,7 +142,7 @@ slot: 100 101 102 103 104 105 106 107 108 109
 Submitting transactions, Receiving RB₀
 ```agda
                    (No-EB-Role-Action 100 , inj₁ SLOT)
-                 ∷ (Base₁-Action      100 , inj₂ (inj₂ (SubmitTxs (3 ∷ 4 ∷ 5 ∷ []))))
+                 ∷ (Base₁-Action      100 , inj₂ (inj₂ (inj₁ (SubmitTxs (3 ∷ 4 ∷ 5 ∷ [])))))
                  ∷ (Base₂-Action      100 , inj₁ SLOT)
                  ∷ (No-VT-Role-Action 100 , inj₁ SLOT)
                  ∷ (Slot₂-Action      100 , inj₂ (inj₁ (BASE-LDG [ RB₀ ])))
@@ -189,10 +195,12 @@ Another vote is received
                  ∷ (Slot₁-Action      106 , inj₁ (FFD-OUT []))
 ```
 #### Slot 107
+The voting functionality delivers the certificate for EB₁
 ```agda
                  ∷ (Base₂-Action      107 , inj₁ SLOT)
                  ∷ (No-EB-Role-Action 107 , inj₁ SLOT)
                  ∷ (No-VT-Role-Action 107 , inj₁ SLOT)
+                 ∷ (Cert-Action       107 , inj₂ (inj₂ (inj₂ (CERT crt₁))))
                  ∷ (Slot₁-Action      107 , inj₁ (FFD-OUT []))
 ```
 #### Slot 108
@@ -225,15 +233,16 @@ SUT is slot leader: create an EB and RB (implicit in Base₂-Action)
     test₂ = refl
 ```
 ### The certificate fires
-After the trace, the voting state has recorded both the node's own vote
-(`VT-Role` at slot 104, via `rememberVote`) and the received vote `VT₁`
-(slot 105), so `EB₁` is vote-certified in the final state.
+The node casts its own vote at slot 104 (`VT-Role`, sent to the voting
+functionality) and the vote `VT₁` diffuses at slot 105; at slot 107 the
+voting functionality delivers the certificate `crt₁`, which the node records
+(`Cert₁`). In the final state `EB₁` is therefore paired with its certificate.
 ```agda
     final : LeiosState
     final = case verifyTrace (L.reverse test-trace) s₁₀₀ of λ where
       (Ok vt) → getNewState vt
       (Err _) → s₁₀₀
 
-    test₃ : ¿ isVoteCertified (LeiosState.votingState final) EB₁ ¿ᵇ ≡ true
+    test₃ : LeiosState.ebsWithCert final ≡ [ (EB₁ , crt₁) ]
     test₃ = refl
 ```

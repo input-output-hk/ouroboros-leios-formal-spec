@@ -24,6 +24,10 @@ module Network.Leios
   (HashCorrect-irrel : ∀ rb eb → Irrelevant (HashCorrectB rb eb))
   (hash-unique : (rb : RankingBlock) → (eb₁ eb₂ : Maybe EndorserBlock)
     → HashCorrectB rb eb₁ → HashCorrectB rb eb₂ → eb₁ ≡ eb₂)
+  -- parameters of the voting functionality
+  (forEB     : Vote → EBRef)
+  (mkCert    : EBRef → EBCert)
+  (threshold : ℕ)
   (cc : ChannelCat) (let open ChannelCat cc)
     where
 
@@ -37,6 +41,7 @@ LeiosMsg = FFDA.Header ⊎ FFDA.Body
 Message  = LeiosMsg ⊎ BaseMsg
 
 import Network.DelayedDiffuse numberOfParties Message k as DD
+import Leios.Voting.Certifier numberOfParties Vote EBRef EBCert forEB mkCert threshold as Certifier
 
 -- multiplexing the network for the base & leios functionality
 -- this is somewhat awkward because we require a strict order on
@@ -72,8 +77,10 @@ NetTranslate : Machine DD.M (Network ⊗₀ BaseNetwork)
 NetTranslate .Machine.State   = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
-Leios1 : Machine DD.M (IO ⊗₀ ((I ⊗₀ I ⊗₀ BaseAdv) ⊗₀ Adv))
-Leios1 = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
+-- The Leios node: the voting channel is part of the node's domain and is
+-- passed through to the shared functionalities when assembling the protocol.
+Leios1 : Machine (DD.M ⊗₀ VotingC) (IO ⊗₀ (((I ⊗₀ I) ⊗₀ ((I ⊗₀ BaseAdv) ⊗₀ I)) ⊗₀ Adv))
+Leios1 = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ B.m) ⊗ᴷ idᴷ) ∘ᴷ (liftᴷ NetTranslate ⊗ᴷ idᴷ)
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
 record LeiosBlock : Type where
@@ -93,25 +100,53 @@ LeiosBlock-Injective
   subst (λ (eb , correct) → _ ≡ record { rb = rb ; eb = eb ; correct = correct })
     (hash-unique' rb eb₁ eb₂ correct₁ correct₂) refl
 
-spec : Machine DD.M ((Network ⊗₀ BaseIO) ⊗₀ (I ⊗₀ I ⊗₀ BaseAdv))
-spec = (idᴷ ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
+-- The base node over the same channels: voting is passed through untouched,
+-- the base protocol is voting-oblivious.
+spec : Machine (DD.M ⊗₀ VotingC)
+               (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ ((I ⊗₀ I) ⊗₀ ((I ⊗₀ BaseAdv) ⊗₀ I)))
+spec = ((idᴷ ⊗ᴷ B.m) ⊗ᴷ idᴷ) ∘ᴷ (liftᴷ NetTranslate ⊗ᴷ idᴷ)
 
-ext-spec : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ I)
-ext-spec = subst (λ x → Machine (Network ⊗₀ BaseIO) (IO ⊗₀ x)) eq body
+ext-spec : Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ I)
+ext-spec = subst (λ x → Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ x)) eq body
   where
-    eq : (I ⊗₀ I) ⊗₀ I ≡ I
-    eq = trans ⊗-identityʳ ⊗-identityʳ
-    body : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ ((I ⊗₀ I) ⊗₀ I))
-    body = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ)
+    eq : ((I ⊗₀ I) ⊗₀ I) ⊗₀ I ≡ I
+    eq = trans ⊗-identityʳ (trans ⊗-identityʳ ⊗-identityʳ)
+    body : Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ (((I ⊗₀ I) ⊗₀ I) ⊗₀ I))
+    body = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ idᴷ) ⊗ᴷ idᴷ)
+
+--------------------------------------------------------------------------------
+-- Shared functionalities
+--
+-- The deployment's `network` is the tensor of the diffusion network and the
+-- voting functionality: each node sees one composite channel `DD.M ⊗₀ VotingC`,
+-- and `shuffle` interleaves the two n-fold functionality channels accordingly.
+
+⊗-interchange : ∀ {m} {A B C D : Channel}
+              → (A ⊗₀ B) ⊗₀ (C ⊗₀ D) [ m ]⇒[ m ] (A ⊗₀ C) ⊗₀ (B ⊗₀ D)
+⊗-interchange =
+  ⊗-right-assoc
+    ⇒ₜ ⊗-left-double-intro (⊗-left-assoc ⇒ₜ ⊗-right-double-intro ⊗-sym ⇒ₜ ⊗-right-assoc)
+    ⇒ₜ ⊗-left-assoc
+
+zip⇒ : ∀ {m} n (A B : Channel) → (n ⨂ⁿ A) ⊗₀ (n ⨂ⁿ B) [ m ]⇒[ m ] n ⨂ⁿ (A ⊗₀ B)
+zip⇒ zero    A B = ⊗-right-neutral
+zip⇒ (suc n) A B = ⊗-interchange ⇒ₜ ⊗-left-double-intro (zip⇒ n A B)
+
+unzip⇒ : ∀ {m} n (A B : Channel) → n ⨂ⁿ (A ⊗₀ B) [ m ]⇒[ m ] (n ⨂ⁿ A) ⊗₀ (n ⨂ⁿ B)
+unzip⇒ zero    A B = ⊗-right-intro
+unzip⇒ (suc n) A B = ⊗-left-double-intro (unzip⇒ n A B) ⇒ₜ ⊗-interchange
+
+shuffle : ∀ n (A B : Channel) → Machine ((n ⨂ⁿ A) ⊗₀ (n ⨂ⁿ B)) (n ⨂ⁿ (A ⊗₀ B))
+shuffle n A B = TotalFunctionMachine' (zip⇒ n A B) (unzip⇒ n A B)
 
 module _ (IOF AdvF : Participant → Channel)
-  (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
+  (nodesF : (p : Participant) → Machine (DD.M ⊗₀ VotingC) (IOF p ⊗₀ AdvF p)) honestNodes
   (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
   (isConstrained-Leios : IsConstrained Leios1 (IsBC.bciQueryType Participant {Block = LeiosBlock}))
   (isPure-Leios        : IsPure isConstrained-Leios)
   (IsBlockchain-base : IsBC.IsBlockchain Participant RankingBlock spec)
   (is-extension-eq :
-    idᴷ ∘ᴷ Leios1 ≡ subst (λ A → Machine DD.M (IO ⊗₀ (A ⊗₀ I))) (sym ⊗-identityʳ) (ext-spec ∘ᴷ spec))
+    idᴷ ∘ᴷ Leios1 ≡ subst (λ A → Machine (DD.M ⊗₀ VotingC) (IO ⊗₀ (A ⊗₀ I))) (sym ⊗-identityʳ) (ext-spec ∘ᴷ spec))
     where
 
   private
@@ -141,7 +176,7 @@ module _ (IOF AdvF : Participant → Channel)
     ; all-nodes           = nodesF
     ; honest-nodes        = honestNodes
     ; honest-nodes-≡-spec = honest-Node
-    ; network             = DD.Network
+    ; network             = liftᴷ {E = I} (shuffle numberOfParties DD.M VotingC) ∘ᴷ ((DD.Network ⊗ᴷ Certifier.Functionality) ∘ idᴷ)
     }
 
   module S = Deployment safetyS

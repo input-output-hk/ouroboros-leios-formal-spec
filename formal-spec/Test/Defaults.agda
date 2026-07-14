@@ -5,7 +5,7 @@
    and functionalities of the Leios protocol. These defaults are intended for
    building examples and traces for different Leios variants, and include
    basic instances for abstract types, VRF, key registration, base layer,
-   FFD buffers, and voting. The implementations are minimal and primarily
+   and FFD buffers. The implementations are minimal and primarily
    for testing and illustration purposes.
 -}
 
@@ -296,33 +296,6 @@ d-FFDFunctionality =
     ; _-⟦_/_⟧⇀_     = SimpleFFD
     }
 
-open import Leios.Voting public
-import Leios.Voting.Machine
-
--- For the Voting instance, everybody is honest here,
--- vote is valid, no party is corrupt and the quorum threshold is 1
-module VM = Leios.Voting.Machine PoolID Hash (λ _ → ⊤) (λ _ _ → ⊤) 1
-module RM = VM.RealMachine Vote proj₁ proj₂ (λ _ → ⊤)
-module RV = RM.Realize [] (Leios.Prelude.N.s≤s Leios.Prelude.N.z≤n)
-              (λ _ _ _ → tt) (λ _ _ ¬h → ⊥-elim (¬h tt))
-
-d-VotingAbstract : VotingAbstract Vote EndorserBlock
-d-VotingAbstract = mapVotingAbstract (hash ⦃ Hashable-EndorserBlock ⦃ hpe ⦄ ⦄) RV.votingAbstract
-  where
-    mapVotingAbstract : ∀ {Vote Subject₁ Subject₂ : Type} → (Subject₂ → Subject₁)
-                        → VotingAbstract Vote Subject₁ → VotingAbstract Vote Subject₂
-    mapVotingAbstract f va = record
-      { VotingState      = VotingState
-      ; initVotingState  = initVotingState
-      ; addVote          = addVote
-      ; isVoteCertified  = λ vs y → isVoteCertified vs (f y)
-      ; isVoteCertified⁇ = isVoteCertified⁇
-      ; Voter            = Voter
-      ; HonestVoter      = HonestVoter
-      ; ValidatedBy      = λ p y → ValidatedBy p (f y)
-      ; cert-correct     = cert-correct
-      } where open VotingAbstract va
-
 d-SpecStructure : SpecStructure
 d-SpecStructure = record
       { a                         = d-Abstract
@@ -338,7 +311,5 @@ d-SpecStructure = record
       ; BM                        = d-BaseFunctionality
       ; K'                        = d-KeyRegistration
       ; KF                        = d-KeyRegistrationFunctionality
-      ; va                        = d-VotingAbstract
-      ; getEBCert                 = λ _ → []
       ; validityCheckTime         = λ _ → 4
       }

@@ -67,7 +67,8 @@ record LeiosState : Type where
         slot         : ℕ
         Upkeep       : List SlotUpkeep
         Upkeep-Stage : ℙ StageUpkeep
-        votingState  : VotingState
+        {- certificates delivered by the voting functionality -}
+        Certs        : List EBCert
         PubKeys      : List PubKey
 
   -- ideally we'd require a non-empty list, but this also works for now
@@ -107,14 +108,12 @@ record LeiosState : Type where
   Dec-needsUpkeep-Stage : ∀ {u : StageUpkeep} → ⦃ DecEq StageUpkeep ⦄ → needsUpkeep-Stage u ⁇
   Dec-needsUpkeep-Stage {u} .dec = ¬? (u ∈? Upkeep-Stage)
 
-  -- Produces a Vote certified block
+  -- Pair each EB with a certificate delivered by the voting functionality
   ebsWithCert : List (EndorserBlock × EBCert)
   ebsWithCert = mapMaybe getCert EBs
     where
       getCert : EndorserBlock → Maybe (EndorserBlock × EBCert)
-      getCert eb = case ¿ isVoteCertified votingState eb ¿ of λ where
-        (yes p) → just (eb , getEBCert p)
-        (no ¬p) → nothing
+      getCert eb = (eb ,_) <$> find (λ c → getEBHash c ≟ getEBRef eb) Certs
 
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
 addUpkeep s u = let open LeiosState s in record s { Upkeep = u ∷ Upkeep }
@@ -135,7 +134,7 @@ initLeiosState V SD pks = record
   ; slot         = initSlot V
   ; Upkeep       = []
   ; Upkeep-Stage = ∅
-  ; votingState  = initVotingState
+  ; Certs        = []
   ; PubKeys      = pks
   }
 
@@ -212,7 +211,7 @@ module _ (s : LeiosState) (open LeiosState s) where
   {- Update the LeiosState upon receiving a message (a header or body) -}
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs' = (slot , eb) ∷ EBs' }
-  upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs ; votingState = L.foldl addVote votingState vs }
+  upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs }
   upd (inj₂ _)             = s
 
 module _ {s s'} (open LeiosState s') where
@@ -273,4 +272,8 @@ module Types (params : Params) (let open Params params) where
 
   BaseC : Channel
   BaseC = simpleChannel BaseT ᵀ
+
+  {- The interface to the voting functionality: a node casts votes and
+     receives certificates for endorser blocks with a vote quorum. -}
+  open import Leios.Voting.Channel Vote EBCert public
 ```

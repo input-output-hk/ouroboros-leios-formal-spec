@@ -13,11 +13,6 @@ channel (`I`) and exposes a channel `C` on which parties *cast* votes.
 open import Leios.Prelude hiding (_⊗_; module Any)
 open import CategoricalCrypto
 
-open import Leios.Voting
-open import Data.List.Membership.Propositional.Properties using (∈-map⁻; ∈-filter⁻; ∈-deduplicate⁻)
-import Data.List.Relation.Unary.Unique.DecPropositional.Properties as UDP′
-import Data.List.Relation.Unary.All as All
-
 import Leios.Voting.Ideal
 import Leios.Voting.Real
 ```
@@ -202,105 +197,4 @@ validated the block.
     → ∃[ p ] (honest p × Validated p eb)
   real-cert-correctᴹ vih corrupt cc bound tr rc =
     Real.real-cert-correct (λ {v} _ → vih v) corrupt (λ {v} _ → cc v) bound rc
-```
-
-### A machine-driven `VotingAbstract`
-
-Finally we close the loop with the protocol: a `VotingAbstract` whose voting state
-*is* a state of the real voting machine together with a `Trace` witnessing its
-reachability. Each `addVote` — called by `Protocol.upd` for received votes and by
-`Linear.rememberVote` for the node's own vote — extends the trace by a `Recv`
-step, so the protocol literally drives the machine. The `cert-correct` obligation
-is discharged through the machine-level forward simulation: the trace is mapped to
-an ideal trace (`simulate-trace`), along which well-formedness is an invariant
-(`wf-invariant`), and the ideal `cert-correct` finishes the argument.
-
-The certificate predicate counts the distinct voters with a valid vote for the
-block — a quorum of `threshold`-many certifies.
-
-```agda
-  module Realize
-    ⦃ _ : DecEq Party ⦄ ⦃ _ : DecEq EBRef ⦄
-    (corrupt : List Party)
-    (bound   : length corrupt N.< threshold)
-    (vih     : ∀ v → Valid v → honest (voter v) → Validated (voter v) (forEB v))
-    (cc      : ∀ v → Valid v → ¬ honest (voter v) → voter v ∈ˡ corrupt)
-    where
-
-    _≟ₚ_ : ∀ (x y : Party) → Dec (x ≡ y)
-    _≟ₚ_ = _≟_
-
-    module UDP = UDP′ _≟ₚ_
-
-    log : IdealState → List (Party × EBRef)
-    log = Ideal.IdealState.voteLog
-
-    rawVoters : IdealState → EBRef → List Party
-    rawVoters st eb = L.map proj₁ (L.filter (λ pe → proj₂ pe ≟ eb) (log st))
-
-    votersFor : IdealState → EBRef → List Party
-    votersFor st eb = L.deduplicate _≟ₚ_ (rawVoters st eb)
-
-    isCert : IdealState → EBRef → Type
-    isCert st eb = threshold N.≤ length (votersFor st eb)
-
-    buildCert : ∀ {st eb} → isCert st eb → Ideal.Certified st eb
-    buildCert {st} {eb} h = record
-      { voters = votersFor st eb
-      ; unique = UDP.deduplicate-! (rawVoters st eb)
-      ; voted  = All.tabulate voted?
-      ; quorum = h
-      }
-      where
-        voted? : ∀ {p} → p ∈ˡ votersFor st eb → Ideal.Voted p eb st
-        voted? {p} p∈ with ∈-deduplicate⁻ _≟ₚ_ (rawVoters st eb) p∈
-        ... | p∈raw with ∈-map⁻ proj₁ p∈raw
-        ... | pe , pe∈filter , p≡ with ∈-filter⁻ (λ pe → proj₂ pe ≟ eb) pe∈filter
-        ... | pe∈log , pf = subst (_∈ˡ log st) (cong₂ _,_ (sym p≡) pf) pe∈log
-```
-
-The voting state: a machine state together with the trace that reached it.
-
-```agda
-    record VState : Type where
-      constructor ⟪_,_⟫
-      field rs    : Real.RealState
-            reach : Trace RealFunctionality [] rs
-
-    addVoteᴹ : VState → Vote → VState
-    addVoteᴹ ⟪ rs , tr ⟫ v = ⟪ v ∷ rs , tr ∷ʳ⟨ L⊗ ϵ ᵗ¹ ↑ₒ Cast v , nothing , Recv v ⟩ ⟫
-```
-
-Certificate correctness for every state the protocol can produce, obtained
-entirely from the machine-level results.
-
-```agda
-    cert-correctᴿ : ∀ {vs eb} → isCert (Real.α (VState.rs vs)) eb
-                  → ∃[ p ] (honest p × Validated p eb)
-    cert-correctᴿ {⟪ rs , tr ⟫} {eb} h =
-      Ideal.cert-correct wf corrupt covers bound (buildCert h)
-      where
-        wf : Ideal.WF (Real.α rs)
-        wf = wf-invariant _ _ (simulate-trace vih tr) Ideal.wf-init
-
-        covers : ∀ {p} → Ideal.Voted p eb (Real.α rs) → ¬ honest p → p ∈ˡ corrupt
-        covers {p} p∈ ¬hp with ∈-map⁻ Real.vote⇒ideal {xs = L.filter ¿ Valid ¿¹ rs} p∈
-        ... | v , v∈filter , pq with ∈-filter⁻ ¿ Valid ¿¹ {xs = rs} v∈filter
-        ... | _ , validv =
-          subst (_∈ˡ corrupt) (sym (cong proj₁ pq))
-            (cc v validv (λ hv → ¬hp (subst honest (sym (cong proj₁ pq)) hv)))
-
-    votingAbstract : VotingAbstract Vote EBRef
-    votingAbstract = record
-      { VotingState      = VState
-      ; initVotingState  = ⟪ [] , [] ⟫
-      ; addVote          = addVoteᴹ
-      ; isVoteCertified  = λ vs eb → isCert (Real.α (VState.rs vs)) eb
-      ; isVoteCertified⁇ = λ {vs} {eb} →
-          record { dec = threshold N.≤? length (votersFor (Real.α (VState.rs vs)) eb) }
-      ; Voter            = Party
-      ; HonestVoter      = honest
-      ; ValidatedBy      = Validated
-      ; cert-correct     = λ {vs} {eb} → cert-correctᴿ {vs} {eb}
-      }
 ```

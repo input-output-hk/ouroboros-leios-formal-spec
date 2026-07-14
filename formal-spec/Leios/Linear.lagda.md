@@ -104,10 +104,13 @@ isEquivocated : LeiosState → EndorserBlock → Type
 isEquivocated s eb = Any (areEquivocated eb) (toSet (LeiosState.EBs s))
 
 rememberVote : LeiosState → EndorserBlock → LeiosState
-rememberVote s@(record { VotedEBs = vebs ; votingState = vst }) eb =
-  record s { VotedEBs = hash eb ∷ vebs ; votingState = addVote vst (vote sk-VT (hash eb)) }
-
-data _↝_ : LeiosState → LeiosState × FFDAbstract.Input ffdAbstract → Type where
+rememberVote s@(record { VotedEBs = vebs }) eb =
+  record s { VotedEBs = hash eb ∷ vebs }
+```
+The output of a block-production step: either a message for the FFD
+functionality (announcing a block) or a vote cast to the voting functionality.
+```agda
+data _↝_ : LeiosState → LeiosState × (FFDAbstract.Input ffdAbstract ⊎ Vote) → Type where
 ```
 #### Positive rules
 
@@ -122,7 +125,8 @@ mempool.
           ∙ toProposeEB s π ≡ just eb
           ∙ canProduceEB slot sk-EB (stake s) π
           ───────────────────────────────────────────────────────
-          s ↝ (addUpkeep s EB-Role , Send (ebHeader eb) nothing)
+          s ↝ (addUpkeep s EB-Role
+              , inj₁ (Send (ebHeader eb) nothing))
 ```
 ```agda
   VT-Role : ∀ {ebHash slot'}
@@ -141,8 +145,8 @@ mempool.
           ∙ needsUpkeep VT-Role
           ∙ canProduceV (slotNumber eb) sk-VT (stake s)
           ───────────────────────────────────────────────────────
-          s ↝ ( rememberVote (addUpkeep s VT-Role) eb
-              , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing)
+          s ↝ (rememberVote (addUpkeep s VT-Role) eb
+              , inj₂ (vote sk-VT (hash eb)))
 ```
 Predicate needed for slot transition. Special care needs to be taken when starting from
 genesis.
@@ -157,14 +161,14 @@ The relation describing the transition given input and state
 open Types params
 open BaseAbstract B'
 
-data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗₀ BaseIO) (IO ⊗₀ Adv) LeiosState where
+data _-⟦_/_⟧⇀_ : MachineType ((FFD ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ Adv) LeiosState where
 ```
 #### Network and Ledger
 ```agda
   Slot₁ : let open LeiosState s in
         ∙ allDone s
         ──────────────────────────────────────────────────────────────────
-        s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ FFD-OUT msgs / just $ (L⊗ ϵ) ⊗R ↑ₒ FTCH-LDG ⟧⇀
+        s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ FFD-OUT msgs / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ FTCH-LDG ⟧⇀
           let s' = s ↑ L.filter (isValid? s) msgs
           in record s'
                { slot   = suc slot
@@ -173,7 +177,7 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗₀ BaseIO) (IO ⊗₀ Adv) LeiosStat
 
   Slot₂ : let open LeiosState s in
         ───────────────────────────────────────────────────────────────────
-        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ BASE-LDG rbs / nothing ⟧⇀ record s { RBs = rbs }
+        s -⟦ ((L⊗ ϵ) ⊗R) ⊗R ↑ᵢ BASE-LDG rbs / nothing ⟧⇀ record s { RBs = rbs }
 ```
 ```agda
   Ftch : let open LeiosState s in
@@ -203,25 +207,38 @@ Note: Submitted data to the base chain is only taken into account
           in
           ∙ needsUpkeep Base
           ───────────────────────────────────────────────────────────────────────────
-          s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ SUBMIT rb ⟧⇀ addUpkeep s Base
+          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT rb ⟧⇀ addUpkeep s Base
+```
+#### Voting
+
+A certificate delivered by the voting functionality is recorded in the state.
+```agda
+  Cert₁ : ∀ {c} → let open LeiosState s in
+        ───────────────────────────────────────────────────────────────────
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / nothing ⟧⇀ record s { Certs = c ∷ Certs }
 ```
 #### Protocol rules
 ```agda
   Roles₁ :
-         ∙ s ↝ (s' , i)
+         ∙ s ↝ (s' , inj₁ i)
          ────────────────────────────────────────────────────────────
-         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (ϵ ⊗R) ⊗R ↑ₒ FFD-IN i ⟧⇀ s'
+         s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ ((ϵ ⊗R) ⊗R) ⊗R ↑ₒ FFD-IN i ⟧⇀ s'
+
+  Vote₁ : ∀ {v} →
+         ∙ s ↝ (s' , inj₂ v)
+         ────────────────────────────────────────────────────────────
+         s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ CAST v ⟧⇀ s'
 
   Roles₂ : ∀ {u} → let open LeiosState in
          ∙ ¬ (∃[ s'×i ] (s ↝ s'×i × Upkeep (addUpkeep s u) ≡ Upkeep (proj₁ s'×i)))
          ∙ needsUpkeep s u
          ∙ u ≢ Base
          ──────────────────────────────────────────────────
-         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s u
+         s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s u
 ```
 <!--
 ```agda
-LinearLeios : Machine (FFD ⊗₀ BaseIO) (IO ⊗₀ Adv)
+LinearLeios : Machine ((FFD ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ Adv)
 LinearLeios .Machine.State = LeiosState
 LinearLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 
@@ -304,7 +321,7 @@ instance
       in just≢nothing $ trans (sym y) (subst (not-found s) (sym ji) eq₃)
   ... | just (slot' , eb)
     with ¿ VT-Role-premises {s} {eb} {ebHash} {slot'} .proj₁ ¿
-  ... | yes p = yes ((rememberVote (addUpkeep s VT-Role) eb , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing) ,
+  ... | yes p = yes ((rememberVote (addUpkeep s VT-Role) eb , inj₂ (vote sk-VT (hash eb))) ,
                       VT-Role p , refl)
   ... | no ¬p = no λ where (_ , VT-Role (x , y , p) , _) → ¬p $ subst
                              (λ where (eb , ebHash , slot) → VT-Role-premises {s} {eb} {ebHash} {slot} .proj₁)

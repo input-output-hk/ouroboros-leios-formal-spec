@@ -33,6 +33,7 @@ An `Action` provides input to the relational semantics
 data Action : Type where
   EB-Role-Action    : ℕ → EndorserBlock → Action
   VT-Role-Action    : ℕ → EndorserBlock → ℕ → Action
+  Cert-Action       : ℕ → Action
   Ftch-Action       : ℕ → Action
   Slot₁-Action      : ℕ → Action
   Slot₂-Action      : ℕ → Action
@@ -43,7 +44,9 @@ data Action : Type where
 ```
 A `TestTrace` is a list of actions togther with channels related to the other functionalities
 ```agda
-TestTrace = List (Action × (FFDT Out ⊎ BaseIOF In ⊎ IOT In))
+TestInput = FFDT Out ⊎ BaseIOF In ⊎ IOT In ⊎ VotingT In
+
+TestTrace = List (Action × TestInput)
 ```
 ```agda
 private variable
@@ -53,7 +56,7 @@ private variable
   eb   : EndorserBlock
   ebs  : List EndorserBlock
   vt   : List Vote
-  i    : FFDT Out ⊎ BaseIOF In ⊎ IOT In
+  i    : TestInput
   o    : FFDT In
 ```
 ```agda
@@ -63,8 +66,9 @@ getAction (Slot₂ {s})                                        = Slot₂-Action 
 getAction (Ftch {s})                                         = Ftch-Action (LeiosState.slot s)
 getAction (Base₁ {s})                                        = Base₁-Action (LeiosState.slot s)
 getAction (Base₂ {s} _)                                      = Base₂-Action (LeiosState.slot s)
+getAction (Cert₁ {s})                                        = Cert-Action (LeiosState.slot s)
 getAction (Roles₁ (EB-Role {s} {eb = eb} _))                 = EB-Role-Action (LeiosState.slot s) eb
-getAction (Roles₁ (VT-Role {s} {eb = eb} {slot' = slot'} _)) = VT-Role-Action (LeiosState.slot s) eb slot'
+getAction (Vote₁ (VT-Role {s} {eb = eb} {slot' = slot'} _))  = VT-Role-Action (LeiosState.slot s) eb slot'
 getAction (Roles₂ {u = Base} (_ , _ , x))                    = ⊥-elim (x refl) -- Roles₂ excludes the `Base` role
 getAction (Roles₂ {s} {u = EB-Role} _)                       = No-EB-Role-Action (LeiosState.slot s)
 getAction (Roles₂ {s} {u = VT-Role} _)                       = No-VT-Role-Action (LeiosState.slot s)
@@ -73,6 +77,7 @@ getAction (Roles₂ {s} {u = VT-Role} _)                       = No-VT-Role-Acti
 getSlot : Action → ℕ
 getSlot (EB-Role-Action x _)   = x
 getSlot (VT-Role-Action x _ _) = x
+getSlot (Cert-Action x)        = x
 getSlot (No-EB-Role-Action x)  = x
 getSlot (No-VT-Role-Action x)  = x
 getSlot (Ftch-Action x)        = x
@@ -93,22 +98,23 @@ data _—→_ : LeiosState → LeiosState → Type where
 open import Prelude.Closures _—→_
 ```
 ```agda
-toRcvType : FFDT Out ⊎ BaseIOF In ⊎ IOT In → Channel.inType ((FFD ⊗₀ BaseIO) ⊗₀ ((IO ⊗₀ Adv) ᵀ))
-toRcvType (inj₁ i) = (ϵ ⊗R) ⊗R ↑ᵢ i
-toRcvType (inj₂ (inj₁ i)) = (L⊗ ϵ) ⊗R ↑ᵢ i
-toRcvType (inj₂ (inj₂ i)) = L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ i
+toRcvType : TestInput → Channel.inType (((FFD ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ ((IO ⊗₀ Adv) ᵀ))
+toRcvType (inj₁ i) = ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ i
+toRcvType (inj₂ (inj₁ i)) = ((L⊗ ϵ) ⊗R) ⊗R ↑ᵢ i
+toRcvType (inj₂ (inj₂ (inj₁ i))) = L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ i
+toRcvType (inj₂ (inj₂ (inj₂ i))) = (L⊗ ϵ) ⊗R ↑ᵢ i
 ```
 ```agda
 infix 0 _≈_ _≈¹_
 
-data _≈¹_ : Action × (FFDT Out ⊎ BaseIOF In ⊎ IOT In) → s′ —→ s → Type where
+data _≈¹_ : Action × TestInput → s′ —→ s → Type where
 
   FromAction :
     ∀ i {s′ o}
       → (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
       → (getAction σ , i) ≈¹ ActionStep σ
 
-data ValidStep (es : Action × (FFDT Out ⊎ BaseIOF In ⊎ IOT In)) (s : LeiosState) : Type where
+data ValidStep (es : Action × TestInput) (s : LeiosState) : Type where
   Valid : (tr : s′ —→ s) → es ≈¹ tr → ValidStep es s
 ```
 ```agda
@@ -147,17 +153,19 @@ data InputC : Type where
   cSLOT cFTCH cFFD-OUT           : InputC  -- FFDT Out
   cBASE-LDG cSTAKE cEMPTY cbSLOT : InputC  -- BaseIOF In
   cSubmitTxs cFetchLdgI          : InputC  -- IOT In
+  cCERT                          : InputC  -- VotingT In
 
-inputC : FFDT Out ⊎ BaseIOF In ⊎ IOT In → InputC
-inputC (inj₁ SLOT)                 = cSLOT
-inputC (inj₁ FTCH)                 = cFTCH
-inputC (inj₁ (FFD-OUT _))          = cFFD-OUT
-inputC (inj₂ (inj₁ (BASE-LDG _)))  = cBASE-LDG
-inputC (inj₂ (inj₁ (STAKE _)))     = cSTAKE
-inputC (inj₂ (inj₁ EMPTY))         = cEMPTY
-inputC (inj₂ (inj₁ (SLOT _)))      = cbSLOT
-inputC (inj₂ (inj₂ (SubmitTxs _))) = cSubmitTxs
-inputC (inj₂ (inj₂ FetchLdgI))     = cFetchLdgI
+inputC : TestInput → InputC
+inputC (inj₁ SLOT)                        = cSLOT
+inputC (inj₁ FTCH)                        = cFTCH
+inputC (inj₁ (FFD-OUT _))                 = cFFD-OUT
+inputC (inj₂ (inj₁ (BASE-LDG _)))         = cBASE-LDG
+inputC (inj₂ (inj₁ (STAKE _)))            = cSTAKE
+inputC (inj₂ (inj₁ EMPTY))                = cEMPTY
+inputC (inj₂ (inj₁ (SLOT _)))             = cbSLOT
+inputC (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) = cSubmitTxs
+inputC (inj₂ (inj₂ (inj₁ FetchLdgI)))     = cFetchLdgI
+inputC (inj₂ (inj₂ (inj₂ (CERT _))))      = cCERT
 
 -- The input constructor each action's transition rule consumes.
 expectedInput : Action → InputC
@@ -170,16 +178,17 @@ expectedInput (Slot₁-Action _)       = cFFD-OUT
 expectedInput (Slot₂-Action _)       = cBASE-LDG
 expectedInput (Base₁-Action _)       = cSubmitTxs
 expectedInput (Ftch-Action _)        = cFetchLdgI
+expectedInput (Cert-Action _)        = cCERT
 
 opaque
   unfolding _⊗₀_
 
-  input-sound : ∀ (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) {s s′ o}
+  input-sound : ∀ (i : TestInput) {s s′ o}
                 (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
               → inputC i ≡ expectedInput (getAction σ)
   input-sound (inj₁ SLOT) (Base₂ _)                       = refl
   input-sound (inj₁ SLOT) (Roles₁ (EB-Role _))            = refl
-  input-sound (inj₁ SLOT) (Roles₁ (VT-Role _))            = refl
+  input-sound (inj₁ SLOT) (Vote₁ (VT-Role _))             = refl
   input-sound (inj₁ SLOT) (Roles₂ {u = Base} (_ , _ , x)) = ⊥-elim (x refl)
   input-sound (inj₁ SLOT) (Roles₂ {u = EB-Role} _)        = refl
   input-sound (inj₁ SLOT) (Roles₂ {u = VT-Role} _)        = refl
@@ -189,16 +198,17 @@ opaque
   input-sound (inj₂ (inj₁ (STAKE _))) ()
   input-sound (inj₂ (inj₁ EMPTY)) ()
   input-sound (inj₂ (inj₁ (SLOT _))) ()
-  input-sound (inj₂ (inj₂ (SubmitTxs _))) Base₁           = refl
-  input-sound (inj₂ (inj₂ FetchLdgI)) Ftch                = refl
+  input-sound (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) Base₁    = refl
+  input-sound (inj₂ (inj₂ (inj₁ FetchLdgI))) Ftch         = refl
+  input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) Cert₁         = refl
 
   input-mismatch : ∀ {a i s} → inputC i ≢ expectedInput a → ¬ ValidStep (a , i) s
   input-mismatch neq (Valid _ (FromAction i σ)) = neq (input-sound i σ)
 
-  Ftch-step : ∀ {s} → ValidStep (Ftch-Action (LeiosState.slot s) , inj₂ (inj₂ FetchLdgI)) s
-  Ftch-step = Valid _ (FromAction (inj₂ (inj₂ FetchLdgI)) Ftch)
+  Ftch-step : ∀ {s} → ValidStep (Ftch-Action (LeiosState.slot s) , inj₂ (inj₂ (inj₁ FetchLdgI))) s
+  Ftch-step = Valid _ (FromAction (inj₂ (inj₂ (inj₁ FetchLdgI))) Ftch)
 
-data Err-verifyStep (σ : Action) (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) (s : LeiosState) : Type where
+data Err-verifyStep (σ : Action) (i : TestInput) (s : LeiosState) : Type where
   Err-Slot : getSlot σ ≢ LeiosState.slot s → Err-verifyStep σ i s
   Err-EB-Role-premises : ∀ {π} → ¬ (
     toProposeEB s π ≡ just eb ×
@@ -241,20 +251,22 @@ Mismatch neq = Err (Err-InputMismatch (input-mismatch neq))
 Reusable witnesses for the mismatching input families:
 ```agda
 inj₂≢SLOT : ∀ y → inputC (inj₂ y) ≢ cSLOT
-inj₂≢SLOT (inj₁ (BASE-LDG _))  ()
-inj₂≢SLOT (inj₁ (STAKE _))     ()
-inj₂≢SLOT (inj₁ EMPTY)         ()
-inj₂≢SLOT (inj₁ (SLOT _))      ()
-inj₂≢SLOT (inj₂ (SubmitTxs _)) ()
-inj₂≢SLOT (inj₂ FetchLdgI)     ()
+inj₂≢SLOT (inj₁ (BASE-LDG _))         ()
+inj₂≢SLOT (inj₁ (STAKE _))            ()
+inj₂≢SLOT (inj₁ EMPTY)                ()
+inj₂≢SLOT (inj₁ (SLOT _))             ()
+inj₂≢SLOT (inj₂ (inj₁ (SubmitTxs _))) ()
+inj₂≢SLOT (inj₂ (inj₁ FetchLdgI))     ()
+inj₂≢SLOT (inj₂ (inj₂ (CERT _)))      ()
 
 inj₂≢FFD-OUT : ∀ y → inputC (inj₂ y) ≢ cFFD-OUT
-inj₂≢FFD-OUT (inj₁ (BASE-LDG _))  ()
-inj₂≢FFD-OUT (inj₁ (STAKE _))     ()
-inj₂≢FFD-OUT (inj₁ EMPTY)         ()
-inj₂≢FFD-OUT (inj₁ (SLOT _))      ()
-inj₂≢FFD-OUT (inj₂ (SubmitTxs _)) ()
-inj₂≢FFD-OUT (inj₂ FetchLdgI)     ()
+inj₂≢FFD-OUT (inj₁ (BASE-LDG _))         ()
+inj₂≢FFD-OUT (inj₁ (STAKE _))            ()
+inj₂≢FFD-OUT (inj₁ EMPTY)                ()
+inj₂≢FFD-OUT (inj₁ (SLOT _))             ()
+inj₂≢FFD-OUT (inj₂ (inj₁ (SubmitTxs _))) ()
+inj₂≢FFD-OUT (inj₂ (inj₁ FetchLdgI))     ()
+inj₂≢FFD-OUT (inj₂ (inj₂ (CERT _)))      ()
 
 inj₁≢BASE-LDG : ∀ x → inputC (inj₁ x) ≢ cBASE-LDG
 inj₁≢BASE-LDG SLOT        ()
@@ -282,10 +294,21 @@ inj₂inj₁≢FetchLdgI (BASE-LDG _) ()
 inj₂inj₁≢FetchLdgI (STAKE _)    ()
 inj₂inj₁≢FetchLdgI EMPTY        ()
 inj₂inj₁≢FetchLdgI (SLOT _)     ()
+
+inj₁≢CERT : ∀ x → inputC (inj₁ x) ≢ cCERT
+inj₁≢CERT SLOT        ()
+inj₁≢CERT FTCH        ()
+inj₁≢CERT (FFD-OUT _) ()
+
+inj₂inj₁≢CERT : ∀ y → inputC (inj₂ (inj₁ y)) ≢ cCERT
+inj₂inj₁≢CERT (BASE-LDG _) ()
+inj₂inj₁≢CERT (STAKE _)    ()
+inj₂inj₁≢CERT EMPTY        ()
+inj₂inj₁≢CERT (SLOT _)     ()
 ```
 ```agda
 verifyStep' : (a : Action) →
-  (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) →
+  (i : TestInput) →
   (s : LeiosState) → getSlot a ≡ LeiosState.slot s →
   Result (Err-verifyStep a i s) (ValidStep (a , i) s)
 verifyStep' (EB-Role-Action n ebs) (inj₁ SLOT) s refl
@@ -297,16 +320,23 @@ verifyStep' (EB-Role-Action _ _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (EB-Role-Action _ _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (VT-Role-Action _ eb slot') (inj₁ SLOT) s refl
   with ¿ VT-Role-premises {s = s} {eb = eb} {ebHash = hash eb} {slot' = slot'} .proj₁ ¿
-... | yes p = Ok' (Roles₁ (VT-Role {ebHash = hash eb} {slot' = slot'} p))
+... | yes p = Ok' (Vote₁ (VT-Role {ebHash = hash eb} {slot' = slot'} p))
 ... | no ¬p = Err (Err-VT-Role-premises ¬p)
 verifyStep' (VT-Role-Action _ _ _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (VT-Role-Action _ _ _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (VT-Role-Action _ _ _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 
-verifyStep' (Ftch-Action _) (inj₁ x) _ _                    = Mismatch (inj₁≢FetchLdgI x)
-verifyStep' (Ftch-Action _) (inj₂ (inj₁ y)) _ _             = Mismatch (inj₂inj₁≢FetchLdgI y)
-verifyStep' (Ftch-Action _) (inj₂ (inj₂ (SubmitTxs _))) _ _ = Mismatch λ ()
-verifyStep' (Ftch-Action _) (inj₂ (inj₂ FetchLdgI)) s refl  = Ok Ftch-step
+verifyStep' (Cert-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢CERT x)
+verifyStep' (Cert-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢CERT y)
+verifyStep' (Cert-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mismatch λ ()
+verifyStep' (Cert-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _     = Mismatch λ ()
+verifyStep' (Cert-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) s refl   = Ok' Cert₁
+
+verifyStep' (Ftch-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢FetchLdgI x)
+verifyStep' (Ftch-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢FetchLdgI y)
+verifyStep' (Ftch-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mismatch λ ()
+verifyStep' (Ftch-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) s refl  = Ok Ftch-step
+verifyStep' (Ftch-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _      = Mismatch λ ()
 
 verifyStep' (Slot₁-Action _) (inj₁ SLOT) _ _ = Mismatch λ ()
 verifyStep' (Slot₁-Action _) (inj₁ FTCH) _ _ = Mismatch λ ()
@@ -316,17 +346,19 @@ verifyStep' (Slot₁-Action _) (inj₁ (FFD-OUT msgs)) s refl
 ... | no ¬p = Err (Err-AllDone ¬p)
 verifyStep' (Slot₁-Action _) (inj₂ y) _ _ = Mismatch (inj₂≢FFD-OUT y)
 verifyStep' (Slot₂-Action _) (inj₁ x) _ _ = Mismatch (inj₁≢BASE-LDG x)
-verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (BASE-LDG rbs))) s refl = Ok' Slot₂
-verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (STAKE _))) _ _        = Mismatch λ ()
-verifyStep' (Slot₂-Action _) (inj₂ (inj₁ EMPTY)) _ _            = Mismatch λ ()
-verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (SLOT _))) _ _         = Mismatch λ ()
-verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (SubmitTxs _))) _ _    = Mismatch λ ()
-verifyStep' (Slot₂-Action _) (inj₂ (inj₂ FetchLdgI)) _ _        = Mismatch λ ()
+verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (BASE-LDG rbs))) s refl       = Ok' Slot₂
+verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (STAKE _))) _ _               = Mismatch λ ()
+verifyStep' (Slot₂-Action _) (inj₂ (inj₁ EMPTY)) _ _                   = Mismatch λ ()
+verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (SLOT _))) _ _                = Mismatch λ ()
+verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _    = Mismatch λ ()
+verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _        = Mismatch λ ()
+verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _         = Mismatch λ ()
 
-verifyStep' (Base₁-Action _) (inj₁ x) _ _                = Mismatch (inj₁≢SubmitTxs x)
-verifyStep' (Base₁-Action _) (inj₂ (inj₁ y)) _ _         = Mismatch (inj₂inj₁≢SubmitTxs y)
-verifyStep' (Base₁-Action _) (inj₂ (inj₂ FetchLdgI)) _ _ = Mismatch λ ()
-verifyStep' (Base₁-Action _) (inj₂ (inj₂ (SubmitTxs _))) _ refl = Ok' Base₁
+verifyStep' (Base₁-Action _) (inj₁ x) _ _                              = Mismatch (inj₁≢SubmitTxs x)
+verifyStep' (Base₁-Action _) (inj₂ (inj₁ y)) _ _                       = Mismatch (inj₂inj₁≢SubmitTxs y)
+verifyStep' (Base₁-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _        = Mismatch λ ()
+verifyStep' (Base₁-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ refl = Ok' Base₁
+verifyStep' (Base₁-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _         = Mismatch λ ()
 verifyStep' (Base₂-Action _) (inj₁ SLOT) s refl
   with ¿ Base₂-premises {s = s} .proj₁ ¿
 ... | yes p = Ok' (Base₂ {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} p)
@@ -350,7 +382,7 @@ verifyStep' (No-VT-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (No-VT-Role-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 ```
 ```agda
-verifyStep : (a : Action) → (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) → (s : LeiosState) → Result (Err-verifyStep a i s) (ValidStep (a , i) s)
+verifyStep : (a : Action) → (i : TestInput) → (s : LeiosState) → Result (Err-verifyStep a i s) (ValidStep (a , i) s)
 verifyStep a i s = case getSlot a ≟ LeiosState.slot s of λ where
   (yes p) → verifyStep' a i s p
   (no ¬p) → Err (Err-Slot λ p → ⊥-elim (¬p p))
@@ -375,6 +407,7 @@ open import Text.Printf
 actionName : Action → String
 actionName (EB-Role-Action _ _)   = "EB-Role-Action"
 actionName (VT-Role-Action _ _ _) = "VT-Role-Action"
+actionName (Cert-Action _)        = "Cert-Action"
 actionName (Ftch-Action _)        = "Ftch-Action"
 actionName (Slot₁-Action _)       = "Slot₁-Action"
 actionName (Slot₂-Action _)       = "Slot₂-Action"
@@ -391,6 +424,7 @@ module _
     iErr-verifyStep : ∀ {s} → IsError (λ σ  → Err-verifyStep σ i s)
     iErr-verifyStep {i} {s} .errorMsg {EB-Role-Action _ _} (Err-Slot _)   = printf "%u : Err-Slot / EB-Role-Action" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg {VT-Role-Action _ _ _} (Err-Slot _) = printf "%u : Err-Slot / VT-Role-Action" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorMsg {Cert-Action _} (Err-Slot _)        = printf "%u : Err-Slot / Cert-Action" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg {Ftch-Action _} (Err-Slot _)        = printf "%u : Err-Slot / Ftch-Action" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg {Slot₁-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Slot₁-Action" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg {Slot₂-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Slot₂-Action" (LeiosState.slot s)
