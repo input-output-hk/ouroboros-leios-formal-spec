@@ -79,6 +79,11 @@ NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
 -- The Leios node: the voting channel is part of the node's domain and is
 -- passed through to the shared functionalities when assembling the protocol.
+-- The `I` padding in the codomain is leftover from the Kleisli combinators:
+-- `A ⊗₀ I ≡ A` is not provable, so the units cannot be normalized away. The
+-- real fix is to work up to trace equivalence in a monoidal category of
+-- machines, where the unitors are coherence isos and the padding disappears;
+-- this is work in progress on the `yveshauser/machine-category` branch.
 Leios1 : Machine (DD.M ⊗₀ VotingC) (IO ⊗₀ (((I ⊗₀ I) ⊗₀ ((I ⊗₀ BaseAdv) ⊗₀ I)) ⊗₀ Adv))
 Leios1 = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ B.m) ⊗ᴷ idᴷ) ∘ᴷ (liftᴷ NetTranslate ⊗ᴷ idᴷ)
 
