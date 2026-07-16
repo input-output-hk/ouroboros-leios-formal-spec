@@ -47,9 +47,14 @@ a node has checked if it can make a block in a particular slot.
 set contains all elements before we can advance to the next slot,
 resetting this field to the empty set.
 
+`CertCheck` records that the node has checked the voting functionality
+for a certificate before producing its RB: it is added either by the
+query (`Base₃`) or by `Base₂` when there is no EB to certify, and the
+RB-submitting answer rule `Cert₁` requires it.
+
 ```agda
 data SlotUpkeep : Type where
-  Base EB-Role VT-Role : SlotUpkeep
+  Base CertCheck EB-Role VT-Role : SlotUpkeep
 ```
 <!--
 ```agda
@@ -168,7 +173,7 @@ Predicate needed for slot transition. Special care needs to be taken when starti
 genesis.
 ```agda
 allDone : LeiosState → Type
-allDone record { Upkeep = u } = VT-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ u
+allDone record { Upkeep = u } = VT-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ u × CertCheck ∈ˡ u
 ```
 ### Linear Leios transitions
 The relation describing the transition given input and state
@@ -212,20 +217,22 @@ Note: Submitted data to the base chain is only taken into account
 
   Base₂   : let open LeiosState s in
           ∙ needsUpkeep Base
+          ∙ needsUpkeep CertCheck
           ∙ certRequest s ≡ nothing
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s π nothing) ⟧⇀
-            addUpkeep s Base
+            addUpkeep (addUpkeep s CertCheck) Base
 ```
 If the chain tip announces an EB whose voting window has passed, the node
 instead queries the voting functionality for a certificate before it submits:
 the `Base` upkeep stays open until the answer arrives.
 ```agda
   Base₃   : let open LeiosState s in
-          ∙ needsUpkeep Base
+          ∙ needsUpkeep CertCheck
           ∙ certRequest s ≡ just eb
           ───────────────────────────────────────────────────────────────────────────
-          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ QUERY (hash eb) ⟧⇀ s
+          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ QUERY (hash eb) ⟧⇀
+            addUpkeep s CertCheck
 ```
 #### Voting
 ```agda
@@ -240,6 +247,7 @@ in the submitted RB, a negative one falls back to submitting transactions.
 ```agda
   Cert₁ : ∀ {c} → let open LeiosState s in
         ∙ needsUpkeep Base
+        ∙ CertCheck ∈ˡ Upkeep
         ───────────────────────────────────────────────────────────────────
         s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s π c) ⟧⇀
           addUpkeep s Base
@@ -255,6 +263,7 @@ in the submitted RB, a negative one falls back to submitting transactions.
          ∙ ¬ (∃[ s'×i ] (s ↝ s'×i × Upkeep (addUpkeep s u) ≡ Upkeep (proj₁ s'×i)))
          ∙ needsUpkeep s u
          ∙ u ≢ Base
+         ∙ u ≢ CertCheck
          ──────────────────────────────────────────────────
          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s u
 ```
@@ -311,6 +320,12 @@ Base≢EB-Role = λ ()
 Base≢VT-Role : SlotUpkeep.Base ≢ SlotUpkeep.VT-Role
 Base≢VT-Role = λ ()
 
+CertCheck≢EB-Role : SlotUpkeep.CertCheck ≢ SlotUpkeep.EB-Role
+CertCheck≢EB-Role = λ ()
+
+CertCheck≢VT-Role : SlotUpkeep.CertCheck ≢ SlotUpkeep.VT-Role
+CertCheck≢VT-Role = λ ()
+
 π-unique : ∀ {s π} → canProduceEB (LeiosState.slot s) sk-EB (stake s) π → π ≡ (proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s)))
 π-unique (_ , refl) = refl
 
@@ -353,6 +368,9 @@ instance
   Dec-↝ {s} {Base} .dec = no λ where
     (_ , EB-Role _ , x) → Base≢EB-Role (∷-injectiveˡ (trans x refl))
     (_ , VT-Role _ , x) → Base≢VT-Role (∷-injectiveˡ (trans x refl))
+  Dec-↝ {s} {CertCheck} .dec = no λ where
+    (_ , EB-Role _ , x) → CertCheck≢EB-Role (∷-injectiveˡ (trans x refl))
+    (_ , VT-Role _ , x) → CertCheck≢VT-Role (∷-injectiveˡ (trans x refl))
 
 unquoteDecl Roles₂-premises = genPremises Roles₂-premises (quote Roles₂)
 ```
