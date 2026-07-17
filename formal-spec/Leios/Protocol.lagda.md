@@ -63,7 +63,6 @@ record LeiosState : Type where
         {- EBs': EBs together with the slot in which we received them -}
         EBs'         : List (ℕ × EndorserBlock)
         VotedEBs     : List Hash
-        Vs           : List (List Vote)
         slot         : ℕ
         Upkeep       : List SlotUpkeep
         Upkeep-Stage : ℙ StageUpkeep
@@ -124,7 +123,6 @@ initLeiosState V SD pks = record
   ; ToPropose    = []
   ; EBs'         = []
   ; VotedEBs     = []
-  ; Vs           = []
   ; slot         = initSlot V
   ; Upkeep       = []
   ; Upkeep-Stage = ∅
@@ -203,9 +201,12 @@ module _ (s : LeiosState)  where
 module _ (s : LeiosState) (open LeiosState s) where
 
   {- Update the LeiosState upon receiving a message (a header or body) -}
+  {- Vote messages are not consumed by the node: vote bookkeeping is the
+     voting functionality's job (resp. the local voter component's, which
+     receives the votes before they ever reach the node). -}
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs' = (slot , eb) ∷ EBs' }
-  upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs }
+  upd (inj₁ (vtHeader _))  = s
   upd (inj₂ _)             = s
 
 module _ {s s'} (open LeiosState s') where

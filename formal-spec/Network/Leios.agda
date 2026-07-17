@@ -94,6 +94,11 @@ splitVotes ms =
     isVote (inj₁ (GenFFD.vtHeader vs)) = inj₁ vs
     isVote m                           = inj₂ m
 
+-- An empty round of casts produces no message.
+voteMsgs : List Vote → List Message
+voteMsgs [] = []
+voteMsgs cs = [ inj₁ (inj₁ (GenFFD.vtHeader cs)) ]
+
 -- The vote-aware network multiplexer: same strict round protocol as
 -- `NetTranslate`, with one extra hop — the round's votes are diverted to
 -- the voter (the node never sees them), and the voter's response (its
@@ -133,7 +138,7 @@ module NetTranslateV where
     SendL : ∀ {m cs m'} →
       WithState record { inLeios = nothing ; inBase = nothing ; outBase = just m ; outVotes = just cs }
       receive L⊗ ((ϵ ⊗R) ⊗R) ᵗ¹ ↑ₒ Done m'
-      return just (ϵ ⊗R ↑ₒ DD.Diffuse (map inj₂ m ++ map inj₁ m' ++ [ inj₁ (inj₁ (GenFFD.vtHeader cs)) ]))
+      return just (ϵ ⊗R ↑ₒ DD.Diffuse (map inj₂ m ++ map inj₁ m' ++ voteMsgs cs))
       newState record { inLeios = nothing ; inBase = nothing ; outBase = nothing ; outVotes = nothing }
 
 NetTranslateV : Machine DD.M ((Network ⊗₀ BaseNetwork) ⊗₀ Voter.VoteNet)
