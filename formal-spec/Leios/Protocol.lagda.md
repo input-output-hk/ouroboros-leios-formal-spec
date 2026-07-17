@@ -67,6 +67,9 @@ record LeiosState : Type where
         slot         : ℕ
         Upkeep       : List SlotUpkeep
         Upkeep-Stage : ℙ StageUpkeep
+        {- the certificate query awaiting an answer, recorded so that the
+           answer can be correlated with the request -}
+        PendingQuery : Maybe EBRef
         PubKeys      : List PubKey
 
   -- ideally we'd require a non-empty list, but this also works for now
@@ -125,6 +128,7 @@ initLeiosState V SD pks = record
   ; slot         = initSlot V
   ; Upkeep       = []
   ; Upkeep-Stage = ∅
+  ; PendingQuery = nothing
   ; PubKeys      = pks
   }
 

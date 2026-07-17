@@ -79,6 +79,8 @@ private variable s s'   : LeiosState
                  SD     : StakeDistr
                  pks    : List PubKey
                  cert   : EBCert
+                 c      : Maybe EBCert
+                 r      : EBRef
 ```
 -->
 
@@ -123,6 +125,19 @@ mkRB s π mc = let open LeiosState s in record
       (just c) → inj₂ c
       nothing  → inj₁ (proj₁ (splitTxs ToPropose))
   }
+
+{- A positive answer to a certificate query must certify the requested EB;
+   a negative answer trivially matches any request. -}
+data AnswerMatches : Maybe EBCert → EBRef → Type where
+  matches-just    : ∀ {c r} → getEBHash c ≡ r → AnswerMatches (just c) r
+  matches-nothing : ∀ {r} → AnswerMatches nothing r
+
+instance
+  Dec-AnswerMatches : ∀ {c r} → AnswerMatches c r ⁇
+  Dec-AnswerMatches {c = just c} {r} .dec with getEBHash c ≟ r
+  ... | yes p = yes (matches-just p)
+  ... | no ¬p = no λ where (matches-just q) → ¬p q
+  Dec-AnswerMatches {c = nothing} .dec = yes matches-nothing
 
 rememberVote : LeiosState → EndorserBlock → LeiosState
 rememberVote s@(record { VotedEBs = vebs }) eb =
@@ -232,7 +247,7 @@ the `Base` upkeep stays open until the answer arrives.
           ∙ certRequest s ≡ just eb
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ QUERY (hash eb) ⟧⇀
-            addUpkeep s CertCheck
+            record (addUpkeep s CertCheck) { PendingQuery = just (hash eb) }
 ```
 #### Voting
 ```agda
@@ -244,13 +259,18 @@ the `Base` upkeep stays open until the answer arrives.
 ```
 The answer to a certificate query: a positive answer embeds the certificate
 in the submitted RB, a negative one falls back to submitting transactions.
+The answer is correlated with the request recorded in `PendingQuery`: the
+rule only accepts an answer while a query is outstanding, a positive answer
+must certify the requested EB, and the request is cleared on submission.
 ```agda
-  Cert₁ : ∀ {c} → let open LeiosState s in
+  Cert₁ : let open LeiosState s in
         ∙ needsUpkeep Base
         ∙ CertCheck ∈ˡ Upkeep
+        ∙ PendingQuery ≡ just r
+        ∙ AnswerMatches c r
         ───────────────────────────────────────────────────────────────────
         s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s π c) ⟧⇀
-          addUpkeep s Base
+          record (addUpkeep s Base) { PendingQuery = nothing }
 ```
 #### Protocol rules
 ```agda
