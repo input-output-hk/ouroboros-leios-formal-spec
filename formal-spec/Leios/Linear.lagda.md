@@ -262,12 +262,17 @@ in the submitted RB, a negative one falls back to submitting transactions.
 The answer is correlated with the request recorded in `PendingQuery`: the
 rule only accepts an answer while a query is outstanding, a positive answer
 must certify the requested EB, and the request is cleared on submission.
+Since the chain tip may change between query and answer (`Slot₂` has no
+premises), the rule also re-validates the request at submission time: the
+pending query must still be for the EB the *current* tip calls for, so a
+stale answer cannot be embedded.
 ```agda
   Cert₁ : let open LeiosState s in
         ∙ needsUpkeep Base
         ∙ CertCheck ∈ˡ Upkeep
-        ∙ PendingQuery ≡ just r
-        ∙ AnswerMatches c r
+        ∙ certRequest s ≡ just eb
+        ∙ PendingQuery ≡ just (hash eb)
+        ∙ AnswerMatches c (hash eb)
         ───────────────────────────────────────────────────────────────────
         s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s π c) ⟧⇀
           record (addUpkeep s Base) { PendingQuery = nothing }
