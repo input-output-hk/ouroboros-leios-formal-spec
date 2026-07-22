@@ -67,8 +67,6 @@ record LeiosState : Type where
         slot         : ℕ
         Upkeep       : List SlotUpkeep
         Upkeep-Stage : ℙ StageUpkeep
-        {- certificates delivered by the voting functionality -}
-        Certs        : List EBCert
         PubKeys      : List PubKey
 
   -- ideally we'd require a non-empty list, but this also works for now
@@ -108,13 +106,6 @@ record LeiosState : Type where
   Dec-needsUpkeep-Stage : ∀ {u : StageUpkeep} → ⦃ DecEq StageUpkeep ⦄ → needsUpkeep-Stage u ⁇
   Dec-needsUpkeep-Stage {u} .dec = ¬? (u ∈? Upkeep-Stage)
 
-  -- Pair each EB with a certificate delivered by the voting functionality
-  ebsWithCert : List (EndorserBlock × EBCert)
-  ebsWithCert = mapMaybe getCert EBs
-    where
-      getCert : EndorserBlock → Maybe (EndorserBlock × EBCert)
-      getCert eb = (eb ,_) <$> find (λ c → getEBHash c ≟ getEBRef eb) Certs
-
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
 addUpkeep s u = let open LeiosState s in record s { Upkeep = u ∷ Upkeep }
 {-# INJECTIVE_FOR_INFERENCE addUpkeep #-}
@@ -134,7 +125,6 @@ initLeiosState V SD pks = record
   ; slot         = initSlot V
   ; Upkeep       = []
   ; Upkeep-Stage = ∅
-  ; Certs        = []
   ; PubKeys      = pks
   }
 
@@ -273,7 +263,8 @@ module Types (params : Params) (let open Params params) where
   BaseC : Channel
   BaseC = simpleChannel BaseT ᵀ
 
-  {- The interface to the voting functionality: a node casts votes and
-     receives certificates for endorser blocks with a vote quorum. -}
-  open import Leios.Voting.Channel Vote EBCert public
+  {- The interface to the voting functionality: a node casts votes and,
+     at RB production, queries for a certificate for the endorser block
+     it wants to endorse. -}
+  open import Leios.Voting.Channel Vote EBRef EBCert public
 ```

@@ -13,9 +13,11 @@ can only cast through the slots of the parties it controls.
 The functionality
 
 - records casts (`Cast-step`),
-- delivers a certificate for an endorser block to a party when instructed to
-  by the adversary — standard UC-style scheduling — but *only* under the
-  premise that the recorded votes certify the block (`Deliver-step`),
+- answers a party's certificate query synchronously from the vote log:
+  positively iff the recorded votes certify the block
+  (`Query-step`/`QueryNo-step`) — there is no delivery event to schedule,
+  matching the protocol, where a certificate is assembled locally at RB
+  production and travels only inside the RB,
 - lets the adversary observe the vote log (`Read-step`); votes are public.
 
 Certificate correctness (`cert-correct`) is obtained by mapping the
@@ -54,7 +56,7 @@ module Leios.Voting.Certifier
   (threshold : ℕ)
   where
 
-open Leios.Voting.Channel Vote EBCert
+open Leios.Voting.Channel Vote EBRef EBCert
 
 Party : Type
 Party = Fin n
@@ -62,12 +64,10 @@ Party = Fin n
 
 ### Channels
 
-One `VotingC` per party, and an adversary channel for scheduling deliveries
-and observing the vote log.
+One `VotingC` per party, and an adversary channel for observing the vote log.
 
 ```agda
 data AdvT : Mode → Type where
-  DeliverEB : Party → EBRef → AdvT Out
   Read      : AdvT Out
   ReadRes   : List (Party × Vote) → AdvT In
 
@@ -106,8 +106,9 @@ record Certified (lg : List (Party × Vote)) (eb : EBRef) : Type where
 ### The functionality
 
 Messages on party `p`'s slot are addressed via the generic selection
-`⨂⇒ p` into the `n`-fold tensor; `castMsg`/`certMsg` inject a cast received
-from, and a certificate delivered to, party `p` into the machine channel.
+`⨂⇒ p` into the `n`-fold tensor; `castMsg`/`queryMsg` inject a cast/query
+received from, and `certMsg` a query answer sent to, party `p` into the
+machine channel.
 
 ```agda
 private
@@ -120,7 +121,10 @@ private
 castMsg : Party → Vote → Channel.inType (I ⊗ᵀ CertifierChannel)
 castMsg p v = app (sel {m = Out} p) (CAST v)
 
-certMsg : Party → EBCert → Channel.outType (I ⊗ᵀ CertifierChannel)
+queryMsg : Party → EBRef → Channel.inType (I ⊗ᵀ CertifierChannel)
+queryMsg p eb = app (sel {m = Out} p) (QUERY eb)
+
+certMsg : Party → Maybe EBCert → Channel.outType (I ⊗ᵀ CertifierChannel)
 certMsg p c = app (sel {m = In} p) (CERT c)
 
 data WithState_receive_return_newState_ : MachineType I CertifierChannel CertifierState where
@@ -131,11 +135,18 @@ data WithState_receive_return_newState_ : MachineType I CertifierChannel Certifi
     return nothing
     newState ⟨ (p , v) ∷ log s ⟩
 
-  Deliver-step : ∀ {s} {p : Party} {eb : EBRef} →
+  Query-step : ∀ {s} {p : Party} {eb : EBRef} →
     Certified (log s) eb →
     WithState s
-    receive L⊗ (L⊗ ϵ) ᵗ¹ ↑ₒ DeliverEB p eb
-    return just (certMsg p (mkCert eb))
+    receive queryMsg p eb
+    return just (certMsg p (just (mkCert eb)))
+    newState s
+
+  QueryNo-step : ∀ {s} {p : Party} {eb : EBRef} →
+    ¬ Certified (log s) eb →
+    WithState s
+    receive queryMsg p eb
+    return just (certMsg p nothing)
     newState s
 
   Read-step : ∀ {s} →

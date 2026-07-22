@@ -102,6 +102,22 @@ getCurrentEBHash s = let open LeiosState s in
 
 isEquivocated : LeiosState → EndorserBlock → Type
 isEquivocated s eb = Any (areEquivocated eb) (toSet (LeiosState.EBs s))
+```
+The EB whose certificate the node would embed in the RB: the EB announced by
+the current chain tip, old enough for the votes on it to have diffused.
+```agda
+certRequest : LeiosState → Maybe EndorserBlock
+certRequest s = let open LeiosState s in
+  find (λ eb → ¿ just (hash eb) ≡ getCurrentEBHash s
+             × slotNumber eb + 3 * Lhdr + Lvote + Ldiff ≤ slot ¿) EBs
+
+mkRB : LeiosState → VrfPf → Maybe EBCert → RankingBlock
+mkRB s π mc = let open LeiosState s in record
+  { announcedEB = hash <$> toProposeEB s π
+  ; txsOrEbCert = case mc of λ where
+      (just c) → inj₂ c
+      nothing  → inj₁ (proj₁ (splitTxs ToPropose))
+  }
 
 rememberVote : LeiosState → EndorserBlock → LeiosState
 rememberVote s@(record { VotedEBs = vebs }) eb =
@@ -194,28 +210,39 @@ Note: Submitted data to the base chain is only taken into account
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ SubmitTxs txs / nothing ⟧⇀ record s { ToPropose = txs }
 
-  Base₂   : let open LeiosState s
-                currentCertEB = find (λ (eb , _) →
-                  ¿ just (hash eb) ≡ getCurrentEBHash s
-                  × slotNumber eb + 3 * Lhdr + Lvote + Ldiff ≤ slot ¿) ebsWithCert
-                rb = record
-                       { announcedEB = hash <$> toProposeEB s π
-                       ; txsOrEbCert = case currentCertEB of λ where
-                           (just (_ , cert)) → inj₂ cert
-                           nothing → inj₁ (proj₁ (splitTxs ToPropose))
-                       }
-          in
+  Base₂   : let open LeiosState s in
           ∙ needsUpkeep Base
+          ∙ certRequest s ≡ nothing
           ───────────────────────────────────────────────────────────────────────────
-          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT rb ⟧⇀ addUpkeep s Base
+          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s π nothing) ⟧⇀
+            addUpkeep s Base
+```
+If the chain tip announces an EB whose voting window has passed, the node
+instead queries the voting functionality for a certificate before it submits:
+the `Base` upkeep stays open until the answer arrives.
+```agda
+  Base₃   : let open LeiosState s in
+          ∙ needsUpkeep Base
+          ∙ certRequest s ≡ just eb
+          ───────────────────────────────────────────────────────────────────────────
+          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ QUERY (hash eb) ⟧⇀ s
 ```
 #### Voting
+```agda
+  Vote₁ : ∀ {v} →
+         ∙ s ↝ (s' , inj₂ v)
+         ────────────────────────────────────────────────────────────
+         s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ CAST v ⟧⇀ s'
 
-A certificate delivered by the voting functionality is recorded in the state.
+```
+The answer to a certificate query: a positive answer embeds the certificate
+in the submitted RB, a negative one falls back to submitting transactions.
 ```agda
   Cert₁ : ∀ {c} → let open LeiosState s in
+        ∙ needsUpkeep Base
         ───────────────────────────────────────────────────────────────────
-        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / nothing ⟧⇀ record s { Certs = c ∷ Certs }
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s π c) ⟧⇀
+          addUpkeep s Base
 ```
 #### Protocol rules
 ```agda
@@ -223,11 +250,6 @@ A certificate delivered by the voting functionality is recorded in the state.
          ∙ s ↝ (s' , inj₁ i)
          ────────────────────────────────────────────────────────────
          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ ((ϵ ⊗R) ⊗R) ⊗R ↑ₒ FFD-IN i ⟧⇀ s'
-
-  Vote₁ : ∀ {v} →
-         ∙ s ↝ (s' , inj₂ v)
-         ────────────────────────────────────────────────────────────
-         s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ CAST v ⟧⇀ s'
 
   Roles₂ : ∀ {u} → let open LeiosState in
          ∙ ¬ (∃[ s'×i ] (s ↝ s'×i × Upkeep (addUpkeep s u) ≡ Upkeep (proj₁ s'×i)))
@@ -253,6 +275,8 @@ unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
 unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
 unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
 unquoteDecl Base₂-premises = genPremises Base₂-premises (quote Base₂)
+unquoteDecl Base₃-premises = genPremises Base₃-premises (quote Base₃)
+unquoteDecl Cert₁-premises = genPremises Cert₁-premises (quote Cert₁)
 
 just≢nothing : ∀ {ℓ} {A : Type ℓ} {x} → (Maybe A ∋ just x) ≡ nothing → ⊥
 just≢nothing = λ ()
