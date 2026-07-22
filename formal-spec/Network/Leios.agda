@@ -28,6 +28,9 @@ module Network.Leios
   (forEB     : Vote → EBRef)
   (mkCert    : EBRef → EBCert)
   (threshold : ℕ)
+  -- parameters of the real voting implementation
+  (voter     : Vote → Fin numberOfParties)
+  (Valid     : Vote → Type) ⦃ _ : Valid ⁇¹ ⦄
   (cc : ChannelCat) (let open ChannelCat cc)
     where
 
@@ -42,6 +45,7 @@ Message  = LeiosMsg ⊎ BaseMsg
 
 import Network.DelayedDiffuse numberOfParties Message k as DD
 import Leios.Voting.Certifier numberOfParties Vote EBRef EBCert forEB mkCert threshold as Certifier
+import Leios.Voting.Voter (Fin numberOfParties) EBRef threshold Vote voter forEB Valid EBCert mkCert as Voter
 
 -- multiplexing the network for the base & leios functionality
 -- this is somewhat awkward because we require a strict order on
@@ -77,6 +81,70 @@ NetTranslate : Machine DD.M (Network ⊗₀ BaseNetwork)
 NetTranslate .Machine.State   = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
+-- For the real voting implementation votes are diffused over the same
+-- network in the FFD wire format: a vote batch is a `vtHeader` message,
+-- like any other FFD header. `splitVotes` carves the round's votes out of
+-- the Leios message stream.
+splitVotes : List LeiosMsg → List Vote × List LeiosMsg
+splitVotes ms =
+  let (vss , rest) = partitionSumsWith isVote ms
+  in L.concat vss , rest
+  where
+    isVote : LeiosMsg → List Vote ⊎ LeiosMsg
+    isVote (inj₁ (GenFFD.vtHeader vs)) = inj₁ vs
+    isVote m                           = inj₂ m
+
+-- An empty round of casts produces no message.
+voteMsgs : List Vote → List Message
+voteMsgs [] = []
+voteMsgs cs = [ inj₁ (inj₁ (GenFFD.vtHeader cs)) ]
+
+-- The vote-aware network multiplexer: same strict round protocol as
+-- `NetTranslate`, with one extra hop — the round's votes are diverted to
+-- the voter (the node never sees them), and the voter's response (its
+-- pending casts) is folded into the round's outgoing diffuse as a
+-- `vtHeader` message.
+module NetTranslateV where
+  record State : Type where
+    field inLeios  : Maybe (List LeiosMsg)
+          inBase   : Maybe (List BaseMsg)
+          outBase  : Maybe (List BaseMsg)
+          outVotes : Maybe (List Vote)
+
+  private variable s : State
+
+  data WithState_receive_return_newState_ :
+    MachineType DD.M ((Network ⊗₀ BaseNetwork) ⊗₀ Voter.VoteNet) State where
+
+    Receive : ∀ {l} → let (msgs , base)  = partitionSumsWith proj₂ l
+                          (votes , leios) = splitVotes msgs in
+      WithState record { inLeios = nothing ; inBase = nothing ; outBase = nothing ; outVotes = nothing }
+      receive ϵ ⊗R ↑ᵢ DD.Deliver l
+      return just (L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ Voter.Deliver votes)
+      newState record { inLeios = just leios ; inBase = just base ; outBase = nothing ; outVotes = nothing }
+
+    SendV : ∀ {leios base cs} →
+      WithState record { inLeios = just leios ; inBase = just base ; outBase = nothing ; outVotes = nothing }
+      receive L⊗ (L⊗ ϵ) ᵗ¹ ↑ₒ Voter.Diffuse cs
+      return just (L⊗ ((L⊗ ϵ) ⊗R) ᵗ¹ ↑ᵢ base)
+      newState record { inLeios = just leios ; inBase = nothing ; outBase = nothing ; outVotes = just cs }
+
+    SendB : ∀ {leios cs m} →
+      WithState record { inLeios = just leios ; inBase = nothing ; outBase = nothing ; outVotes = just cs }
+      receive L⊗ ((L⊗ ϵ) ⊗R) ᵗ¹ ↑ₒ m
+      return just (L⊗ ((ϵ ⊗R) ⊗R) ᵗ¹ ↑ᵢ Activate leios)
+      newState record { inLeios = nothing ; inBase = nothing ; outBase = just m ; outVotes = just cs }
+
+    SendL : ∀ {m cs m'} →
+      WithState record { inLeios = nothing ; inBase = nothing ; outBase = just m ; outVotes = just cs }
+      receive L⊗ ((ϵ ⊗R) ⊗R) ᵗ¹ ↑ₒ Done m'
+      return just (ϵ ⊗R ↑ₒ DD.Diffuse (map inj₂ m ++ map inj₁ m' ++ voteMsgs cs))
+      newState record { inLeios = nothing ; inBase = nothing ; outBase = nothing ; outVotes = nothing }
+
+NetTranslateV : Machine DD.M ((Network ⊗₀ BaseNetwork) ⊗₀ Voter.VoteNet)
+NetTranslateV .Machine.State   = _
+NetTranslateV .Machine.stepRel = NetTranslateV.WithState_receive_return_newState_
+
 -- The Leios node: the voting channel is part of the node's domain and is
 -- passed through to the shared functionalities when assembling the protocol.
 -- The `I` padding in the codomain is leftover from the Kleisli combinators:
@@ -86,6 +154,18 @@ NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 -- this is work in progress on the `yveshauser/machine-category` branch.
 Leios1 : Machine (DD.M ⊗₀ VotingC) (IO ⊗₀ (((I ⊗₀ I) ⊗₀ ((I ⊗₀ BaseAdv) ⊗₀ I)) ⊗₀ Adv))
 Leios1 = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ B.m) ⊗ᴷ idᴷ) ∘ᴷ (liftᴷ NetTranslate ⊗ᴷ idᴷ)
+
+-- The real Leios node: same protocol core, but the voting channel is served
+-- *locally* by a voter component wired into the node (the `idᴷ` slot of
+-- `Leios1`). Votes travel over the same diffusion network as everything
+-- else, framed as `vtHeader` FFD messages: `NetTranslateV` diverts them to
+-- the voter on delivery and frames the voter's casts on the way out — the
+-- node itself never sees vote messages. Certificate queries are answered
+-- synchronously from the voter's local vote log, so the voter needs no
+-- adversary port. Relating a deployment of these nodes over `DD.Network`
+-- to `Leios1` + `Certifier.Functionality` is the open UC-realization step.
+Leios1ʳ : Machine DD.M (IO ⊗₀ ((I ⊗₀ ((I ⊗₀ BaseAdv) ⊗₀ I)) ⊗₀ Adv))
+Leios1ʳ = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ B.m) ⊗ᴷ liftᴷ Voter.Voter) ∘ᴷ liftᴷ NetTranslateV
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
 record LeiosBlock : Type where

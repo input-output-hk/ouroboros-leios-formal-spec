@@ -47,9 +47,14 @@ a node has checked if it can make a block in a particular slot.
 set contains all elements before we can advance to the next slot,
 resetting this field to the empty set.
 
+`CertCheck` records that the node has checked the voting functionality
+for a certificate before producing its RB: it is added either by the
+query (`Base₃`) or by `Base₂` when there is no EB to certify, and the
+RB-submitting answer rule `Cert₁` requires it.
+
 ```agda
 data SlotUpkeep : Type where
-  Base EB-Role VT-Role : SlotUpkeep
+  Base CertCheck EB-Role VT-Role : SlotUpkeep
 ```
 <!--
 ```agda
@@ -74,7 +79,7 @@ private variable s s'   : LeiosState
                  SD     : StakeDistr
                  pks    : List PubKey
                  cert   : EBCert
-                 mc     : Maybe EBCert
+                 c      : Maybe EBCert
                  r      : EBRef
 ```
 -->
@@ -120,22 +125,19 @@ mkRB s π mc = let open LeiosState s in record
       (just c) → inj₂ c
       nothing  → inj₁ (proj₁ (splitTxs ToPropose))
   }
-```
-A query answer matches the requested EB ref if it is negative, or if it is a
-certificate for exactly that ref. (This is a data type rather than a function
-computing to `⊤` in the negative case, as the latter overlaps every `⊤ ⁇`
-instance goal.)
-```agda
+
+{- A positive answer to a certificate query must certify the requested EB;
+   a negative answer trivially matches any request. -}
 data AnswerMatches : Maybe EBCert → EBRef → Type where
-  AnswerJust    : getEBHash cert ≡ r → AnswerMatches (just cert) r
-  AnswerNothing : AnswerMatches nothing r
+  matches-just    : ∀ {c r} → getEBHash c ≡ r → AnswerMatches (just c) r
+  matches-nothing : ∀ {r} → AnswerMatches nothing r
 
 instance
-  Dec-AnswerMatches : AnswerMatches mc r ⁇
-  Dec-AnswerMatches {mc = nothing}           .dec = yes AnswerNothing
-  Dec-AnswerMatches {mc = just c}  {r = r}   .dec with getEBHash c ≟ r
-  ... | yes p = yes (AnswerJust p)
-  ... | no ¬p = no λ where (AnswerJust p) → ¬p p
+  Dec-AnswerMatches : ∀ {c r} → AnswerMatches c r ⁇
+  Dec-AnswerMatches {c = just c} {r} .dec with getEBHash c ≟ r
+  ... | yes p = yes (matches-just p)
+  ... | no ¬p = no λ where (matches-just q) → ¬p q
+  Dec-AnswerMatches {c = nothing} .dec = yes matches-nothing
 
 rememberVote : LeiosState → EndorserBlock → LeiosState
 rememberVote s@(record { VotedEBs = vebs }) eb =
@@ -186,7 +188,7 @@ Predicate needed for slot transition. Special care needs to be taken when starti
 genesis.
 ```agda
 allDone : LeiosState → Type
-allDone record { Upkeep = u } = VT-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ u
+allDone record { Upkeep = u } = VT-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ u × CertCheck ∈ˡ u
 ```
 ### Linear Leios transitions
 The relation describing the transition given input and state
@@ -230,22 +232,22 @@ Note: Submitted data to the base chain is only taken into account
 
   Base₂   : let open LeiosState s in
           ∙ needsUpkeep Base
+          ∙ needsUpkeep CertCheck
           ∙ certRequest s ≡ nothing
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s π nothing) ⟧⇀
-            addUpkeep s Base
+            addUpkeep (addUpkeep s CertCheck) Base
 ```
 If the chain tip announces an EB whose voting window has passed, the node
 instead queries the voting functionality for a certificate before it submits:
-the `Base` upkeep stays open until the answer arrives, and the queried EB ref
-is recorded in `PendingQuery` so the answer can be correlated to the request.
+the `Base` upkeep stays open until the answer arrives.
 ```agda
   Base₃   : let open LeiosState s in
-          ∙ needsUpkeep Base
+          ∙ needsUpkeep CertCheck
           ∙ certRequest s ≡ just eb
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ QUERY (hash eb) ⟧⇀
-            record s { PendingQuery = just (hash eb) }
+            record (addUpkeep s CertCheck) { PendingQuery = just (hash eb) }
 ```
 #### Voting
 ```agda
@@ -257,22 +259,18 @@ is recorded in `PendingQuery` so the answer can be correlated to the request.
 ```
 The answer to a certificate query: a positive answer embeds the certificate
 in the submitted RB, a negative one falls back to submitting transactions.
-The rule only accepts an answer to the query the node actually issued —
-there must be a pending query and the answer must match its EB ref
-(`AnswerMatches`) — and consuming the answer clears the marker. Since the
-chain tip may change between query and answer (`Slot₂` has no premises),
-the rule re-validates the request at submission time: the pending query
-must still be for the EB the *current* tip calls for, so a stale answer
-cannot be embedded.
+The answer is correlated with the request recorded in `PendingQuery`: the
+rule only accepts an answer while a query is outstanding, a positive answer
+must certify the requested EB, and the request is cleared on submission.
 ```agda
   Cert₁ : let open LeiosState s in
         ∙ needsUpkeep Base
-        ∙ certRequest s ≡ just eb
-        ∙ PendingQuery ≡ just (hash eb)
-        ∙ AnswerMatches mc (hash eb)
+        ∙ CertCheck ∈ˡ Upkeep
+        ∙ PendingQuery ≡ just r
+        ∙ AnswerMatches c r
         ───────────────────────────────────────────────────────────────────
-        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT mc / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s π mc) ⟧⇀
-          addUpkeep (record s { PendingQuery = nothing }) Base
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s π c) ⟧⇀
+          record (addUpkeep s Base) { PendingQuery = nothing }
 ```
 #### Protocol rules
 ```agda
@@ -285,6 +283,7 @@ cannot be embedded.
          ∙ ¬ (∃[ s'×i ] (s ↝ s'×i × Upkeep (addUpkeep s u) ≡ Upkeep (proj₁ s'×i)))
          ∙ needsUpkeep s u
          ∙ u ≢ Base
+         ∙ u ≢ CertCheck
          ──────────────────────────────────────────────────
          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s u
 ```
@@ -341,6 +340,12 @@ Base≢EB-Role = λ ()
 Base≢VT-Role : SlotUpkeep.Base ≢ SlotUpkeep.VT-Role
 Base≢VT-Role = λ ()
 
+CertCheck≢EB-Role : SlotUpkeep.CertCheck ≢ SlotUpkeep.EB-Role
+CertCheck≢EB-Role = λ ()
+
+CertCheck≢VT-Role : SlotUpkeep.CertCheck ≢ SlotUpkeep.VT-Role
+CertCheck≢VT-Role = λ ()
+
 π-unique : ∀ {s π} → canProduceEB (LeiosState.slot s) sk-EB (stake s) π → π ≡ (proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s)))
 π-unique (_ , refl) = refl
 
@@ -383,6 +388,9 @@ instance
   Dec-↝ {s} {Base} .dec = no λ where
     (_ , EB-Role _ , x) → Base≢EB-Role (∷-injectiveˡ (trans x refl))
     (_ , VT-Role _ , x) → Base≢VT-Role (∷-injectiveˡ (trans x refl))
+  Dec-↝ {s} {CertCheck} .dec = no λ where
+    (_ , EB-Role _ , x) → CertCheck≢EB-Role (∷-injectiveˡ (trans x refl))
+    (_ , VT-Role _ , x) → CertCheck≢VT-Role (∷-injectiveˡ (trans x refl))
 
 unquoteDecl Roles₂-premises = genPremises Roles₂-premises (quote Roles₂)
 ```

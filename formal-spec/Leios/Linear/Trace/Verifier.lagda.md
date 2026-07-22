@@ -71,7 +71,8 @@ getAction (Base₃ {s} _)                                      = Base₃-Action 
 getAction (Cert₁ {s} _)                                      = Cert-Action (LeiosState.slot s)
 getAction (Roles₁ (EB-Role {s} {eb = eb} _))                 = EB-Role-Action (LeiosState.slot s) eb
 getAction (Vote₁ (VT-Role {s} {eb = eb} {slot' = slot'} _))  = VT-Role-Action (LeiosState.slot s) eb slot'
-getAction (Roles₂ {u = Base} (_ , _ , x))                    = ⊥-elim (x refl) -- Roles₂ excludes the `Base` role
+getAction (Roles₂ {u = Base} (_ , _ , x , _))                = ⊥-elim (x refl) -- Roles₂ excludes the `Base` role
+getAction (Roles₂ {u = CertCheck} (_ , _ , _ , x))           = ⊥-elim (x refl) -- ... and the `CertCheck` duty
 getAction (Roles₂ {s} {u = EB-Role} _)                       = No-EB-Role-Action (LeiosState.slot s)
 getAction (Roles₂ {s} {u = VT-Role} _)                       = No-VT-Role-Action (LeiosState.slot s)
 ```
@@ -194,7 +195,8 @@ opaque
   input-sound (inj₁ SLOT) (Base₃ _)                       = refl
   input-sound (inj₁ SLOT) (Roles₁ (EB-Role _))            = refl
   input-sound (inj₁ SLOT) (Vote₁ (VT-Role _))             = refl
-  input-sound (inj₁ SLOT) (Roles₂ {u = Base} (_ , _ , x)) = ⊥-elim (x refl)
+  input-sound (inj₁ SLOT) (Roles₂ {u = Base} (_ , _ , x , _))      = ⊥-elim (x refl)
+  input-sound (inj₁ SLOT) (Roles₂ {u = CertCheck} (_ , _ , _ , x)) = ⊥-elim (x refl)
   input-sound (inj₁ SLOT) (Roles₂ {u = EB-Role} _)        = refl
   input-sound (inj₁ SLOT) (Roles₂ {u = VT-Role} _)        = refl
   input-sound (inj₁ FTCH) ()
@@ -234,7 +236,7 @@ data Err-verifyStep (σ : Action) (i : TestInput) (s : LeiosState) : Type where
     canProduceV (slotNumber eb) sk-VT (stake s)) →
     Err-verifyStep σ i s
   Err-AllDone : ¬ (allDone s) → Err-verifyStep σ i s
-  Err-Cert₁-premises : ∀ {mc} → (∀ {eb} → ¬ (Cert₁-premises {s = s} {eb = eb} {mc = mc} .proj₁)) → Err-verifyStep σ i s
+  Err-Cert₁-premises : ∀ {c} → (∀ {r} → ¬ (Cert₁-premises {s = s} {r = r} {c = c} .proj₁)) → Err-verifyStep σ i s
   Err-Base₂-premises : ¬ (Base₂-premises {s = s} .proj₁) → Err-verifyStep σ i s
   Err-Base₃-premises : (∀ {eb} → ¬ (Base₃-premises {s = s} {eb = eb} .proj₁)) → Err-verifyStep σ i s
   Err-Roles₂-premises : ∀ {u} → ¬ (Roles₂-premises {s = s} {u = u} .proj₁) → Err-verifyStep σ i s
@@ -338,22 +340,14 @@ verifyStep' (Cert-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatc
 verifyStep' (Cert-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mismatch λ ()
 verifyStep' (Cert-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _     = Mismatch λ ()
 verifyStep' (Cert-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
-  with certRequest s in eq
-... | nothing = Err (Err-Cert₁-premises {mc = c} λ { (_ , q , _ , _) → just≢nothing (trans (sym q) eq) })
-... | just eb
-  with ¿ LeiosState.needsUpkeep s Base ¿
-... | no ¬p = Err (Err-Cert₁-premises {mc = c} λ { (p , _ , _ , _) → ¬p p })
-... | yes p
-  with ¿ LeiosState.PendingQuery s ≡ just (hash eb) ¿
-... | no ¬pq = Err (Err-Cert₁-premises {mc = c} λ { (_ , q , pq , _) →
-                 ¬pq (subst (λ x → LeiosState.PendingQuery s ≡ just (hash x))
-                            (just-injective (trans (sym q) eq)) pq) })
-... | yes pq
-  with ¿ AnswerMatches c (hash eb) ¿
-... | yes m = Ok' (Cert₁ {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} (p , eq , pq , m))
-... | no ¬m = Err (Err-Cert₁-premises λ { (_ , q , _ , m) →
-                ¬m (subst (λ x → AnswerMatches c (hash x))
-                          (just-injective (trans (sym q) eq)) m) })
+  with LeiosState.PendingQuery s in eq
+... | nothing = Err (Err-Cert₁-premises {c = c} λ { (_ , _ , peq , _) → nothing≢just (trans (sym eq) peq) })
+... | just r
+  with ¿ (LeiosState.needsUpkeep s Base × (CertCheck ∈ˡ LeiosState.Upkeep s) × AnswerMatches c r) ¿
+... | yes (upk , chk , match) =
+  Ok' (Cert₁ {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} (upk , chk , eq , match))
+... | no ¬p = Err (Err-Cert₁-premises λ { (upk , chk , peq , match) →
+                ¬p (upk , chk , subst (AnswerMatches c) (just-injective (trans (sym peq) eq)) match) })
 
 verifyStep' (Ftch-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢FetchLdgI x)
 verifyStep' (Ftch-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢FetchLdgI y)
@@ -393,7 +387,7 @@ verifyStep' (Base₃-Action _) (inj₁ SLOT) s refl
   with certRequest s in eq
 ... | nothing = Err (Err-Base₃-premises λ { (_ , q) → just≢nothing (trans (sym q) eq) })
 ... | just eb
-  with ¿ LeiosState.needsUpkeep s Base ¿
+  with ¿ LeiosState.needsUpkeep s CertCheck ¿
 ... | yes p = Ok' (Base₃ (p , eq))
 ... | no ¬p = Err (Err-Base₃-premises λ { (p , _) → ¬p p })
 verifyStep' (Base₃-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
