@@ -67,6 +67,8 @@ record LeiosState : Type where
         slot         : ℕ
         Upkeep       : List SlotUpkeep
         Upkeep-Stage : ℙ StageUpkeep
+        {- the EB ref of a certificate query awaiting an answer -}
+        PendingQuery : Maybe EBRef
         PubKeys      : List PubKey
 
   -- ideally we'd require a non-empty list, but this also works for now
@@ -125,6 +127,7 @@ initLeiosState V SD pks = record
   ; slot         = initSlot V
   ; Upkeep       = []
   ; Upkeep-Stage = ∅
+  ; PendingQuery = nothing
   ; PubKeys      = pks
   }
 
@@ -262,9 +265,10 @@ module Types (params : Params) (let open Params params) where
 
   BaseC : Channel
   BaseC = simpleChannel BaseT ᵀ
-
-  {- The interface to the voting functionality: a node casts votes and,
-     at RB production, queries for a certificate for the endorser block
-     it wants to endorse. -}
+```
+The interface to the voting functionality: a node casts votes and,
+at RB production, queries for a certificate for the endorser block
+it wants to endorse.
+```agda
   open import Leios.Voting.Channel Vote EBRef EBCert public
 ```
