@@ -197,10 +197,11 @@ module _ (s : LeiosState)  where
     isValid? : ∀ (x : Header ⊎ Body) → Dec (isValid x)
     isValid? (inj₁ h) = headerValid? h
     isValid? (inj₂ b) = bodyValid? b
-
+```
+Update the LeiosState upon receiving a message
+```agda
 module _ (s : LeiosState) (open LeiosState s) where
 
-  {- Update the LeiosState upon receiving a message (a header or body) -}
   {- Vote messages are not consumed by the node: vote bookkeeping is the
      voting functionality's job (resp. the local voter component's, which
      receives the votes before they ever reach the node). -}
@@ -267,9 +268,10 @@ module Types (params : Params) (let open Params params) where
 
   BaseC : Channel
   BaseC = simpleChannel BaseT ᵀ
-
-  {- The interface to the voting functionality: a node casts votes and,
-     at RB production, queries for a certificate for the endorser block
-     it wants to endorse. -}
+```
+The interface to the voting functionality: a node casts votes and,
+at RB production, queries for a certificate for the endorser block
+it wants to endorse.
+```agda
   open import Leios.Voting.Channel Vote EBRef EBCert public
 ```

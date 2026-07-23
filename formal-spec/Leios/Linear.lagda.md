@@ -48,10 +48,7 @@ set contains all elements before we can advance to the next slot,
 resetting this field to the empty set.
 
 `CertCheck` records that the node has checked the voting functionality
-for a certificate before producing its RB: it is added either by the
-query (`Base₃`) or by `Base₂` when there is no EB to certify, and the
-RB-submitting answer rule `Cert₁` requires it.
-
+for a certificate before producing its RB.
 ```agda
 data SlotUpkeep : Type where
   Base CertCheck EB-Role VT-Role : SlotUpkeep
@@ -125,9 +122,10 @@ mkRB s π mc = let open LeiosState s in record
       (just c) → inj₂ c
       nothing  → inj₁ (proj₁ (splitTxs ToPropose))
   }
-
-{- A positive answer to a certificate query must certify the requested EB;
-   a negative answer trivially matches any request. -}
+```
+A positive answer to a certificate query must certify the requested EB;
+a negative answer trivially matches any request.
+```agda
 data AnswerMatches : Maybe EBCert → EBRef → Type where
   matches-just    : ∀ {c r} → getEBHash c ≡ r → AnswerMatches (just c) r
   matches-nothing : ∀ {r} → AnswerMatches nothing r
@@ -232,7 +230,8 @@ Note: Submitted data to the base chain is only taken into account
 
   Base₂   : let open LeiosState s in
           ∙ needsUpkeep Base
-          ∙ needsUpkeep CertCheck
+-- See comment about liveness below
+--          ∙ needsUpkeep CertCheck
           ∙ certRequest s ≡ nothing
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s π nothing) ⟧⇀
@@ -257,15 +256,17 @@ the `Base` upkeep stays open until the answer arrives.
          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ CAST v ⟧⇀ s'
 
 ```
-The answer to a certificate query: a positive answer embeds the certificate
-in the submitted RB, a negative one falls back to submitting transactions.
 The answer is correlated with the request recorded in `PendingQuery`: the
 rule only accepts an answer while a query is outstanding, a positive answer
 must certify the requested EB, and the request is cleared on submission.
+
 Since the chain tip may change between query and answer (`Slot₂` has no
 premises), the rule also re-validates the request at submission time: the
 pending query must still be for the EB the *current* tip calls for, so a
 stale answer cannot be embedded.
+
+TODO: this is a liveness issue - can this be resolved by dropping the
+`needsUpkeep CertCheck` precondition in `Base₂`?
 ```agda
   Cert₁ : let open LeiosState s in
         ∙ needsUpkeep Base
