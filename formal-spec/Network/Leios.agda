@@ -24,6 +24,13 @@ module Network.Leios
   (HashCorrect-irrel : ∀ rb eb → Irrelevant (HashCorrectB rb eb))
   (hash-unique : (rb : RankingBlock) → (eb₁ eb₂ : Maybe EndorserBlock)
     → HashCorrectB rb eb₁ → HashCorrectB rb eb₂ → eb₁ ≡ eb₂)
+  -- parameters of the voting functionality
+  (forEB     : Vote → EBRef)
+  (mkCert    : EBRef → EBCert)
+  (threshold : ℕ)
+  -- parameters of the real voting implementation
+  (voter     : Vote → Fin numberOfParties)
+  (Valid     : Vote → Type) ⦃ _ : Valid ⁇¹ ⦄
   (cc : ChannelCat) (let open ChannelCat cc)
     where
 
@@ -37,6 +44,8 @@ LeiosMsg = FFDA.Header ⊎ FFDA.Body
 Message  = LeiosMsg ⊎ BaseMsg
 
 import Network.DelayedDiffuse numberOfParties Message k as DD
+import Leios.Voting.Certifier numberOfParties Vote EBRef EBCert forEB mkCert threshold as Certifier
+import Leios.Voting.Voter (Fin numberOfParties) EBRef threshold Vote voter forEB Valid EBCert mkCert as Voter
 
 -- multiplexing the network for the base & leios functionality
 -- this is somewhat awkward because we require a strict order on
@@ -72,8 +81,91 @@ NetTranslate : Machine DD.M (Network ⊗₀ BaseNetwork)
 NetTranslate .Machine.State   = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
-Leios1 : Machine DD.M (IO ⊗₀ ((I ⊗₀ I ⊗₀ BaseAdv) ⊗₀ Adv))
-Leios1 = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
+-- For the real voting implementation votes are diffused over the same
+-- network in the FFD wire format: a vote batch is a `vtHeader` message,
+-- like any other FFD header. `splitVotes` carves the round's votes out of
+-- the Leios message stream.
+splitVotes : List LeiosMsg → List Vote × List LeiosMsg
+splitVotes ms =
+  let (vss , rest) = partitionSumsWith isVote ms
+  in L.concat vss , rest
+  where
+    isVote : LeiosMsg → List Vote ⊎ LeiosMsg
+    isVote (inj₁ (GenFFD.vtHeader vs)) = inj₁ vs
+    isVote m                           = inj₂ m
+
+-- An empty round of casts produces no message.
+voteMsgs : List Vote → List Message
+voteMsgs [] = []
+voteMsgs cs = [ inj₁ (inj₁ (GenFFD.vtHeader cs)) ]
+
+-- The vote-aware network multiplexer: same strict round protocol as
+-- `NetTranslate`, with one extra hop — the round's votes are diverted to
+-- the voter (the node never sees them), and the voter's response (its
+-- pending casts) is folded into the round's outgoing diffuse as a
+-- `vtHeader` message.
+module NetTranslateV where
+  record State : Type where
+    field inLeios  : Maybe (List LeiosMsg)
+          inBase   : Maybe (List BaseMsg)
+          outBase  : Maybe (List BaseMsg)
+          outVotes : Maybe (List Vote)
+
+  private variable s : State
+
+  data WithState_receive_return_newState_ :
+    MachineType DD.M ((Network ⊗₀ BaseNetwork) ⊗₀ Voter.VoteNet) State where
+
+    Receive : ∀ {l} → let (msgs , base)  = partitionSumsWith proj₂ l
+                          (votes , leios) = splitVotes msgs in
+      WithState record { inLeios = nothing ; inBase = nothing ; outBase = nothing ; outVotes = nothing }
+      receive ϵ ⊗R ↑ᵢ DD.Deliver l
+      return just (L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ Voter.Deliver votes)
+      newState record { inLeios = just leios ; inBase = just base ; outBase = nothing ; outVotes = nothing }
+
+    SendV : ∀ {leios base cs} →
+      WithState record { inLeios = just leios ; inBase = just base ; outBase = nothing ; outVotes = nothing }
+      receive L⊗ (L⊗ ϵ) ᵗ¹ ↑ₒ Voter.Diffuse cs
+      return just (L⊗ ((L⊗ ϵ) ⊗R) ᵗ¹ ↑ᵢ base)
+      newState record { inLeios = just leios ; inBase = nothing ; outBase = nothing ; outVotes = just cs }
+
+    SendB : ∀ {leios cs m} →
+      WithState record { inLeios = just leios ; inBase = nothing ; outBase = nothing ; outVotes = just cs }
+      receive L⊗ ((L⊗ ϵ) ⊗R) ᵗ¹ ↑ₒ m
+      return just (L⊗ ((ϵ ⊗R) ⊗R) ᵗ¹ ↑ᵢ Activate leios)
+      newState record { inLeios = nothing ; inBase = nothing ; outBase = just m ; outVotes = just cs }
+
+    SendL : ∀ {m cs m'} →
+      WithState record { inLeios = nothing ; inBase = nothing ; outBase = just m ; outVotes = just cs }
+      receive L⊗ ((ϵ ⊗R) ⊗R) ᵗ¹ ↑ₒ Done m'
+      return just (ϵ ⊗R ↑ₒ DD.Diffuse (map inj₂ m ++ map inj₁ m' ++ voteMsgs cs))
+      newState record { inLeios = nothing ; inBase = nothing ; outBase = nothing ; outVotes = nothing }
+
+NetTranslateV : Machine DD.M ((Network ⊗₀ BaseNetwork) ⊗₀ Voter.VoteNet)
+NetTranslateV .Machine.State   = _
+NetTranslateV .Machine.stepRel = NetTranslateV.WithState_receive_return_newState_
+
+-- The Leios node: the voting channel is part of the node's domain and is
+-- passed through to the shared functionalities when assembling the protocol.
+-- The `I` padding in the codomain is leftover from the Kleisli combinators:
+-- `A ⊗₀ I ≡ A` is not provable, so the units cannot be normalized away. The
+-- real fix is to work up to trace equivalence in a monoidal category of
+-- machines, where the unitors are coherence isos and the padding disappears;
+-- this is work in progress on the `yveshauser/machine-category` branch.
+Leios1 : Machine (DD.M ⊗₀ VotingC) (IO ⊗₀ (((I ⊗₀ I) ⊗₀ ((I ⊗₀ BaseAdv) ⊗₀ I)) ⊗₀ Adv))
+Leios1 = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ B.m) ⊗ᴷ idᴷ) ∘ᴷ (liftᴷ NetTranslate ⊗ᴷ idᴷ)
+
+-- The real Leios node: same protocol core, but the voting channel is served
+-- *locally* by a voter component wired into the node (the `idᴷ` slot of
+-- `Leios1`). Votes travel over the same diffusion network as everything
+-- else, framed as `vtHeader` FFD messages: `NetTranslateV` diverts them to
+-- the voter on delivery and frames the voter's casts on the way out — the
+-- node itself never sees vote messages. Certificate queries are answered
+-- synchronously from the voter's local vote log, so the voter needs no
+-- adversary port. Relating a deployment of these nodes over `DD.Network`
+-- to `Leios1` + `Certifier.Functionality` is the open UC-realization step.
+Leios1ʳ : Machine DD.M (IO ⊗₀ ((I ⊗₀ ((I ⊗₀ BaseAdv) ⊗₀ I)) ⊗₀ Adv))
+Leios1ʳ = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ B.m) ⊗ᴷ liftᴷ Voter.Voter) ∘ᴷ liftᴷ NetTranslateV
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
 record LeiosBlock : Type where
@@ -93,25 +185,53 @@ LeiosBlock-Injective
   subst (λ (eb , correct) → _ ≡ record { rb = rb ; eb = eb ; correct = correct })
     (hash-unique' rb eb₁ eb₂ correct₁ correct₂) refl
 
-spec : Machine DD.M ((Network ⊗₀ BaseIO) ⊗₀ (I ⊗₀ I ⊗₀ BaseAdv))
-spec = (idᴷ ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
+-- The base node over the same channels: voting is passed through untouched,
+-- the base protocol is voting-oblivious.
+spec : Machine (DD.M ⊗₀ VotingC)
+               (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ ((I ⊗₀ I) ⊗₀ ((I ⊗₀ BaseAdv) ⊗₀ I)))
+spec = ((idᴷ ⊗ᴷ B.m) ⊗ᴷ idᴷ) ∘ᴷ (liftᴷ NetTranslate ⊗ᴷ idᴷ)
 
-ext-spec : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ I)
-ext-spec = subst (λ x → Machine (Network ⊗₀ BaseIO) (IO ⊗₀ x)) eq body
+ext-spec : Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ I)
+ext-spec = subst (λ x → Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ x)) eq body
   where
-    eq : (I ⊗₀ I) ⊗₀ I ≡ I
-    eq = trans ⊗-identityʳ ⊗-identityʳ
-    body : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ ((I ⊗₀ I) ⊗₀ I))
-    body = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ)
+    eq : ((I ⊗₀ I) ⊗₀ I) ⊗₀ I ≡ I
+    eq = trans ⊗-identityʳ (trans ⊗-identityʳ ⊗-identityʳ)
+    body : Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ (((I ⊗₀ I) ⊗₀ I) ⊗₀ I))
+    body = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ idᴷ) ⊗ᴷ idᴷ)
+
+--------------------------------------------------------------------------------
+-- Shared functionalities
+--
+-- The deployment's `network` is the tensor of the diffusion network and the
+-- voting functionality: each node sees one composite channel `DD.M ⊗₀ VotingC`,
+-- and `shuffle` interleaves the two n-fold functionality channels accordingly.
+
+⊗-interchange : ∀ {m} {A B C D : Channel}
+              → (A ⊗₀ B) ⊗₀ (C ⊗₀ D) [ m ]⇒[ m ] (A ⊗₀ C) ⊗₀ (B ⊗₀ D)
+⊗-interchange =
+  ⊗-right-assoc
+    ⇒ₜ ⊗-left-double-intro (⊗-left-assoc ⇒ₜ ⊗-right-double-intro ⊗-sym ⇒ₜ ⊗-right-assoc)
+    ⇒ₜ ⊗-left-assoc
+
+zip⇒ : ∀ {m} n (A B : Channel) → (n ⨂ⁿ A) ⊗₀ (n ⨂ⁿ B) [ m ]⇒[ m ] n ⨂ⁿ (A ⊗₀ B)
+zip⇒ zero    A B = ⊗-right-neutral
+zip⇒ (suc n) A B = ⊗-interchange ⇒ₜ ⊗-left-double-intro (zip⇒ n A B)
+
+unzip⇒ : ∀ {m} n (A B : Channel) → n ⨂ⁿ (A ⊗₀ B) [ m ]⇒[ m ] (n ⨂ⁿ A) ⊗₀ (n ⨂ⁿ B)
+unzip⇒ zero    A B = ⊗-right-intro
+unzip⇒ (suc n) A B = ⊗-left-double-intro (unzip⇒ n A B) ⇒ₜ ⊗-interchange
+
+shuffle : ∀ n (A B : Channel) → Machine ((n ⨂ⁿ A) ⊗₀ (n ⨂ⁿ B)) (n ⨂ⁿ (A ⊗₀ B))
+shuffle n A B = TotalFunctionMachine' (zip⇒ n A B) (unzip⇒ n A B)
 
 module _ (IOF AdvF : Participant → Channel)
-  (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
+  (nodesF : (p : Participant) → Machine (DD.M ⊗₀ VotingC) (IOF p ⊗₀ AdvF p)) honestNodes
   (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
   (isConstrained-Leios : IsConstrained Leios1 (IsBC.bciQueryType Participant {Block = LeiosBlock}))
   (isPure-Leios        : IsPure isConstrained-Leios)
   (IsBlockchain-base : IsBC.IsBlockchain Participant RankingBlock spec)
   (is-extension-eq :
-    idᴷ ∘ᴷ Leios1 ≡ subst (λ A → Machine DD.M (IO ⊗₀ (A ⊗₀ I))) (sym ⊗-identityʳ) (ext-spec ∘ᴷ spec))
+    idᴷ ∘ᴷ Leios1 ≡ subst (λ A → Machine (DD.M ⊗₀ VotingC) (IO ⊗₀ (A ⊗₀ I))) (sym ⊗-identityʳ) (ext-spec ∘ᴷ spec))
     where
 
   private
@@ -141,7 +261,7 @@ module _ (IOF AdvF : Participant → Channel)
     ; all-nodes           = nodesF
     ; honest-nodes        = honestNodes
     ; honest-nodes-≡-spec = honest-Node
-    ; network             = DD.Network
+    ; network             = liftᴷ {E = I} (shuffle numberOfParties DD.M VotingC) ∘ᴷ ((DD.Network ⊗ᴷ Certifier.Functionality) ∘ idᴷ)
     }
 
   module S = Deployment safetyS

@@ -11,7 +11,6 @@ open import Leios.VRF
 import Leios.Base
 import Leios.Blocks
 import Leios.KeyRegistration
-import Leios.Voting
 
 open import Data.Fin
 ```
@@ -56,14 +55,7 @@ record SpecStructure : Type₂ where
   module B   = BaseAbstract.BaseMachine BM
   module K   = KeyRegistrationAbstract.Functionality KF
   module FFD = FFDAbstract.Functionality FFD'
-
-  open Leios.Voting public
 ```
 ```agda
-  field va : VotingAbstract EndorserBlock
-  open VotingAbstract va public
-```
-```agda
-  field getEBCert         : ∀ {s eb} → isVoteCertified s eb → EBCert
-        validityCheckTime : EndorserBlock → ℕ
+  field validityCheckTime : EndorserBlock → ℕ
 ```

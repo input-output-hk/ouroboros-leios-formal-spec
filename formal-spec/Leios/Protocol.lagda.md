@@ -63,11 +63,12 @@ record LeiosState : Type where
         {- EBs': EBs together with the slot in which we received them -}
         EBs'         : List (ℕ × EndorserBlock)
         VotedEBs     : List Hash
-        Vs           : List (List Vote)
         slot         : ℕ
         Upkeep       : List SlotUpkeep
         Upkeep-Stage : ℙ StageUpkeep
-        votingState  : VotingState
+        {- the certificate query awaiting an answer, recorded so that the
+           answer can be correlated with the request -}
+        PendingQuery : Maybe EBRef
         PubKeys      : List PubKey
 
   -- ideally we'd require a non-empty list, but this also works for now
@@ -107,15 +108,6 @@ record LeiosState : Type where
   Dec-needsUpkeep-Stage : ∀ {u : StageUpkeep} → ⦃ DecEq StageUpkeep ⦄ → needsUpkeep-Stage u ⁇
   Dec-needsUpkeep-Stage {u} .dec = ¬? (u ∈? Upkeep-Stage)
 
-  -- Produces a Vote certified block
-  ebsWithCert : List (EndorserBlock × EBCert)
-  ebsWithCert = mapMaybe getCert EBs
-    where
-      getCert : EndorserBlock → Maybe (EndorserBlock × EBCert)
-      getCert eb = case ¿ isVoteCertified votingState eb ¿ of λ where
-        (yes p) → just (eb , getEBCert p)
-        (no ¬p) → nothing
-
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
 addUpkeep s u = let open LeiosState s in record s { Upkeep = u ∷ Upkeep }
 {-# INJECTIVE_FOR_INFERENCE addUpkeep #-}
@@ -131,11 +123,10 @@ initLeiosState V SD pks = record
   ; ToPropose    = []
   ; EBs'         = []
   ; VotedEBs     = []
-  ; Vs           = []
   ; slot         = initSlot V
   ; Upkeep       = []
   ; Upkeep-Stage = ∅
-  ; votingState  = initVotingState
+  ; PendingQuery = nothing
   ; PubKeys      = pks
   }
 
@@ -206,13 +197,17 @@ module _ (s : LeiosState)  where
     isValid? : ∀ (x : Header ⊎ Body) → Dec (isValid x)
     isValid? (inj₁ h) = headerValid? h
     isValid? (inj₂ b) = bodyValid? b
-
+```
+Update the LeiosState upon receiving a message
+```agda
 module _ (s : LeiosState) (open LeiosState s) where
 
-  {- Update the LeiosState upon receiving a message (a header or body) -}
+  {- Vote messages are not consumed by the node: vote bookkeeping is the
+     voting functionality's job (resp. the local voter component's, which
+     receives the votes before they ever reach the node). -}
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs' = (slot , eb) ∷ EBs' }
-  upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs }
+  upd (inj₁ (vtHeader _))  = s
   upd (inj₂ _)             = s
 
 module _ {s s'} (open LeiosState s') where
@@ -273,4 +268,10 @@ module Types (params : Params) (let open Params params) where
 
   BaseC : Channel
   BaseC = simpleChannel BaseT ᵀ
+```
+The interface to the voting functionality: a node casts votes and,
+at RB production, queries for a certificate for the endorser block
+it wants to endorse.
+```agda
+  open import Leios.Voting.Channel Vote EBRef EBCert public
 ```
