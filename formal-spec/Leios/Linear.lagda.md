@@ -230,8 +230,7 @@ Note: Submitted data to the base chain is only taken into account
 
   Base₂   : let open LeiosState s in
           ∙ needsUpkeep Base
--- See comment about liveness below
---          ∙ needsUpkeep CertCheck
+          ∙ needsUpkeep CertCheck
           ∙ certRequest s ≡ nothing
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s π nothing) ⟧⇀
@@ -263,10 +262,21 @@ must certify the requested EB, and the request is cleared on submission.
 Since the chain tip may change between query and answer (`Slot₂` has no
 premises), the rule also re-validates the request at submission time: the
 pending query must still be for the EB the *current* tip calls for, so a
-stale answer cannot be embedded.
+stale answer cannot be embedded. This re-validation, combined with
+`needsUpkeep CertCheck` in `Base₂` and `Base₃` (each fires only once per
+slot), would otherwise leave `Base` stuck open forever if the tip changes
+between query and answer: `Cert₁` refuses the stale answer, `Base₂` requires
+`certRequest s ≡ nothing`, and `Base₃` can no longer fire since `CertCheck`
+upkeep is already spent. Two further rules make every `CERT` answer lead
+somewhere:
 
-TODO: this is a liveness issue - can this be resolved by dropping the
-`needsUpkeep CertCheck` precondition in `Base₂`?
+- `Cert₂`: the tip no longer calls for a certificate at all
+  (`certRequest s ≡ nothing`). The stale answer is discarded and the RB is
+  submitted without a certificate, discharging `Base` — mirroring `Base₂`'s
+  action.
+- `Cert₃`: the tip now calls for a certificate on a *different* EB than the
+  one queried. The stale answer is discarded and a fresh query is issued for
+  the new EB; `Base` stays open until that query is answered.
 ```agda
   Cert₁ : let open LeiosState s in
         ∙ needsUpkeep Base
@@ -277,6 +287,25 @@ TODO: this is a liveness issue - can this be resolved by dropping the
         ───────────────────────────────────────────────────────────────────
         s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s π c) ⟧⇀
           record (addUpkeep s Base) { PendingQuery = nothing }
+
+  Cert₂ : let open LeiosState s in
+        ∙ needsUpkeep Base
+        ∙ CertCheck ∈ˡ Upkeep
+        ∙ certRequest s ≡ nothing
+        ∙ PendingQuery ≡ just r
+        ───────────────────────────────────────────────────────────────────
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s π nothing) ⟧⇀
+          record (addUpkeep s Base) { PendingQuery = nothing }
+
+  Cert₃ : let open LeiosState s in
+        ∙ needsUpkeep Base
+        ∙ CertCheck ∈ˡ Upkeep
+        ∙ certRequest s ≡ just eb
+        ∙ PendingQuery ≡ just r
+        ∙ hash eb ≢ r
+        ───────────────────────────────────────────────────────────────────
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ (L⊗ ϵ) ⊗R ↑ₒ QUERY (hash eb) ⟧⇀
+          record s { PendingQuery = just (hash eb) }
 ```
 #### Protocol rules
 ```agda
@@ -312,6 +341,8 @@ unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
 unquoteDecl Base₂-premises = genPremises Base₂-premises (quote Base₂)
 unquoteDecl Base₃-premises = genPremises Base₃-premises (quote Base₃)
 unquoteDecl Cert₁-premises = genPremises Cert₁-premises (quote Cert₁)
+unquoteDecl Cert₂-premises = genPremises Cert₂-premises (quote Cert₂)
+unquoteDecl Cert₃-premises = genPremises Cert₃-premises (quote Cert₃)
 
 just≢nothing : ∀ {ℓ} {A : Type ℓ} {x} → (Maybe A ∋ just x) ≡ nothing → ⊥
 just≢nothing = λ ()

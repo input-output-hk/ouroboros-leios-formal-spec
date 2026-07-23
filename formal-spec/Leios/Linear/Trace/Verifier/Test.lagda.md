@@ -201,7 +201,7 @@ functionality for a certificate (`Base₃`); the positive answer is embedded
 in the submitted RB (`Cert₁`).
 ```agda
                  ∷ (Base₃-Action      107 , inj₁ SLOT)
-                 ∷ (Cert-Action       107 , inj₂ (inj₂ (inj₂ (CERT (just crt₁)))))
+                 ∷ (Cert₁-Action      107 , inj₂ (inj₂ (inj₂ (CERT (just crt₁)))))
                  ∷ (No-EB-Role-Action 107 , inj₁ SLOT)
                  ∷ (No-VT-Role-Action 107 , inj₁ SLOT)
                  ∷ (Slot₁-Action      107 , inj₁ (FFD-OUT []))
@@ -213,7 +213,7 @@ RB carrying it
                  ∷ (EB-Role-Action    108 EB₂ , inj₁ SLOT)
                  ∷ (No-VT-Role-Action 108 , inj₁ SLOT)
                  ∷ (Base₃-Action      108 , inj₁ SLOT)
-                 ∷ (Cert-Action       108 , inj₂ (inj₂ (inj₂ (CERT (just crt₁)))))
+                 ∷ (Cert₁-Action      108 , inj₂ (inj₂ (inj₂ (CERT (just crt₁)))))
                  ∷ (Slot₁-Action      108 , inj₁ (FFD-OUT []))
 ```
 #### Slot 109
@@ -222,7 +222,7 @@ payload; finally the base chain delivers `RB₂` carrying the certificate
 for EB₁.
 ```agda
                  ∷ (Base₃-Action      109 , inj₁ SLOT)
-                 ∷ (Cert-Action       109 , inj₂ (inj₂ (inj₂ (CERT nothing))))
+                 ∷ (Cert₁-Action      109 , inj₂ (inj₂ (inj₂ (CERT nothing))))
                  ∷ (Slot₂-Action      109 , inj₂ (inj₁ (BASE-LDG [ RB₂ ])))
                  ∷ []
 ```
@@ -258,4 +258,66 @@ resolves it to `EB₁`'s transactions.
 
     test₃ : LeiosState.Ledger final ≡ 1 ∷ 2 ∷ 3 ∷ []
     test₃ = refl
+```
+### The tip changes while a certificate query is outstanding
+The `QUERY`/`CERT` exchange is not atomic with the surrounding `SLOT` step:
+`Slot₂` has no premises, so the base chain's tip can move in between. The
+following trace shows a stale answer arriving after two such tip changes,
+demonstrating that `Base` is discharged either way instead of getting stuck.
+
+`EB₃` and `EB₄` are two distinct EBs whose voting windows have both already
+passed as of slot 200.
+```agda
+    EB₃ : EndorserBlock
+    EB₃ = mkEB 190 fzero tt (EB , tt) (100 ∷ [])
+
+    EB₄ : EndorserBlock
+    EB₄ = mkEB 190 fzero tt (EB , tt) (200 ∷ [])
+```
+The certificate for `EB₃`, as it would be answered before the tip moves on.
+```agda
+    crt₃ : EBCert
+    crt₃ = hash EB₃
+```
+`RB₃` announces `EB₃`, `RB₄` announces `EB₄`.
+```agda
+    RB₃ RB₄ : RankingBlock
+    RB₃ = record { txsOrEbCert = inj₁ [] ; announcedEB = just (hash EB₃) }
+    RB₄ = record { txsOrEbCert = inj₁ [] ; announcedEB = just (hash EB₄) }
+```
+Starting at slot 200, with the chain tip announcing `EB₃`.
+```agda
+    s₂₀₀ : LeiosState
+    s₂₀₀ = record s₀
+             { slot    = 200
+             ; EBs'    = (0 , EB₃) ∷ (0 , EB₄) ∷ []
+             ; RBs     = [ RB₃ ]
+             ; PubKeys = (fzero , tt) ∷ (fsuc fzero , tt) ∷ []
+             }
+      where
+        s₀ : LeiosState
+        s₀ = initLeiosState tt stakeDistribution ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
+```
+`Base₃` queries for `EB₃` (`certRequest s₂₀₀ ≡ just EB₃`); the tip then moves
+to `EB₄` (`Slot₂`), so the stale answer for `EB₃` is discarded and `Cert₃`
+re-queries for `EB₄`. The tip then moves again, this time to announce
+nothing at all, so the stale answer for `EB₄` is discarded and `Cert₂`
+submits the RB without a certificate.
+```agda
+    stale-cert-trace : TestTrace
+    stale-cert-trace =
+                   (Base₃-Action      200 , inj₁ SLOT)
+                 ∷ (Slot₂-Action      200 , inj₂ (inj₁ (BASE-LDG [ RB₄ ])))
+                 ∷ (Cert₃-Action      200 , inj₂ (inj₂ (inj₂ (CERT (just crt₃)))))
+                 ∷ (Slot₂-Action      200 , inj₂ (inj₁ (BASE-LDG [])))
+                 ∷ (Cert₂-Action      200 , inj₂ (inj₂ (inj₂ (CERT nothing))))
+                 ∷ (No-EB-Role-Action 200 , inj₁ SLOT)
+                 ∷ (No-VT-Role-Action 200 , inj₁ SLOT)
+                 ∷ (Slot₁-Action      200 , inj₁ (FFD-OUT []))
+                 ∷ []
+```
+#### Verify the stale-certificate trace
+```agda
+    test₄ : IsOk (verifyTrace (L.reverse stale-cert-trace) s₂₀₀)
+    test₄ = _
 ```

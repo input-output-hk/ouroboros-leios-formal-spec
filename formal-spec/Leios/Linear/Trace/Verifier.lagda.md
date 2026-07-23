@@ -33,7 +33,9 @@ An `Action` provides input to the relational semantics
 data Action : Type where
   EB-Role-Action    : ℕ → EndorserBlock → Action
   VT-Role-Action    : ℕ → EndorserBlock → ℕ → Action
-  Cert-Action       : ℕ → Action
+  Cert₁-Action      : ℕ → Action
+  Cert₂-Action      : ℕ → Action
+  Cert₃-Action      : ℕ → Action
   Ftch-Action       : ℕ → Action
   Slot₁-Action      : ℕ → Action
   Slot₂-Action      : ℕ → Action
@@ -68,7 +70,9 @@ getAction (Ftch {s})                                         = Ftch-Action (Leio
 getAction (Base₁ {s})                                        = Base₁-Action (LeiosState.slot s)
 getAction (Base₂ {s} _)                                      = Base₂-Action (LeiosState.slot s)
 getAction (Base₃ {s} _)                                      = Base₃-Action (LeiosState.slot s)
-getAction (Cert₁ {s} _)                                      = Cert-Action (LeiosState.slot s)
+getAction (Cert₁ {s} _)                                      = Cert₁-Action (LeiosState.slot s)
+getAction (Cert₂ {s} _)                                      = Cert₂-Action (LeiosState.slot s)
+getAction (Cert₃ {s} _)                                      = Cert₃-Action (LeiosState.slot s)
 getAction (Roles₁ (EB-Role {s} {eb = eb} _))                 = EB-Role-Action (LeiosState.slot s) eb
 getAction (Vote₁ (VT-Role {s} {eb = eb} {slot' = slot'} _))  = VT-Role-Action (LeiosState.slot s) eb slot'
 getAction (Roles₂ {u = Base} (_ , _ , x , _))                = ⊥-elim (x refl) -- Roles₂ excludes the `Base` role
@@ -80,7 +84,9 @@ getAction (Roles₂ {s} {u = VT-Role} _)                       = No-VT-Role-Acti
 getSlot : Action → ℕ
 getSlot (EB-Role-Action x _)   = x
 getSlot (VT-Role-Action x _ _) = x
-getSlot (Cert-Action x)        = x
+getSlot (Cert₁-Action x)       = x
+getSlot (Cert₂-Action x)       = x
+getSlot (Cert₃-Action x)       = x
 getSlot (No-EB-Role-Action x)  = x
 getSlot (No-VT-Role-Action x)  = x
 getSlot (Ftch-Action x)        = x
@@ -183,7 +189,9 @@ expectedInput (Slot₁-Action _)       = cFFD-OUT
 expectedInput (Slot₂-Action _)       = cBASE-LDG
 expectedInput (Base₁-Action _)       = cSubmitTxs
 expectedInput (Ftch-Action _)        = cFetchLdgI
-expectedInput (Cert-Action _)        = cCERT
+expectedInput (Cert₁-Action _)       = cCERT
+expectedInput (Cert₂-Action _)       = cCERT
+expectedInput (Cert₃-Action _)       = cCERT
 
 opaque
   unfolding _⊗₀_
@@ -208,6 +216,8 @@ opaque
   input-sound (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) Base₁    = refl
   input-sound (inj₂ (inj₂ (inj₁ FetchLdgI))) Ftch         = refl
   input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₁ _)     = refl
+  input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₂ _)     = refl
+  input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₃ _)     = refl
 
   input-mismatch : ∀ {a i s} → inputC i ≢ expectedInput a → ¬ ValidStep (a , i) s
   input-mismatch neq (Valid _ (FromAction i σ)) = neq (input-sound i σ)
@@ -237,6 +247,8 @@ data Err-verifyStep (σ : Action) (i : TestInput) (s : LeiosState) : Type where
     Err-verifyStep σ i s
   Err-AllDone : ¬ (allDone s) → Err-verifyStep σ i s
   Err-Cert₁-premises : ∀ {c} → (∀ {eb} → ¬ (Cert₁-premises {s = s} {eb = eb} {c = c} .proj₁)) → Err-verifyStep σ i s
+  Err-Cert₂-premises : (∀ {r} → ¬ (Cert₂-premises {s = s} {r = r} .proj₁)) → Err-verifyStep σ i s
+  Err-Cert₃-premises : (∀ {eb r} → ¬ (Cert₃-premises {s = s} {eb = eb} {r = r} .proj₁)) → Err-verifyStep σ i s
   Err-Base₂-premises : ¬ (Base₂-premises {s = s} .proj₁) → Err-verifyStep σ i s
   Err-Base₃-premises : (∀ {eb} → ¬ (Base₃-premises {s = s} {eb = eb} .proj₁)) → Err-verifyStep σ i s
   Err-Roles₂-premises : ∀ {u} → ¬ (Roles₂-premises {s = s} {u = u} .proj₁) → Err-verifyStep σ i s
@@ -335,11 +347,11 @@ verifyStep' (VT-Role-Action _ _ _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (VT-Role-Action _ _ _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (VT-Role-Action _ _ _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 
-verifyStep' (Cert-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢CERT x)
-verifyStep' (Cert-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢CERT y)
-verifyStep' (Cert-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mismatch λ ()
-verifyStep' (Cert-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _     = Mismatch λ ()
-verifyStep' (Cert-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
+verifyStep' (Cert₁-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢CERT x)
+verifyStep' (Cert₁-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢CERT y)
+verifyStep' (Cert₁-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mismatch λ ()
+verifyStep' (Cert₁-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _     = Mismatch λ ()
+verifyStep' (Cert₁-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
   with certRequest s in eq
 ... | nothing = Err (Err-Cert₁-premises {c = c} λ { (_ , _ , creq , _ , _) → nothing≢just (trans (sym eq) creq) })
 ... | just eb
@@ -351,6 +363,39 @@ verifyStep' (Cert-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
                 in ¬p (upk , chk
                       , subst (λ x → LeiosState.PendingQuery s ≡ just (hash x)) e peq
                       , subst (λ x → AnswerMatches c (hash x)) e match) })
+
+verifyStep' (Cert₂-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢CERT x)
+verifyStep' (Cert₂-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢CERT y)
+verifyStep' (Cert₂-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mismatch λ ()
+verifyStep' (Cert₂-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _     = Mismatch λ ()
+verifyStep' (Cert₂-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
+  with certRequest s in eq
+... | just eb = Err (Err-Cert₂-premises λ { (_ , _ , creq , _) → nothing≢just (trans (sym creq) eq) })
+... | nothing
+  with LeiosState.PendingQuery s in peq
+... | nothing = Err (Err-Cert₂-premises λ { (_ , _ , _ , pq) → just≢nothing (trans (sym pq) peq) })
+... | just r
+  with ¿ (LeiosState.needsUpkeep s Base × (CertCheck ∈ˡ LeiosState.Upkeep s)) ¿
+... | yes (upk , chk) = Ok' (Cert₂ {r = r} {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} (upk , chk , eq , peq))
+... | no ¬p = Err (Err-Cert₂-premises λ { (upk , chk , _ , _) → ¬p (upk , chk) })
+
+verifyStep' (Cert₃-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢CERT x)
+verifyStep' (Cert₃-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢CERT y)
+verifyStep' (Cert₃-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mismatch λ ()
+verifyStep' (Cert₃-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _     = Mismatch λ ()
+verifyStep' (Cert₃-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
+  with certRequest s in eq
+... | nothing = Err (Err-Cert₃-premises λ { (_ , _ , creq , _ , _) → just≢nothing (trans (sym creq) eq) })
+... | just eb
+  with LeiosState.PendingQuery s in peq
+... | nothing = Err (Err-Cert₃-premises λ { (_ , _ , _ , pq , _) → just≢nothing (trans (sym pq) peq) })
+... | just r
+  with ¿ (LeiosState.needsUpkeep s Base × (CertCheck ∈ˡ LeiosState.Upkeep s) × hash eb ≢ r) ¿
+... | yes (upk , chk , neq) = Ok' (Cert₃ {eb = eb} {r = r} (upk , chk , eq , peq , neq))
+... | no ¬p = Err (Err-Cert₃-premises λ { (upk , chk , creq , pq , neq) →
+                let e  = just-injective (trans (sym creq) eq)
+                    e' = just-injective (trans (sym pq) peq)
+                in ¬p (upk , chk , λ eqhr → neq (trans (trans (cong hash e) eqhr) (sym e'))) })
 
 verifyStep' (Ftch-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢FetchLdgI x)
 verifyStep' (Ftch-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢FetchLdgI y)
@@ -437,7 +482,9 @@ open import Text.Printf
 actionName : Action → String
 actionName (EB-Role-Action _ _)   = "EB-Role-Action"
 actionName (VT-Role-Action _ _ _) = "VT-Role-Action"
-actionName (Cert-Action _)        = "Cert-Action"
+actionName (Cert₁-Action _)       = "Cert₁-Action"
+actionName (Cert₂-Action _)       = "Cert₂-Action"
+actionName (Cert₃-Action _)       = "Cert₃-Action"
 actionName (Ftch-Action _)        = "Ftch-Action"
 actionName (Slot₁-Action _)       = "Slot₁-Action"
 actionName (Slot₂-Action _)       = "Slot₂-Action"
@@ -455,7 +502,9 @@ module _
     iErr-verifyStep : ∀ {s} → IsError (λ σ  → Err-verifyStep σ i s)
     iErr-verifyStep {i} {s} .errorMsg {EB-Role-Action _ _} (Err-Slot _)   = printf "%u : Err-Slot / EB-Role-Action" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg {VT-Role-Action _ _ _} (Err-Slot _) = printf "%u : Err-Slot / VT-Role-Action" (LeiosState.slot s)
-    iErr-verifyStep {i} {s} .errorMsg {Cert-Action _} (Err-Slot _)        = printf "%u : Err-Slot / Cert-Action" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorMsg {Cert₁-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Cert₁-Action" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorMsg {Cert₂-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Cert₂-Action" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorMsg {Cert₃-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Cert₃-Action" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg {Base₃-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Base₃-Action" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg {Ftch-Action _} (Err-Slot _)        = printf "%u : Err-Slot / Ftch-Action" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg {Slot₁-Action _} (Err-Slot _)       = printf "%u : Err-Slot / Slot₁-Action" (LeiosState.slot s)
@@ -467,6 +516,8 @@ module _
     iErr-verifyStep {i} {s} .errorMsg (Err-EB-Role-premises _)            = printf "%u : Err-EB-Role-premises" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg (Err-AllDone _)                     = printf "%u : Err-AllDone" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg (Err-Cert₁-premises _)              = printf "%u : Err-Cert₁-premises" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorMsg (Err-Cert₂-premises _)              = printf "%u : Err-Cert₂-premises" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorMsg (Err-Cert₃-premises _)              = printf "%u : Err-Cert₃-premises" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg (Err-Base₂-premises _)              = printf "%u : Err-Base₂-premises" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg (Err-Base₃-premises _)              = printf "%u : Err-Base₃-premises" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg (Err-Roles₂-premises _)             = printf "%u : Err-Roles₂-premises: no applicable role step to skip" (LeiosState.slot s)
