@@ -5,7 +5,7 @@
    and functionalities of the Leios protocol. These defaults are intended for
    building examples and traces for different Leios variants, and include
    basic instances for abstract types, VRF, key registration, base layer,
-   FFD buffers, and voting. The implementations are minimal and primarily
+   and FFD buffers. The implementations are minimal and primarily
    for testing and illustration purposes.
 -}
 
@@ -56,8 +56,8 @@ d-Abstract =
     ; Hash              = List ℕ
     ; EBCert            = List ℕ
     ; getEBHash         = id
-    ; Vote              = ⊤
-    ; vote              = λ _ _ → tt
+    ; Vote              = Fin numberOfParties × List ℕ
+    ; vote              = λ _ h → sutId , h
     ; sign              = λ _ _ → tt
     ; splitTxs          = λ l → [] , l
     }
@@ -296,16 +296,6 @@ d-FFDFunctionality =
     ; _-⟦_/_⟧⇀_     = SimpleFFD
     }
 
-open import Leios.Voting public
-
-d-VotingAbstract : VotingAbstract EndorserBlock
-d-VotingAbstract =
-  record
-    { VotingState     = ⊤
-    ; initVotingState = tt
-    ; isVoteCertified = λ _ _ → ⊤
-    }
-
 d-SpecStructure : SpecStructure
 d-SpecStructure = record
       { a                         = d-Abstract
@@ -321,7 +311,5 @@ d-SpecStructure = record
       ; BM                        = d-BaseFunctionality
       ; K'                        = d-KeyRegistration
       ; KF                        = d-KeyRegistrationFunctionality
-      ; va                        = d-VotingAbstract
-      ; getEBCert                 = λ _ → []
-      ; validityCheckTime          = λ _ → 4
+      ; validityCheckTime         = λ _ → 4
       }
