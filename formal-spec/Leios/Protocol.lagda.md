@@ -201,10 +201,11 @@ module _ (s : LeiosState)  where
 Update the LeiosState upon receiving a message
 ```agda
 module _ (s : LeiosState) (open LeiosState s) where
-
-  {- Vote messages are not consumed by the node: vote bookkeeping is the
-     voting functionality's job (resp. the local voter component's, which
-     receives the votes before they ever reach the node). -}
+```
+Vote messages are not consumed by the node: vote bookkeeping is the
+voting functionality's job (resp. the local voter component's, which
+receives the votes before they ever reach the node).
+```agda
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs' = (slot , eb) ∷ EBs' }
   upd (inj₁ (vtHeader _))  = s
