@@ -12,7 +12,8 @@ can only cast through the slots of the parties it controls.
 
 The functionality
 
-- records casts (`Cast-step`),
+- records casts, acknowledging each with `ACK` so that control returns to the
+  caster rather than to the environment (`Cast-step`),
 - answers a party's certificate query synchronously from the vote log:
   positively iff the recorded votes certify the block
   (`Query-step`/`QueryNo-step`) — there is no delivery event to schedule,
@@ -127,12 +128,15 @@ queryMsg p eb = app (sel {m = Out} p) (QUERY eb)
 certMsg : Party → Maybe EBCert → Channel.outType (I ⊗ᵀ CertifierChannel)
 certMsg p c = app (sel {m = In} p) (CERT c)
 
+ackMsg : Party → Channel.outType (I ⊗ᵀ CertifierChannel)
+ackMsg p = app (sel {m = In} p) ACK
+
 data WithState_receive_return_newState_ : MachineType I CertifierChannel CertifierState where
 
   Cast-step : ∀ {s} (p : Party) (v : Vote) →
     WithState s
     receive castMsg p v
-    return nothing
+    return just (ackMsg p)
     newState ⟨ (p , v) ∷ log s ⟩
 
   Query-step : ∀ {s} {p : Party} {eb : EBRef} →
