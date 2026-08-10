@@ -37,6 +37,14 @@ record LeiosVRF : Type₁ where
   -- transforming slot numbers into VRF seeds
   field genIBInput genEBInput genVInput genV1Input genV2Input : ℕ → ℕ
 
+  -- Voting-committee seed (CIP-0164): the committee is fixed once per epoch
+  -- from the stake distribution (stake-based truncation to the σc coverage
+  -- target); there is no per-election sortition. This specification covers a
+  -- single epoch (one static stake distribution), so membership is a
+  -- slot-independent eligibility check against this fixed, epoch-level input
+  -- (see `inVotingCommittee` below).
+  field epochVInput : ℕ
+
   canProduceIB : ℕ → PrivKey → ℕ → VrfPf → Type
   canProduceIB slot k stake π = let (val , pf) = eval k (genIBInput slot) in val < stake × pf ≡ π
 
@@ -66,6 +74,14 @@ record LeiosVRF : Type₁ where
 
   Dec-canProduceV : ∀ {slot k stake} → Dec (canProduceV slot k stake)
   Dec-canProduceV {slot} {k} {stake} with eval k (genVInput slot)
+  ... | (val , pf) = ¿ val < stake ¿
+
+  -- Voting-committee membership (CIP-0164): slot-independent, epoch-fixed.
+  inVotingCommittee : PrivKey → ℕ → Type
+  inVotingCommittee k stake = proj₁ (eval k epochVInput) < stake
+
+  Dec-inVotingCommittee : ∀ {k stake} → Dec (inVotingCommittee k stake)
+  Dec-inVotingCommittee {k} {stake} with eval k epochVInput
   ... | (val , pf) = ¿ val < stake ¿
 
   canProduceV1 : ℕ → PrivKey → ℕ → Type

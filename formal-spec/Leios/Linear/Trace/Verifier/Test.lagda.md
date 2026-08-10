@@ -38,12 +38,12 @@ and there are the schedules for block production and voting in the field `winnin
     record
       { sutId = fzero
       ; winning-slots = fromList $
-                     (VT , 100) ∷
-                     (VT , 104) ∷
-                     (VT , 105) ∷
-                     (VT , 106) ∷
-                     (VT , 107) ∷
-        (EB , 108) ∷ (VT , 108) ∷
+        -- Voting eligibility is epoch-fixed (CIP-0164 committee): the single
+        -- (VT , 0) entry makes the SUT a committee member for the whole trace
+        -- (0 is `epochVInput` in `Test.Defaults`). EB production remains
+        -- per-slot.
+                     (VT , 0)   ∷
+        (EB , 108) ∷
         []
       }
 ```

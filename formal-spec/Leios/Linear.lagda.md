@@ -134,11 +134,11 @@ mempool.
           ∙ isValid s (inj₁ (ebHeader eb))
           ∙ slot' ≤ slotNumber eb + Lhdr
           ∙ slotNumber eb + 3 * Lhdr ≤ slot
-          ∙ slot ≡ slotNumber eb + (3 * Lhdr ⊔ validityCheckTime eb)
+          ∙ slot ≤ slotNumber eb + 3 * Lhdr + Lvote
           ∙ validityCheckTime eb ≤ 3 * Lhdr + Lvote
           ∙ EndorserBlockOSig.txs eb ≢ []
           ∙ needsUpkeep VT-Role
-          ∙ canProduceV (slotNumber eb) sk-VT (stake s)
+          ∙ inVotingCommittee sk-VT (stake s)
           ───────────────────────────────────────────────────────
           s ↝ ( rememberVote (addUpkeep s VT-Role) eb
               , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing)
@@ -148,6 +148,21 @@ genesis.
 ```agda
 allDone : LeiosState → Type
 allDone record { Upkeep = u } = VT-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ u
+```
+Voting happens within a window (CIP-0164, "Committee Validation"): it opens
+`3 * Lhdr` slots after the announcing RB's slot (the equivocation-detection
+period) and closes `Lvote` slots later. `voteDeadline` is the last slot at
+which the current EB may still be voted on; when there is no current EB (or it
+has not been received yet) the deadline is `0`, so the deferral rule `Roles₃`
+below is vacuously inapplicable and abstention is governed solely by `Roles₂`.
+```agda
+voteDeadline : LeiosState → ℕ
+voteDeadline s = let open LeiosState s in
+  case getCurrentEBHash s of λ where
+    nothing       → 0
+    (just ebHash) → case find (λ (_ , eb') → hash eb' ≟ ebHash) EBs' of λ where
+      nothing         → 0
+      (just (_ , eb)) → slotNumber eb + 3 * Lhdr + Lvote
 ```
 ### Linear Leios transitions
 The relation describing the transition given input and state
@@ -216,6 +231,18 @@ Note: Submitted data to the base chain is only taken into account
          ∙ u ≢ Base
          ──────────────────────────────────────────────────
          s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s u
+
+  -- Deferral of the VT-Role (CIP-0164 voting window): abstaining from voting
+  -- is permitted while the current EB's voting window is still open
+  -- (`slot < voteDeadline`), even when a positive VT-Role step could fire.
+  -- Together with `Roles₂` this yields bounded liveness: at the deadline slot
+  -- neither `Roles₃` (window closes) nor `Roles₂` (a vote can still fire)
+  -- applies, so a vote must be cast by then.
+  Roles₃ : let open LeiosState s in
+         ∙ slot < voteDeadline s
+         ∙ needsUpkeep VT-Role
+         ──────────────────────────────────────────────────
+         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s VT-Role
 ```
 <!--
 ```agda
@@ -312,5 +339,6 @@ instance
     (_ , VT-Role _ , x) → Base≢VT-Role (∷-injectiveˡ (trans x refl))
 
 unquoteDecl Roles₂-premises = genPremises Roles₂-premises (quote Roles₂)
+unquoteDecl Roles₃-premises = genPremises Roles₃-premises (quote Roles₃)
 ```
 -->
