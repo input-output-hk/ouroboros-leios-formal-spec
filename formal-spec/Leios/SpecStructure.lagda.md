@@ -65,5 +65,14 @@ record SpecStructure : Type₂ where
 ```
 ```agda
   field getEBCert         : ∀ {s eb} → isVoteCertified s eb → EBCert
-        validityCheckTime : EndorserBlock → ℕ
+        -- Whether validation of the given EB has completed by the given slot.
+        -- Replaces the former `validityCheckTime : EndorserBlock → ℕ` oracle:
+        -- validation latency is a property of the node and its environment,
+        -- not of the EB alone, so the spec only assumes an observable
+        -- completion predicate (monotone in the slot in intended
+        -- instantiations). Eventually to be provided by an asynchronous
+        -- validation functionality (Valid/Invalid/InProgress with bounded
+        -- InProgress).
+        isValidityChecked  : ℕ → EndorserBlock → Type
+        isValidityChecked? : ∀ n eb → Dec (isValidityChecked n eb)
 ```

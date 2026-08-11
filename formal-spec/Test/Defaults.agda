@@ -324,5 +324,8 @@ d-SpecStructure = record
       ; KF                        = d-KeyRegistrationFunctionality
       ; va                        = d-VotingAbstract
       ; getEBCert                 = λ _ → []
-      ; validityCheckTime          = λ _ → 4
+      -- Validation is not modelled in the test defaults: every EB counts as
+      -- checked at every slot.
+      ; isValidityChecked          = λ _ _ → ⊤
+      ; isValidityChecked?         = λ _ _ → yes tt
       }

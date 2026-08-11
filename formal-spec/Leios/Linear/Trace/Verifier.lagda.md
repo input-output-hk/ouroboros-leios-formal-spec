@@ -183,7 +183,7 @@ data Err-verifyStep (σ : Action) (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) (s : 
     slot' ≤ slotNumber eb + Lhdr ×
     slotNumber eb + 3 * Lhdr ≤ slot ×
     slot ≤ slotNumber eb + 3 * Lhdr + Lvote ×
-    validityCheckTime eb ≤ 3 * Lhdr + Lvote ×
+    isValidityChecked slot eb ×
     EndorserBlockOSig.txs eb ≢ [] ×
     needsUpkeep VT-Role ×
     inVotingCommittee sk-VT (stake s)) →
@@ -396,8 +396,8 @@ module _
       with ¿ (LeiosState.slot s) ≤ slotNumber eb + 3 * Lhdr + Lvote ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ ((LeiosState.slot s) ≤ slotNumber eb + 3 * Lhdr + Lvote)" (LeiosState.slot s)
     ... | yes p
-      with ¿ validityCheckTime eb ≤ 3 * Lhdr + Lvote ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ (validityCheckTime eb ≤ 3 * Lhdr + Lvote)" (LeiosState.slot s)
+      with ¿ isValidityChecked (LeiosState.slot s) eb ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: EB validation not completed (isValidityChecked)" (LeiosState.slot s)
     ... | yes p
       with ¿ EndorserBlockOSig.txs eb ≢ [] ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: No transactions in EB" (LeiosState.slot s)

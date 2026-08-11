@@ -36,7 +36,8 @@ In addition to the expected paramaters, we assume a two functions:
 - `splitTxs`: produces a pair of a list of transactions that can be
   included in an RB and a list of transactions that can be included in
   an EB
-- `validityCheckTime`: the time it takes to validate a given EB (in slots)
+- `isValidityChecked`: whether validation of a given EB has completed by a
+  given slot
 
 ### Upkeep
 
@@ -135,7 +136,7 @@ mempool.
           ∙ slot' ≤ slotNumber eb + Lhdr
           ∙ slotNumber eb + 3 * Lhdr ≤ slot
           ∙ slot ≤ slotNumber eb + 3 * Lhdr + Lvote
-          ∙ validityCheckTime eb ≤ 3 * Lhdr + Lvote
+          ∙ isValidityChecked slot eb
           ∙ EndorserBlockOSig.txs eb ≢ []
           ∙ needsUpkeep VT-Role
           ∙ inVotingCommittee sk-VT (stake s)
@@ -263,6 +264,9 @@ LinearLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 instance
   Dec-isValid : ∀ {s x} → isValid s x ⁇
   Dec-isValid {s} {x} = ⁇ isValid? s x
+
+  Dec-isValidityChecked : ∀ {n eb} → isValidityChecked n eb ⁇
+  Dec-isValidityChecked {n} {eb} = ⁇ isValidityChecked? n eb
 
 unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
 unquoteDecl VT-Role-premises = genPremises VT-Role-premises (quote _↝_.VT-Role)
