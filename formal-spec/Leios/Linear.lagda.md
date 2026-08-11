@@ -238,6 +238,16 @@ Note: Submitted data to the base chain is only taken into account
   -- Together with `Roles₂` this yields bounded liveness: at the deadline slot
   -- neither `Roles₃` (window closes) nor `Roles₂` (a vote can still fire)
   -- applies, so a vote must be cast by then.
+  --
+  -- Note the deadline forces a vote only if a VT-Role step is still possible.
+  -- In particular, a vote provided earlier in the window does not get forced
+  -- again: `rememberVote` records the EB in `VotedEBs`, which persists in
+  -- 'LeiosState' (unlike the per-slot `Upkeep`), so VT-Role's
+  -- `hash eb ∉ VotedEBs` premise blocks any re-vote and `Roles₂` then licenses
+  -- abstention at and after the deadline. The same holds when no vote step
+  -- ever becomes possible (ineligible, EB received after `Lhdr`, invalid or
+  -- empty EB): abstention goes through `Roles₂` at every slot; `Roles₃` is
+  -- only needed while an eligible voter is still deliberating.
   Roles₃ : let open LeiosState s in
          ∙ slot < voteDeadline s
          ∙ needsUpkeep VT-Role
