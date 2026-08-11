@@ -140,9 +140,16 @@ mempool.
           ∙ EndorserBlockOSig.txs eb ≢ []
           ∙ needsUpkeep VT-Role
           ∙ inVotingCommittee params (stake s)
+          -- Only a pool with a registered voting key may sign (CIP-0164,
+          -- "Key Registration and Rotation"): a pool selected by stake
+          -- without a registered key holds a *keyless* committee seat and
+          -- must abstain.
+          ∙ id ∈ˡ L.map poolID PubKeys
           ───────────────────────────────────────────────────────
           s ↝ ( rememberVote (addUpkeep s VT-Role) eb
-              , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing)
+              -- the vote signs the hash of the announcing RB (CIP-0164,
+              -- "Vote Structure")
+              , Send (vtHeader [ vote sk-VT (hash currentRB) ]) nothing)
 ```
 Predicate needed for slot transition. Special care needs to be taken when starting from
 genesis.
@@ -343,7 +350,7 @@ instance
       in just≢nothing $ trans (sym y) (subst (not-found s) (sym ji) eq₃)
   ... | just (slot' , eb)
     with ¿ VT-Role-premises {s} {eb} {ebHash} {slot'} .proj₁ ¿
-  ... | yes p = yes ((rememberVote (addUpkeep s VT-Role) eb , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing) ,
+  ... | yes p = yes ((rememberVote (addUpkeep s VT-Role) eb , Send (vtHeader [ vote sk-VT (hash (LeiosState.currentRB s)) ]) nothing) ,
                       VT-Role p , refl)
   ... | no ¬p = no λ where (_ , VT-Role (x , y , p) , _) → ¬p $ subst
                              (λ where (eb , ebHash , slot) → VT-Role-premises {s} {eb} {ebHash} {slot} .proj₁)

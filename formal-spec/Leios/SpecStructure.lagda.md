@@ -46,6 +46,10 @@ record SpecStructure : Type₂ where
 ```agda
   field B' : BaseAbstract
         BM : BaseAbstract.BaseMachine B'
+        -- Votes sign the hash of the announcing RB (CIP-0164, "Vote
+        -- Structure"): binding the vote to the announcement distinguishes
+        -- multiple RB headers announcing the same EB.
+        ⦃ Hashable-RankingBlock ⦄ : Hashable RankingBlock Hash
 
   open Leios.KeyRegistration a vrf' public
 ```

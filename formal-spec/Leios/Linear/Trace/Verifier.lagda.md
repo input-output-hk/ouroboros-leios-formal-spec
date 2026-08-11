@@ -186,7 +186,8 @@ data Err-verifyStep (σ : Action) (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) (s : 
     isValidityChecked slot eb ×
     EndorserBlockOSig.txs eb ≢ [] ×
     needsUpkeep VT-Role ×
-    inVotingCommittee params (stake s)) →
+    inVotingCommittee params (stake s) ×
+    id ∈ˡ L.map poolID PubKeys) →
     Err-verifyStep σ i s
   Err-AllDone : ¬ (allDone s) → Err-verifyStep σ i s
   Err-BaseUpkeep : ¬ (LeiosState.needsUpkeep s Base) → Err-verifyStep σ i s
@@ -407,6 +408,9 @@ module _
     ... | yes p
       with ¿ inVotingCommittee params (stake s) ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: Not in the voting committee" (LeiosState.slot s)
+    ... | yes p
+      with ¿ id ∈ˡ L.map poolID (LeiosState.PubKeys s) ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: No registered voting key (keyless committee seat)" (LeiosState.slot s)
     ... | yes p = printf "%u : Impossible!" (LeiosState.slot s)
 
     iErr-verifyTrace : ∀ {s} → IsError (λ t → Err-verifyTrace t s)

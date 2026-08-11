@@ -227,6 +227,10 @@ instance
   hpe : Hashable PreEndorserBlock Hash
   hpe .hash = EndorserBlockOSig.txs
 
+  -- Votes sign the announcing RB's hash: slot plus announced-EB payload.
+  hrb : Hashable RankingBlock Hash
+  hrb .hash rb = RankingBlock.slot rb ∷ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+
 record FFDBuffers : Type where
   field inEBs : List EndorserBlock
         inVTs : List (List Vote)
@@ -310,6 +314,7 @@ d-SpecStructure : SpecStructure
 d-SpecStructure = record
       { a                         = d-Abstract
       ; Hashable-PreEndorserBlock = hpe
+      ; Hashable-RankingBlock     = hrb
       ; id                        = sutId
       ; FFD'                      = d-FFDFunctionality
       ; vrf'                      = d-VRF
