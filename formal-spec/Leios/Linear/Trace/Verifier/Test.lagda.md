@@ -31,6 +31,8 @@ and there are the schedules for block production and voting in the field `winnin
       ; Lhdr = 1
       ; Lvote = 2
       ; Ldiff = 2
+      ; σc-num = 99
+      ; σc-den = 100
       }
 
   testParams : TestParams params
@@ -38,11 +40,9 @@ and there are the schedules for block production and voting in the field `winnin
     record
       { sutId = fzero
       ; winning-slots = fromList $
-        -- Voting eligibility is epoch-fixed (CIP-0164 committee): the single
-        -- (VT , 0) entry makes the SUT a committee member for the whole trace
-        -- (0 is `epochVInput` in `Test.Defaults`). EB production remains
-        -- per-slot.
-                     (VT , 0)   ∷
+        -- Voting eligibility is the explicit CIP-0164 stake-truncation
+        -- committee (see `inVotingCommittee` in Leios.Config); winning-slots
+        -- only govern EB production.
         (EB , 108) ∷
         []
       }

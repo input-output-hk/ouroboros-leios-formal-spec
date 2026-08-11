@@ -139,7 +139,7 @@ mempool.
           ∙ isValidityChecked slot eb
           ∙ EndorserBlockOSig.txs eb ≢ []
           ∙ needsUpkeep VT-Role
-          ∙ inVotingCommittee sk-VT (stake s)
+          ∙ inVotingCommittee params (stake s)
           ───────────────────────────────────────────────────────
           s ↝ ( rememberVote (addUpkeep s VT-Role) eb
               , Send (vtHeader [ vote sk-VT (hash eb) ]) nothing)

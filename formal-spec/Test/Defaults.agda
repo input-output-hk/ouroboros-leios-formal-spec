@@ -90,7 +90,6 @@ d-VRF =
     ; genVInput  = id
     ; genV1Input = id
     ; genV2Input = id
-    ; epochVInput = 0
     ; poolID     = proj₁
     ; verifySig  = λ _ _ → ⊤
     ; verifySig? = λ _ _ → yes tt

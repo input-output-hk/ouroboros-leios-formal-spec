@@ -186,7 +186,7 @@ data Err-verifyStep (σ : Action) (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) (s : 
     isValidityChecked slot eb ×
     EndorserBlockOSig.txs eb ≢ [] ×
     needsUpkeep VT-Role ×
-    inVotingCommittee sk-VT (stake s)) →
+    inVotingCommittee params (stake s)) →
     Err-verifyStep σ i s
   Err-AllDone : ¬ (allDone s) → Err-verifyStep σ i s
   Err-BaseUpkeep : ¬ (LeiosState.needsUpkeep s Base) → Err-verifyStep σ i s
@@ -405,7 +405,7 @@ module _
       with ¿ LeiosState.needsUpkeep s VT-Role ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: VT-Role already done" (LeiosState.slot s)
     ... | yes p
-      with ¿ inVotingCommittee sk-VT (stake s) ¿
+      with ¿ inVotingCommittee params (stake s) ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: Not in the voting committee" (LeiosState.slot s)
     ... | yes p = printf "%u : Impossible!" (LeiosState.slot s)
 
