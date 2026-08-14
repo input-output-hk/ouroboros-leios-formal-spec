@@ -227,9 +227,11 @@ instance
   hpe : Hashable PreEndorserBlock Hash
   hpe .hash = EndorserBlockOSig.txs
 
-  -- Votes sign the announcing RB's hash: slot plus announced-EB payload.
+  -- Votes sign the announcing RB's hash: body payload plus announced-EB hash.
   hrb : Hashable RankingBlock Hash
-  hrb .hash rb = RankingBlock.slot rb ∷ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+  hrb .hash rb = case RankingBlock.txsOrEbCert rb of λ where
+    (inj₁ txs)  → txs  ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+    (inj₂ cert) → cert ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
 
 record FFDBuffers : Type where
   field inEBs : List EndorserBlock

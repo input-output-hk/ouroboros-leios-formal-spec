@@ -132,18 +132,22 @@ Errors that occur when verifying a step
 getNewState : ∀ {es s} → ValidTrace es s → LeiosState
 getNewState (Valid {s′ = s} _ _) = s
 ```
-Ideally an `Err-InputMismatch`/`Err-Unsupported` would carry `¬ ValidStep (σ , i) s`. That is
-however not provable here: the transition's input index is `toRcvType i`, and `toRcvType`
-routes through the channel-selection `app`, an opaque record projection Agda cannot invert. So
-we instead witness the mismatch at the level of the *input-channel selector*: every transition
-rule reads one specific input constructor, and an action/input pairing is rejected exactly when
-the constructor supplied differs from the one the action's rule consumes.
+`Err-InputMismatch` carries the real refutation `¬ ValidStep (σ , i) s`. Deriving it requires
+inverting the transition's input index `toRcvType i`, whose channel selections are `opaque` in
+categorical-crypto; the lemmas below therefore sit in an `opaque unfolding _⊗₀_` block, where
+the selections reduce to constructor form and Agda can dismiss the impossible transition
+rules. The refutation is mediated by the *input-channel selector*: `input-sound` proves that
+every derivable step consumes the input constructor its action's rule expects, so a selector
+mismatch refutes the step.
+
+The premise-less `Ftch` rule reads its input through an output-typed channel selection, which
+nevertheless coincides with `toRcvType (inj₂ (inj₂ FetchLdgI))` once the selections reduce;
+`Ftch-step` witnesses this inside the unfolding block, letting `verifyStep'` accept the pairing.
 ```agda
 data InputC : Type where
   cSLOT cFTCH cFFD-OUT           : InputC  -- FFDT Out
   cBASE-LDG cSTAKE cEMPTY cbSLOT : InputC  -- BaseIOF In
   cSubmitTxs cFetchLdgI          : InputC  -- IOT In
-  cUnreachable                   : InputC  -- no representable input (Ftch's output-typed pattern)
 
 inputC : FFDT Out ⊎ BaseIOF In ⊎ IOT In → InputC
 inputC (inj₁ SLOT)                 = cSLOT
@@ -166,7 +170,35 @@ expectedInput (Base₂-Action _)       = cSLOT
 expectedInput (Slot₁-Action _)       = cFFD-OUT
 expectedInput (Slot₂-Action _)       = cBASE-LDG
 expectedInput (Base₁-Action _)       = cSubmitTxs
-expectedInput (Ftch-Action _)        = cUnreachable
+expectedInput (Ftch-Action _)        = cFetchLdgI
+
+opaque
+  unfolding _⊗₀_
+
+  input-sound : ∀ (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) {s s′ o}
+                (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
+              → inputC i ≡ expectedInput (getAction σ)
+  input-sound (inj₁ SLOT) (Base₂ _)                       = refl
+  input-sound (inj₁ SLOT) (Roles₁ (EB-Role _))            = refl
+  input-sound (inj₁ SLOT) (Roles₁ (VT-Role _))            = refl
+  input-sound (inj₁ SLOT) (Roles₂ {u = Base} (_ , _ , x)) = ⊥-elim (x refl)
+  input-sound (inj₁ SLOT) (Roles₂ {u = EB-Role} _)        = refl
+  input-sound (inj₁ SLOT) (Roles₂ {u = VT-Role} _)        = refl
+  input-sound (inj₁ SLOT) (Roles₃ _)                      = refl
+  input-sound (inj₁ FTCH) ()
+  input-sound (inj₁ (FFD-OUT _)) (Slot₁ _)                = refl
+  input-sound (inj₂ (inj₁ (BASE-LDG _))) Slot₂            = refl
+  input-sound (inj₂ (inj₁ (STAKE _))) ()
+  input-sound (inj₂ (inj₁ EMPTY)) ()
+  input-sound (inj₂ (inj₁ (SLOT _))) ()
+  input-sound (inj₂ (inj₂ (SubmitTxs _))) Base₁           = refl
+  input-sound (inj₂ (inj₂ FetchLdgI)) Ftch                = refl
+
+  input-mismatch : ∀ {a i s} → inputC i ≢ expectedInput a → ¬ ValidStep (a , i) s
+  input-mismatch neq (Valid _ (FromAction i σ)) = neq (input-sound i σ)
+
+  Ftch-step : ∀ {s} → ValidStep (Ftch-Action (LeiosState.slot s) , inj₂ (inj₂ FetchLdgI)) s
+  Ftch-step = Valid _ (FromAction (inj₂ (inj₂ FetchLdgI)) Ftch)
 
 data Err-verifyStep (σ : Action) (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) (s : LeiosState) : Type where
   Err-Slot : getSlot σ ≢ LeiosState.slot s → Err-verifyStep σ i s
@@ -192,8 +224,7 @@ data Err-verifyStep (σ : Action) (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) (s : 
   Err-AllDone : ¬ (allDone s) → Err-verifyStep σ i s
   Err-BaseUpkeep : ¬ (LeiosState.needsUpkeep s Base) → Err-verifyStep σ i s
   Err-Roles₂-premises : ∀ {u} → ¬ (Roles₂-premises {s = s} {u = u} .proj₁) → Err-verifyStep σ i s
-  Err-InputMismatch : inputC i ≢ expectedInput σ → Err-verifyStep σ i s -- the input channel does not match the action
-  Err-Unsupported : inputC i ≢ expectedInput σ → Err-verifyStep σ i s   -- the action's IO pattern is not modelled by the verifier
+  Err-InputMismatch : ¬ ValidStep (σ , i) s → Err-verifyStep σ i s -- no step consumes this input for this action
 ```
 Errors when verifying a trace
 ```agda
@@ -205,8 +236,12 @@ data Err-verifyTrace : TestTrace → LeiosState → Type where
 Ok' : ∀ {s i o s′} → (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
     → Result (Err-verifyStep (getAction σ) i s) (ValidStep (getAction σ , i) s)
 Ok' a = Ok (Valid _ (FromAction _ a))
+
+Mismatch : ∀ {a i s} → inputC i ≢ expectedInput a
+         → Result (Err-verifyStep a i s) (ValidStep (a , i) s)
+Mismatch neq = Err (Err-InputMismatch (input-mismatch neq))
 ```
-Reusable witnesses for the mismatching input families (payloads are irrelevant):
+Reusable witnesses for the mismatching input families:
 ```agda
 inj₂≢SLOT : ∀ y → inputC (inj₂ y) ≢ cSLOT
 inj₂≢SLOT (inj₁ (BASE-LDG _))  ()
@@ -240,16 +275,16 @@ inj₂inj₁≢SubmitTxs (STAKE _)    ()
 inj₂inj₁≢SubmitTxs EMPTY        ()
 inj₂inj₁≢SubmitTxs (SLOT _)     ()
 
-≢Unreachable : ∀ i → inputC i ≢ cUnreachable
-≢Unreachable (inj₁ SLOT)                 ()
-≢Unreachable (inj₁ FTCH)                 ()
-≢Unreachable (inj₁ (FFD-OUT _))          ()
-≢Unreachable (inj₂ (inj₁ (BASE-LDG _)))  ()
-≢Unreachable (inj₂ (inj₁ (STAKE _)))     ()
-≢Unreachable (inj₂ (inj₁ EMPTY))         ()
-≢Unreachable (inj₂ (inj₁ (SLOT _)))      ()
-≢Unreachable (inj₂ (inj₂ (SubmitTxs _))) ()
-≢Unreachable (inj₂ (inj₂ FetchLdgI))     ()
+inj₁≢FetchLdgI : ∀ x → inputC (inj₁ x) ≢ cFetchLdgI
+inj₁≢FetchLdgI SLOT        ()
+inj₁≢FetchLdgI FTCH        ()
+inj₁≢FetchLdgI (FFD-OUT _) ()
+
+inj₂inj₁≢FetchLdgI : ∀ y → inputC (inj₂ (inj₁ y)) ≢ cFetchLdgI
+inj₂inj₁≢FetchLdgI (BASE-LDG _) ()
+inj₂inj₁≢FetchLdgI (STAKE _)    ()
+inj₂inj₁≢FetchLdgI EMPTY        ()
+inj₂inj₁≢FetchLdgI (SLOT _)     ()
 ```
 ```agda
 verifyStep' : (a : Action) →
@@ -260,62 +295,63 @@ verifyStep' (EB-Role-Action n ebs) (inj₁ SLOT) s refl
   with ¿ EB-Role-premises {s = s} {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} .proj₁ ¿
 ... | yes p = Ok' (Roles₁ (EB-Role p))
 ... | no ¬p = Err (Err-EB-Role-premises ¬p)
-verifyStep' (EB-Role-Action _ _) (inj₁ FTCH) _ _        = Err (Err-InputMismatch λ ())
-verifyStep' (EB-Role-Action _ _) (inj₁ (FFD-OUT _)) _ _ = Err (Err-InputMismatch λ ())
-verifyStep' (EB-Role-Action _ _) (inj₂ y) _ _           = Err (Err-InputMismatch (inj₂≢SLOT y))
+verifyStep' (EB-Role-Action _ _) (inj₁ FTCH) _ _        = Mismatch λ ()
+verifyStep' (EB-Role-Action _ _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
+verifyStep' (EB-Role-Action _ _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (VT-Role-Action _ eb slot') (inj₁ SLOT) s refl
   with ¿ VT-Role-premises {s = s} {eb = eb} {ebHash = hash eb} {slot' = slot'} .proj₁ ¿
 ... | yes p = Ok' (Roles₁ (VT-Role {ebHash = hash eb} {slot' = slot'} p))
 ... | no ¬p = Err (Err-VT-Role-premises ¬p)
-verifyStep' (VT-Role-Action _ _ _) (inj₁ FTCH) _ _        = Err (Err-InputMismatch λ ())
-verifyStep' (VT-Role-Action _ _ _) (inj₁ (FFD-OUT _)) _ _ = Err (Err-InputMismatch λ ())
-verifyStep' (VT-Role-Action _ _ _) (inj₂ y) _ _           = Err (Err-InputMismatch (inj₂≢SLOT y))
+verifyStep' (VT-Role-Action _ _ _) (inj₁ FTCH) _ _        = Mismatch λ ()
+verifyStep' (VT-Role-Action _ _ _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
+verifyStep' (VT-Role-Action _ _ _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 
--- The `Ftch` transition uses a different IO pattern (an output-typed channel), so it is never
--- reachable through `toRcvType`; hence no representable input produces a `Ftch-Action` step.
-verifyStep' (Ftch-Action _) i _ _ = Err (Err-Unsupported (≢Unreachable i))
+verifyStep' (Ftch-Action _) (inj₁ x) _ _                    = Mismatch (inj₁≢FetchLdgI x)
+verifyStep' (Ftch-Action _) (inj₂ (inj₁ y)) _ _             = Mismatch (inj₂inj₁≢FetchLdgI y)
+verifyStep' (Ftch-Action _) (inj₂ (inj₂ (SubmitTxs _))) _ _ = Mismatch λ ()
+verifyStep' (Ftch-Action _) (inj₂ (inj₂ FetchLdgI)) s refl  = Ok Ftch-step
 
-verifyStep' (Slot₁-Action _) (inj₁ SLOT) _ _ = Err (Err-InputMismatch λ ())
-verifyStep' (Slot₁-Action _) (inj₁ FTCH) _ _ = Err (Err-InputMismatch λ ())
+verifyStep' (Slot₁-Action _) (inj₁ SLOT) _ _ = Mismatch λ ()
+verifyStep' (Slot₁-Action _) (inj₁ FTCH) _ _ = Mismatch λ ()
 verifyStep' (Slot₁-Action _) (inj₁ (FFD-OUT msgs)) s refl
   with ¿ Slot₁-premises {s = s} .proj₁ ¿
 ... | yes p = Ok' (Slot₁ {s = s} {msgs = msgs} p)
 ... | no ¬p = Err (Err-AllDone ¬p)
-verifyStep' (Slot₁-Action _) (inj₂ y) _ _ = Err (Err-InputMismatch (inj₂≢FFD-OUT y))
-verifyStep' (Slot₂-Action _) (inj₁ x) _ _ = Err (Err-InputMismatch (inj₁≢BASE-LDG x))
+verifyStep' (Slot₁-Action _) (inj₂ y) _ _ = Mismatch (inj₂≢FFD-OUT y)
+verifyStep' (Slot₂-Action _) (inj₁ x) _ _ = Mismatch (inj₁≢BASE-LDG x)
 verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (BASE-LDG rbs))) s refl = Ok' Slot₂
-verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (STAKE _))) _ _        = Err (Err-InputMismatch λ ())
-verifyStep' (Slot₂-Action _) (inj₂ (inj₁ EMPTY)) _ _            = Err (Err-InputMismatch λ ())
-verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (SLOT _))) _ _         = Err (Err-InputMismatch λ ())
-verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (SubmitTxs _))) _ _    = Err (Err-InputMismatch λ ())
-verifyStep' (Slot₂-Action _) (inj₂ (inj₂ FetchLdgI)) _ _        = Err (Err-InputMismatch λ ())
+verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (STAKE _))) _ _        = Mismatch λ ()
+verifyStep' (Slot₂-Action _) (inj₂ (inj₁ EMPTY)) _ _            = Mismatch λ ()
+verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (SLOT _))) _ _         = Mismatch λ ()
+verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (SubmitTxs _))) _ _    = Mismatch λ ()
+verifyStep' (Slot₂-Action _) (inj₂ (inj₂ FetchLdgI)) _ _        = Mismatch λ ()
 
-verifyStep' (Base₁-Action _) (inj₁ x) _ _                = Err (Err-InputMismatch (inj₁≢SubmitTxs x))
-verifyStep' (Base₁-Action _) (inj₂ (inj₁ y)) _ _         = Err (Err-InputMismatch (inj₂inj₁≢SubmitTxs y))
-verifyStep' (Base₁-Action _) (inj₂ (inj₂ FetchLdgI)) _ _ = Err (Err-InputMismatch λ ())
+verifyStep' (Base₁-Action _) (inj₁ x) _ _                = Mismatch (inj₁≢SubmitTxs x)
+verifyStep' (Base₁-Action _) (inj₂ (inj₁ y)) _ _         = Mismatch (inj₂inj₁≢SubmitTxs y)
+verifyStep' (Base₁-Action _) (inj₂ (inj₂ FetchLdgI)) _ _ = Mismatch λ ()
 verifyStep' (Base₁-Action _) (inj₂ (inj₂ (SubmitTxs _))) _ refl = Ok' Base₁
 verifyStep' (Base₂-Action _) (inj₁ SLOT) s refl
   with ¿ Base₂-premises {s = s} .proj₁ ¿
 ... | yes p = Ok' (Base₂ {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} p)
 ... | no ¬p = Err (Err-BaseUpkeep ¬p)
-verifyStep' (Base₂-Action _) (inj₁ FTCH) _ _        = Err (Err-InputMismatch λ ())
-verifyStep' (Base₂-Action _) (inj₁ (FFD-OUT _)) _ _ = Err (Err-InputMismatch λ ())
-verifyStep' (Base₂-Action _) (inj₂ y) _ _           = Err (Err-InputMismatch (inj₂≢SLOT y))
+verifyStep' (Base₂-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
+verifyStep' (Base₂-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
+verifyStep' (Base₂-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (No-EB-Role-Action _) (inj₁ SLOT) s refl
   with ¿ Roles₂-premises {s = s} {u = EB-Role} .proj₁ ¿
 ... | yes p = Ok' (Roles₂ p)
 ... | no ¬p = Err (Err-Roles₂-premises ¬p)
-verifyStep' (No-EB-Role-Action _) (inj₁ FTCH) _ _        = Err (Err-InputMismatch λ ())
-verifyStep' (No-EB-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Err (Err-InputMismatch λ ())
-verifyStep' (No-EB-Role-Action _) (inj₂ y) _ _           = Err (Err-InputMismatch (inj₂≢SLOT y))
+verifyStep' (No-EB-Role-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
+verifyStep' (No-EB-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
+verifyStep' (No-EB-Role-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (No-VT-Role-Action _) (inj₁ SLOT) s refl
   with ¿ Roles₂-premises {s = s} {u = VT-Role} .proj₁ ¿ | ¿ Roles₃-premises {s = s} .proj₁ ¿
 ... | yes p | _     = Ok' (Roles₂ p)
 ... | no _  | yes q = Ok' (Roles₃ q)
 ... | no ¬p | no _  = Err (Err-Roles₂-premises ¬p)
-verifyStep' (No-VT-Role-Action _) (inj₁ FTCH) _ _        = Err (Err-InputMismatch λ ())
-verifyStep' (No-VT-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Err (Err-InputMismatch λ ())
-verifyStep' (No-VT-Role-Action _) (inj₂ y) _ _           = Err (Err-InputMismatch (inj₂≢SLOT y))
+verifyStep' (No-VT-Role-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
+verifyStep' (No-VT-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
+verifyStep' (No-VT-Role-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 ```
 ```agda
 verifyStep : (a : Action) → (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) → (s : LeiosState) → Result (Err-verifyStep a i s) (ValidStep (a , i) s)
@@ -371,7 +407,6 @@ module _
     iErr-verifyStep {i} {s} .errorMsg (Err-BaseUpkeep _)                  = printf "%u : Err-BaseUpkeep" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg (Err-Roles₂-premises _)             = printf "%u : Err-Roles₂-premises: no applicable role step to skip" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg {a} (Err-InputMismatch _)           = printf "%u : Err-InputMismatch: input channel does not match action %s" (LeiosState.slot s) (actionName a)
-    iErr-verifyStep {i} {s} .errorMsg {a} (Err-Unsupported _)             = printf "%u : Err-Unsupported: IO pattern of action %s not modelled" (LeiosState.slot s) (actionName a)
     iErr-verifyStep {i} {s} .errorMsg (Err-VT-Role-premises {eb = eb} {ebHash = ebHash} {slot' = slot'} _)
       with ¿ getCurrentEBHash s ≡ just ebHash ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: Current EB hash does not match" (LeiosState.slot s)
