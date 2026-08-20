@@ -140,15 +140,10 @@ mempool.
           ∙ EndorserBlockOSig.txs eb ≢ []
           ∙ needsUpkeep VT-Role
           ∙ inVotingCommittee params (stake s)
-          -- Only a pool with a registered voting key may sign (CIP-0164,
-          -- "Key Registration and Rotation"): a pool selected by stake
-          -- without a registered key holds a *keyless* committee seat and
-          -- must abstain.
+          -- Only a pool with a registered voting key may sign
           ∙ id ∈ˡ L.map poolID PubKeys
           ───────────────────────────────────────────────────────
           s ↝ ( rememberVote (addUpkeep s VT-Role) eb
-              -- the vote signs the hash of the announcing RB (CIP-0164,
-              -- "Vote Structure")
               , Send (vtHeader [ vote sk-VT (hash currentRB) ]) nothing)
 ```
 Predicate needed for slot transition. Special care needs to be taken when starting from
@@ -157,12 +152,12 @@ genesis.
 allDone : LeiosState → Type
 allDone record { Upkeep = u } = VT-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ u
 ```
-Voting happens within a window (CIP-0164, "Committee Validation"): it opens
-`3 * Lhdr` slots after the announcing RB's slot (the equivocation-detection
-period) and closes `Lvote` slots later. `voteDeadline` is the last slot at
-which the current EB may still be voted on; when there is no current EB (or it
-has not been received yet) the deadline is `0`, so the deferral rule `Roles₃`
-below is vacuously inapplicable and abstention is governed solely by `Roles₂`.
+Voting happens within a window: it opens `3 * Lhdr` slots after the announcing
+RB's slot (the equivocation-detection period) and closes `Lvote` slots later.
+`voteDeadline` is the last slot at which the current EB may still be voted on;
+when there is no current EB (or it has not been received yet) the deadline is `0`,
+so the deferral rule `Roles₃` below is vacuously inapplicable and abstention is
+governed solely by `Roles₂`.
 ```agda
 voteDeadline : LeiosState → ℕ
 voteDeadline s = let open LeiosState s in
@@ -240,23 +235,13 @@ Note: Submitted data to the base chain is only taken into account
          ∙ u ≢ Base
          ──────────────────────────────────────────────────
          s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s u
-
-  -- Deferral of the VT-Role (CIP-0164 voting window): abstaining from voting
-  -- is permitted while the current EB's voting window is still open
-  -- (`slot < voteDeadline`), even when a positive VT-Role step could fire.
-  -- Together with `Roles₂` this yields bounded liveness: at the deadline slot
-  -- neither `Roles₃` (window closes) nor `Roles₂` (a vote can still fire)
-  -- applies, so a vote must be cast by then.
-  --
-  -- Note the deadline forces a vote only if a VT-Role step is still possible.
-  -- In particular, a vote provided earlier in the window does not get forced
-  -- again: `rememberVote` records the EB in `VotedEBs`, which persists in
-  -- 'LeiosState' (unlike the per-slot `Upkeep`), so VT-Role's
-  -- `hash eb ∉ VotedEBs` premise blocks any re-vote and `Roles₂` then licenses
-  -- abstention at and after the deadline. The same holds when no vote step
-  -- ever becomes possible (ineligible, EB received after `Lhdr`, invalid or
-  -- empty EB): abstention goes through `Roles₂` at every slot; `Roles₃` is
-  -- only needed while an eligible voter is still deliberating.
+```
+Deferral of the VT-Role: abstaining from voting is permitted while the
+current EB's voting window is still open, even when a positive VT-Role
+step could fire. Together with `Roles₂` this yields bounded liveness:
+at the deadline slot neither `Roles₃` (window closes) nor `Roles₂` (a vote can still fire)
+applies, so a vote must be cast by then.
+```agda
   Roles₃ : let open LeiosState s in
          ∙ slot < voteDeadline s
          ∙ needsUpkeep VT-Role

@@ -29,9 +29,7 @@ record NetworkParams : Type where
 record Params : Type where
   field networkParams    : NetworkParams
         Lhdr Lvote Ldiff : ℕ
-        -- CIP-0164 committee stake coverage σc, as a ratio σc-num / σc-den
-        -- (e.g. 99 / 100): the voting committee is the stake-descending
-        -- prefix of pools whose cumulative stake reaches σc of the total.
+        -- stake coverage σc, as a ratio σc-num / σc-den
         σc-num σc-den    : ℕ
 
   open NetworkParams networkParams public
@@ -49,14 +47,13 @@ module _ (params : Params) where
     -- stake held by pools with strictly more stake than the given one
     richerStake : ℕ → ℕ
     richerStake st = L.sum (L.filter (st <?_) allStakes)
-
-  -- Voting-committee membership by stake-based truncation (CIP-0164,
-  -- "Committee Structure"): order pools by stake descending and accumulate
-  -- until the cumulative stake covers the σc target; the committee is fixed
-  -- for the whole epoch. A pool with stake `st` is on the committee iff the
-  -- pools with strictly more stake do not already cover the target. Pools of
-  -- equal stake at the boundary are all included (the CIP fixes no tie
-  -- order).
+```
+Voting-committee membership by stake-based truncation: order pools by
+stake descending and accumulate until the cumulative stake covers the σc
+target; the committee is fixed for the whole epoch. A pool with stake `st`
+is on the committee iff the pools with strictly more stake do not already
+cover the target. Pools of equal stake at the boundary are all included.
+```agda
   inVotingCommittee : ℕ → Type
   inVotingCommittee st = richerStake st * σc-den < totalStake * σc-num
 
