@@ -43,8 +43,7 @@ and there are the schedules for block production and voting in the field `winnin
         -- Voting eligibility is the explicit CIP-0164 stake-truncation
         -- committee (see `inVotingCommittee` in Leios.Config); winning-slots
         -- only govern EB production.
-        (EB , 108) ∷
-        []
+        108 ∷ []
       }
 ```
 #### SpecStructure

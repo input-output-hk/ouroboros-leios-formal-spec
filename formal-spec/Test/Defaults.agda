@@ -69,8 +69,8 @@ open import Leios.VRF d-Abstract public
 sutStake : ℕ
 sutStake = TotalMap.lookup stakeDistribution sutId
 
-sortition : BlockType → ℕ → ℕ
-sortition b n with (b , n) ∈? winning-slots
+sortition : ℕ → ℕ
+sortition n with n ∈? winning-slots
 ... | yes _ = 0
 ... | no _ = sutStake
 
@@ -81,7 +81,7 @@ d-VRF =
     ; vrf        =
         record
           { isKeyPair = λ _ _ → ⊤
-          ; eval      = λ (b , _) y → sortition b y , tt
+          ; eval      = λ _ y → sortition y , tt
           ; verify    = λ _ _ _ _ → ⊤
           ; verify?   = λ _ _ _ _ → yes tt
           }

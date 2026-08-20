@@ -64,5 +64,5 @@ record TestParams (params : Params) : Type where
   open Params params
 
   field sutId : Fin numberOfParties
-        winning-slots : ℙ (BlockType × ℕ)
+        winning-slots : ℙ ℕ
 ```
