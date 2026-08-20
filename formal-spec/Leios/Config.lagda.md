@@ -24,13 +24,16 @@ unquoteDecl DecEq-BlockType = derive-DecEq ((quote BlockType , DecEq-BlockType) 
 record NetworkParams : Type where
   field numberOfParties   : ℕ
         stakeDistribution : TotalMap (Fin numberOfParties) ℕ
-        ⦃ NonZero-numberOfParties ⦄ : NonZero numberOfParties
+        stake-support-nonEmpty : ∃[ i ] NonZero (TotalMap.lookup stakeDistribution i)
+
+  instance
+    NonZero-numberOfParties : NonZero numberOfParties
+    NonZero-numberOfParties = F.nonZeroIndex (proj₁ stake-support-nonEmpty)
 
 record Params : Type where
   field networkParams    : NetworkParams
         Lhdr Lvote Ldiff : ℕ
-        -- stake coverage σc, as a ratio σc-num / σc-den
-        σc-num σc-den    : ℕ
+        σc               : ℚ
 
   open NetworkParams networkParams public
 
@@ -44,6 +47,18 @@ module _ (params : Params) where
     totalStake : ℕ
     totalStake = L.sum allStakes
 
+    instance
+      totalStake-nonZero : NonZero totalStake
+      totalStake-nonZero = tabulate-sum-nonZero (TotalMap.lookup stakeDistribution) stake-support-nonEmpty
+        where
+          elem≤tabulate-sum : ∀ {n} (f : Fin n → ℕ) (i : Fin n) → f i N.≤ L.sum (L.tabulate f)
+          elem≤tabulate-sum f fzero    = N.m≤m+n (f fzero) _
+          elem≤tabulate-sum f (fsuc i) = N.≤-trans (elem≤tabulate-sum (f ∘ fsuc) i) (N.m≤n+m _ (f fzero))
+
+          tabulate-sum-nonZero : ∀ {n} (f : Fin n → ℕ) → ∃[ i ] NonZero (f i) → NonZero (L.sum (L.tabulate f))
+          tabulate-sum-nonZero f (i , nz) =
+            N.>-nonZero (N.<-≤-trans (N.>-nonZero⁻¹ (f i) ⦃ nz ⦄) (elem≤tabulate-sum f i))
+
     -- stake held by pools with strictly more stake than the given one
     richerStake : ℕ → ℕ
     richerStake st = L.sum (L.filter (st <?_) allStakes)
@@ -55,7 +70,7 @@ is on the committee iff the pools with strictly more stake do not already
 cover the target. Pools of equal stake at the boundary are all included.
 ```agda
   inVotingCommittee : ℕ → Type
-  inVotingCommittee st = richerStake st * σc-den < totalStake * σc-num
+  inVotingCommittee st = (Z.+ richerStake st) Q./ totalStake Q.< σc
 
 record TestParams (params : Params) : Type where
   open Params params

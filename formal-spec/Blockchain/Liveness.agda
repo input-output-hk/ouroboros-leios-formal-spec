@@ -6,10 +6,6 @@ open import CategoricalCrypto hiding (id; _∘_)
 
 open import Blockchain.Safety using (Deployment)
 
-import Data.Integer as ℤ
-import Data.Rational as ℚ
-open ℚ using (ℚ)
-
 module Blockchain.Liveness
   (Block : Type)
   (S     : Deployment Block)
@@ -18,7 +14,7 @@ module Blockchain.Liveness
 open Deployment S
 
 ℕ→ℚ : ℕ → ℚ
-ℕ→ℚ n = (ℤ.+ n) ℚ./ 1
+ℕ→ℚ n = (+ n) Q./ 1
 
 isHonestBlock : Block → Type
 isHonestBlock b = producer b ∈ honest-nodes
@@ -35,7 +31,7 @@ hcgState τ E S₀ =
     {pref suff : List Block} {b : Block}
   → getChain E S₀ hp ≡ pref ++ (b ∷ suff)
   → isHonestBlock b
-  → τ ℚ.* ℕ→ℚ (getSlot E S₀ hp ∸ slotOf b) ℚ.≤ ℕ→ℚ (length suff)
+  → τ Q.* ℕ→ℚ (getSlot E S₀ hp ∸ slotOf b) Q.≤ ℕ→ℚ (length suff)
 
 hcg : ℚ → Type₁
 hcg τ = ∀ {A} (E : Environment A) → Invariant (protocol E) (hcgState τ E)

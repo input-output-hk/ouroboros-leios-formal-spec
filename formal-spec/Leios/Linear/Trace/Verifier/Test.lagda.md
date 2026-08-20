@@ -22,17 +22,17 @@ and there are the schedules for block production and voting in the field `winnin
   params =
     record
       { networkParams =
+          let open FunTot (completeFin 2) (maximalFin 2) in
           record
             { numberOfParties = 2
-            ; stakeDistribution =
-                let open FunTot (completeFin 2) (maximalFin 2)
-                in Fun⇒TotalMap (const 100000000)
+            ; stakeDistribution = Fun⇒TotalMap (const 100000000)
+            ; stake-support-nonEmpty =
+                fzero , subst NonZero (sym (lookup∘Fun⇒TotalMap-id {a = fzero})) it
             }
       ; Lhdr = 1
       ; Lvote = 2
       ; Ldiff = 2
-      ; σc-num = 99
-      ; σc-den = 100
+      ; σc = (Z.+ 99) Q./ 100
       }
 
   testParams : TestParams params

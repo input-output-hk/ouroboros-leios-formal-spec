@@ -25,6 +25,14 @@ module N where
   open import Data.Nat.Properties public
 open N public using (ℕ; zero; suc)
 
+module Z where
+  open import Data.Integer public
+open Z public using (ℤ; +_)
+
+module Q where
+  open import Data.Rational public
+open Q public using (ℚ)
+
 module F where
   open import Data.Fin public
   open import Data.Fin.Patterns public

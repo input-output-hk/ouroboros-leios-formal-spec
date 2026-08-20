@@ -7,9 +7,7 @@ open import Leios.ChannelCat
 
 open import CategoricalCrypto hiding (id)
 
-import Data.Rational as ℚ
 import Data.Rational.Properties as ℚP
-open ℚ using (ℚ)
 
 open import Data.List.Properties using (∷-injective; map-++; length-map; filter-≐)
 import Data.List.Relation.Unary.Any.Properties as AnyP
@@ -124,8 +122,8 @@ module Main where
                             (trans (producer-compat b') (cong Base.producer fb'≡) |> sym)
                             honest-b
 
-          ext-bound : τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ Ext.slotOf b')
-                    ℚ.≤ ℕ→ℚ (length suff')
+          ext-bound : τ Q.* ℕ→ℚ (Ext.getSlot E s hp ∸ Ext.slotOf b')
+                    Q.≤ ℕ→ℚ (length suff')
           ext-bound = ext-hcg-s hp ext-eq honest-b'
 
           slot-eq : Ext.getSlot E s hp
@@ -139,16 +137,16 @@ module Main where
           length-eq = trans (sym (length-map getBaseBlock suff'))
                             (cong length msuff≡)
 
-          result : τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
+          result : τ Q.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
                                ∸ Base.slotOf b)
-                 ℚ.≤ ℕ→ℚ (length suff)
+                 Q.≤ ℕ→ℚ (length suff)
           result = let open ℚP.≤-Reasoning in
             begin
-              τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ Base.slotOf b)
-            ≡⟨ cong (λ x → τ ℚ.* ℕ→ℚ (x ∸ Base.slotOf b)) (sym slot-eq) ⟩
-              τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ Base.slotOf b)
-            ≡⟨ cong (λ y → τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ y)) (sym slotOf-eq) ⟩
-              τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ Ext.slotOf b')
+              τ Q.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ Base.slotOf b)
+            ≡⟨ cong (λ x → τ Q.* ℕ→ℚ (x ∸ Base.slotOf b)) (sym slot-eq) ⟩
+              τ Q.* ℕ→ℚ (Ext.getSlot E s hp ∸ Base.slotOf b)
+            ≡⟨ cong (λ y → τ Q.* ℕ→ℚ (Ext.getSlot E s hp ∸ y)) (sym slotOf-eq) ⟩
+              τ Q.* ℕ→ℚ (Ext.getSlot E s hp ∸ Ext.slotOf b')
             ≤⟨ ext-bound ⟩
               ℕ→ℚ (length suff')
             ≡⟨ cong ℕ→ℚ length-eq ⟩
@@ -174,9 +172,9 @@ module Main where
                           (trans (cong (map getBaseBlock) ext-eq)
                                  (map-++ getBaseBlock pref (b ∷ suff)))
 
-          bound : τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
+          bound : τ Q.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp
                               ∸ Base.slotOf (getBaseBlock b))
-                ℚ.≤ ℕ→ℚ (length (map getBaseBlock suff))
+                Q.≤ ℕ→ℚ (length (map getBaseBlock suff))
           bound = base-hcg-s hp base-eq honest-base-b
 
           slot-eq : Base.getSlot (transEnv E) (transState E s) hp
@@ -189,15 +187,15 @@ module Main where
           slotOf-eq : Base.slotOf (getBaseBlock b) ≡ Ext.slotOf b
           slotOf-eq = sym (slotOf-compat b)
 
-          result : τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ Ext.slotOf b)
-                 ℚ.≤ ℕ→ℚ (length suff)
+          result : τ Q.* ℕ→ℚ (Ext.getSlot E s hp ∸ Ext.slotOf b)
+                 Q.≤ ℕ→ℚ (length suff)
           result = let open ℚP.≤-Reasoning in
             begin
-              τ ℚ.* ℕ→ℚ (Ext.getSlot E s hp ∸ Ext.slotOf b)
-            ≡⟨ cong (λ x → τ ℚ.* ℕ→ℚ (x ∸ Ext.slotOf b)) (sym slot-eq) ⟩
-              τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ Ext.slotOf b)
-            ≡⟨ cong (λ y → τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ y)) (sym slotOf-eq) ⟩
-              τ ℚ.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ Base.slotOf (getBaseBlock b))
+              τ Q.* ℕ→ℚ (Ext.getSlot E s hp ∸ Ext.slotOf b)
+            ≡⟨ cong (λ x → τ Q.* ℕ→ℚ (x ∸ Ext.slotOf b)) (sym slot-eq) ⟩
+              τ Q.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ Ext.slotOf b)
+            ≡⟨ cong (λ y → τ Q.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ y)) (sym slotOf-eq) ⟩
+              τ Q.* ℕ→ℚ (Base.getSlot (transEnv E) (transState E s) hp ∸ Base.slotOf (getBaseBlock b))
             ≤⟨ bound ⟩
               ℕ→ℚ (length (map getBaseBlock suff))
             ≡⟨ cong ℕ→ℚ length-eq ⟩
