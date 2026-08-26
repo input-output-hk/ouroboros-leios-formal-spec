@@ -68,6 +68,7 @@ getAction (Roles₁ (VT-Role {s} {eb = eb} {slot' = slot'} _)) = VT-Role-Action 
 getAction (Roles₂ {u = Base} (_ , _ , x))                    = ⊥-elim (x refl) -- Roles₂ excludes the `Base` role
 getAction (Roles₂ {s} {u = EB-Role} _)                       = No-EB-Role-Action (LeiosState.slot s)
 getAction (Roles₂ {s} {u = VT-Role} _)                       = No-VT-Role-Action (LeiosState.slot s)
+getAction (Roles₃ {s} _)                                     = No-VT-Role-Action (LeiosState.slot s)
 ```
 ```agda
 getSlot : Action → ℕ
@@ -183,6 +184,7 @@ opaque
   input-sound (inj₁ SLOT) (Roles₂ {u = Base} (_ , _ , x)) = ⊥-elim (x refl)
   input-sound (inj₁ SLOT) (Roles₂ {u = EB-Role} _)        = refl
   input-sound (inj₁ SLOT) (Roles₂ {u = VT-Role} _)        = refl
+  input-sound (inj₁ SLOT) (Roles₃ _)                      = refl
   input-sound (inj₁ FTCH) ()
   input-sound (inj₁ (FFD-OUT _)) (Slot₁ _)                = refl
   input-sound (inj₂ (inj₁ (BASE-LDG _))) Slot₂            = refl
@@ -212,11 +214,12 @@ data Err-verifyStep (σ : Action) (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) (s : 
     isValid s (inj₁ (ebHeader eb)) ×
     slot' ≤ slotNumber eb + Lhdr ×
     slotNumber eb + 3 * Lhdr ≤ slot ×
-    slot ≡ slotNumber eb + (3 * Lhdr ⊔ validityCheckTime eb) ×
-    validityCheckTime eb ≤ 3 * Lhdr + Lvote ×
+    slot ≤ slotNumber eb + 3 * Lhdr + Lvote ×
+    isValidityChecked slot eb ×
     EndorserBlockOSig.txs eb ≢ [] ×
     needsUpkeep VT-Role ×
-    canProduceV (slotNumber eb) sk-VT (stake s)) →
+    inVotingCommittee params (stake s) ×
+    id ∈ˡ L.map poolID PubKeys) →
     Err-verifyStep σ i s
   Err-AllDone : ¬ (allDone s) → Err-verifyStep σ i s
   Err-BaseUpkeep : ¬ (LeiosState.needsUpkeep s Base) → Err-verifyStep σ i s
@@ -342,9 +345,10 @@ verifyStep' (No-EB-Role-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (No-EB-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (No-EB-Role-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (No-VT-Role-Action _) (inj₁ SLOT) s refl
-  with ¿ Roles₂-premises {s = s} {u = VT-Role} .proj₁ ¿
-... | yes p = Ok' (Roles₂ p)
-... | no ¬p = Err (Err-Roles₂-premises ¬p)
+  with ¿ Roles₂-premises {s = s} {u = VT-Role} .proj₁ ¿ | ¿ Roles₃-premises {s = s} .proj₁ ¿
+... | yes p | _     = Ok' (Roles₂ p)
+... | no _  | yes q = Ok' (Roles₃ q)
+... | no ¬p | no _  = Err (Err-Roles₂-premises ¬p)
 verifyStep' (No-VT-Role-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (No-VT-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (No-VT-Role-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
@@ -425,11 +429,11 @@ module _
       with ¿ slotNumber eb + 3 * Lhdr ≤ (LeiosState.slot s) ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ (slotNumber eb + 3 * Lhdr ≤ (LeiosState.slot s))" (LeiosState.slot s)
     ... | yes p
-      with ¿ (LeiosState.slot s) ≡ slotNumber eb + validityCheckTime eb ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ ((LeiosState.slot s) ≡ slotNumber eb + validityCheckTime eb)" (LeiosState.slot s)
+      with ¿ (LeiosState.slot s) ≤ slotNumber eb + 3 * Lhdr + Lvote ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ ((LeiosState.slot s) ≤ slotNumber eb + 3 * Lhdr + Lvote)" (LeiosState.slot s)
     ... | yes p
-      with ¿ validityCheckTime eb ≤ 3 * Lhdr + Lvote ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ (validityCheckTime eb ≤ 3 * Lhdr + Lvote)" (LeiosState.slot s)
+      with ¿ isValidityChecked (LeiosState.slot s) eb ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: EB validation not completed (isValidityChecked)" (LeiosState.slot s)
     ... | yes p
       with ¿ EndorserBlockOSig.txs eb ≢ [] ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: No transactions in EB" (LeiosState.slot s)
@@ -437,8 +441,11 @@ module _
       with ¿ LeiosState.needsUpkeep s VT-Role ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: VT-Role already done" (LeiosState.slot s)
     ... | yes p
-      with ¿ canProduceV (slotNumber eb) sk-VT (stake s) ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises: Can not produce vote" (LeiosState.slot s)
+      with ¿ inVotingCommittee params (stake s) ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: Not in the voting committee" (LeiosState.slot s)
+    ... | yes p
+      with ¿ id ∈ˡ L.map poolID (LeiosState.PubKeys s) ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: No registered voting key (keyless committee seat)" (LeiosState.slot s)
     ... | yes p = printf "%u : Impossible!" (LeiosState.slot s)
 
     iErr-verifyTrace : ∀ {s} → IsError (λ t → Err-verifyTrace t s)

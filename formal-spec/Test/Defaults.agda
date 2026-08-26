@@ -69,8 +69,8 @@ open import Leios.VRF d-Abstract public
 sutStake : ℕ
 sutStake = TotalMap.lookup stakeDistribution sutId
 
-sortition : BlockType → ℕ → ℕ
-sortition b n with (b , n) ∈? winning-slots
+sortition : ℕ → ℕ
+sortition n with n ∈? winning-slots
 ... | yes _ = 0
 ... | no _ = sutStake
 
@@ -81,7 +81,7 @@ d-VRF =
     ; vrf        =
         record
           { isKeyPair = λ _ _ → ⊤
-          ; eval      = λ (b , _) y → sortition b y , tt
+          ; eval      = λ _ y → sortition y , tt
           ; verify    = λ _ _ _ _ → ⊤
           ; verify?   = λ _ _ _ _ → yes tt
           }
@@ -227,6 +227,12 @@ instance
   hpe : Hashable PreEndorserBlock Hash
   hpe .hash = EndorserBlockOSig.txs
 
+  -- Votes sign the announcing RB's hash: body payload plus announced-EB hash.
+  hrb : Hashable RankingBlock Hash
+  hrb .hash rb = case RankingBlock.txsOrEbCert rb of λ where
+    (inj₁ txs)  → txs  ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+    (inj₂ cert) → cert ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+
 record FFDBuffers : Type where
   field inEBs : List EndorserBlock
         inVTs : List (List Vote)
@@ -310,6 +316,7 @@ d-SpecStructure : SpecStructure
 d-SpecStructure = record
       { a                         = d-Abstract
       ; Hashable-PreEndorserBlock = hpe
+      ; Hashable-RankingBlock     = hrb
       ; id                        = sutId
       ; FFD'                      = d-FFDFunctionality
       ; vrf'                      = d-VRF
@@ -323,5 +330,8 @@ d-SpecStructure = record
       ; KF                        = d-KeyRegistrationFunctionality
       ; va                        = d-VotingAbstract
       ; getEBCert                 = λ _ → []
-      ; validityCheckTime          = λ _ → 4
+      -- Validation is not modelled in the test defaults: every EB counts as
+      -- checked at every slot.
+      ; isValidityChecked          = λ _ _ → ⊤
+      ; isValidityChecked?         = λ _ _ → yes tt
       }

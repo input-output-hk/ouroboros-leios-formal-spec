@@ -31,20 +31,15 @@ and there are the schedules for block production and voting in the field `winnin
       ; Lhdr = 1
       ; Lvote = 2
       ; Ldiff = 2
+      ; σc-num = 99
+      ; σc-den = 100
       }
 
   testParams : TestParams params
   testParams =
     record
       { sutId = fzero
-      ; winning-slots = fromList $
-                     (VT , 100) ∷
-                     (VT , 104) ∷
-                     (VT , 105) ∷
-                     (VT , 106) ∷
-                     (VT , 107) ∷
-        (EB , 108) ∷ (VT , 108) ∷
-        []
+      ; winning-slots = fromList $ 108 ∷ []
       }
 ```
 #### SpecStructure
