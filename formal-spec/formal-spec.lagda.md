@@ -70,6 +70,7 @@ Category-theoretic approach to cryptography
 ```agda
 open import CategoricalCrypto
 import CategoricalCrypto.Ext
+import CategoricalCrypto.IsoExt
 ```
 ### Blockchain abstractions
 ```agda

@@ -163,26 +163,35 @@ module _ (IOF AdvF : Participant → Channel)
     ; getBaseBlock-inj = LeiosBlock-Injective
     }
 
-  private
-    module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-      safetyS base-spec cc extension
-    module TrM = Tr.Main
+  -- The two channel-level facts about honest nodes that the transfer needs.
+  -- They used to be extracted from `honest-Node` using `ChannelCat`'s
+  -- ⊗-injectivity — which is inconsistent (see `Leios.ChannelCat`) — so they
+  -- are now explicit.  For a uniform deployment (`IOF = const IO`,
+  -- `AdvF = const Adv`) both are discharged by `λ _ → refl`.
+  module _ (honest-IOF≡  : ∀ {p} → p ∈ honestNodes → IOF p ≡ S.IO)
+           (honest-AdvF≡ : ∀ {p} → p ∈ honestNodes → AdvF p ≡ Spec.Adv base-spec)
+           where
 
-  leiosSafety : (∀ {A} (E : Deployment.Environment safetyS A) → TrM.ChainLemma-ty E)
-              → Deployment.safety Tr.base k → S.safety k
-  leiosSafety = TrM.transfer k
+    private
+      module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
+        safetyS base-spec cc extension honest-IOF≡ honest-AdvF≡
+      module TrM = Tr.Main
 
-  private
-    module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-      safetyS base-spec cc extension (λ _ → refl) (λ _ → refl)
-    module LTrM = LTr.Main
+    leiosSafety : (∀ {A} (E : Deployment.Environment safetyS A) → TrM.ChainLemma-ty E)
+                → Deployment.safety Tr.base k → S.safety k
+    leiosSafety = TrM.transfer k
 
-  leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-           → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-           → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
-  leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
+    private
+      module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
+        safetyS base-spec cc extension honest-IOF≡ honest-AdvF≡ (λ _ → refl) (λ _ → refl)
+      module LTrM = LTr.Main
 
-  leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-           → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-           → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
-  leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL
+    leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+             → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
+             → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
+    leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
+
+    leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+             → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
+             → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
+    leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL

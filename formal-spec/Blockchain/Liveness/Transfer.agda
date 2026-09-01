@@ -29,6 +29,8 @@ module Blockchain.Liveness.Transfer
   (base-spec          : Spec BlockBase Ext.n Ext.Network)
   (cc                 : ChannelCat)
   (extension          : IsExtension base-spec Ext.spec)
+  (honest-IOF         : ∀ {p} → p ∈ Ext.honest-nodes → Ext.IOF p ≡ Ext.IO)
+  (honest-AdvF        : ∀ {p} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ Spec.Adv base-spec)
   (producer-compat    : ∀ b → Deployment.producer ext b
                             ≡ Spec.producer base-spec (IsExtension.getBaseBlock extension b))
   (slotOf-compat      : ∀ b → Deployment.slotOf ext b
@@ -38,7 +40,7 @@ module Blockchain.Liveness.Transfer
 open IsExtension extension
 
 import Blockchain.Safety.Transfer as ST
-module Tr = ST ext base-spec cc extension
+module Tr = ST ext base-spec cc extension honest-IOF honest-AdvF
 
 open Tr using (extPart; base-all-nodes)
 

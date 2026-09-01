@@ -8,6 +8,9 @@ open import Leios.ChannelCat
 open import CategoricalCrypto hiding (id)
 import CategoricalCrypto as CC
 open import CategoricalCrypto.Ext
+open import CategoricalCrypto.IsoExt
+open import CategoricalCrypto.Machine.Iso
+  using (_≅ᴹ_; ≅ᴹ-refl; ≅ᴹ-sym; ≅ᴹ-trans; ∘-resp-≅ᴹ)
 
 import Relation.Binary.Reasoning.PartialOrder
 open import Relation.Binary using (Poset)
@@ -17,6 +20,15 @@ open import Relation.Binary using (Poset)
 -- Given an ext `Deployment` and an `IsExtension` witness (the base-side spec,
 -- channel/layer equipment, and block-level projection), safety of the
 -- derived base `Deployment` implies safety of the ext `Deployment`.
+--
+-- The protocol correspondence is now a machine ISOMORPHISM (`_≅ᴹ_`, a
+-- bisimulation) rather than propositional machine equality.  Structurally the
+-- proof is unchanged: `transState`/`transTrace` still push a state and a run
+-- from the ext protocol to the base protocol, only now via the iso's `to` and
+-- `Trace-map` instead of `subst`.  The channel-injectivity facts that the old
+-- `ChannelCat` supplied — and that made it inconsistent, see
+-- `Leios.ChannelCat` — are now explicit parameters, discharged by `refl` for a
+-- uniform deployment.
 module Blockchain.Safety.Transfer
   {BlockExt BlockBase : Type}
   (ext                : Deployment BlockExt)
@@ -24,17 +36,17 @@ module Blockchain.Safety.Transfer
   (base-spec          : Spec BlockBase Ext.n Ext.Network)
   (cc                 : ChannelCat)
   (extension          : IsExtension base-spec Ext.spec)
+  (honest-IOF         : ∀ {p} → p ∈ Ext.honest-nodes → Ext.IOF p ≡ Ext.IO)
+  (honest-AdvF        : ∀ {p} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ Spec.Adv base-spec)
   where
 
 module B = Spec base-spec
 open IsExtension extension
 open ChannelCat cc
 
-honest-IOF : {p : Fin Ext.n} → p ∈ Ext.honest-nodes → Ext.IOF p ≡ Ext.IO
-honest-IOF hp = ⊗-injectiveˡ (_≡ᴹ_.B≡D (Ext.honest-nodes-≡-spec hp))
-
-honest-AdvF : {p : Fin Ext.n} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ B.Adv
-honest-AdvF hp = trans (⊗-injectiveʳ (_≡ᴹ_.B≡D (Ext.honest-nodes-≡-spec hp))) ext-Adv≡base-Adv
+-- `Ext.AdvF p ≡ Ext.Adv`, the ext-side reading of `honest-AdvF`.
+honest-AdvF-ext : ∀ {p} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ Ext.Adv
+honest-AdvF-ext hp = trans (honest-AdvF hp) (sym ext-Adv≡base-Adv)
 
 base-IOF : Fin Ext.n → Channel
 base-IOF p = case p ∈? Ext.honest-nodes of λ where
@@ -82,11 +94,12 @@ single-protocol-≡ : ∀ p → idᴷ ∘ᴷ Ext.all-nodes p ≡ extPart p ∘�
 single-protocol-≡ p with p ∈? Ext.honest-nodes
 ... | no ¬hp = refl
 ... | yes hp = ≡ᴹ→≡
-  (≡ᴹ-trans (∘ᴷ-cong-≡ᴹ (idᴷ-cong-≡ᴹ (honest-IOF hp))
-                        (Ext.honest-nodes-≡-spec hp))
+  (≡ᴹ-trans (∘ᴷ-cong-≡ᴹ (honest-IOF hp) (honest-IOF hp) refl (honest-AdvF-ext hp)
+                        (idᴷ-cong-≡ᴹ (honest-IOF hp)) (Ext.honest-nodes-≡-spec hp))
   (≡ᴹ-trans (≡→≡ᴹ is-extension)
   (≡ᴹ-trans (subst-≡ᴹ-out (sym ext-Adv≡base-Adv) _)
-            (∘ᴷ-cong-≡ᴹ (≡ᴹ-sym (subst-≡ᴹ (sym (honest-IOF hp)) ext-layer))
+            (∘ᴷ-cong-≡ᴹ refl (sym (honest-IOF hp)) refl (sym (honest-AdvF hp))
+                        (≡ᴹ-sym (subst-≡ᴹ (sym (honest-IOF hp)) ext-layer))
                         (≡ᴹ-sym (subst-≡ᴹ (sym (honest-AdvF hp)) B.honest-node-spec))))))
 
 module Main where
@@ -97,30 +110,31 @@ module Main where
     transId : Machine
       ((⨂ Ext.IOF ⊗₀ (⨂_ {n = Ext.n} (const I))) ⊗₀ (Ext.NAdv ⊗₀ ⨂ Ext.AdvF))
       (⨂ Ext.IOF ⊗₀ (Ext.NAdv ⊗₀ ⨂ Ext.AdvF))
-    transId = insert-id-helper Ext.AdvF ∘ (⨂-absorb-env-helper Ext.IOF)
+    transId = insert-id-helper Ext.AdvF CC.∘ (⨂-absorb-env-helper Ext.IOF)
 
     transEnv : Base.Environment A
-    transEnv = E ∘ transId ∘ ⨂ᴷ extPart ⊗₁ CC.id
+    transEnv = E CC.∘ transId CC.∘ ⨂ᴷ extPart ⊗₁ CC.id
 
-    transProtocol : Ext.protocol E ≡ᴹ Base.protocol transEnv
-    transProtocol = flip (subst (Ext.protocol E ≡ᴹ_)) ≡ᴹ-refl $
-      E ∘ (Ext.nodes ∘ᴷ Ext.network) ≡⟨ insert-id Ext.all-nodes Ext.network E ⟩
-      (E ∘ insert-id-helper Ext.AdvF) ∘ (⨂ᴷ (λ p → idᴷ ∘ᴷ Ext.all-nodes p) ∘ᴷ Ext.network)
-        ≡⟨ cong (λ x → (E ∘ insert-id-helper Ext.AdvF) ∘ x ∘ᴷ Ext.network) (⨂ᴷ-cong single-protocol-≡) ⟩
-      (E ∘ insert-id-helper Ext.AdvF) ∘ (⨂ᴷ (λ p → extPart p ∘ᴷ base-all-nodes p) ∘ᴷ Ext.network)
-        ≡⟨ ⨂-absorb-env extPart base-all-nodes Ext.network (E ∘ insert-id-helper Ext.AdvF) ⟩
-      ((E ∘ insert-id-helper Ext.AdvF) ∘ (⨂-absorb-env-helper Ext.IOF) ∘ ⨂ᴷ extPart ⊗₁ CC.id) ∘ ((⨂ᴷ base-all-nodes) ∘ᴷ Ext.network)
-        ≡⟨ cong (_∘ (Base.nodes ∘ᴷ Ext.network)) (assoc²γδ {g = ⨂-absorb-env-helper Ext.IOF} {h = insert-id-helper Ext.AdvF}) ⟩
-      (E ∘ transId ∘ ⨂ᴷ extPart ⊗₁ CC.id) ∘ (Base.nodes ∘ᴷ Base.network) ∎
-      where
-        open ≡-Reasoning
+    -- Was: a propositional `_≡ᴹ_`, proven from the `ChannelCat` equations.
+    -- The shape of the chain is identical; `⨂ᴷ-cong` and `assoc²γδ` are now
+    -- theorems (`CategoricalCrypto.IsoExt`), and only `insert-id` /
+    -- `⨂-absorb-env` remain assumptions.
+    transProtocol : Ext.protocol E ≅ᴹ Base.protocol transEnv
+    transProtocol =
+      ≅ᴹ-trans (insert-id Ext.all-nodes Ext.network E)
+      (≅ᴹ-trans (∘-resp-≅ᴹ ≅ᴹ-refl
+                  (∘ᴷ-resp-≅ᴹ (⨂ᴷ-resp-≅ᴹ (λ p → ≡ᴹ→≅ᴹ (≡→≡ᴹ (single-protocol-≡ p))))
+                              ≅ᴹ-refl))
+      (≅ᴹ-trans (⨂-absorb-env extPart base-all-nodes Ext.network
+                              (E CC.∘ insert-id-helper Ext.AdvF))
+                (∘-resp-≅ᴹ assoc²γδ-≅ᴹ ≅ᴹ-refl)))
 
     transState : Machine.State (Ext.protocol E) → Machine.State (Base.protocol transEnv)
-    transState = state-subst transProtocol
+    transState = _≅ᴹ_.to transProtocol
 
     transTrace : {s₁ s₂ : Machine.State (Ext.protocol E)} → Trace (Ext.protocol E) s₁ s₂
       → Trace (Base.protocol transEnv) (transState s₁) (transState s₂)
-    transTrace = Trace-subst transProtocol
+    transTrace = Trace-map transProtocol
 
   ChainLemma-ty : ∀ {A : Channel} → Ext.Environment A → Type
   ChainLemma-ty {A} E = ∀ {p : Fin Ext.n} {s} (p-honest : p ∈ Ext.honest-nodes)
