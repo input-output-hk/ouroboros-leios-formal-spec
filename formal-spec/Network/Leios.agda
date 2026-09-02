@@ -6,6 +6,7 @@ open import Leios.SpecStructure
 open import Leios.Config
 
 open import CategoricalCrypto hiding (id)
+import CategoricalCrypto as CC
 open import CategoricalCrypto.Channel.Selection
 
 open import Blockchain.Safety
@@ -72,8 +73,14 @@ NetTranslate : Machine DD.M (Network ⊗₀ BaseNetwork)
 NetTranslate .Machine.State   = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
-Leios1 : Machine DD.M (IO ⊗₀ ((I ⊗₀ I ⊗₀ BaseAdv) ⊗₀ Adv))
-Leios1 = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
+-- The raw composite exposes `(I ⊗₀ I ⊗₀ BaseAdv) ⊗₀ Adv` on the adversary
+-- side, whose trailing factor is `LinearLeios`'s own residual adversary
+-- channel `Adv = I`.  Stripping it with the right unitor `ρ⇒` makes the ext
+-- spec's adversary channel *definitionally* the base spec's, so `IsExtension`'s
+-- `ext-Adv≡base-Adv` is `refl` and the unprovable `A ⊗₀ I ≡ A` is not needed.
+Leios1 : Machine DD.M (IO ⊗₀ (I ⊗₀ I ⊗₀ BaseAdv))
+Leios1 = (CC.id ⊗₁ ρ⇒)
+       ∘ (LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate)
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
 record LeiosBlock : Type where
@@ -96,13 +103,12 @@ LeiosBlock-Injective
 spec : Machine DD.M ((Network ⊗₀ BaseIO) ⊗₀ (I ⊗₀ I ⊗₀ BaseAdv))
 spec = (idᴷ ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
 
+-- Same unitor treatment: the unit clutter `(I ⊗₀ I) ⊗₀ I` left on the
+-- adversary side is collapsed by two right unitors rather than `subst`ed away
+-- along `A ⊗₀ I ≡ A`.
 ext-spec : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ I)
-ext-spec = subst (λ x → Machine (Network ⊗₀ BaseIO) (IO ⊗₀ x)) eq body
-  where
-    eq : (I ⊗₀ I) ⊗₀ I ≡ I
-    eq = trans ⊗-identityʳ ⊗-identityʳ
-    body : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ ((I ⊗₀ I) ⊗₀ I))
-    body = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ)
+ext-spec = (CC.id ⊗₁ (ρ⇒ ∘ ρ⇒))
+         ∘ (LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ))
 
 module _ (IOF AdvF : Participant → Channel)
   (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
@@ -110,8 +116,7 @@ module _ (IOF AdvF : Participant → Channel)
   (isConstrained-Leios : IsConstrained Leios1 (IsBC.bciQueryType Participant {Block = LeiosBlock}))
   (isPure-Leios        : IsPure isConstrained-Leios)
   (IsBlockchain-base : IsBC.IsBlockchain Participant RankingBlock spec)
-  (is-extension-eq :
-    idᴷ ∘ᴷ Leios1 ≡ subst (λ A → Machine DD.M (IO ⊗₀ (A ⊗₀ I))) (sym ⊗-identityʳ) (ext-spec ∘ᴷ spec))
+  (is-extension-eq : idᴷ ∘ᴷ Leios1 ≡ ext-spec ∘ᴷ spec)
     where
 
   private
@@ -156,7 +161,7 @@ module _ (IOF AdvF : Participant → Channel)
 
   extension : IsExtension base-spec (Deployment.spec safetyS)
   extension = record
-    { ext-Adv≡base-Adv = ⊗-identityʳ
+    { ext-Adv≡base-Adv = refl
     ; ext-layer        = ext-spec
     ; is-extension     = is-extension-eq
     ; getBaseBlock     = LeiosBlock.rb
