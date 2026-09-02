@@ -331,9 +331,9 @@ verifyStep' (Base₁-Action _) (inj₂ (inj₁ y)) _ _         = Mismatch (inj�
 verifyStep' (Base₁-Action _) (inj₂ (inj₂ FetchLdgI)) _ _ = Mismatch λ ()
 verifyStep' (Base₁-Action _) (inj₂ (inj₂ (SubmitTxs _))) _ refl = Ok' Base₁
 verifyStep' (Base₂-Action _) (inj₁ SLOT) s refl
-  with ¿ Base₂-premises {s = s} .proj₁ ¿
-... | yes p = Ok' (Base₂ {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} p)
-... | no ¬p = Err (Err-BaseUpkeep ¬p)
+  with ¿ Base₂-premises {s = s} {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} .proj₁ ¿
+... | yes p = Ok' (Base₂ p)
+... | no ¬p = Err (Err-BaseUpkeep λ q → ¬p (q , refl))
 verifyStep' (Base₂-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (Base₂-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (Base₂-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)

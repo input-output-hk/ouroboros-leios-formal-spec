@@ -219,6 +219,7 @@ Note: Submitted data to the base chain is only taken into account
                        }
           in
           ∙ needsUpkeep Base
+          ∙ π ≡ proj₂ (eval sk-EB (genEBInput slot))
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ SUBMIT rb ⟧⇀ addUpkeep s Base
 ```
