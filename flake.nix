@@ -9,9 +9,7 @@
     agda-nix = {
       url = "github:input-output-hk/agda.nix";
       inputs.nixpkgs.follows = "nixpkgs";
-      # Pinned: first rev providing `CategoricalCrypto.Machine.Iso` (`_≅ᴹ_` and
-      # the proven `MachineCategory`), which replaces the `ChannelCat` postulates.
-      inputs.categorical-crypto.url = "github:input-output-hk/categorical-crypto/3ddb87c17fe417554ec85244712474bbf2d4cf20";
+      inputs.categorical-crypto.url = "github:input-output-hk/categorical-crypto/88044ecf27ea181c965096fd5ea0c3d1cf514c00";
     };
   };
 
