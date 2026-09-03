@@ -66,6 +66,8 @@ record LeiosState : Type where
         Vs           : List (List Vote)
         slot         : ℕ
         Upkeep       : List SlotUpkeep
+        {- proposedEB: the EB this party diffused in the current slot, if any -}
+        proposedEB   : Maybe Hash
         Upkeep-Stage : ℙ StageUpkeep
         votingState  : VotingState
         PubKeys      : List PubKey
@@ -101,6 +103,9 @@ record LeiosState : Type where
   needsUpkeep : SlotUpkeep → Type
   needsUpkeep = _∉ˡ Upkeep
 
+  hasUpkeep : SlotUpkeep → Type
+  hasUpkeep = _∈ˡ Upkeep
+
   needsUpkeep-Stage : StageUpkeep → Set
   needsUpkeep-Stage = _∉ Upkeep-Stage
 
@@ -134,6 +139,7 @@ initLeiosState V SD pks = record
   ; Vs           = []
   ; slot         = initSlot V
   ; Upkeep       = []
+  ; proposedEB   = nothing
   ; Upkeep-Stage = ∅
   ; votingState  = initVotingState
   ; PubKeys      = pks

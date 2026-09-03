@@ -222,7 +222,7 @@ data Err-verifyStep (σ : Action) (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) (s : 
     id ∈ˡ L.map poolID PubKeys) →
     Err-verifyStep σ i s
   Err-AllDone : ¬ (allDone s) → Err-verifyStep σ i s
-  Err-BaseUpkeep : ¬ (LeiosState.needsUpkeep s Base) → Err-verifyStep σ i s
+  Err-Base₂-premises : ¬ (Base₂-premises {s = s} .proj₁) → Err-verifyStep σ i s
   Err-Roles₂-premises : ∀ {u} → ¬ (Roles₂-premises {s = s} {u = u} .proj₁) → Err-verifyStep σ i s
   Err-InputMismatch : ¬ ValidStep (σ , i) s → Err-verifyStep σ i s -- no step consumes this input for this action
 ```
@@ -332,8 +332,8 @@ verifyStep' (Base₁-Action _) (inj₂ (inj₂ FetchLdgI)) _ _ = Mismatch λ ()
 verifyStep' (Base₁-Action _) (inj₂ (inj₂ (SubmitTxs _))) _ refl = Ok' Base₁
 verifyStep' (Base₂-Action _) (inj₁ SLOT) s refl
   with ¿ Base₂-premises {s = s} .proj₁ ¿
-... | yes p = Ok' (Base₂ {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} p)
-... | no ¬p = Err (Err-BaseUpkeep ¬p)
+... | yes p = Ok' (Base₂ p)
+... | no ¬p = Err (Err-Base₂-premises ¬p)
 verifyStep' (Base₂-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (Base₂-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (Base₂-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
@@ -404,7 +404,7 @@ module _
     iErr-verifyStep {i} {s} .errorMsg {No-VT-Role-Action _} (Err-Slot _)  = printf "%u : Err-Slot / No-VT-Role-Action" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg (Err-EB-Role-premises _)            = printf "%u : Err-EB-Role-premises" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg (Err-AllDone _)                     = printf "%u : Err-AllDone" (LeiosState.slot s)
-    iErr-verifyStep {i} {s} .errorMsg (Err-BaseUpkeep _)                  = printf "%u : Err-BaseUpkeep" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorMsg (Err-Base₂-premises _)              = printf "%u : Err-Base₂-premises: Base upkeep spent, or EB role not yet settled" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg (Err-Roles₂-premises _)             = printf "%u : Err-Roles₂-premises: no applicable role step to skip" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg {a} (Err-InputMismatch _)           = printf "%u : Err-InputMismatch: input channel does not match action %s" (LeiosState.slot s) (actionName a)
     iErr-verifyStep {i} {s} .errorMsg (Err-VT-Role-premises {eb = eb} {ebHash = ebHash} {slot' = slot'} _)

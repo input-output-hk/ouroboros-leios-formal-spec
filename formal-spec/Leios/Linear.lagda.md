@@ -107,6 +107,11 @@ isEquivocated s eb = Any (areEquivocated eb) (toSet (LeiosState.EBs s))
 rememberVote : LeiosState → EndorserBlock → LeiosState
 rememberVote s@(record { VotedEBs = vebs }) eb = record s { VotedEBs = hash eb ∷ vebs }
 
+-- Record the EB this party is diffusing, so that `Base₂` announces the block
+-- that actually went out rather than recomputing a candidate from `ToPropose`.
+rememberProposal : LeiosState → EndorserBlock → LeiosState
+rememberProposal s eb = record s { proposedEB = just (hash eb) }
+
 data _↝_ : LeiosState → LeiosState × FFDAbstract.Input ffdAbstract → Type where
 ```
 #### Positive rules
@@ -122,7 +127,7 @@ mempool.
           ∙ toProposeEB s π ≡ just eb
           ∙ canProduceEB slot sk-EB (stake s) π
           ───────────────────────────────────────────────────────
-          s ↝ (addUpkeep s EB-Role , Send (ebHeader eb) nothing)
+          s ↝ (rememberProposal (addUpkeep s EB-Role) eb , Send (ebHeader eb) nothing)
 ```
 ```agda
   VT-Role : ∀ {ebHash slot'}
@@ -184,8 +189,9 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗₀ BaseIO) (IO ⊗₀ Adv) LeiosStat
         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ FFD-OUT msgs / just $ (L⊗ ϵ) ⊗R ↑ₒ FTCH-LDG ⟧⇀
           let s' = s ↑ L.filter (isValid? s) msgs
           in record s'
-               { slot   = suc slot
-               ; Upkeep = []
+               { slot       = suc slot
+               ; Upkeep     = []
+               ; proposedEB = nothing
                }
 
   Slot₂ : let open LeiosState s in
@@ -202,6 +208,13 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗₀ BaseIO) (IO ⊗₀ Adv) LeiosStat
 Note: Submitted data to the base chain is only taken into account
       if the party submitting is the block producer on the base chain
       for the given slot
+
+`Base₂` announces the EB recorded by `EB-Role`, not a candidate recomputed
+from `ToPropose`. The premise `EB-Role ∈ˡ Upkeep` makes the party settle its
+EB role for the slot first, either by producing (which sets `proposedEB`) or
+by declining through `Roles₂`; without it a `Base₂` step scheduled early in
+the slot would announce `nothing` and strand the EB the party goes on to
+diffuse.
 ```agda
   Base₁   :
           ───────────────────────────────────────────────────────────────────────────
@@ -212,13 +225,14 @@ Note: Submitted data to the base chain is only taken into account
                   ¿ just (hash eb) ≡ getCurrentEBHash s
                   × slotNumber eb + 3 * Lhdr + Lvote + Ldiff ≤ slot ¿) ebsWithCert
                 rb = record
-                       { announcedEB = hash <$> toProposeEB s π
+                       { announcedEB = proposedEB
                        ; txsOrEbCert = case currentCertEB of λ where
                            (just (_ , cert)) → inj₂ cert
                            nothing → inj₁ (proj₁ (splitTxs ToPropose))
                        }
           in
           ∙ needsUpkeep Base
+          ∙ hasUpkeep EB-Role
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ SUBMIT rb ⟧⇀ addUpkeep s Base
 ```
