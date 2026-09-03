@@ -204,7 +204,8 @@ data Err-verifyStep (σ : Action) (i : FFDT Out ⊎ BaseIOF In ⊎ IOT In) (s : 
   Err-Slot : getSlot σ ≢ LeiosState.slot s → Err-verifyStep σ i s
   Err-EB-Role-premises : ∀ {π} → ¬ (
     toProposeEB s π ≡ just eb ×
-    canProduceEB (LeiosState.slot s) sk-EB (stake s) π) →
+    canProduceEB (LeiosState.slot s) sk-EB (stake s) π ×
+    LeiosState.needsUpkeep s EB-Role) →
     Err-verifyStep σ i s
   Err-VT-Role-premises : ∀ {ebHash slot'} → let open LeiosState s in ¬ (
     getCurrentEBHash s ≡ just ebHash ×
