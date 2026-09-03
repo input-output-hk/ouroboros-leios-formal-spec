@@ -210,7 +210,7 @@ Note: Submitted data to the base chain is only taken into account
       for the given slot
 
 `Base₂` announces the EB recorded by `EB-Role`, not a candidate recomputed
-from `ToPropose`. The premise `EB-Role ∈ˡ Upkeep` makes the party settle its
+from `ToPropose`. The premise `hasUpkeep EB-Role` makes the party settle its
 EB role for the slot first, either by producing (which sets `proposedEB`) or
 by declining through `Roles₂`; without it a `Base₂` step scheduled early in
 the slot would announce `nothing` and strand the EB the party goes on to
