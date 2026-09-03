@@ -203,7 +203,8 @@ Note: Submitted data to the base chain is only taken into account
       if the party submitting is the block producer on the base chain
       for the given slot
 ```agda
-  Base₁   :
+  Base₁   : let open LeiosState s in
+          ∙ hasUpkeep Base
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ SubmitTxs txs / nothing ⟧⇀ record s { ToPropose = txs }
 
@@ -219,6 +220,7 @@ Note: Submitted data to the base chain is only taken into account
                        }
           in
           ∙ needsUpkeep Base
+          ∙ hasUpkeep EB-Role
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ SUBMIT rb ⟧⇀ addUpkeep s Base
 ```

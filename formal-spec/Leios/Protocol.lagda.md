@@ -101,6 +101,9 @@ record LeiosState : Type where
   needsUpkeep : SlotUpkeep → Type
   needsUpkeep = _∉ˡ Upkeep
 
+  hasUpkeep : SlotUpkeep → Type
+  hasUpkeep = _∈ˡ Upkeep
+
   needsUpkeep-Stage : StageUpkeep → Set
   needsUpkeep-Stage = _∉ Upkeep-Stage
 
