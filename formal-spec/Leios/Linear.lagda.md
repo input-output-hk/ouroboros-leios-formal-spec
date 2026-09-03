@@ -121,6 +121,7 @@ mempool.
   EB-Role : let open LeiosState s in
           ∙ toProposeEB s π ≡ just eb
           ∙ canProduceEB slot sk-EB (stake s) π
+          ∙ needsUpkeep EB-Role
           ───────────────────────────────────────────────────────
           s ↝ (addUpkeep s EB-Role , Send (ebHeader eb) nothing)
 ```
@@ -311,16 +312,19 @@ instance
   Dec-↝ {s} {EB-Role} .dec
     with toProposeEB s (proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))) in eq₁
   ... | nothing = no λ where
-    (_ , EB-Role {π = π} (p , a) , b) →
+    (_ , EB-Role {π = π} (p , a , _) , b) →
       case (π ≟ (proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s)))) of λ
         { (yes q) → nothing≢just (trans (sym eq₁) (subst (λ x → toProposeEB s x ≡ just _) q p)) ;
           (no ¬q) → contradiction (π-unique {s} {π} a) ¬q
         }
   ... | just eb
     with ¿ canProduceEB (LeiosState.slot s) sk-EB (stake s) _ ¿
-  ... | yes q = yes (_ , EB-Role (eq₁ , q) , refl)
-  ... | no ¬q = no λ where
-    (_ , EB-Role {π = π} (a , q) , b) →
+       | ¿ LeiosState.needsUpkeep s SlotUpkeep.EB-Role ¿
+  ... | yes q | yes u = yes (_ , EB-Role (eq₁ , q , u) , refl)
+  ... | yes _ | no ¬u = no λ where
+    (_ , EB-Role (_ , _ , u) , _) → ¬u u
+  ... | no ¬q | _ = no λ where
+    (_ , EB-Role {π = π} (a , q , _) , b) →
       case (π ≟ (proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s)))) of λ
         { (yes r) → ¬q (subst (λ x → canProduceEB (LeiosState.slot s) sk-EB (stake s) x) r q) ;
           (no ¬r) → contradiction (π-unique {s} {π} q) ¬r
