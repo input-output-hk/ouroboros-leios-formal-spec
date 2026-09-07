@@ -45,17 +45,17 @@
     "categorical-crypto": {
       "flake": false,
       "locked": {
-        "lastModified": 1788792759,
-        "narHash": "sha256-CC5UsXTHRFLMNvDl9rfIpw9JswVLLN7Xj6y5uh0mSUs=",
+        "lastModified": 1788805247,
+        "narHash": "sha256-3eIHzVO1DI81SwxyxLBmYE1CGn16fv9vICbRNjaSSl0=",
         "owner": "input-output-hk",
         "repo": "categorical-crypto",
-        "rev": "2576be0de72a9d76e6ad6fc96b47912e242ef97f",
+        "rev": "c6eca8bb67251e980aa41f65ce140321ef59b61a",
         "type": "github"
       },
       "original": {
         "owner": "input-output-hk",
         "repo": "categorical-crypto",
-        "rev": "2576be0de72a9d76e6ad6fc96b47912e242ef97f",
+        "rev": "c6eca8bb67251e980aa41f65ce140321ef59b61a",
         "type": "github"
       }
     },
