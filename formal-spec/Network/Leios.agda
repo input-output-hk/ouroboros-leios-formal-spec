@@ -71,14 +71,10 @@ NetTranslate : Machine DD.M (Network ⊗₀ BaseNetwork)
 NetTranslate .Machine.State   = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
--- The raw composite exposes `(I ⊗₀ I ⊗₀ BaseAdv) ⊗₀ Adv` on the adversary
--- side, whose trailing factor is `LinearLeios`'s own residual adversary
--- channel `Adv = I`.  Stripping it with the right unitor `ρ⇒` makes the ext
--- spec's adversary channel *definitionally* the base spec's, so `IsExtension`'s
--- `ext-Adv≡base-Adv` is `refl` and the unprovable `A ⊗₀ I ≡ A` is not needed.
-Leios1 : Machine DD.M (IO ⊗₀ (I ⊗₀ I ⊗₀ BaseAdv))
-Leios1 = (CC.id ⊗₁ ρ⇒)
-       ∘ (LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate)
+-- The adversary channel is the base functionality's, `I ⊗₀ I ⊗₀ BaseAdv`, next
+-- to `LinearLeios`'s own, `Adv`; that split is what `IsExtension` asks for.
+Leios1 : Machine DD.M (IO ⊗₀ ((I ⊗₀ I ⊗₀ BaseAdv) ⊗₀ Adv))
+Leios1 = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
 record LeiosBlock : Type where
@@ -101,11 +97,11 @@ LeiosBlock-Injective
 spec : Machine DD.M ((Network ⊗₀ BaseIO) ⊗₀ (I ⊗₀ I ⊗₀ BaseAdv))
 spec = (idᴷ ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
 
--- Same unitor treatment: the unit clutter `(I ⊗₀ I) ⊗₀ I` left on the
--- adversary side is collapsed by two right unitors rather than `subst`ed away
--- along `A ⊗₀ I ≡ A`.
-ext-spec : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ I)
-ext-spec = (CC.id ⊗₁ (ρ⇒ ∘ ρ⇒))
+-- The extension layer, with `Adv` as its adversary channel.  The unit clutter
+-- `I ⊗₀ I` that the two lifted machines leave next to it is collapsed by left
+-- unitors rather than `subst`ed away along `I ⊗₀ A ≡ A`, which is unprovable.
+ext-spec : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ Adv)
+ext-spec = (CC.id ⊗₁ (λ⇒ ∘ (λ⇒ ⊗₁ CC.id)))
          ∘ (LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ))
 
 module _ (IOF AdvF : Participant → Channel)
@@ -115,11 +111,11 @@ module _ (IOF AdvF : Participant → Channel)
   -- For a uniform deployment (`IOF = const IO`, `AdvF = const _`) both are
   -- `λ _ → refl`.
   (honest-IOF  : {p : Participant} → p ∈ honestNodes → IOF p ≡ IO)
-  (honest-AdvF : {p : Participant} → p ∈ honestNodes → AdvF p ≡ (I ⊗₀ I ⊗₀ BaseAdv))
+  (honest-AdvF : {p : Participant} → p ∈ honestNodes → AdvF p ≡ ((I ⊗₀ I ⊗₀ BaseAdv) ⊗₀ Adv))
   (isConstrained-Leios : IsConstrained Leios1 (IsBC.bciQueryType Participant {Block = LeiosBlock}))
   (isPure-Leios        : IsPure isConstrained-Leios)
   (IsBlockchain-base : IsBC.IsBlockchain Participant RankingBlock spec)
-  (is-extension-eq : idᴷ ∘ᴷ Leios1 ≡ ext-spec ∘ᴷ spec)
+  (is-extension-eq : Leios1 ≡ ext-spec ∘ᴷ spec)
     where
 
   private
@@ -166,7 +162,8 @@ module _ (IOF AdvF : Participant → Channel)
 
   extension : IsExtension base-spec (Deployment.spec safetyS)
   extension = record
-    { ext-Adv≡base-Adv = refl
+    { AdvL             = Adv
+    ; ext-Adv≡base-Adv⊗AdvL = refl
     ; ext-layer        = ext-spec
     ; is-extension     = is-extension-eq
     ; getBaseBlock     = LeiosBlock.rb

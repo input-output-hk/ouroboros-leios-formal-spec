@@ -77,7 +77,10 @@ record Deployment (Block : Type) : Type₂ where
   safety : ℕ → Type₁
   safety k = ∀ {A} (E : Environment A) → Invariant (protocol E) (safeState k E)
 
--- | Witness that one `Spec` extends a given base `Spec`
+-- | Witness that one `Spec` extends a given base `Spec`: the ext honest node
+-- is an extension layer stacked (`_∘ᴷ_`) on the base honest node.  The layer
+-- has its own adversary channel `AdvL`, so the ext adversary channel is the
+-- base one next to the layer's.
 record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
                    (base-spec : Spec BlockBase n Network)
                    (ext-spec  : Spec BlockExt  n Network) : Type₂ where
@@ -85,12 +88,13 @@ record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
     module B = Spec base-spec
     module E = Spec ext-spec
   field
-    ext-layer        : Machine B.IO (E.IO ⊗₀ I)
+    AdvL             : Channel
+    ext-layer        : Machine B.IO (E.IO ⊗₀ AdvL)
     getBaseBlock     : BlockExt → BlockBase
 
-    ext-Adv≡base-Adv : E.Adv ≡ B.Adv
+    ext-Adv≡base-Adv⊗AdvL : E.Adv ≡ B.Adv ⊗₀ AdvL
     getBaseBlock-inj : Injective _≡_ _≡_ getBaseBlock
-    is-extension : idᴷ ∘ᴷ E.honest-node-spec
-                 ≡ subst (λ A → Machine Network (E.IO ⊗₀ (A ⊗₀ I)))
-                         (sym ext-Adv≡base-Adv)
+    is-extension : E.honest-node-spec
+                 ≡ subst (λ A → Machine Network (E.IO ⊗₀ A))
+                         (sym ext-Adv≡base-Adv⊗AdvL)
                          (ext-layer ∘ᴷ B.honest-node-spec)

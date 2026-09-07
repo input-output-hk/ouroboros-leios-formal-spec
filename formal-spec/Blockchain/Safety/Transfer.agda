@@ -4,13 +4,14 @@ open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import Blockchain.Safety
 import Blockchain.IsBlockchain as IsBC
 open import CategoricalCrypto.Machine.NAry
-  using (insert-id-helper; ⨂-absorb-env-helper; insert-id; ⨂-absorb-env)
+  using (⨂-reshape-env-helper; ⨂-absorb-env-helper; unit-∘ᴷ; ⨂-reshape-env; ⨂-absorb-env)
 
 open import CategoricalCrypto hiding (id)
 import CategoricalCrypto as CC
 open import CategoricalCrypto.Ext
 open import CategoricalCrypto.Machine.Iso
-  using (_≅ᴹ_; ≅ᴹ-refl; ≅ᴹ-sym; ≅ᴹ-trans; ∘-resp-≅ᴹ)
+  using (_≅ᴹ_; ≅ᴹ-refl; ≅ᴹ-sym; ≅ᴹ-trans; ∘-resp-≅ᴹ; ∘-identityˡ-≅ᴹ)
+open import CategoricalCrypto.Machine.Monoidal using (⊗₁-id)
 
 import Relation.Binary.Reasoning.PartialOrder
 open import Relation.Binary using (Poset)
@@ -29,6 +30,12 @@ open import Relation.Binary using (Poset)
 -- honest nodes that the old `ChannelCat` extracted by ⊗-injectivity — which is
 -- what made it inconsistent — are fields of `Deployment` (`honest-IOF`,
 -- `honest-AdvF`).
+--
+-- The extension layer has its own adversary channel (`IsExtension.AdvL`), so
+-- an ext node's adversary channel splits into its base node's and its
+-- layer's.  The derived base deployment therefore has per-party adversary
+-- channels (`base-AdvF`), and the environment is rewired with a per-party
+-- forwarder (`unpad`) reassembling the ext channel.
 module Blockchain.Safety.Transfer
   {BlockExt BlockBase : Type}
   (ext                : Deployment BlockExt)
@@ -40,47 +47,65 @@ module Blockchain.Safety.Transfer
 module B = Spec base-spec
 open IsExtension extension
 
--- The honest nodes' channels, from the deployment; `honest-AdvF` is the
--- base-side reading, through `ext-Adv≡base-Adv`.
+-- The honest nodes' channels, from the deployment.  The adversary channel is
+-- read on the base side: the base spec's next to the extension layer's.
 honest-IOF : ∀ {p} → p ∈ Ext.honest-nodes → Ext.IOF p ≡ Ext.IO
 honest-IOF = Ext.honest-IOF
 
-honest-AdvF-ext : ∀ {p} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ Ext.Adv
-honest-AdvF-ext = Ext.honest-AdvF
+honest-AdvF : ∀ {p} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ B.Adv ⊗₀ AdvL
+honest-AdvF hp = trans (Ext.honest-AdvF hp) ext-Adv≡base-Adv⊗AdvL
 
-honest-AdvF : ∀ {p} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ B.Adv
-honest-AdvF hp = trans (Ext.honest-AdvF hp) ext-Adv≡base-Adv
-
+-- The base deployment's channels: the base spec's for honest parties, the ext
+-- deployment's for the rest, whose nodes are kept as they are.
 base-IOF : Fin Ext.n → Channel
 base-IOF p = case p ∈? Ext.honest-nodes of λ where
   (yes _) → B.IO
   (no  _) → Ext.IOF p
 
-base-all-nodes : (p : Fin Ext.n) → Machine Ext.Network (base-IOF p ⊗₀ Ext.AdvF p)
-base-all-nodes p with p ∈? Ext.honest-nodes
-... | yes hp = subst (λ x → Machine Ext.Network (B.IO ⊗₀ x)) (sym (honest-AdvF hp)) B.honest-node-spec
-... | no  _  = Ext.all-nodes p
+base-AdvF : Fin Ext.n → Channel
+base-AdvF p = case p ∈? Ext.honest-nodes of λ where
+  (yes _) → B.Adv
+  (no  _) → Ext.AdvF p
 
-private
-  subst-≡ᴹ : ∀ {x y : Channel} {A B : Channel → Channel} → (eq : x ≡ y)
-    → (M : Machine (A x) (B x)) → subst (λ x → Machine (A x) (B x)) eq M ≡ᴹ M
-  subst-≡ᴹ refl _ = ≡ᴹ-refl
+-- The extension layer's adversary channel, per party: `AdvL` for honest
+-- parties, the unit for the rest, whose layer is `idᴷ`.
+extAdv : Fin Ext.n → Channel
+extAdv p = case p ∈? Ext.honest-nodes of λ where
+  (yes _) → AdvL
+  (no  _) → I
+
+base-all-nodes : (p : Fin Ext.n) → Machine Ext.Network (base-IOF p ⊗₀ base-AdvF p)
+base-all-nodes p with p ∈? Ext.honest-nodes
+... | yes _ = B.honest-node-spec
+... | no  _ = Ext.all-nodes p
 
 base-honest-≡-spec : {p : Fin Ext.n} → p ∈ Ext.honest-nodes
                    → base-all-nodes p ≡ᴹ B.honest-node-spec
 base-honest-≡-spec {p} hp with p ∈? Ext.honest-nodes
-... | yes hp' = subst-≡ᴹ (sym (honest-AdvF hp')) B.honest-node-spec
-... | no ¬hp  = contradiction hp ¬hp
+... | yes _   = ≡ᴹ-refl
+... | no  ¬hp = contradiction hp ¬hp
 
 base-honest-IOF : {p : Fin Ext.n} → p ∈ Ext.honest-nodes → base-IOF p ≡ B.IO
 base-honest-IOF {p} hp with p ∈? Ext.honest-nodes
 ... | yes _   = refl
 ... | no  ¬hp = contradiction hp ¬hp
 
-extPart : (p : Fin Ext.n) → Machine (base-IOF p) (Ext.IOF p ⊗₀ I)
+base-honest-AdvF : {p : Fin Ext.n} → p ∈ Ext.honest-nodes → base-AdvF p ≡ B.Adv
+base-honest-AdvF {p} hp with p ∈? Ext.honest-nodes
+... | yes _   = refl
+... | no  ¬hp = contradiction hp ¬hp
+
+extPart : (p : Fin Ext.n) → Machine (base-IOF p) (Ext.IOF p ⊗₀ extAdv p)
 extPart p with p ∈? Ext.honest-nodes
-... | yes hp = subst (λ x → Machine B.IO (x ⊗₀ I)) (sym (honest-IOF hp)) ext-layer
+... | yes hp = subst (λ x → Machine B.IO (x ⊗₀ AdvL)) (sym (honest-IOF hp)) ext-layer
 ... | no  _  = idᴷ
+
+-- Reassembling an ext node's adversary channel from its base node's and its
+-- layer's: a renaming for honest parties, the right unitor for the rest.
+unpad : (p : Fin Ext.n) → Machine (base-AdvF p ⊗₀ extAdv p) (Ext.AdvF p)
+unpad p with p ∈? Ext.honest-nodes
+... | yes hp = subst (Machine (B.Adv ⊗₀ AdvL)) (sym (honest-AdvF hp)) CC.id
+... | no  _  = ρ⇒
 
 base : Deployment BlockBase
 base = record
@@ -89,38 +114,57 @@ base = record
   ; spec                = base-spec
   ; NAdv                = Ext.NAdv
   ; IOF                 = base-IOF
-  ; AdvF                = Ext.AdvF
+  ; AdvF                = base-AdvF
   ; all-nodes           = base-all-nodes
   ; honest-nodes        = Ext.honest-nodes
   ; honest-nodes-≡-spec = base-honest-≡-spec
   ; honest-IOF          = base-honest-IOF
-  ; honest-AdvF         = honest-AdvF
+  ; honest-AdvF         = base-honest-AdvF
   ; network             = Ext.network
   }
 
 module Base = Deployment base
 
-single-protocol-≡ : ∀ p → idᴷ ∘ᴷ Ext.all-nodes p ≡ extPart p ∘ᴷ base-all-nodes p
-single-protocol-≡ p with p ∈? Ext.honest-nodes
-... | no ¬hp = refl
-... | yes hp = ≡ᴹ→≡
-  (≡ᴹ-trans (∘ᴷ-cong-≡ᴹ (honest-IOF hp) (honest-IOF hp) refl (honest-AdvF-ext hp)
-                        (idᴷ-cong-≡ᴹ (honest-IOF hp)) (Ext.honest-nodes-≡-spec hp))
+private
+  subst-≡ᴹ : ∀ {x y : Channel} {A B : Channel → Channel} → (eq : x ≡ y)
+    → (M : Machine (A x) (B x)) → subst (λ x → Machine (A x) (B x)) eq M ≡ᴹ M
+  subst-≡ᴹ refl _ = ≡ᴹ-refl
+
+  -- The honest case of `single-protocol`, over channel variables so that the
+  -- two channel equalities can be matched on.
+  single-honest : ∀ {X Y} (eX : X ≡ Ext.IO) (eY : Y ≡ B.Adv ⊗₀ AdvL)
+    (N : Machine Ext.Network (X ⊗₀ Y))
+    → N ≡ᴹ (ext-layer ∘ᴷ B.honest-node-spec)
+    → ((CC.id ⊗₁ subst (Machine (B.Adv ⊗₀ AdvL)) (sym eY) CC.id)
+        CC.∘ (subst (λ x → Machine B.IO (x ⊗₀ AdvL)) (sym eX) ext-layer ∘ᴷ B.honest-node-spec))
+      ≅ᴹ N
+  single-honest refl refl N eq =
+    ≅ᴹ-trans (∘-resp-≅ᴹ ⊗₁-id ≅ᴹ-refl)
+    (≅ᴹ-trans ∘-identityˡ-≅ᴹ (≡ᴹ→≅ᴹ (≡ᴹ-sym eq)))
+
+-- Each ext node is its extension layer stacked on its base node, once the
+-- adversary channel is reassembled.  Honest parties by `is-extension`, the
+-- rest by the unit law of `_∘ᴷ_`.
+single-protocol : ∀ p
+  → ((CC.id ⊗₁ unpad p) CC.∘ (extPart p ∘ᴷ base-all-nodes p)) ≅ᴹ Ext.all-nodes p
+single-protocol p with p ∈? Ext.honest-nodes
+... | no  _  = unit-∘ᴷ (Ext.all-nodes p)
+... | yes hp = single-honest (honest-IOF hp) (honest-AdvF hp) (Ext.all-nodes p)
+  (≡ᴹ-trans (Ext.honest-nodes-≡-spec hp)
   (≡ᴹ-trans (≡→≡ᴹ is-extension)
-  (≡ᴹ-trans (subst-≡ᴹ-out (sym ext-Adv≡base-Adv) _)
-            (∘ᴷ-cong-≡ᴹ refl (sym (honest-IOF hp)) refl (sym (honest-AdvF hp))
-                        (≡ᴹ-sym (subst-≡ᴹ (sym (honest-IOF hp)) ext-layer))
-                        (≡ᴹ-sym (subst-≡ᴹ (sym (honest-AdvF hp)) B.honest-node-spec))))))
+            (subst-≡ᴹ-out (sym ext-Adv≡base-Adv⊗AdvL) _)))
 
 module Main where
 
   module _ {A : Channel} (E : Ext.Environment A) where
 
-    -- this is a structure isomorphism
+    -- Reassembling the ext deployment's channels from the base deployment's
+    -- and the extension layers': a structure isomorphism.
     transId : Machine
-      ((⨂ Ext.IOF ⊗₀ (⨂_ {n = Ext.n} (const I))) ⊗₀ (Ext.NAdv ⊗₀ ⨂ Ext.AdvF))
+      ((⨂ Ext.IOF ⊗₀ ⨂ extAdv) ⊗₀ (Ext.NAdv ⊗₀ ⨂ base-AdvF))
       (⨂ Ext.IOF ⊗₀ (Ext.NAdv ⊗₀ ⨂ Ext.AdvF))
-    transId = insert-id-helper Ext.AdvF CC.∘ (⨂-absorb-env-helper Ext.IOF)
+    transId = ⨂-reshape-env-helper {n = Ext.n} {E₂' = λ p → base-AdvF p ⊗₀ extAdv p} {E₂ = Ext.AdvF} unpad
+         CC.∘ ⨂-absorb-env-helper {E = Ext.NAdv} Ext.IOF {E₁ = base-AdvF} {E₂ = extAdv}
 
     transEnv : Base.Environment A
     transEnv = E CC.∘ transId CC.∘ ⨂ᴷ extPart ⊗₁ CC.id
@@ -138,13 +182,12 @@ module Main where
     opaque
       transProtocol : Ext.protocol E ≅ᴹ Base.protocol transEnv
       transProtocol =
-        ≅ᴹ-trans (insert-id Ext.all-nodes Ext.network E)
-        (≅ᴹ-trans (∘-resp-≅ᴹ ≅ᴹ-refl
-                    (∘ᴷ-resp-≅ᴹ (⨂ᴷ-resp-≅ᴹ (λ p → ≡ᴹ→≅ᴹ (≡→≡ᴹ (single-protocol-≡ p))))
-                                ≅ᴹ-refl))
+        ≅ᴹ-trans (⨂-reshape-env Ext.all-nodes (λ p → extPart p ∘ᴷ base-all-nodes p)
+                                unpad single-protocol Ext.network E)
         (≅ᴹ-trans (⨂-absorb-env extPart base-all-nodes Ext.network
-                                (E CC.∘ insert-id-helper Ext.AdvF))
-                  (∘-resp-≅ᴹ assoc²γδ-≅ᴹ ≅ᴹ-refl)))
+                                (E CC.∘ ⨂-reshape-env-helper {n = Ext.n}
+                                          {E₂' = λ p → base-AdvF p ⊗₀ extAdv p} {E₂ = Ext.AdvF} unpad))
+                  (∘-resp-≅ᴹ assoc²γδ-≅ᴹ ≅ᴹ-refl))
 
     transState : Machine.State (Ext.protocol E) → Machine.State (Base.protocol transEnv)
     transState = _≅ᴹ_.to transProtocol
