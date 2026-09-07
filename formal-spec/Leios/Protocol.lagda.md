@@ -58,6 +58,11 @@ Block = RankingBlock ⊎ EndorserBlock
 record LeiosState : Type where
   field V            : VTy
         SD           : StakeDistr
+        {- RBs: the party's base chain, oldest first.  The list grows at the
+           back, so `last RBs` is the tip and `take` keeps a prefix towards
+           genesis.  This is the order `Blockchain.Safety` requires, since it
+           compares chains with `prune k = take (length ∸ k)` under the list
+           prefix order, and the order `Ledger` needs to replay transactions. -}
         RBs          : List RankingBlock
         ToPropose    : List Tx
         {- EBs': EBs together with the slot in which we received them -}
@@ -66,6 +71,8 @@ record LeiosState : Type where
         Vs           : List (List Vote)
         slot         : ℕ
         Upkeep       : List SlotUpkeep
+        {- proposedEB: the EB this party diffused in the current slot, if any -}
+        proposedEB   : Maybe Hash
         Upkeep-Stage : ℙ StageUpkeep
         votingState  : VotingState
         PubKeys      : List PubKey
@@ -73,7 +80,7 @@ record LeiosState : Type where
   -- ideally we'd require a non-empty list, but this also works for now
   currentRB : RankingBlock
   currentRB = maybe (λ x → x) (record { txsOrEbCert = inj₁ [] ; announcedEB = nothing })
-                (head RBs)
+                (L.last RBs)
 
   EBs : List EndorserBlock
   EBs = map proj₂ EBs'
@@ -100,6 +107,9 @@ record LeiosState : Type where
 
   needsUpkeep : SlotUpkeep → Type
   needsUpkeep = _∉ˡ Upkeep
+
+  hasUpkeep : SlotUpkeep → Type
+  hasUpkeep = _∈ˡ Upkeep
 
   needsUpkeep-Stage : StageUpkeep → Set
   needsUpkeep-Stage = _∉ Upkeep-Stage
@@ -134,6 +144,7 @@ initLeiosState V SD pks = record
   ; Vs           = []
   ; slot         = initSlot V
   ; Upkeep       = []
+  ; proposedEB   = nothing
   ; Upkeep-Stage = ∅
   ; votingState  = initVotingState
   ; PubKeys      = pks
