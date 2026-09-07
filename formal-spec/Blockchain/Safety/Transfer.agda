@@ -3,12 +3,12 @@
 open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import Blockchain.Safety
 import Blockchain.IsBlockchain as IsBC
-open import Leios.ChannelCat
+open import CategoricalCrypto.Machine.NAry
+  using (insert-id-helper; ⨂-absorb-env-helper; insert-id; ⨂-absorb-env)
 
 open import CategoricalCrypto hiding (id)
 import CategoricalCrypto as CC
 open import CategoricalCrypto.Ext
-open import CategoricalCrypto.IsoExt
 open import CategoricalCrypto.Machine.Iso
   using (_≅ᴹ_; ≅ᴹ-refl; ≅ᴹ-sym; ≅ᴹ-trans; ∘-resp-≅ᴹ)
 
@@ -27,7 +27,7 @@ open import Relation.Binary using (Poset)
 -- from the ext protocol to the base protocol, only now via the iso's `to` and
 -- `Trace-map` instead of `subst`.  The channel-injectivity facts that the old
 -- `ChannelCat` supplied — and that made it inconsistent, see
--- `Leios.ChannelCat` — are now explicit parameters, discharged by `refl` for a
+-- record — are now explicit parameters, discharged by `refl` for a
 -- uniform deployment.
 module Blockchain.Safety.Transfer
   {BlockExt BlockBase : Type}
@@ -41,7 +41,6 @@ module Blockchain.Safety.Transfer
 
 module B = Spec base-spec
 open IsExtension extension
-open import Leios.ChannelCat.Monoidal using (insert-id; ⨂-absorb-env)
 
 -- `Ext.AdvF p ≡ Ext.Adv`, the ext-side reading of `honest-AdvF`.
 honest-AdvF-ext : ∀ {p} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ Ext.Adv
@@ -116,7 +115,7 @@ module Main where
 
     -- Was: a propositional `_≡ᴹ_`, proven from the `ChannelCat` equations.
     -- The shape of the chain is identical; every step is now a theorem
-    -- (`CategoricalCrypto.IsoExt`, `Leios.ChannelCat.Monoidal`).
+    -- (`CategoricalCrypto.Machine.Iso`, `CategoricalCrypto.Machine.NAry`).
     --
     -- Opaque on purpose.  While `insert-id`/`⨂-absorb-env` were record fields
     -- of a module parameter, `transState` below was a rigid term and

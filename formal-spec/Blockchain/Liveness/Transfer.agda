@@ -3,7 +3,6 @@
 open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import Blockchain.Safety
 import Blockchain.Liveness
-open import Leios.ChannelCat
 
 open import CategoricalCrypto hiding (id)
 

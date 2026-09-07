@@ -11,7 +11,6 @@ open import CategoricalCrypto.Channel.Selection
 
 open import Blockchain.Safety
 import Blockchain.IsBlockchain as IsBC
-open import Leios.ChannelCat
 import Blockchain.Safety.Transfer as Transfer
 import Blockchain.Liveness.Transfer as LTransfer
 
@@ -169,7 +168,7 @@ module _ (IOF AdvF : Participant → Channel)
 
   -- The two channel-level facts about honest nodes that the transfer needs.
   -- They used to be extracted from `honest-Node` using `ChannelCat`'s
-  -- ⊗-injectivity — which is inconsistent (see `Leios.ChannelCat`) — so they
+  -- ⊗-injectivity — which is inconsistent (the old `ChannelCat` record) — so they
   -- are now explicit.  For a uniform deployment (`IOF = const IO`,
   -- `AdvF = const Adv`) both are discharged by `λ _ → refl`.
   module _ (honest-IOF≡  : ∀ {p} → p ∈ honestNodes → IOF p ≡ S.IO)
