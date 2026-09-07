@@ -34,7 +34,6 @@ module Blockchain.Safety.Transfer
   (ext                : Deployment BlockExt)
   (let module Ext = Deployment ext)
   (base-spec          : Spec BlockBase Ext.n Ext.Network)
-  (cc                 : ChannelCat)
   (extension          : IsExtension base-spec Ext.spec)
   (honest-IOF         : ∀ {p} → p ∈ Ext.honest-nodes → Ext.IOF p ≡ Ext.IO)
   (honest-AdvF        : ∀ {p} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ Spec.Adv base-spec)
@@ -42,7 +41,7 @@ module Blockchain.Safety.Transfer
 
 module B = Spec base-spec
 open IsExtension extension
-open ChannelCat cc
+open import Leios.ChannelCat.Monoidal using (insert-id; ⨂-absorb-env)
 
 -- `Ext.AdvF p ≡ Ext.Adv`, the ext-side reading of `honest-AdvF`.
 honest-AdvF-ext : ∀ {p} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ Ext.Adv
@@ -116,18 +115,25 @@ module Main where
     transEnv = E CC.∘ transId CC.∘ ⨂ᴷ extPart ⊗₁ CC.id
 
     -- Was: a propositional `_≡ᴹ_`, proven from the `ChannelCat` equations.
-    -- The shape of the chain is identical; `⨂ᴷ-cong` and `assoc²γδ` are now
-    -- theorems (`CategoricalCrypto.IsoExt`), and only `insert-id` /
-    -- `⨂-absorb-env` remain assumptions.
-    transProtocol : Ext.protocol E ≅ᴹ Base.protocol transEnv
-    transProtocol =
-      ≅ᴹ-trans (insert-id Ext.all-nodes Ext.network E)
-      (≅ᴹ-trans (∘-resp-≅ᴹ ≅ᴹ-refl
-                  (∘ᴷ-resp-≅ᴹ (⨂ᴷ-resp-≅ᴹ (λ p → ≡ᴹ→≅ᴹ (≡→≡ᴹ (single-protocol-≡ p))))
-                              ≅ᴹ-refl))
-      (≅ᴹ-trans (⨂-absorb-env extPart base-all-nodes Ext.network
-                              (E CC.∘ insert-id-helper Ext.AdvF))
-                (∘-resp-≅ᴹ assoc²γδ-≅ᴹ ≅ᴹ-refl)))
+    -- The shape of the chain is identical; every step is now a theorem
+    -- (`CategoricalCrypto.IsoExt`, `Leios.ChannelCat.Monoidal`).
+    --
+    -- Opaque on purpose.  While `insert-id`/`⨂-absorb-env` were record fields
+    -- of a module parameter, `transState` below was a rigid term and
+    -- `transState E ?s ≟ transState E s` solved by first-order unification;
+    -- as theorems they unfold, and the unifier then has to compare two
+    -- normal forms of the whole isomorphism instead.  Nothing downstream needs
+    -- to see inside.
+    opaque
+      transProtocol : Ext.protocol E ≅ᴹ Base.protocol transEnv
+      transProtocol =
+        ≅ᴹ-trans (insert-id Ext.all-nodes Ext.network E)
+        (≅ᴹ-trans (∘-resp-≅ᴹ ≅ᴹ-refl
+                    (∘ᴷ-resp-≅ᴹ (⨂ᴷ-resp-≅ᴹ (λ p → ≡ᴹ→≅ᴹ (≡→≡ᴹ (single-protocol-≡ p))))
+                                ≅ᴹ-refl))
+        (≅ᴹ-trans (⨂-absorb-env extPart base-all-nodes Ext.network
+                                (E CC.∘ insert-id-helper Ext.AdvF))
+                  (∘-resp-≅ᴹ assoc²γδ-≅ᴹ ≅ᴹ-refl)))
 
     transState : Machine.State (Ext.protocol E) → Machine.State (Base.protocol transEnv)
     transState = _≅ᴹ_.to transProtocol

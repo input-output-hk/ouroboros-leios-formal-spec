@@ -73,12 +73,12 @@ absorb-regroup = TotalFunctionMachine' ⇒-solver ⇒-solver
   (CC.id ⊗₁ CC.id ⊗₁ ⨂-zip {n} {E₁} {E₂}) ∘ absorb-regroup
 
 -- ============================================================================
--- What actually remains as an assumption.
+-- Nothing remains as an assumption.
 --
--- The old record had ~30 fields; the ∘/⊗ laws are now theorems
+-- The old record had ~30 fields; the ∘/⊗ laws are theorems
 -- (`CategoricalCrypto.Machine.Iso`, `CategoricalCrypto.IsoExt`), the structural
--- machines are definitions (above), and the two channel-injectivity fields —
--- the inconsistent ones — become explicit parameters of the transfer, where a
+-- machines are the definitions above, and the two channel-injectivity fields —
+-- the inconsistent ones — became explicit parameters of the transfer, where a
 -- uniform deployment discharges them with `refl`.
 --
 -- The unit law `A ⊗₀ I ≡ A` is gone too.  It is unprovable in `--safe` Agda
@@ -87,29 +87,9 @@ absorb-regroup = TotalFunctionMachine' ⇒-solver ⇒-solver
 -- the right unitor `ρ⇒` above instead, so the channels it used to reconcile
 -- are now definitionally equal and `ext-Adv≡base-Adv` is `refl`.
 --
--- `⨂-absorb-env-helper` is gone as well.  It was never a proposition, only a
--- machine, so it just had to be built: a four-atom permutation from
--- `⇒-solver`, then the n-ary interchange `⨂-zip` above.
---
--- What is left is the genuine content, and it is genuinely two laws: rewiring
--- a ⨂ of per-node machines past the environment really does change the state
--- space, so an equation is needed, not a definition.  Both are stated at
--- `_≅ᴹ_` (a bisimulation) rather than propositional machine equality, so
--- unlike their predecessors they are, at least, satisfiable.
+-- The last two fields, `insert-id` and `⨂-absorb-env` — rewiring a ⨂ of
+-- per-node machines past the environment, stated at `_≅ᴹ_` — are theorems in
+-- `Leios.ChannelCat.Monoidal`, derived from nine binary laws that are all
+-- proved in the modules under `Leios.ChannelCat.*`.  The record that used to
+-- carry them was deleted on 2026-09-07.
 -- ============================================================================
-
-record ChannelCat : Type₁ where
-  field
-    insert-id : ∀ {n} {E₁} {B C E₂ : Fin n → Channel}
-      → (f : (k : Fin n) → Machine (B k) (C k ⊗₀ E₂ k)) (g : Machine A (⨂ B ⊗₀ E₁))
-      → (α : Machine (⨂ C ⊗₀ E₁ ⊗₀ ⨂ E₂) D)
-      → (α CC.∘ (⨂ᴷ f ∘ᴷ g))
-        ≅ᴹ ((α CC.∘ insert-id-helper E₂) CC.∘ (⨂ᴷ (λ k → idᴷ ∘ᴷ f k) ∘ᴷ g))
-
-    ⨂-absorb-env : ∀ {n} {B C D E₁ E₂ : Fin n → Channel} {F : Channel}
-      (f : (k : Fin n) → Machine (C k) (D k ⊗₀ E₂ k))
-      (g : (k : Fin n) → Machine (B k) (C k ⊗₀ E₁ k))
-      (h : Machine A (⨂ B ⊗₀ E))
-      (α : Machine (⨂ D ⊗₀ E ⊗₀ ⨂ (λ k → E₁ k ⊗₀ E₂ k)) F)
-      → (α CC.∘ (⨂ᴷ (λ k → f k ∘ᴷ g k) ∘ᴷ h))
-        ≅ᴹ ((α CC.∘ (⨂-absorb-env-helper D) CC.∘ (⨂ᴷ f ⊗₁ CC.id)) CC.∘ (⨂ᴷ g ∘ᴷ h))

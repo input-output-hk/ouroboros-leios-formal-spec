@@ -1,28 +1,34 @@
 {-# OPTIONS --safe #-}
 
 -- ============================================================================
--- Discharging `Leios.ChannelCat.ChannelCat` from monoidal laws.
+-- The two rewiring laws of `Leios.ChannelCat`, derived from monoidal laws.
 --
--- `Derived.channelCat` builds the whole record.  Both remaining fields —
--- `insert-id` and `⨂-absorb-env`, equations about rewiring a ⨂ of per-node
--- machines past the environment — are DERIVED here from nine assumptions, none
+-- `insert-id` and `⨂-absorb-env` — equations about rewiring a ⨂ of per-node
+-- machines past the environment, the last two fields of the `ChannelCat`
+-- record that the transfer theorems used to assume — are derived here, WITHOUT
+-- ASSUMPTIONS, from nine binary laws, none
 -- of which mentions `⨂`, the node count, per-node channel families, the
--- environment, or anything else specific to a deployment.  All nine are binary
--- and fully abstract, so they belong in the library rather than here.
+-- environment, or anything else specific to a deployment; and all nine are now
+-- theorems:
 --
--- `MonoidalLaws` is the genuinely categorical content: `_⊗₁_` is a functor for
--- the trace composition `_∘_`.  Neither field is provable today —
--- `Machine.Iso` gives the CATEGORY laws at `_≅ᴹ_` and nothing monoidal — and
--- `⊗₁-interchange` is the hard one, comparable to `∘-assoc-≅ᴹ` because `_∘_`
--- traces out the shared channel.
+--   `⊗₁-interchange` — `_⊗₁_` is a functor for `_∘_`, the genuinely
+--     categorical part (`Leios.ChannelCat.Interchange`);
+--   `⊗₁-id`, `ρ-∘ᴷ-fwd`, `ρ-idᴷ`, `λ-zip-idᴷ` — forwarders are closed under
+--     `_⊗₁_`, `modifyStepRel` and `_∘_`, so an equation between two composites
+--     of them is a finite message-level computation (`Leios.ChannelCat.Fwd`);
+--   `∘ᴷ-fwd-natural`, `⊗ᴷ-fwd-natural` — the shuffles inside `_∘ᴷ_`/`_⊗ᴷ_`
+--     are natural, because a forwarder is a reindexed identity and a
+--     relabelling that fixes the traced channel slides out of `_∘_`
+--     (`Leios.ChannelCat.Naturality`, on `Slide`, `Collapse`, `FwdId`,
+--     `PairAssoc`);
+--   `∘ᴷ-assoc`, `⊗ᴷ-∘ᴷ` — `_∘ᴷ_` associates and interchanges with `_⊗ᴷ_`,
+--     by flattening with `⊗₁-interchange`, re-bracketing, carrying the abstract
+--     machines across the shuffles with the naturality laws, and closing the
+--     forwarder-only heads pointwise (`Leios.ChannelCat.Kleisli`).
 --
--- `KleisliLaws` says `_∘ᴷ_` associates and that `_⊗ᴷ_` and `_∘ᴷ_` interchange.
---
--- `Forwarders` holds facts about the stateless shuffles that `_∘ᴷ_` and
--- `_⊗ᴷ_` are built from: two naturality laws, and three bare identities
--- between composites of stateless machines with no machine variables at all.
--- Those three are a strictly easier class — once `_⊗₀_` is unfolded they are
--- finite message-level computations.
+-- The `ChannelCat` record itself, and the `Forwarders`/`KleisliLaws` records
+-- that used to hold the last four laws, are gone.  `Derived` is kept as a
+-- module name so the proof reads as before.
 --
 -- Elaboration note.  Channel families must be PINNED wherever `⨂` appears in
 -- an inferred position (hence `strip`, and the explicit `{n} {E₁} {E₂}` on
@@ -41,25 +47,25 @@ open import CategoricalCrypto.IsoExt
 open import CategoricalCrypto.Machine.Iso
   using (_≅ᴹ_; ≅ᴹ-refl; ≅ᴹ-sym; ≅ᴹ-trans; ∘-resp-≅ᴹ; ∘-assoc-≅ᴹ; ∘-identityˡ-≅ᴹ)
 open import Leios.ChannelCat
-  using (ChannelCat; ρ⇒; λ⇒; insert-id-helper; ⨂-zip; ⨂-absorb-env-helper;
+  using (ρ⇒; λ⇒; insert-id-helper; ⨂-zip; ⨂-absorb-env-helper;
          absorb-regroup; mid4)
+open import Leios.ChannelCat.Fwd
+  using (∘ᴷ-fwd; ⊗ᴷ-fwd; ⊗₁-id; ρ-∘ᴷ-fwd; ρ-idᴷ; λ-zip-idᴷ)
+open import Leios.ChannelCat.Interchange using (⊗₁-interchange)
+open import Leios.ChannelCat.Naturality using (∘ᴷ-fwd-natural; ⊗ᴷ-fwd-natural)
+open import Leios.ChannelCat.Kleisli using (∘ᴷ-assoc; ⊗ᴷ-∘ᴷ)
 open import Tactic.Defaults
 
 module Leios.ChannelCat.Monoidal where
 
 -- ----------------------------------------------------------------------------
--- The shuffles inside `_∘ᴷ_` and `_⊗ᴷ_`, named.  `⇒-solver` is deterministic,
--- so re-running it at the same type yields the same term and the `unfold`
--- lemmas below hold by `refl`.  Naming them is what makes the whole derivation
--- possible: every operator in `ChannelCat`'s fields becomes a composite of
--- `_∘_`, `_⊗₁_` and these two.
+-- The shuffles inside `_∘ᴷ_` and `_⊗ᴷ_` are `∘ᴷ-fwd` and `⊗ᴷ-fwd`, defined
+-- (and shown to be forwarders) in `Leios.ChannelCat.Fwd` and re-exported
+-- above.  `⇒-solver` is deterministic, so re-running it at the same type
+-- yields the same term and the `unfold` lemmas below hold by `refl`.  Naming
+-- them is what makes the whole derivation possible: every operator in
+-- `ChannelCat`'s fields becomes a composite of `_∘_`, `_⊗₁_` and these two.
 -- ----------------------------------------------------------------------------
-
-∘ᴷ-fwd : ∀ {C E₁ E₂} → Machine ((C ⊗₀ E₂) ⊗₀ E₁) (C ⊗₀ (E₁ ⊗₀ E₂))
-∘ᴷ-fwd = TotalFunctionMachine' ⇒-solver ⇒-solver
-
-⊗ᴷ-fwd : ∀ {B₁ E₁ B₂ E₂} → Machine ((B₁ ⊗₀ E₁) ⊗₀ (B₂ ⊗₀ E₂)) ((B₁ ⊗₀ B₂) ⊗₀ (E₁ ⊗₀ E₂))
-⊗ᴷ-fwd = TotalFunctionMachine' ⇒-solver ⇒-solver
 
 ∘ᴷ-unfold : ∀ {A B C E₁ E₂} (M₂ : Machine B (C ⊗₀ E₂)) (M₁ : Machine A (B ⊗₀ E₁))
           → (M₂ ∘ᴷ M₁) ≡ (∘ᴷ-fwd CC.∘ ((M₂ ⊗ʳ E₁) CC.∘ M₁))
@@ -77,63 +83,10 @@ strip : ∀ {n} (E : Fin n → Channel) → Machine (⨂ (λ k → E k ⊗₀ I)
 strip {n} E = ⨂₁ {n = n} {A = λ k → E k ⊗₀ I} {B = E} (λ _ → ρ⇒)
 
 -- ----------------------------------------------------------------------------
--- The assumptions.
+-- The derivation.
 -- ----------------------------------------------------------------------------
 
--- `_⊗₁_` is a functor for `_∘_`.  This is the hard, genuinely categorical part.
-record MonoidalLaws : Type₁ where
-  field
-    ⊗₁-interchange : ∀ {A₁ B₁ C₁ A₂ B₂ C₂}
-      (f : Machine A₁ B₁) (g : Machine B₁ C₁)
-      (h : Machine A₂ B₂) (k : Machine B₂ C₂)
-      → ((g CC.∘ f) ⊗₁ (k CC.∘ h)) ≅ᴹ ((g ⊗₁ k) CC.∘ (f ⊗₁ h))
-
-    ⊗₁-id : ∀ {A B} → (CC.id {A} ⊗₁ CC.id {B}) ≅ᴹ CC.id {A ⊗₀ B}
-
--- Facts about the stateless shuffles.
-record Forwarders : Type₁ where
-  field
-    -- Naturality of the two shuffles.
-    ∘ᴷ-fwd-natural : ∀ {C C' E₁ E₁' E₂ E₂'}
-      (c : Machine C C') (u₁ : Machine E₁ E₁') (u₂ : Machine E₂ E₂')
-      → ((c ⊗₁ (u₁ ⊗₁ u₂)) CC.∘ ∘ᴷ-fwd) ≅ᴹ (∘ᴷ-fwd CC.∘ ((c ⊗₁ u₂) ⊗₁ u₁))
-
-    ⊗ᴷ-fwd-natural : ∀ {B₁ B₁' E₁ E₁' B₂ B₂' E₂ E₂'}
-      (b₁ : Machine B₁ B₁') (u₁ : Machine E₁ E₁')
-      (b₂ : Machine B₂ B₂') (u₂ : Machine E₂ E₂')
-      → (((b₁ ⊗₁ b₂) ⊗₁ (u₁ ⊗₁ u₂)) CC.∘ ⊗ᴷ-fwd)
-        ≅ᴹ (⊗ᴷ-fwd CC.∘ ((b₁ ⊗₁ u₁) ⊗₁ (b₂ ⊗₁ u₂)))
-
-    -- Two bare identities between stateless composites.  No machine variables.
-    ρ-∘ᴷ-fwd : ∀ {C E₁}
-      → ((CC.id {C} ⊗₁ ρ⇒ {E₁}) CC.∘ ∘ᴷ-fwd {C} {E₁} {I}) ≅ᴹ (ρ⇒ ⊗₁ CC.id {E₁})
-
-    ρ-idᴷ : ∀ {C} → (ρ⇒ CC.∘ idᴷ {C}) ≅ᴹ CC.id {C}
-
-    -- Base case of the ⨂-zip induction: also a bare stateless identity.
-    λ-zip-idᴷ : ((CC.id {I} ⊗₁ λ⇒ {I}) CC.∘ (idᴷ {I} ∘ᴷ idᴷ {I})) ≅ᴹ idᴷ {I}
-
--- The two Kleisli laws.  Both are binary and fully abstract: no ⨂, no
--- environment threading, no per-node families.  They say that `_∘ᴷ_`
--- associates (with `absorb-regroup` as reassociator) and that `_⊗ᴷ_` and
--- `_∘ᴷ_` interchange (with `mid4` as the shuffle).
-record KleisliLaws : Type₁ where
-  field
-    ∘ᴷ-assoc : ∀ {A B C D E E₁ E₂}
-      (F : Machine C (D ⊗₀ E₂)) (G : Machine B (C ⊗₀ E₁)) (h : Machine A (B ⊗₀ E))
-      → ((absorb-regroup CC.∘ (F ⊗₁ CC.id)) CC.∘ (G ∘ᴷ h)) ≅ᴹ ((F ∘ᴷ G) ∘ᴷ h)
-
-    ⊗ᴷ-∘ᴷ : ∀ {A₁ B₁ C₁ E₁ᵃ E₁ᵇ A₂ B₂ C₂ E₂ᵃ E₂ᵇ}
-      (a : Machine B₁ (C₁ ⊗₀ E₁ᵇ)) (b : Machine A₁ (B₁ ⊗₀ E₁ᵃ))
-      (c : Machine B₂ (C₂ ⊗₀ E₂ᵇ)) (d : Machine A₂ (B₂ ⊗₀ E₂ᵃ))
-      → ((CC.id ⊗₁ mid4) CC.∘ ((a ⊗ᴷ c) ∘ᴷ (b ⊗ᴷ d))) ≅ᴹ ((a ∘ᴷ b) ⊗ᴷ (c ∘ᴷ d))
-
--- ----------------------------------------------------------------------------
-
-module Derived (ml : MonoidalLaws) (fw : Forwarders) (kl : KleisliLaws) where
-  open MonoidalLaws ml
-  open Forwarders fw
-  open KleisliLaws kl
+module Derived where
 
   -- Inserting a unit with `idᴷ ∘ᴷ _` and stripping it again is a no-op.
   unit-∘ᴷ : ∀ {A C E₁} (h : Machine A (C ⊗₀ E₁))
@@ -264,13 +217,5 @@ module Derived (ml : MonoidalLaws) (fw : Forwarders) (kl : KleisliLaws) where
                   (slide-∘ᴷ (⨂ᴷ (λ k → f k ∘ᴷ g k)) (⨂ᴷ f ∘ᴷ ⨂ᴷ g)
                             (⨂-zip {n} {E₁} {E₂}) h (⨂-functorial f g))))
 
-  -- --------------------------------------------------------------------------
-  -- Both fields together: `ChannelCat` itself, with no assumptions left beyond
-  -- `MonoidalLaws`, `Forwarders` and `KleisliLaws`.
-  -- --------------------------------------------------------------------------
-
-  channelCat : ChannelCat
-  channelCat = record
-    { insert-id    = λ f g α   → insert-id f g α
-    ; ⨂-absorb-env = λ f g h α → ⨂-absorb-env f g h α
-    }
+-- The two laws the transfer theorems use.
+open Derived public using (insert-id; ⨂-absorb-env)

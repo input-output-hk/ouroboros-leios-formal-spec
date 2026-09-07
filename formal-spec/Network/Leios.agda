@@ -25,7 +25,6 @@ module Network.Leios
   (HashCorrect-irrel : ∀ rb eb → Irrelevant (HashCorrectB rb eb))
   (hash-unique : (rb : RankingBlock) → (eb₁ eb₂ : Maybe EndorserBlock)
     → HashCorrectB rb eb₁ → HashCorrectB rb eb₂ → eb₁ ≡ eb₂)
-  (cc : ChannelCat) (let open ChannelCat cc)
     where
 
 open import Leios.Linear ⋯ params
@@ -179,7 +178,7 @@ module _ (IOF AdvF : Participant → Channel)
 
     private
       module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-        safetyS base-spec cc extension honest-IOF≡ honest-AdvF≡
+        safetyS base-spec extension honest-IOF≡ honest-AdvF≡
       module TrM = Tr.Main
 
     leiosSafety : (∀ {A} (E : Deployment.Environment safetyS A) → TrM.ChainLemma-ty E)
@@ -188,7 +187,7 @@ module _ (IOF AdvF : Participant → Channel)
 
     private
       module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-        safetyS base-spec cc extension honest-IOF≡ honest-AdvF≡ (λ _ → refl) (λ _ → refl)
+        safetyS base-spec extension honest-IOF≡ honest-AdvF≡ (λ _ → refl) (λ _ → refl)
       module LTrM = LTr.Main
 
     leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
