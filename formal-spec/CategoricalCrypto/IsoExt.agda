@@ -6,8 +6,7 @@
 --
 -- `Machine.Iso` proves the `_∘_` congruence (`∘-resp-≅ᴹ`) and the ∘-laws, but
 -- states nothing for `_⊗₁_`, `_∘ᴷ_` or `⨂ᴷ` — which is what the safety /
--- liveness transfer needs in order to rebuild `transProtocol` without the
--- (inconsistent, see `Leios.ChannelCat`) `ChannelCat` postulates.
+-- liveness transfer needs in order to rebuild `transProtocol`
 --
 -- `×-map`/`CompRel-map` mirror the corresponding PRIVATE helpers of
 -- `Machine.Iso`.  `CompRel-map` is fully generic in the message indices
