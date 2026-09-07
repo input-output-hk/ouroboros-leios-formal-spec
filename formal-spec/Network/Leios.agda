@@ -111,6 +111,11 @@ ext-spec = (CC.id ⊗₁ (ρ⇒ ∘ ρ⇒))
 module _ (IOF AdvF : Participant → Channel)
   (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
   (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
+  -- The honest nodes' channel, component by component; see `Deployment`.
+  -- For a uniform deployment (`IOF = const IO`, `AdvF = const _`) both are
+  -- `λ _ → refl`.
+  (honest-IOF  : {p : Participant} → p ∈ honestNodes → IOF p ≡ IO)
+  (honest-AdvF : {p : Participant} → p ∈ honestNodes → AdvF p ≡ (I ⊗₀ I ⊗₀ BaseAdv))
   (isConstrained-Leios : IsConstrained Leios1 (IsBC.bciQueryType Participant {Block = LeiosBlock}))
   (isPure-Leios        : IsPure isConstrained-Leios)
   (IsBlockchain-base : IsBC.IsBlockchain Participant RankingBlock spec)
@@ -144,6 +149,8 @@ module _ (IOF AdvF : Participant → Channel)
     ; all-nodes           = nodesF
     ; honest-nodes        = honestNodes
     ; honest-nodes-≡-spec = honest-Node
+    ; honest-IOF          = honest-IOF
+    ; honest-AdvF         = honest-AdvF
     ; network             = DD.Network
     }
 
@@ -166,35 +173,26 @@ module _ (IOF AdvF : Participant → Channel)
     ; getBaseBlock-inj = LeiosBlock-Injective
     }
 
-  -- The two channel-level facts about honest nodes that the transfer needs.
-  -- They used to be extracted from `honest-Node` using `ChannelCat`'s
-  -- ⊗-injectivity — which is inconsistent (the old `ChannelCat` record) — so they
-  -- are now explicit.  For a uniform deployment (`IOF = const IO`,
-  -- `AdvF = const Adv`) both are discharged by `λ _ → refl`.
-  module _ (honest-IOF≡  : ∀ {p} → p ∈ honestNodes → IOF p ≡ S.IO)
-           (honest-AdvF≡ : ∀ {p} → p ∈ honestNodes → AdvF p ≡ Spec.Adv base-spec)
-           where
+  private
+    module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
+      safetyS base-spec extension
+    module TrM = Tr.Main
 
-    private
-      module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-        safetyS base-spec extension honest-IOF≡ honest-AdvF≡
-      module TrM = Tr.Main
+  leiosSafety : (∀ {A} (E : Deployment.Environment safetyS A) → TrM.ChainLemma-ty E)
+              → Deployment.safety Tr.base k → S.safety k
+  leiosSafety = TrM.transfer k
 
-    leiosSafety : (∀ {A} (E : Deployment.Environment safetyS A) → TrM.ChainLemma-ty E)
-                → Deployment.safety Tr.base k → S.safety k
-    leiosSafety = TrM.transfer k
+  private
+    module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
+      safetyS base-spec extension (λ _ → refl) (λ _ → refl)
+    module LTrM = LTr.Main
 
-    private
-      module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-        safetyS base-spec extension honest-IOF≡ honest-AdvF≡ (λ _ → refl) (λ _ → refl)
-      module LTrM = LTr.Main
+  leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+           → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
+           → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
+  leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
 
-    leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-             → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-             → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
-    leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
-
-    leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-             → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-             → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
-    leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL
+  leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
+           → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
+           → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
+  leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL

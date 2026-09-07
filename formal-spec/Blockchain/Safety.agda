@@ -31,6 +31,13 @@ record Deployment (Block : Type) : Type₂ where
     all-nodes           : (p : Fin n) → Machine Network (IOF p ⊗₀ AdvF p)
     honest-nodes        : ℙ (Fin n)
     honest-nodes-≡-spec : ∀ {p} → p ∈ honest-nodes → all-nodes p ≡ᴹ honest-node-spec
+    -- The channel of an honest node, component by component.  These are not
+    -- consequences of `honest-nodes-≡-spec`: that equates the tensors
+    -- `IOF p ⊗₀ AdvF p` and `IO ⊗₀ Adv`, and `_⊗₀_` — a sum of types — is not
+    -- injective, so the factors have to be given.  For a uniform deployment
+    -- (`IOF = const IO`, `AdvF = const Adv`) both are `λ _ → refl`.
+    honest-IOF          : ∀ {p} → p ∈ honest-nodes → IOF p ≡ IO
+    honest-AdvF         : ∀ {p} → p ∈ honest-nodes → AdvF p ≡ Adv
     network             : Machine I (n ⨂ⁿ Network ⊗₀ NAdv)
 
   honest-nodes-blockchain : ∀ {p} → p ∈ honest-nodes → IsBlockchain Block (all-nodes p)

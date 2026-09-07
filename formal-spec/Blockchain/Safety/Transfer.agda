@@ -25,26 +25,31 @@ open import Relation.Binary using (Poset)
 -- bisimulation) rather than propositional machine equality.  Structurally the
 -- proof is unchanged: `transState`/`transTrace` still push a state and a run
 -- from the ext protocol to the base protocol, only now via the iso's `to` and
--- `Trace-map` instead of `subst`.  The channel-injectivity facts that the old
--- `ChannelCat` supplied — and that made it inconsistent, see
--- record — are now explicit parameters, discharged by `refl` for a
--- uniform deployment.
+-- `Trace-map` instead of `subst`.  The component-wise channel facts about
+-- honest nodes that the old `ChannelCat` extracted by ⊗-injectivity — which is
+-- what made it inconsistent — are fields of `Deployment` (`honest-IOF`,
+-- `honest-AdvF`).
 module Blockchain.Safety.Transfer
   {BlockExt BlockBase : Type}
   (ext                : Deployment BlockExt)
   (let module Ext = Deployment ext)
   (base-spec          : Spec BlockBase Ext.n Ext.Network)
   (extension          : IsExtension base-spec Ext.spec)
-  (honest-IOF         : ∀ {p} → p ∈ Ext.honest-nodes → Ext.IOF p ≡ Ext.IO)
-  (honest-AdvF        : ∀ {p} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ Spec.Adv base-spec)
   where
 
 module B = Spec base-spec
 open IsExtension extension
 
--- `Ext.AdvF p ≡ Ext.Adv`, the ext-side reading of `honest-AdvF`.
+-- The honest nodes' channels, from the deployment; `honest-AdvF` is the
+-- base-side reading, through `ext-Adv≡base-Adv`.
+honest-IOF : ∀ {p} → p ∈ Ext.honest-nodes → Ext.IOF p ≡ Ext.IO
+honest-IOF = Ext.honest-IOF
+
 honest-AdvF-ext : ∀ {p} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ Ext.Adv
-honest-AdvF-ext hp = trans (honest-AdvF hp) (sym ext-Adv≡base-Adv)
+honest-AdvF-ext = Ext.honest-AdvF
+
+honest-AdvF : ∀ {p} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ B.Adv
+honest-AdvF hp = trans (Ext.honest-AdvF hp) ext-Adv≡base-Adv
 
 base-IOF : Fin Ext.n → Channel
 base-IOF p = case p ∈? Ext.honest-nodes of λ where
@@ -67,6 +72,11 @@ base-honest-≡-spec {p} hp with p ∈? Ext.honest-nodes
 ... | yes hp' = subst-≡ᴹ (sym (honest-AdvF hp')) B.honest-node-spec
 ... | no ¬hp  = contradiction hp ¬hp
 
+base-honest-IOF : {p : Fin Ext.n} → p ∈ Ext.honest-nodes → base-IOF p ≡ B.IO
+base-honest-IOF {p} hp with p ∈? Ext.honest-nodes
+... | yes _   = refl
+... | no  ¬hp = contradiction hp ¬hp
+
 extPart : (p : Fin Ext.n) → Machine (base-IOF p) (Ext.IOF p ⊗₀ I)
 extPart p with p ∈? Ext.honest-nodes
 ... | yes hp = subst (λ x → Machine B.IO (x ⊗₀ I)) (sym (honest-IOF hp)) ext-layer
@@ -83,6 +93,8 @@ base = record
   ; all-nodes           = base-all-nodes
   ; honest-nodes        = Ext.honest-nodes
   ; honest-nodes-≡-spec = base-honest-≡-spec
+  ; honest-IOF          = base-honest-IOF
+  ; honest-AdvF         = honest-AdvF
   ; network             = Ext.network
   }
 
