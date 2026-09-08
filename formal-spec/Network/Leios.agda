@@ -81,7 +81,7 @@ NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 -- plainly rather than lifted into the Kleisli combinators, which would pad the
 -- adversary channel with units.  The one reshuffle, `⊗-assoc⃖`, moves the
 -- base functionality's adversary channel out to the Kleisli slot.
-Leios1 : Machine DD.M (IO ⊗₀ (BaseAdv ⊗₀ Adv))
+Leios1 : Machine DD.M (IO ⊗₀ BaseAdv ⊗₀ Adv)
 Leios1 = LinearLeios ∘ᴷ (⊗-assoc⃖ CC.∘ (Shim ⊗₁ B.m) CC.∘ NetTranslate)
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
@@ -171,7 +171,7 @@ module _ (IOF AdvF : Participant → Channel)
   -- For a uniform deployment (`IOF = const IO`, `AdvF = const _`) both are
   -- `λ _ → refl`.
   (honest-IOF  : {p : Participant} → p ∈ honestNodes → IOF p ≡ IO)
-  (honest-AdvF : {p : Participant} → p ∈ honestNodes → AdvF p ≡ (BaseAdv ⊗₀ Adv))
+  (honest-AdvF : {p : Participant} → p ∈ honestNodes → AdvF p ≡ BaseAdv ⊗₀ Adv)
   (isConstrained-Leios : IsConstrained Leios1 (IsBC.bciQueryType Participant {Block = LeiosBlock}))
   (isPure-Leios        : IsPure isConstrained-Leios)
   (IsBlockchain-base : IsBC.IsBlockchain Participant RankingBlock spec)
