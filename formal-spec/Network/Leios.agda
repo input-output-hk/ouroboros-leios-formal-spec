@@ -8,6 +8,10 @@ open import Leios.Config
 open import CategoricalCrypto hiding (id)
 import CategoricalCrypto as CC
 open import CategoricalCrypto.Channel.Selection
+open import CategoricalCrypto.Machine.Iso
+  using (_≅ᴹ_; ≅ᴹ-refl; ≅ᴹ-sym; ≅ᴹ-trans; ∘-resp-≅ᴹ; ⊗₁-resp-≅ᴹ;
+         ∘-identityˡ-≅ᴹ; ∘-identityʳ-≅ᴹ; ∘-assoc-≅ᴹ)
+open import CategoricalCrypto.Machine.Monoidal using (⊗₁-id; ⊗₁-interchange; ⊗-assoc⃖-natural)
 
 open import Blockchain.Safety
 import Blockchain.IsBlockchain as IsBC
@@ -71,10 +75,14 @@ NetTranslate : Machine DD.M (Network ⊗₀ BaseNetwork)
 NetTranslate .Machine.State   = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
--- The adversary channel is the base functionality's, `I ⊗₀ I ⊗₀ BaseAdv`, next
--- to `LinearLeios`'s own, `Adv`; that split is what `IsExtension` asks for.
-Leios1 : Machine DD.M (IO ⊗₀ ((I ⊗₀ I ⊗₀ BaseAdv) ⊗₀ Adv))
-Leios1 = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
+-- The adversary channel is the base functionality's, `BaseAdv`, next to
+-- `LinearLeios`'s own, `Adv`; that split is what `IsExtension` asks for.
+-- `Shim` and `NetTranslate` have no adversary channel, so they are composed
+-- plainly rather than lifted into the Kleisli combinators, which would pad the
+-- adversary channel with units.  The one reshuffle, `⊗-assoc⃖`, moves the
+-- base functionality's adversary channel out to the Kleisli slot.
+Leios1 : Machine DD.M (IO ⊗₀ (BaseAdv ⊗₀ Adv))
+Leios1 = LinearLeios ∘ᴷ (⊗-assoc⃖ CC.∘ (Shim ⊗₁ B.m) CC.∘ NetTranslate)
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
 record LeiosBlock : Type where
@@ -94,15 +102,67 @@ LeiosBlock-Injective
   subst (λ (eb , correct) → _ ≡ record { rb = rb ; eb = eb ; correct = correct })
     (hash-unique' rb eb₁ eb₂ correct₁ correct₂) refl
 
-spec : Machine DD.M ((Network ⊗₀ BaseIO) ⊗₀ (I ⊗₀ I ⊗₀ BaseAdv))
-spec = (idᴷ ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
+-- The base functionality as seen through the multiplexed network.
+spec : Machine DD.M ((Network ⊗₀ BaseIO) ⊗₀ BaseAdv)
+spec = ⊗-assoc⃖ CC.∘ (CC.id ⊗₁ B.m) CC.∘ NetTranslate
 
--- The extension layer, with `Adv` as its adversary channel.  The unit clutter
--- `I ⊗₀ I` that the two lifted machines leave next to it is collapsed by left
--- unitors rather than `subst`ed away along `I ⊗₀ A ≡ A`, which is unprovable.
+-- The extension layer, with `Adv` as its adversary channel.
 ext-spec : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ Adv)
-ext-spec = (CC.id ⊗₁ (λ⇒ ∘ (λ⇒ ⊗₁ CC.id)))
-         ∘ (LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ))
+ext-spec = LinearLeios CC.∘ (Shim ⊗₁ CC.id)
+
+-- `Leios1` is the extension layer stacked on the base spec.  `_∘ᴷ_` unfolds
+-- to `∘ᴷ-fwd ∘ ((M₂ ⊗₁ id) ∘ M₁)`, so once `⊗₁-interchange` has split
+-- `ext-spec ⊗₁ id` into `LinearLeios ⊗₁ id` over `(Shim ⊗₁ id) ⊗₁ id`, the
+-- shim is moved through the associator (`⊗-assoc⃖-natural`) and merged with
+-- `id ⊗₁ B.m` (interchange again, then the unit laws).
+is-extension-eq : Leios1 ≅ᴹ ext-spec ∘ᴷ spec
+is-extension-eq = ∘-resp-≅ᴹ ≅ᴹ-refl (≅ᴹ-sym outer)
+  where
+    S₁ : Machine (Network ⊗₀ BaseIO) (FFD ⊗₀ BaseIO)
+    S₁ = Shim ⊗₁ CC.id
+
+    -- The shim on the three-fold channel, on either side of the associator.
+    S₃ˡ : Machine ((Network ⊗₀ BaseIO) ⊗₀ BaseAdv) ((FFD ⊗₀ BaseIO) ⊗₀ BaseAdv)
+    S₃ˡ = S₁ ⊗₁ CC.id
+
+    S₃ʳ : Machine (Network ⊗₀ (BaseIO ⊗₀ BaseAdv)) (FFD ⊗₀ (BaseIO ⊗₀ BaseAdv))
+    S₃ʳ = Shim ⊗₁ (CC.id ⊗₁ CC.id)
+
+    Bm : Machine (Network ⊗₀ BaseNetwork) (Network ⊗₀ (BaseIO ⊗₀ BaseAdv))
+    Bm = CC.id ⊗₁ B.m
+
+    X : Machine DD.M ((FFD ⊗₀ BaseIO) ⊗₀ BaseAdv)
+    X = ⊗-assoc⃖ CC.∘ ((Shim ⊗₁ B.m) CC.∘ NetTranslate)
+
+    split-ext : ((LinearLeios CC.∘ S₁) ⊗₁ CC.id {BaseAdv})
+              ≅ᴹ ((LinearLeios ⊗₁ CC.id) CC.∘ S₃ˡ)
+    split-ext = ≅ᴹ-trans (⊗₁-resp-≅ᴹ ≅ᴹ-refl (≅ᴹ-sym ∘-identityˡ-≅ᴹ))
+                         (⊗₁-interchange S₁ LinearLeios CC.id CC.id)
+
+    shim-nat : (S₃ˡ CC.∘ ⊗-assoc⃖) ≅ᴹ (⊗-assoc⃖ CC.∘ S₃ʳ)
+    shim-nat = ⊗-assoc⃖-natural Shim CC.id CC.id
+
+    merge-base : (S₃ʳ CC.∘ Bm) ≅ᴹ (Shim ⊗₁ B.m)
+    merge-base = ≅ᴹ-trans (≅ᴹ-sym (⊗₁-interchange CC.id Shim B.m (CC.id ⊗₁ CC.id)))
+                          (⊗₁-resp-≅ᴹ ∘-identityʳ-≅ᴹ
+                             (≅ᴹ-trans (∘-resp-≅ᴹ ⊗₁-id ≅ᴹ-refl) ∘-identityˡ-≅ᴹ))
+
+    inner : (S₃ˡ CC.∘ (⊗-assoc⃖ CC.∘ (Bm CC.∘ NetTranslate))) ≅ᴹ X
+    inner =
+      ≅ᴹ-trans (≅ᴹ-sym (∘-assoc-≅ᴹ {f = Bm CC.∘ NetTranslate} {g = ⊗-assoc⃖} {h = S₃ˡ}))
+      (≅ᴹ-trans (∘-resp-≅ᴹ shim-nat ≅ᴹ-refl)
+      (≅ᴹ-trans (∘-assoc-≅ᴹ {f = Bm CC.∘ NetTranslate} {g = S₃ʳ} {h = ⊗-assoc⃖})
+      (∘-resp-≅ᴹ ≅ᴹ-refl
+        (≅ᴹ-trans (≅ᴹ-sym (∘-assoc-≅ᴹ {f = NetTranslate} {g = Bm} {h = S₃ʳ}))
+                  (∘-resp-≅ᴹ merge-base ≅ᴹ-refl)))))
+
+    outer : (((LinearLeios CC.∘ S₁) ⊗₁ CC.id) CC.∘ (⊗-assoc⃖ CC.∘ (Bm CC.∘ NetTranslate)))
+          ≅ᴹ ((LinearLeios ⊗₁ CC.id) CC.∘ X)
+    outer =
+      ≅ᴹ-trans (∘-resp-≅ᴹ split-ext ≅ᴹ-refl)
+      (≅ᴹ-trans (∘-assoc-≅ᴹ {f = ⊗-assoc⃖ CC.∘ (Bm CC.∘ NetTranslate)} {g = S₃ˡ}
+                            {h = LinearLeios ⊗₁ CC.id})
+                (∘-resp-≅ᴹ ≅ᴹ-refl inner))
 
 module _ (IOF AdvF : Participant → Channel)
   (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
@@ -111,11 +171,10 @@ module _ (IOF AdvF : Participant → Channel)
   -- For a uniform deployment (`IOF = const IO`, `AdvF = const _`) both are
   -- `λ _ → refl`.
   (honest-IOF  : {p : Participant} → p ∈ honestNodes → IOF p ≡ IO)
-  (honest-AdvF : {p : Participant} → p ∈ honestNodes → AdvF p ≡ ((I ⊗₀ I ⊗₀ BaseAdv) ⊗₀ Adv))
+  (honest-AdvF : {p : Participant} → p ∈ honestNodes → AdvF p ≡ (BaseAdv ⊗₀ Adv))
   (isConstrained-Leios : IsConstrained Leios1 (IsBC.bciQueryType Participant {Block = LeiosBlock}))
   (isPure-Leios        : IsPure isConstrained-Leios)
   (IsBlockchain-base : IsBC.IsBlockchain Participant RankingBlock spec)
-  (is-extension-eq : Leios1 ≡ ext-spec ∘ᴷ spec)
     where
 
   private

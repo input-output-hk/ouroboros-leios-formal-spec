@@ -8,7 +8,6 @@ open import CategoricalCrypto.Machine.NAry
 
 open import CategoricalCrypto hiding (id)
 import CategoricalCrypto as CC
-open import CategoricalCrypto.Ext
 open import CategoricalCrypto.Machine.Iso
   using (_≅ᴹ_; ≅ᴹ-refl; ≅ᴹ-sym; ≅ᴹ-trans; ∘-resp-≅ᴹ; ∘-identityˡ-≅ᴹ)
 open import CategoricalCrypto.Machine.Monoidal using (⊗₁-id)
@@ -126,21 +125,23 @@ base = record
 module Base = Deployment base
 
 private
-  subst-≡ᴹ : ∀ {x y : Channel} {A B : Channel → Channel} → (eq : x ≡ y)
-    → (M : Machine (A x) (B x)) → subst (λ x → Machine (A x) (B x)) eq M ≡ᴹ M
-  subst-≡ᴹ refl _ = ≡ᴹ-refl
-
   -- The honest case of `single-protocol`, over channel variables so that the
-  -- two channel equalities can be matched on.
-  single-honest : ∀ {X Y} (eX : X ≡ Ext.IO) (eY : Y ≡ B.Adv ⊗₀ AdvL)
-    (N : Machine Ext.Network (X ⊗₀ Y))
-    → N ≡ᴹ (ext-layer ∘ᴷ B.honest-node-spec)
-    → ((CC.id ⊗₁ subst (Machine (B.Adv ⊗₀ AdvL)) (sym eY) CC.id)
+  -- three channel equalities can be matched on: the node's channels against
+  -- the ext spec's (`eX`, `eY`), and the ext spec's adversary channel against
+  -- its base/layer split (`eZ`).  With all three `refl`, the `subst`s vanish
+  -- and what is left is `is-extension` itself, up to the unit law.
+  single-honest : ∀ {X Y Z} (eX : X ≡ Ext.IO) (eY : Y ≡ Z) (eZ : Z ≡ B.Adv ⊗₀ AdvL)
+    (N : Machine Ext.Network (X ⊗₀ Y)) (S : Machine Ext.Network (Ext.IO ⊗₀ Z))
+    → N ≡ᴹ S
+    → S ≅ᴹ subst (λ A → Machine Ext.Network (Ext.IO ⊗₀ A)) (sym eZ)
+                 (ext-layer ∘ᴷ B.honest-node-spec)
+    → ((CC.id ⊗₁ subst (Machine (B.Adv ⊗₀ AdvL)) (sym (trans eY eZ)) CC.id)
         CC.∘ (subst (λ x → Machine B.IO (x ⊗₀ AdvL)) (sym eX) ext-layer ∘ᴷ B.honest-node-spec))
       ≅ᴹ N
-  single-honest refl refl N eq =
+  single-honest refl refl refl N S eq iso =
     ≅ᴹ-trans (∘-resp-≅ᴹ ⊗₁-id ≅ᴹ-refl)
-    (≅ᴹ-trans ∘-identityˡ-≅ᴹ (≡ᴹ→≅ᴹ (≡ᴹ-sym eq)))
+    (≅ᴹ-trans ∘-identityˡ-≅ᴹ
+    (≅ᴹ-trans (≅ᴹ-sym iso) (≡ᴹ→≅ᴹ (≡ᴹ-sym eq))))
 
 -- Each ext node is its extension layer stacked on its base node, once the
 -- adversary channel is reassembled.  Honest parties by `is-extension`, the
@@ -149,10 +150,8 @@ single-protocol : ∀ p
   → ((CC.id ⊗₁ unpad p) CC.∘ (extPart p ∘ᴷ base-all-nodes p)) ≅ᴹ Ext.all-nodes p
 single-protocol p with p ∈? Ext.honest-nodes
 ... | no  _  = unit-∘ᴷ (Ext.all-nodes p)
-... | yes hp = single-honest (honest-IOF hp) (honest-AdvF hp) (Ext.all-nodes p)
-  (≡ᴹ-trans (Ext.honest-nodes-≡-spec hp)
-  (≡ᴹ-trans (≡→≡ᴹ is-extension)
-            (subst-≡ᴹ-out (sym ext-Adv≡base-Adv⊗AdvL) _)))
+... | yes hp = single-honest (honest-IOF hp) (Ext.honest-AdvF hp) ext-Adv≡base-Adv⊗AdvL
+  (Ext.all-nodes p) Ext.honest-node-spec (Ext.honest-nodes-≡-spec hp) is-extension
 
 module Main where
 

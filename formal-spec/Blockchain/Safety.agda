@@ -3,6 +3,7 @@
 open import Leios.Prelude hiding (id; _⊗_)
 
 open import CategoricalCrypto hiding (id; _∘_)
+open import CategoricalCrypto.Machine.Iso using (_≅ᴹ_)
 
 import Blockchain.IsBlockchain as IsBC
 
@@ -81,6 +82,11 @@ record Deployment (Block : Type) : Type₂ where
 -- is an extension layer stacked (`_∘ᴷ_`) on the base honest node.  The layer
 -- has its own adversary channel `AdvL`, so the ext adversary channel is the
 -- base one next to the layer's.
+--
+-- The correspondence is a machine isomorphism (`_≅ᴹ_`), not propositional
+-- equality: the two sides are built from different combinators and have
+-- different `State` types, so `_≡_` between them is not provable, whereas
+-- the transfer proofs only ever use the iso.
 record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
                    (base-spec : Spec BlockBase n Network)
                    (ext-spec  : Spec BlockExt  n Network) : Type₂ where
@@ -95,6 +101,6 @@ record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
     ext-Adv≡base-Adv⊗AdvL : E.Adv ≡ B.Adv ⊗₀ AdvL
     getBaseBlock-inj : Injective _≡_ _≡_ getBaseBlock
     is-extension : E.honest-node-spec
-                 ≡ subst (λ A → Machine Network (E.IO ⊗₀ A))
-                         (sym ext-Adv≡base-Adv⊗AdvL)
-                         (ext-layer ∘ᴷ B.honest-node-spec)
+                 ≅ᴹ subst (λ A → Machine Network (E.IO ⊗₀ A))
+                          (sym ext-Adv≡base-Adv⊗AdvL)
+                          (ext-layer ∘ᴷ B.honest-node-spec)
