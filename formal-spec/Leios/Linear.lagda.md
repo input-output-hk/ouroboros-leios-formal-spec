@@ -196,8 +196,8 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗₀ BaseIO) (IO ⊗₀ Adv) LeiosStat
                }
 
   Slot₂ : let open LeiosState s in
-        ──────────────────────────────────────────────────────────────────────────────────
-        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ BASE-LDG rbs / just $ (ϵ ⊗R) ⊗R ↑ₒ FFD-ACK ⟧⇀ record s { RBs = rbs }
+        ───────────────────────────────────────────────────────────────────
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ BASE-LDG rbs / nothing ⟧⇀ record s { RBs = rbs }
 ```
 ```agda
   Ftch : let open LeiosState s in
@@ -217,12 +217,11 @@ by declining through `Roles₂`; without it a `Base₂` step scheduled early in
 the slot would announce `nothing` and strand the EB the party goes on to
 diffuse.
 
-`Base₂` spends its one output on the `SUBMIT` to the base layer, so it cannot
-also answer the `SLOT` it consumed.  The base layer acknowledges the
-submission with `EMPTY`, and `Base₃` turns that into the `FFD-ACK` the network
-shim is waiting for.  A base functionality that answers `SUBMIT` with anything
-else, or with nothing, stalls the composite node; that is an obligation on the
-base layer, not on this specification.
+The base layer acknowledges a submission with `EMPTY`, which `Base₃` consumes.
+A message nobody consumes stops the composite machine, so without `Base₃` the
+node could not be composed with a base layer that acknowledges.  A base
+functionality that answers `SUBMIT` with anything else stalls the composite
+node; that is an obligation on the base layer, not on this specification.
 ```agda
   Base₁   :
           ───────────────────────────────────────────────────────────────────────────
@@ -246,14 +245,12 @@ base layer, not on this specification.
 
   Base₃   :
           ───────────────────────────────────────────────────────────────────────────
-          s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ EMPTY / just $ (ϵ ⊗R) ⊗R ↑ₒ FFD-ACK ⟧⇀ s
+          s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ EMPTY / nothing ⟧⇀ s
 ```
 #### Protocol rules
 
-Every rule that consumes a `SLOT` answers on the FFD channel: `Roles₁` with the
-message it diffuses, the negative rules with `FFD-ACK`.  The network shim emits
-the next `SLOT` only after receiving that answer, which is what sequences the
-three upkeep steps of a slot.
+`SLOT` comes from outside: the node's environment decides when the node takes
+an upkeep step.  A step that produces no message answers nothing.
 ```agda
   Roles₁ :
          ∙ s ↝ (s' , i)
@@ -264,8 +261,8 @@ three upkeep steps of a slot.
          ∙ ¬ (∃[ s'×i ] (s ↝ s'×i × Upkeep (addUpkeep s u) ≡ Upkeep (proj₁ s'×i)))
          ∙ needsUpkeep s u
          ∙ u ≢ Base
-         ──────────────────────────────────────────────────────────────────
-         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (ϵ ⊗R) ⊗R ↑ₒ FFD-ACK ⟧⇀ addUpkeep s u
+         ──────────────────────────────────────────────────
+         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s u
 ```
 Deferral of the VT-Role: abstaining from voting is permitted while the
 current EB's voting window is still open, even when a positive VT-Role
@@ -276,8 +273,8 @@ applies, so a vote must be cast by then.
   Roles₃ : let open LeiosState s in
          ∙ slot < voteDeadline s
          ∙ needsUpkeep VT-Role
-         ────────────────────────────────────────────────────────────────────────
-         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (ϵ ⊗R) ⊗R ↑ₒ FFD-ACK ⟧⇀ addUpkeep s VT-Role
+         ──────────────────────────────────────────────────
+         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s VT-Role
 ```
 <!--
 ```agda

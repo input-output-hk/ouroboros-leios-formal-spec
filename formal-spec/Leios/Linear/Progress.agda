@@ -18,8 +18,9 @@ open import Data.Nat.Properties using (+-suc; +-comm)
 -- the traces: `tick` builds one slot, `ticks` iterates it, and `enough-traces`
 -- states the result in the form of the requirement, "every future slot is
 -- reachable".  The inputs are chosen here (the messages delivered, the ledger
--- fetched); a node in a network gets them from the network shim and the base
--- layer, and the corresponding lemma for the composite node is future work.
+-- fetched); a node in a network gets them from its network adapter and the
+-- base layer, and the corresponding lemma for the composite node is future
+-- work.
 module Leios.Linear.Progress (⋯ : SpecStructure)
   (let open SpecStructure ⋯)
   (params : Params)

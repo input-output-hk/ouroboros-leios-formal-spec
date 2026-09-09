@@ -8,10 +8,9 @@ open import Leios.Config
 open import CategoricalCrypto hiding (id)
 import CategoricalCrypto as CC
 open import CategoricalCrypto.Channel.Selection
-open import CategoricalCrypto.Machine.Iso
-  using (_≅ᴹ_; ≅ᴹ-refl; ≅ᴹ-sym; ≅ᴹ-trans; ∘-resp-≅ᴹ; ⊗₁-resp-≅ᴹ;
-         ∘-identityˡ-≅ᴹ; ∘-identityʳ-≅ᴹ; ∘-assoc-≅ᴹ)
-open import CategoricalCrypto.Machine.Monoidal using (⊗₁-id; ⊗₁-interchange; ⊗-assoc⃖-natural)
+open import CategoricalCrypto.Machine.Iso using (_≅ᴹ_; ≅ᴹ-refl)
+
+open import Tactic.Defaults
 
 open import Blockchain.Safety
 import Blockchain.IsBlockchain as IsBC
@@ -33,7 +32,6 @@ module Network.Leios
 open import Leios.Linear ⋯ params
 open Types params hiding (Network)
 
-open import Leios.NetworkShim ⋯ params
 open BaseAbstract B'
 
 LeiosMsg = FFDA.Header ⊎ FFDA.Body
@@ -41,48 +39,74 @@ Message  = LeiosMsg ⊎ BaseMsg
 
 import Network.DelayedDiffuse numberOfParties Message k as DD
 
--- multiplexing the network for the base & leios functionality
--- this is somewhat awkward because we require a strict order on
--- the messages going through it
+-- The node's clock, driven by the environment: `Tick` asks the node for one
+-- upkeep step, `EndSlot` ends the slot and releases the node's messages to
+-- the network.  Nothing is acknowledged on it.
+data ClockT : Mode → Type where
+  Tick EndSlot : ClockT Out
+
+Clock : Channel
+Clock = simpleChannel ClockT
+
+-- The adapter between the delayed-diffusion network and the node.  It splits
+-- the multiplexed network messages between the base functionality and the
+-- Leios node, forwards the environment's clock to the node, and collects
+-- what the node sends into the single `Diffuse` that ends the node's network
+-- round.  It counts nothing: how many upkeep steps a slot has is the node's
+-- business, and when the slot ends is the environment's.
 module NetTranslate where
-  record State : Type where
-    field inBuffer  : Maybe (List LeiosMsg)
-          outBuffer : Maybe (List BaseMsg)
 
-  private variable s : State
+  data State : Type where
+    Idle      : State
+    Receiving : List LeiosMsg → State              -- Leios messages held while the base functionality answers
+    Active    : List BaseMsg → List LeiosMsg → State  -- the base functionality's and the node's outgoing messages
 
-  data WithState_receive_return_newState_ : MachineType DD.M (Network ⊗₀ BaseNetwork) State where
+  messages : FFDA.Input → List LeiosMsg
+  messages (FFDAbstract.Send h b) = [ inj₁ h ] ++ L.fromMaybe (inj₂ <$> b)
+  messages FFDAbstract.Fetch      = []
 
-    Receive : ∀ {l} → let (leios , base) = partitionSumsWith proj₂ l in
-      WithState record { inBuffer = nothing ; outBuffer = nothing }
+  private variable
+    l      : List DD.Message'
+    m      : List BaseMsg
+    leios  : List LeiosMsg
+    buffer : List LeiosMsg
+    i      : FFDA.Input
+
+  data WithState_receive_return_newState_ : MachineType DD.M ((FFD ⊗₀ BaseNetwork) ⊗₀ Clock) State where
+
+    Receive : let (leios , base) = partitionSumsWith proj₂ l in
+      WithState Idle
       receive ϵ ⊗R ↑ᵢ DD.Deliver l
-      return just (L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ base)
-      newState record { inBuffer = just leios ; outBuffer = nothing }
+      return just (L⊗ ((L⊗ ϵ) ⊗R) ᵗ¹ ↑ᵢ base)       -- the base functionality's share
+      newState Receiving leios
 
-    SendB : ∀ {m leios} →
-      WithState record { inBuffer = just leios ; outBuffer = nothing }
-      receive L⊗ (L⊗ ϵ) ᵗ¹ ↑ₒ m
-      return just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ Activate leios)
-      newState record { inBuffer = nothing ; outBuffer = just m }
+    Begin :
+      WithState Receiving leios
+      receive L⊗ ((L⊗ ϵ) ⊗R) ᵗ¹ ↑ₒ m                -- the base functionality's outgoing messages
+      return just (L⊗ ((ϵ ⊗R) ⊗R) ᵗ¹ ↑ᵢ FFD-OUT leios)
+      newState Active m []
 
-    SendL : ∀ {m m'} →
-      WithState record { inBuffer = nothing ; outBuffer = just m }
-      receive L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ Done m'
-      return just (ϵ ⊗R ↑ₒ DD.Diffuse (map inj₂ m ++ map inj₁ m'))
-      newState record { inBuffer = nothing ; outBuffer = nothing }
+    Step :
+      WithState Active m buffer
+      receive L⊗ (L⊗ ϵ) ᵗ¹ ↑ₒ Tick
+      return just (L⊗ ((ϵ ⊗R) ⊗R) ᵗ¹ ↑ᵢ SLOT)
+      newState Active m buffer
 
-NetTranslate : Machine DD.M (Network ⊗₀ BaseNetwork)
+    Collect :
+      WithState Active m buffer
+      receive L⊗ ((ϵ ⊗R) ⊗R) ᵗ¹ ↑ₒ FFD-IN i
+      return nothing
+      newState Active m (buffer ++ messages i)
+
+    Finish :
+      WithState Active m buffer
+      receive L⊗ (L⊗ ϵ) ᵗ¹ ↑ₒ EndSlot
+      return just (ϵ ⊗R ↑ₒ DD.Diffuse (map inj₂ m ++ map inj₁ buffer))
+      newState Idle
+
+NetTranslate : Machine DD.M ((FFD ⊗₀ BaseNetwork) ⊗₀ Clock)
 NetTranslate .Machine.State   = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
-
--- The adversary channel is the base functionality's, `BaseAdv`, next to
--- `LinearLeios`'s own, `Adv`; that split is what `IsExtension` asks for.
--- `Shim` and `NetTranslate` have no adversary channel, so they are composed
--- plainly rather than lifted into the Kleisli combinators, which would pad the
--- adversary channel with units.  The one reshuffle, `⊗-assoc⃖`, moves the
--- base functionality's adversary channel out to the Kleisli slot.
-Leios1 : Machine DD.M (IO ⊗₀ BaseAdv ⊗₀ Adv)
-Leios1 = LinearLeios ∘ᴷ (⊗-assoc⃖ CC.∘ (Shim ⊗₁ B.m) CC.∘ NetTranslate)
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
 record LeiosBlock : Type where
@@ -102,67 +126,28 @@ LeiosBlock-Injective
   subst (λ (eb , correct) → _ ≡ record { rb = rb ; eb = eb ; correct = correct })
     (hash-unique' rb eb₁ eb₂ correct₁ correct₂) refl
 
--- The base functionality as seen through the multiplexed network.
-spec : Machine DD.M ((Network ⊗₀ BaseIO) ⊗₀ BaseAdv)
-spec = ⊗-assoc⃖ CC.∘ (CC.id ⊗₁ B.m) CC.∘ NetTranslate
-
--- The extension layer, with `Adv` as its adversary channel.
-ext-spec : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ Adv)
-ext-spec = LinearLeios CC.∘ (Shim ⊗₁ CC.id)
-
--- `Leios1` is the extension layer stacked on the base spec.  `_∘ᴷ_` unfolds
--- to `∘ᴷ-fwd ∘ ((M₂ ⊗₁ id) ∘ M₁)`, so once `⊗₁-interchange` has split
--- `ext-spec ⊗₁ id` into `LinearLeios ⊗₁ id` over `(Shim ⊗₁ id) ⊗₁ id`, the
--- shim is moved through the associator (`⊗-assoc⃖-natural`) and merged with
--- `id ⊗₁ B.m` (interchange again, then the unit laws).
-is-extension-eq : Leios1 ≅ᴹ ext-spec ∘ᴷ spec
-is-extension-eq = ∘-resp-≅ᴹ ≅ᴹ-refl (≅ᴹ-sym outer)
+-- The base functionality as seen through the multiplexed network, with the
+-- node's clock passed along.  Its adversary channel is moved out to the
+-- Kleisli slot.
+spec : Machine DD.M (((FFD ⊗₀ BaseIO) ⊗₀ Clock) ⊗₀ BaseAdv)
+spec = regroup CC.∘ ((CC.id ⊗₁ B.m) ⊗₁ CC.id) CC.∘ NetTranslate
   where
-    S₁ : Machine (Network ⊗₀ BaseIO) (FFD ⊗₀ BaseIO)
-    S₁ = Shim ⊗₁ CC.id
+    regroup : Machine ((FFD ⊗₀ (BaseIO ⊗₀ BaseAdv)) ⊗₀ Clock) (((FFD ⊗₀ BaseIO) ⊗₀ Clock) ⊗₀ BaseAdv)
+    regroup = TotalFunctionMachine' ⇒-solver ⇒-solver
 
-    -- The shim on the three-fold channel, on either side of the associator.
-    S₃ˡ : Machine ((Network ⊗₀ BaseIO) ⊗₀ BaseAdv) ((FFD ⊗₀ BaseIO) ⊗₀ BaseAdv)
-    S₃ˡ = S₁ ⊗₁ CC.id
+-- The extension layer, with `Adv` as its adversary channel; the clock passes
+-- through untouched.
+ext-spec : Machine ((FFD ⊗₀ BaseIO) ⊗₀ Clock) ((IO ⊗₀ Clock) ⊗₀ Adv)
+ext-spec = regroup CC.∘ (LinearLeios ⊗₁ CC.id)
+  where
+    regroup : Machine ((IO ⊗₀ Adv) ⊗₀ Clock) ((IO ⊗₀ Clock) ⊗₀ Adv)
+    regroup = TotalFunctionMachine' ⇒-solver ⇒-solver
 
-    S₃ʳ : Machine (Network ⊗₀ (BaseIO ⊗₀ BaseAdv)) (FFD ⊗₀ (BaseIO ⊗₀ BaseAdv))
-    S₃ʳ = Shim ⊗₁ (CC.id ⊗₁ CC.id)
-
-    Bm : Machine (Network ⊗₀ BaseNetwork) (Network ⊗₀ (BaseIO ⊗₀ BaseAdv))
-    Bm = CC.id ⊗₁ B.m
-
-    X : Machine DD.M ((FFD ⊗₀ BaseIO) ⊗₀ BaseAdv)
-    X = ⊗-assoc⃖ CC.∘ ((Shim ⊗₁ B.m) CC.∘ NetTranslate)
-
-    split-ext : ((LinearLeios CC.∘ S₁) ⊗₁ CC.id {BaseAdv})
-              ≅ᴹ ((LinearLeios ⊗₁ CC.id) CC.∘ S₃ˡ)
-    split-ext = ≅ᴹ-trans (⊗₁-resp-≅ᴹ ≅ᴹ-refl (≅ᴹ-sym ∘-identityˡ-≅ᴹ))
-                         (⊗₁-interchange S₁ LinearLeios CC.id CC.id)
-
-    shim-nat : (S₃ˡ CC.∘ ⊗-assoc⃖) ≅ᴹ (⊗-assoc⃖ CC.∘ S₃ʳ)
-    shim-nat = ⊗-assoc⃖-natural Shim CC.id CC.id
-
-    merge-base : (S₃ʳ CC.∘ Bm) ≅ᴹ (Shim ⊗₁ B.m)
-    merge-base = ≅ᴹ-trans (≅ᴹ-sym (⊗₁-interchange CC.id Shim B.m (CC.id ⊗₁ CC.id)))
-                          (⊗₁-resp-≅ᴹ ∘-identityʳ-≅ᴹ
-                             (≅ᴹ-trans (∘-resp-≅ᴹ ⊗₁-id ≅ᴹ-refl) ∘-identityˡ-≅ᴹ))
-
-    inner : (S₃ˡ CC.∘ (⊗-assoc⃖ CC.∘ (Bm CC.∘ NetTranslate))) ≅ᴹ X
-    inner =
-      ≅ᴹ-trans (≅ᴹ-sym (∘-assoc-≅ᴹ {f = Bm CC.∘ NetTranslate} {g = ⊗-assoc⃖} {h = S₃ˡ}))
-      (≅ᴹ-trans (∘-resp-≅ᴹ shim-nat ≅ᴹ-refl)
-      (≅ᴹ-trans (∘-assoc-≅ᴹ {f = Bm CC.∘ NetTranslate} {g = S₃ʳ} {h = ⊗-assoc⃖})
-      (∘-resp-≅ᴹ ≅ᴹ-refl
-        (≅ᴹ-trans (≅ᴹ-sym (∘-assoc-≅ᴹ {f = NetTranslate} {g = Bm} {h = S₃ʳ}))
-                  (∘-resp-≅ᴹ merge-base ≅ᴹ-refl)))))
-
-    outer : (((LinearLeios CC.∘ S₁) ⊗₁ CC.id) CC.∘ (⊗-assoc⃖ CC.∘ (Bm CC.∘ NetTranslate)))
-          ≅ᴹ ((LinearLeios ⊗₁ CC.id) CC.∘ X)
-    outer =
-      ≅ᴹ-trans (∘-resp-≅ᴹ split-ext ≅ᴹ-refl)
-      (≅ᴹ-trans (∘-assoc-≅ᴹ {f = ⊗-assoc⃖ CC.∘ (Bm CC.∘ NetTranslate)} {g = S₃ˡ}
-                            {h = LinearLeios ⊗₁ CC.id})
-                (∘-resp-≅ᴹ ≅ᴹ-refl inner))
+-- The node as deployed: the extension layer stacked on the base spec.  Its
+-- adversary channel is the base functionality's next to `LinearLeios`'s own,
+-- the split `IsExtension` asks for.
+Leios1 : Machine DD.M ((IO ⊗₀ Clock) ⊗₀ (BaseAdv ⊗₀ Adv))
+Leios1 = ext-spec ∘ᴷ spec
 
 module _ (IOF AdvF : Participant → Channel)
   (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
@@ -170,7 +155,7 @@ module _ (IOF AdvF : Participant → Channel)
   -- The honest nodes' channel, component by component; see `Deployment`.
   -- For a uniform deployment (`IOF = const IO`, `AdvF = const _`) both are
   -- `λ _ → refl`.
-  (honest-IOF  : {p : Participant} → p ∈ honestNodes → IOF p ≡ IO)
+  (honest-IOF  : {p : Participant} → p ∈ honestNodes → IOF p ≡ IO ⊗₀ Clock)
   (honest-AdvF : {p : Participant} → p ∈ honestNodes → AdvF p ≡ BaseAdv ⊗₀ Adv)
   (isConstrained-Leios : IsConstrained Leios1 (IsBC.bciQueryType Participant {Block = LeiosBlock}))
   (isPure-Leios        : IsPure isConstrained-Leios)
@@ -224,7 +209,7 @@ module _ (IOF AdvF : Participant → Channel)
     { AdvL             = Adv
     ; ext-Adv≡base-Adv⊗AdvL = refl
     ; ext-layer        = ext-spec
-    ; is-extension     = is-extension-eq
+    ; is-extension     = ≅ᴹ-refl
     ; getBaseBlock     = LeiosBlock.rb
     ; getBaseBlock-inj = LeiosBlock-Injective
     }
