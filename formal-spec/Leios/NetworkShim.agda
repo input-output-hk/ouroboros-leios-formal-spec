@@ -34,8 +34,15 @@ Network = simpleChannel NetworkT
 messages : FFD .Channel.outType → List (FFDA.Header ⊎ FFDA.Body)
 messages (FFD-IN (FFDAbstract.Send h b)) = [ inj₁ h ] ++ L.fromMaybe (inj₂ <$> b)
 messages (FFD-IN FFDAbstract.Fetch)      = []
+messages FFD-ACK                         = []
 
--- send SLOT 3 times
+-- One slot of the node, paced by the node's answers on the FFD channel.
+-- `Begin` delivers the round's messages (`FFD-OUT`); the node answers once
+-- its slot transition is through.  `Progress` then emits `SLOT` three times,
+-- one per upkeep item, each time waiting for the node's answer (a message to
+-- diffuse, or `FFD-ACK`), and `Finish` hands the collected messages back to
+-- the network.  So a slot is exactly four answers from the node, and a node
+-- rule that consumed `FFD-OUT` or `SLOT` without answering would stall it.
 data _-⟦_/_⟧ˢ⇀_ : MachineType Network FFD ShimState where
   Begin : ∀ ms → let open ShimState s in
     ∙ iteration ≡ 0

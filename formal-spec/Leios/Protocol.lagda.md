@@ -268,9 +268,14 @@ module Types (params : Params) (let open Params params) where
 
   module FFDA = FFDAbstract ffdAbstract
 
+  -- The node answers every `FFD-OUT` and every `SLOT` on this channel: with a
+  -- message to diffuse (`FFD-IN`) or, when the step has nothing to send, with
+  -- `FFD-ACK`.  The network shim counts these answers to pace the slot, so a
+  -- step that consumed a `SLOT` silently would stall the composite node.
   data FFDT : Mode → Type where
     FFD-OUT : List (FFDA.Header ⊎ FFDA.Body) → FFDT Out
     FFD-IN  : FFDA.Input → FFDT In
+    FFD-ACK : FFDT In
     SLOT    : FFDT Out
     FTCH    : FFDT Out
 

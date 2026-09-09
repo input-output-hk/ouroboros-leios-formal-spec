@@ -26,3 +26,9 @@ subst-≡ᴹ-out refl _ = ≡ᴹ-refl
 
 idᴷ-cong-≡ᴹ : ∀ {A B} → A ≡ B → _≡ᴹ_ (idᴷ {A = A}) (idᴷ {A = B})
 idᴷ-cong-≡ᴹ refl = ≡ᴹ-refl
+
+-- Traces compose.  `Trace` is a snoc list, so induct on the second one.
+Trace-trans : ∀ {A B} {M : Machine A B} {s₁ s₂ s₃}
+            → Trace M s₁ s₂ → Trace M s₂ s₃ → Trace M s₁ s₃
+Trace-trans t []                       = t
+Trace-trans t (t' ∷ʳ⟨ i , o , step ⟩) = Trace-trans t t' ∷ʳ⟨ i , o , step ⟩

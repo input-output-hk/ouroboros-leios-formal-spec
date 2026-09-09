@@ -196,8 +196,8 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗₀ BaseIO) (IO ⊗₀ Adv) LeiosStat
                }
 
   Slot₂ : let open LeiosState s in
-        ───────────────────────────────────────────────────────────────────
-        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ BASE-LDG rbs / nothing ⟧⇀ record s { RBs = rbs }
+        ──────────────────────────────────────────────────────────────────────────────────
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ BASE-LDG rbs / just $ (ϵ ⊗R) ⊗R ↑ₒ FFD-ACK ⟧⇀ record s { RBs = rbs }
 ```
 ```agda
   Ftch : let open LeiosState s in
@@ -216,6 +216,13 @@ EB role for the slot first, either by producing (which sets `proposedEB`) or
 by declining through `Roles₂`; without it a `Base₂` step scheduled early in
 the slot would announce `nothing` and strand the EB the party goes on to
 diffuse.
+
+`Base₂` spends its one output on the `SUBMIT` to the base layer, so it cannot
+also answer the `SLOT` it consumed.  The base layer acknowledges the
+submission with `EMPTY`, and `Base₃` turns that into the `FFD-ACK` the network
+shim is waiting for.  A base functionality that answers `SUBMIT` with anything
+else, or with nothing, stalls the composite node; that is an obligation on the
+base layer, not on this specification.
 ```agda
   Base₁   :
           ───────────────────────────────────────────────────────────────────────────
@@ -236,8 +243,17 @@ diffuse.
           ∙ hasUpkeep EB-Role
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ SUBMIT rb ⟧⇀ addUpkeep s Base
+
+  Base₃   :
+          ───────────────────────────────────────────────────────────────────────────
+          s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ EMPTY / just $ (ϵ ⊗R) ⊗R ↑ₒ FFD-ACK ⟧⇀ s
 ```
 #### Protocol rules
+
+Every rule that consumes a `SLOT` answers on the FFD channel: `Roles₁` with the
+message it diffuses, the negative rules with `FFD-ACK`.  The network shim emits
+the next `SLOT` only after receiving that answer, which is what sequences the
+three upkeep steps of a slot.
 ```agda
   Roles₁ :
          ∙ s ↝ (s' , i)
@@ -248,8 +264,8 @@ diffuse.
          ∙ ¬ (∃[ s'×i ] (s ↝ s'×i × Upkeep (addUpkeep s u) ≡ Upkeep (proj₁ s'×i)))
          ∙ needsUpkeep s u
          ∙ u ≢ Base
-         ──────────────────────────────────────────────────
-         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s u
+         ──────────────────────────────────────────────────────────────────
+         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (ϵ ⊗R) ⊗R ↑ₒ FFD-ACK ⟧⇀ addUpkeep s u
 ```
 Deferral of the VT-Role: abstaining from voting is permitted while the
 current EB's voting window is still open, even when a positive VT-Role
@@ -260,8 +276,8 @@ applies, so a vote must be cast by then.
   Roles₃ : let open LeiosState s in
          ∙ slot < voteDeadline s
          ∙ needsUpkeep VT-Role
-         ──────────────────────────────────────────────────
-         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s VT-Role
+         ────────────────────────────────────────────────────────────────────────
+         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (ϵ ⊗R) ⊗R ↑ₒ FFD-ACK ⟧⇀ addUpkeep s VT-Role
 ```
 <!--
 ```agda
@@ -283,6 +299,7 @@ unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
 unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
 unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
 unquoteDecl Base₂-premises = genPremises Base₂-premises (quote Base₂)
+unquoteDecl Base₃-premises = genPremises Base₃-premises (quote Base₃)
 
 just≢nothing : ∀ {ℓ} {A : Type ℓ} {x} → (Maybe A ∋ just x) ≡ nothing → ⊥
 just≢nothing = λ ()
