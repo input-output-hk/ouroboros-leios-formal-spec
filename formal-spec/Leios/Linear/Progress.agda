@@ -76,8 +76,7 @@ upkeep-step s u u≢Base nu with ¿ ∃[ s'×i ] (s ↝ s'×i × (u ∷ Upkeep s
 ... | no ¬p                    = addUpkeep s u , _ , Roles₂ (¬p , nu , u≢Base) , refl , refl
 
 -- The three upkeep items of a slot, in the order `Base₂` requires: the EB
--- role first, then the base step with its round trip through the base layer,
--- then the vote.
+-- role first, then the base step, then the vote.
 upkeep : ∀ s → Upkeep s ≡ []
        → ∃[ s' ] Trace LinearLeios s s' × allDone s' × slot s' ≡ slot s
 upkeep s eq₀
@@ -87,7 +86,7 @@ upkeep s eq₀
          (needs (addUpkeep s₃ Base) (cong (Base ∷_) (trans eq₃ (cong (EB-Role ∷_) eq₀))) VT-Role∉)
 ... | s₅ , _ , st₅ , eq₅ , sl₅ =
   s₅
-  , (((([] ∷ʳ⟨ _ , _ , st₃ ⟩) ∷ʳ⟨ _ , _ , st₄ ⟩) ∷ʳ⟨ _ , _ , Base₃ ⟩) ∷ʳ⟨ _ , _ , st₅ ⟩)
+  , ((([] ∷ʳ⟨ _ , _ , st₃ ⟩) ∷ʳ⟨ _ , _ , st₄ ⟩) ∷ʳ⟨ _ , _ , st₅ ⟩)
   , allDone-of s₅ (trans eq₅ (cong (λ l → VT-Role ∷ Base ∷ l) eq₃'))
   , trans sl₅ sl₃
   where

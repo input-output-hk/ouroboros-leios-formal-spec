@@ -52,7 +52,9 @@ Parameters:
 ```agda
     INIT   : (EndorserBlock × Cert → Bool) → BaseIOF Out
 ```
-SUBMIT: Submit a ranking block to the base layer for processing.
+SUBMIT: Submit a ranking block to the base layer for processing.  The base
+layer does not answer: a submission is only taken into account if the
+submitting party is the block producer, so there is nothing to acknowledge.
 
 Parameters:
 - RankingBlock: A ranking block containing either an endorser block,
@@ -75,11 +77,10 @@ slot of the base layer ledger.
 ```agda
     FTCH-SLOT : BaseIOF Out
 ```
-The base layer can produce four types of outputs:
+The base layer can produce three types of outputs:
 - Stake distribution information
-- Empty response (no meaningful output)
 - Base layer ledger contents
-- Curreent slot of the base layer
+- Current slot of the base layer
 
 STAKE: Output containing the current stake distribution.
 
@@ -89,13 +90,6 @@ Parameters:
   in the system.
 ```agda
     STAKE : StakeDistr → BaseIOF In
-```
-EMPTY: Empty output indicating no meaningful result.
-
-This output is used when an operation completes successfully
-but produces no data that needs to be returned to the caller.
-```agda
-    EMPTY : BaseIOF In
 ```
 BASE-LDG: Output containing the base layer ledger contents.
 

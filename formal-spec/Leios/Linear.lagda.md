@@ -217,11 +217,10 @@ by declining through `Roles₂`; without it a `Base₂` step scheduled early in
 the slot would announce `nothing` and strand the EB the party goes on to
 diffuse.
 
-The base layer acknowledges a submission with `EMPTY`, which `Base₃` consumes.
-A message nobody consumes stops the composite machine, so without `Base₃` the
-node could not be composed with a base layer that acknowledges.  A base
-functionality that answers `SUBMIT` with anything else stalls the composite
-node; that is an obligation on the base layer, not on this specification.
+The base layer does not answer a `SUBMIT`.  A message nobody consumes stops
+the composite machine, so a base functionality that did answer would stall the
+node; staying silent is an obligation on the base layer, not on this
+specification.
 ```agda
   Base₁   :
           ───────────────────────────────────────────────────────────────────────────
@@ -242,10 +241,6 @@ node; that is an obligation on the base layer, not on this specification.
           ∙ hasUpkeep EB-Role
           ───────────────────────────────────────────────────────────────────────────
           s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ SUBMIT rb ⟧⇀ addUpkeep s Base
-
-  Base₃   :
-          ───────────────────────────────────────────────────────────────────────────
-          s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ EMPTY / nothing ⟧⇀ s
 ```
 #### Protocol rules
 
@@ -296,7 +291,6 @@ unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
 unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
 unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
 unquoteDecl Base₂-premises = genPremises Base₂-premises (quote Base₂)
-unquoteDecl Base₃-premises = genPremises Base₃-premises (quote Base₃)
 
 just≢nothing : ∀ {ℓ} {A : Type ℓ} {x} → (Maybe A ∋ just x) ≡ nothing → ⊥
 just≢nothing = λ ()

@@ -148,14 +148,13 @@ data d-BaseRel : machine-type d-BaseState d-BaseChannel where
         (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot))
         (blocks , slot)
 
-  -- A submitted ranking block is appended to the ledger and acknowledged with
-  -- `EMPTY`; the Linear Leios node's `Base₃` rule relies on that answer.
+  -- A submitted ranking block is appended to the ledger, without an answer.
   submit :
     ∀ blocks slot rb →
       d-BaseRel
         (blocks , slot)
         (L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ BaseAbstract.SUBMIT rb)
-        (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.EMPTY))
+        nothing
         (blocks ∷ʳ rb , slot)
 
 open Blockchain.IsBlockchain (Fin 1)
