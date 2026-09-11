@@ -268,6 +268,10 @@ module Types (params : Params) (let open Params params) where
 
   module FFDA = FFDAbstract ffdAbstract
 
+  -- The node's network-facing interface.  `FFD-OUT` delivers the messages of
+  -- a slot and `SLOT` asks for one upkeep step; both come from the node's
+  -- network adapter, which is driven by the environment's clock.  The node
+  -- answers with the messages it diffuses (`FFD-IN`), or not at all.
   data FFDT : Mode → Type where
     FFD-OUT : List (FFDA.Header ⊎ FFDA.Body) → FFDT Out
     FFD-IN  : FFDA.Input → FFDT In

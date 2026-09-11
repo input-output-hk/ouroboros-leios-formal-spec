@@ -216,6 +216,11 @@ EB role for the slot first, either by producing (which sets `proposedEB`) or
 by declining through `Roles₂`; without it a `Base₂` step scheduled early in
 the slot would announce `nothing` and strand the EB the party goes on to
 diffuse.
+
+The base layer does not answer a `SUBMIT`.  A message nobody consumes stops
+the composite machine, so a base functionality that did answer would stall the
+node; staying silent is an obligation on the base layer, not on this
+specification.
 ```agda
   Base₁   :
           ───────────────────────────────────────────────────────────────────────────
@@ -238,6 +243,9 @@ diffuse.
           s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ SUBMIT rb ⟧⇀ addUpkeep s Base
 ```
 #### Protocol rules
+
+`SLOT` comes from outside: the node's environment decides when the node takes
+an upkeep step.  A step that produces no message answers nothing.
 ```agda
   Roles₁ :
          ∙ s ↝ (s' , i)

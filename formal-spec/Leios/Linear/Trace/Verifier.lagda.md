@@ -146,7 +146,7 @@ nevertheless coincides with `toRcvType (inj₂ (inj₂ FetchLdgI))` once the sel
 ```agda
 data InputC : Type where
   cSLOT cFTCH cFFD-OUT           : InputC  -- FFDT Out
-  cBASE-LDG cSTAKE cEMPTY cbSLOT : InputC  -- BaseIOF In
+  cBASE-LDG cSTAKE cbSLOT        : InputC  -- BaseIOF In
   cSubmitTxs cFetchLdgI          : InputC  -- IOT In
 
 inputC : FFDT Out ⊎ BaseIOF In ⊎ IOT In → InputC
@@ -155,7 +155,6 @@ inputC (inj₁ FTCH)                 = cFTCH
 inputC (inj₁ (FFD-OUT _))          = cFFD-OUT
 inputC (inj₂ (inj₁ (BASE-LDG _)))  = cBASE-LDG
 inputC (inj₂ (inj₁ (STAKE _)))     = cSTAKE
-inputC (inj₂ (inj₁ EMPTY))         = cEMPTY
 inputC (inj₂ (inj₁ (SLOT _)))      = cbSLOT
 inputC (inj₂ (inj₂ (SubmitTxs _))) = cSubmitTxs
 inputC (inj₂ (inj₂ FetchLdgI))     = cFetchLdgI
@@ -189,7 +188,6 @@ opaque
   input-sound (inj₁ (FFD-OUT _)) (Slot₁ _)                = refl
   input-sound (inj₂ (inj₁ (BASE-LDG _))) Slot₂            = refl
   input-sound (inj₂ (inj₁ (STAKE _))) ()
-  input-sound (inj₂ (inj₁ EMPTY)) ()
   input-sound (inj₂ (inj₁ (SLOT _))) ()
   input-sound (inj₂ (inj₂ (SubmitTxs _))) Base₁           = refl
   input-sound (inj₂ (inj₂ FetchLdgI)) Ftch                = refl
@@ -247,7 +245,6 @@ Reusable witnesses for the mismatching input families:
 inj₂≢SLOT : ∀ y → inputC (inj₂ y) ≢ cSLOT
 inj₂≢SLOT (inj₁ (BASE-LDG _))  ()
 inj₂≢SLOT (inj₁ (STAKE _))     ()
-inj₂≢SLOT (inj₁ EMPTY)         ()
 inj₂≢SLOT (inj₁ (SLOT _))      ()
 inj₂≢SLOT (inj₂ (SubmitTxs _)) ()
 inj₂≢SLOT (inj₂ FetchLdgI)     ()
@@ -255,7 +252,6 @@ inj₂≢SLOT (inj₂ FetchLdgI)     ()
 inj₂≢FFD-OUT : ∀ y → inputC (inj₂ y) ≢ cFFD-OUT
 inj₂≢FFD-OUT (inj₁ (BASE-LDG _))  ()
 inj₂≢FFD-OUT (inj₁ (STAKE _))     ()
-inj₂≢FFD-OUT (inj₁ EMPTY)         ()
 inj₂≢FFD-OUT (inj₁ (SLOT _))      ()
 inj₂≢FFD-OUT (inj₂ (SubmitTxs _)) ()
 inj₂≢FFD-OUT (inj₂ FetchLdgI)     ()
@@ -273,7 +269,6 @@ inj₁≢SubmitTxs (FFD-OUT _) ()
 inj₂inj₁≢SubmitTxs : ∀ y → inputC (inj₂ (inj₁ y)) ≢ cSubmitTxs
 inj₂inj₁≢SubmitTxs (BASE-LDG _) ()
 inj₂inj₁≢SubmitTxs (STAKE _)    ()
-inj₂inj₁≢SubmitTxs EMPTY        ()
 inj₂inj₁≢SubmitTxs (SLOT _)     ()
 
 inj₁≢FetchLdgI : ∀ x → inputC (inj₁ x) ≢ cFetchLdgI
@@ -284,7 +279,6 @@ inj₁≢FetchLdgI (FFD-OUT _) ()
 inj₂inj₁≢FetchLdgI : ∀ y → inputC (inj₂ (inj₁ y)) ≢ cFetchLdgI
 inj₂inj₁≢FetchLdgI (BASE-LDG _) ()
 inj₂inj₁≢FetchLdgI (STAKE _)    ()
-inj₂inj₁≢FetchLdgI EMPTY        ()
 inj₂inj₁≢FetchLdgI (SLOT _)     ()
 ```
 ```agda
@@ -322,7 +316,6 @@ verifyStep' (Slot₁-Action _) (inj₂ y) _ _ = Mismatch (inj₂≢FFD-OUT y)
 verifyStep' (Slot₂-Action _) (inj₁ x) _ _ = Mismatch (inj₁≢BASE-LDG x)
 verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (BASE-LDG rbs))) s refl = Ok' Slot₂
 verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (STAKE _))) _ _        = Mismatch λ ()
-verifyStep' (Slot₂-Action _) (inj₂ (inj₁ EMPTY)) _ _            = Mismatch λ ()
 verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (SLOT _))) _ _         = Mismatch λ ()
 verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (SubmitTxs _))) _ _    = Mismatch λ ()
 verifyStep' (Slot₂-Action _) (inj₂ (inj₂ FetchLdgI)) _ _        = Mismatch λ ()
