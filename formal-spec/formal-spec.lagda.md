@@ -65,6 +65,11 @@ Linear Leios specification
 ```agda
 open import Leios.Linear
 ```
+Progress of the Linear Leios node: enough traces exist for the invariants to
+say something
+```agda
+import Leios.Linear.Progress
+```
 ### Cryptographic Foundations
 Category-theoretic approach to cryptography
 ```agda
