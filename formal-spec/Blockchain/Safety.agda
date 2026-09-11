@@ -3,6 +3,7 @@
 open import Leios.Prelude hiding (id; _⊗_)
 
 open import CategoricalCrypto hiding (id; _∘_)
+open import CategoricalCrypto.Machine.Iso using (_≅ᴹ_)
 
 import Blockchain.IsBlockchain as IsBC
 
@@ -31,6 +32,13 @@ record Deployment (Block : Type) : Type₂ where
     all-nodes           : (p : Fin n) → Machine Network (IOF p ⊗₀ AdvF p)
     honest-nodes        : ℙ (Fin n)
     honest-nodes-≡-spec : ∀ {p} → p ∈ honest-nodes → all-nodes p ≡ᴹ honest-node-spec
+    -- The channel of an honest node, component by component.  These are not
+    -- consequences of `honest-nodes-≡-spec`: that equates the tensors
+    -- `IOF p ⊗₀ AdvF p` and `IO ⊗₀ Adv`, and `_⊗₀_` — a sum of types — is not
+    -- injective, so the factors have to be given.  For a uniform deployment
+    -- (`IOF = const IO`, `AdvF = const Adv`) both are `λ _ → refl`.
+    honest-IOF          : ∀ {p} → p ∈ honest-nodes → IOF p ≡ IO
+    honest-AdvF         : ∀ {p} → p ∈ honest-nodes → AdvF p ≡ Adv
     network             : Machine I (n ⨂ⁿ Network ⊗₀ NAdv)
 
   honest-nodes-blockchain : ∀ {p} → p ∈ honest-nodes → IsBlockchain Block (all-nodes p)
@@ -70,7 +78,15 @@ record Deployment (Block : Type) : Type₂ where
   safety : ℕ → Type₁
   safety k = ∀ {A} (E : Environment A) → Invariant (protocol E) (safeState k E)
 
--- | Witness that one `Spec` extends a given base `Spec`
+-- | Witness that one `Spec` extends a given base `Spec`: the ext honest node
+-- is an extension layer stacked (`_∘ᴷ_`) on the base honest node.  The layer
+-- has its own adversary channel `AdvL`, so the ext adversary channel is the
+-- base one next to the layer's.
+--
+-- The correspondence is a machine isomorphism (`_≅ᴹ_`), not propositional
+-- equality: the two sides are built from different combinators and have
+-- different `State` types, so `_≡_` between them is not provable, whereas
+-- the transfer proofs only ever use the iso.
 record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
                    (base-spec : Spec BlockBase n Network)
                    (ext-spec  : Spec BlockExt  n Network) : Type₂ where
@@ -78,12 +94,13 @@ record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
     module B = Spec base-spec
     module E = Spec ext-spec
   field
-    ext-layer        : Machine B.IO (E.IO ⊗₀ I)
+    AdvL             : Channel
+    ext-layer        : Machine B.IO (E.IO ⊗₀ AdvL)
     getBaseBlock     : BlockExt → BlockBase
 
-    ext-Adv≡base-Adv : E.Adv ≡ B.Adv
+    ext-Adv≡base-Adv⊗AdvL : E.Adv ≡ B.Adv ⊗₀ AdvL
     getBaseBlock-inj : Injective _≡_ _≡_ getBaseBlock
-    is-extension : idᴷ ∘ᴷ E.honest-node-spec
-                 ≡ subst (λ A → Machine Network (E.IO ⊗₀ (A ⊗₀ I)))
-                         (sym ext-Adv≡base-Adv)
-                         (ext-layer ∘ᴷ B.honest-node-spec)
+    is-extension : E.honest-node-spec
+                 ≅ᴹ subst (λ A → Machine Network (E.IO ⊗₀ A))
+                          (sym ext-Adv≡base-Adv⊗AdvL)
+                          (ext-layer ∘ᴷ B.honest-node-spec)

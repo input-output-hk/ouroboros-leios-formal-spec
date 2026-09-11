@@ -3,7 +3,6 @@
 open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import Blockchain.Safety
 import Blockchain.Liveness
-open import Leios.ChannelCat
 
 open import CategoricalCrypto hiding (id)
 
@@ -27,7 +26,6 @@ module Blockchain.Liveness.Transfer
   (ext                : Deployment BlockExt)
   (let module Ext = Deployment ext)
   (base-spec          : Spec BlockBase Ext.n Ext.Network)
-  (cc                 : ChannelCat)
   (extension          : IsExtension base-spec Ext.spec)
   (producer-compat    : ∀ b → Deployment.producer ext b
                             ≡ Spec.producer base-spec (IsExtension.getBaseBlock extension b))
@@ -38,7 +36,7 @@ module Blockchain.Liveness.Transfer
 open IsExtension extension
 
 import Blockchain.Safety.Transfer as ST
-module Tr = ST ext base-spec cc extension
+module Tr = ST ext base-spec extension
 
 open Tr using (extPart; base-all-nodes)
 
