@@ -13,14 +13,8 @@ open import Data.Nat.Properties using (+-suc; +-comm)
 -- Progress for the bare Linear Leios node: from any state whose slot upkeep
 -- is complete, the node can run through a whole slot.
 --
--- Safety and liveness are stated as `Invariant`s, i.e. preservation along
--- `Trace`s, which says nothing if too few traces exist.  This module supplies
--- the traces: `tick` builds one slot, `ticks` iterates it, and `enough-traces`
--- states the result in the form of the requirement, "every future slot is
--- reachable".  The inputs are chosen here (the messages delivered, the ledger
--- fetched); a node in a network gets them from the network shim and the
--- base layer, and the corresponding lemma for the composite node is future
--- work.
+-- Safety and liveness are stated as `Invariant`s, i.e. preservation along `Trace`s.
+-- In addition `enough-traces` shows progress, i.e. that every future slot is reachable.
 module Leios.Linear.Progress (⋯ : SpecStructure)
   (let open SpecStructure ⋯)
   (params : Params)
