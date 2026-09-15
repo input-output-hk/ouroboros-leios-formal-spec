@@ -111,6 +111,12 @@ record LeiosState : Type where
   hasUpkeep : SlotUpkeep → Type
   hasUpkeep = _∈ˡ Upkeep
 
+  needs : ∀ {u l} → Upkeep ≡ l → u ∉ˡ l → needsUpkeep u
+  needs {u} eq n = subst (u ∉ˡ_) (sym eq) n
+
+  has : ∀ {u l} → Upkeep ≡ l → u ∈ˡ l → hasUpkeep u
+  has {u} eq h = subst (u ∈ˡ_) (sym eq) h
+
   needsUpkeep-Stage : StageUpkeep → Set
   needsUpkeep-Stage = _∉ Upkeep-Stage
 
