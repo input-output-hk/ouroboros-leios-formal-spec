@@ -30,28 +30,17 @@ open import Leios.Linear ⋯ params
 open Types params
 open BaseAbstract B'
 
-open LeiosState using (slot; Upkeep)
+open LeiosState using (slot; Upkeep; needs; has)
 
 private variable
   s s' : LeiosState
-  u    : SlotUpkeep
-  l    : List SlotUpkeep
 
 -- The block-production rules leave the slot alone.
 ↝-slot : ∀ {i} → s ↝ (s' , i) → slot s' ≡ slot s
 ↝-slot (EB-Role _) = refl
 ↝-slot (VT-Role _) = refl
 
--- Upkeep facts, transported along an equation for the upkeep list.
 private
-  -- The state is explicit: reached only through the projection `Upkeep`, an
-  -- implicit one would be η-expanded and its other fields left unsolved.
-  needs : ∀ s → Upkeep s ≡ l → u ∉ˡ l → LeiosState.needsUpkeep s u
-  needs {u = u} _ eq n = subst (u ∉ˡ_) (sym eq) n
-
-  has : ∀ s → Upkeep s ≡ l → u ∈ˡ l → LeiosState.hasUpkeep s u
-  has {u = u} _ eq h = subst (u ∈ˡ_) (sym eq) h
-
   allDone-of : ∀ s → Upkeep s ≡ VT-Role ∷ Base ∷ EB-Role ∷ [] → allDone s
   allDone-of s eq = has s eq (here refl) , has s eq (there (there (here refl))) , has s eq (there (here refl))
 
