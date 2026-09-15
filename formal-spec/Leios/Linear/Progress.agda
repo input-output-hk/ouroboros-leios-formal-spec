@@ -68,22 +68,21 @@ upkeep-step s u u≢Base nu with ¿ ∃[ s'×i ] (s ↝ s'×i × (u ∷ Upkeep s
 -- role first, then the base step, then the vote.
 upkeep : ∀ s → Upkeep s ≡ []
        → ∃[ s' ] Trace LinearLeios s s' × allDone s' × slot s' ≡ slot s
-upkeep s eq₀
-  with upkeep-step s EB-Role (λ ()) (needs s eq₀ λ ())
-... | s₃ , _ , st₃ , eq₃ , sl₃
-  with upkeep-step (addUpkeep s₃ Base) VT-Role (λ ())
-         (needs (addUpkeep s₃ Base) (cong (Base ∷_) (trans eq₃ (cong (EB-Role ∷_) eq₀))) VT-Role∉)
-... | s₅ , _ , st₅ , eq₅ , sl₅ =
-  s₅
-  , ((([] ∷ʳ⟨ _ , _ , st₃ ⟩) ∷ʳ⟨ _ , _ , st₄ ⟩) ∷ʳ⟨ _ , _ , st₅ ⟩)
-  , allDone-of s₅ (trans eq₅ (cong (λ l → VT-Role ∷ Base ∷ l) eq₃'))
-  , trans sl₅ sl₃
-  where
-    eq₃' : Upkeep s₃ ≡ EB-Role ∷ []
-    eq₃' = trans eq₃ (cong (EB-Role ∷_) eq₀)
+upkeep s eq₀ =
+  let s₃ , _ , st₃ , eq₃ , sl₃ = upkeep-step s EB-Role (λ ()) (needs s eq₀ λ ())
 
-    st₄ : s₃ -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / _ ⟧⇀ addUpkeep s₃ Base
-    st₄ = Base₂ (needs s₃ eq₃' Base∉ , has s₃ eq₃' (here refl))
+      eq₃' : Upkeep s₃ ≡ EB-Role ∷ []
+      eq₃' = trans eq₃ (cong (EB-Role ∷_) eq₀)
+
+      st₄ : s₃ -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / _ ⟧⇀ addUpkeep s₃ Base
+      st₄ = Base₂ (needs s₃ eq₃' Base∉ , has s₃ eq₃' (here refl))
+
+      s₅ , _ , st₅ , eq₅ , sl₅ = upkeep-step (addUpkeep s₃ Base) VT-Role (λ ())
+                                   (needs (addUpkeep s₃ Base) (cong (Base ∷_) eq₃') VT-Role∉)
+  in s₅
+   , ((([] ∷ʳ⟨ _ , _ , st₃ ⟩) ∷ʳ⟨ _ , _ , st₄ ⟩) ∷ʳ⟨ _ , _ , st₅ ⟩)
+   , allDone-of s₅ (trans eq₅ (cong (λ l → VT-Role ∷ Base ∷ l) eq₃'))
+   , trans sl₅ sl₃
 
 -- The slot transition: the network's messages arrive and the ledger is
 -- fetched, leaving the upkeep empty and the slot advanced.
@@ -95,18 +94,20 @@ slot-step s msgs rbs done =
 -- One whole slot.
 tick : ∀ s msgs rbs → allDone s
      → ∃[ s' ] Trace LinearLeios s s' × allDone s' × slot s' ≡ suc (slot s)
-tick s msgs rbs done with slot-step s msgs rbs done
-... | s₂ , t₂ , up₂ , sl₂ with upkeep s₂ up₂
-... | s' , t' , done' , sl' = s' , Trace-trans t₂ t' , done' , trans sl' sl₂
+tick s msgs rbs done =
+  let s₂ , t₂ , up₂ , sl₂ = slot-step s msgs rbs done
+      s' , t' , done' , sl' = upkeep s₂ up₂
+  in s' , Trace-trans t₂ t' , done' , trans sl' sl₂
 
 -- `n` slots, with the inputs of each slot chosen by slot number.
 ticks : ∀ n s (msgsAt : ℕ → List (FFDA.Header ⊎ FFDA.Body)) (rbsAt : ℕ → List RankingBlock)
       → allDone s
       → ∃[ s' ] Trace LinearLeios s s' × allDone s' × slot s' ≡ n + slot s
 ticks zero    s _      _     done = s , [] , done , refl
-ticks (suc n) s msgsAt rbsAt done with tick s (msgsAt (slot s)) (rbsAt (slot s)) done
-... | s₁ , t₁ , done₁ , sl₁ with ticks n s₁ msgsAt rbsAt done₁
-... | s' , t' , done' , sl' = s' , Trace-trans t₁ t' , done' , trans sl' (trans (cong (n +_) sl₁) (+-suc n _))
+ticks (suc n) s msgsAt rbsAt done =
+  let s₁ , t₁ , done₁ , sl₁ = tick s (msgsAt (slot s)) (rbsAt (slot s)) done
+      s' , t' , done' , sl' = ticks n s₁ msgsAt rbsAt done₁
+  in s' , Trace-trans t₁ t' , done' , trans sl' (trans (cong (n +_) sl₁) (+-suc n _))
 
 -- The requirement itself: every future slot is reachable.
 enough-traces : ∀ s n → allDone s → ∃[ s' ] slot s + n ≡ slot s' × Trace LinearLeios s s'
