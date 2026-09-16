@@ -72,23 +72,17 @@ NetTranslate : Machine DD.M (Network ⊗₀ BaseNetwork)
 NetTranslate .Machine.State   = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
--- The base functionality as seen through the multiplexed network.
--- `NetTranslate` has no adversary channel, so it is composed plainly rather
--- than lifted into the Kleisli combinators, which would pad the adversary
--- channel with units.  The one reshuffle, `⊗-assoc⃖`, moves the base
--- functionality's adversary channel out to the Kleisli slot.
+-- The base functionality as seen through the multiplexed network
 spec : Machine DD.M ((Network ⊗₀ BaseIO) ⊗₀ BaseAdv)
 spec = ⊗-assoc⃖ CC.∘ (CC.id ⊗₁ B.m) CC.∘ NetTranslate
 
--- The extension layer, with `Adv` as its adversary channel.  `Shim` has none
--- either and is composed plainly for the same reason.
+-- The extension layer, with `Adv` as its adversary channel
 ext-spec : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ Adv)
 ext-spec = LinearLeios CC.∘ (Shim ⊗₁ CC.id)
 
--- The node as deployed: the extension layer stacked on the base spec.  Its
+-- The node as deployed: the extension layer stacked on the base spec. Its
 -- adversary channel is the base functionality's, `BaseAdv`, next to
--- `LinearLeios`'s own, `Adv`; that split is what `IsExtension` asks for, and
--- stating `Leios1` in this form makes its `is-extension` hold by `≅ᴹ-refl`.
+-- `LinearLeios`'s own, `Adv`
 Leios1 : Machine DD.M (IO ⊗₀ BaseAdv ⊗₀ Adv)
 Leios1 = ext-spec ∘ᴷ spec
 
@@ -111,13 +105,10 @@ LeiosBlock-Injective
     (hash-unique' rb eb₁ eb₂ correct₁ correct₂) refl
 
 module _ (IOF AdvF : Participant → Channel)
-  (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
-  (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
-  -- The honest nodes' channel, component by component; see `Deployment`.
-  -- For a uniform deployment (`IOF = const IO`, `AdvF = const _`) both are
-  -- `λ _ → refl`.
-  (honest-IOF  : {p : Participant} → p ∈ honestNodes → IOF p ≡ IO)
-  (honest-AdvF : {p : Participant} → p ∈ honestNodes → AdvF p ≡ BaseAdv ⊗₀ Adv)
+  (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honest-Nodes
+  (honest-Node : {p : Participant} → p ∈ honest-Nodes → nodesF p ≡ᴹ Leios1)
+  (honest-IOF  : {p : Participant} → p ∈ honest-Nodes → IOF p ≡ IO)
+  (honest-AdvF : {p : Participant} → p ∈ honest-Nodes → AdvF p ≡ BaseAdv ⊗₀ Adv)
   (isConstrained-Leios : IsConstrained Leios1 (IsBC.bciQueryType Participant {Block = LeiosBlock}))
   (isPure-Leios        : IsPure isConstrained-Leios)
   (IsBlockchain-base : IsBC.IsBlockchain Participant RankingBlock spec)
@@ -148,7 +139,7 @@ module _ (IOF AdvF : Participant → Channel)
     ; IOF                 = IOF
     ; AdvF                = AdvF
     ; all-nodes           = nodesF
-    ; honest-nodes        = honestNodes
+    ; honest-nodes        = honest-Nodes
     ; honest-nodes-≡-spec = honest-Node
     ; honest-IOF          = honest-IOF
     ; honest-AdvF         = honest-AdvF

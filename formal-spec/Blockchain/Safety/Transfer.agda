@@ -20,21 +20,6 @@ open import Relation.Binary using (Poset)
 -- Given an ext `Deployment` and an `IsExtension` witness (the base-side spec,
 -- channel/layer equipment, and block-level projection), safety of the
 -- derived base `Deployment` implies safety of the ext `Deployment`.
---
--- The protocol correspondence is now a machine ISOMORPHISM (`_≅ᴹ_`, a
--- bisimulation) rather than propositional machine equality.  Structurally the
--- proof is unchanged: `transState`/`transTrace` still push a state and a run
--- from the ext protocol to the base protocol, only now via the iso's `to` and
--- `Trace-map` instead of `subst`.  The component-wise channel facts about
--- honest nodes that the old `ChannelCat` extracted by ⊗-injectivity — which is
--- what made it inconsistent — are fields of `Deployment` (`honest-IOF`,
--- `honest-AdvF`).
---
--- The extension layer has its own adversary channel (`IsExtension.AdvL`), so
--- an ext node's adversary channel splits into its base node's and its
--- layer's.  The derived base deployment therefore has per-party adversary
--- channels (`base-AdvF`), and the environment is rewired with a per-party
--- forwarder (`unpad`) reassembling the ext channel.
 module Blockchain.Safety.Transfer
   {BlockExt BlockBase : Type}
   (ext                : Deployment BlockExt)
@@ -46,16 +31,16 @@ module Blockchain.Safety.Transfer
 module B = Spec base-spec
 open IsExtension extension
 
--- The honest nodes' channels, from the deployment.  The adversary channel is
--- read on the base side: the base spec's next to the extension layer's.
+-- The honest nodes' channels, from the deployment
 honest-IOF : ∀ {p} → p ∈ Ext.honest-nodes → Ext.IOF p ≡ Ext.IO
 honest-IOF = Ext.honest-IOF
 
+-- The adversary channel is the base spec's next to the extension layer's
 honest-AdvF : ∀ {p} → p ∈ Ext.honest-nodes → Ext.AdvF p ≡ B.Adv ⊗₀ AdvL
 honest-AdvF hp = trans (Ext.honest-AdvF hp) ext-Adv≡base-Adv⊗AdvL
 
 -- The base deployment's channels: the base spec's for honest parties, the ext
--- deployment's for the rest, whose nodes are kept as they are.
+-- deployment's for the rest
 base-IOF : Fin Ext.n → Channel
 base-IOF p = case p ∈? Ext.honest-nodes of λ where
   (yes _) → B.IO
@@ -125,11 +110,6 @@ base = record
 module Base = Deployment base
 
 private
-  -- The honest case of `single-protocol`, over channel variables so that the
-  -- three channel equalities can be matched on: the node's channels against
-  -- the ext spec's (`eX`, `eY`), and the ext spec's adversary channel against
-  -- its base/layer split (`eZ`).  With all three `refl`, the `subst`s vanish
-  -- and what is left is `is-extension` itself, up to the unit law.
   single-honest : ∀ {X Y Z} (eX : X ≡ Ext.IO) (eY : Y ≡ Z) (eZ : Z ≡ B.Adv ⊗₀ AdvL)
     (N : Machine Ext.Network (X ⊗₀ Y)) (S : Machine Ext.Network (Ext.IO ⊗₀ Z))
     → N ≡ᴹ S
@@ -144,8 +124,7 @@ private
     (≅ᴹ-trans (≅ᴹ-sym iso) (≡ᴹ→≅ᴹ (≡ᴹ-sym eq))))
 
 -- Each ext node is its extension layer stacked on its base node, once the
--- adversary channel is reassembled.  Honest parties by `is-extension`, the
--- rest by the unit law of `_∘ᴷ_`.
+-- adversary channel is reassembled
 single-protocol : ∀ p
   → ((CC.id ⊗₁ unpad p) CC.∘ (extPart p ∘ᴷ base-all-nodes p)) ≅ᴹ Ext.all-nodes p
 single-protocol p with p ∈? Ext.honest-nodes

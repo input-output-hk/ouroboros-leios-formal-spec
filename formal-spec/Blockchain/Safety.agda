@@ -32,11 +32,6 @@ record Deployment (Block : Type) : Type₂ where
     all-nodes           : (p : Fin n) → Machine Network (IOF p ⊗₀ AdvF p)
     honest-nodes        : ℙ (Fin n)
     honest-nodes-≡-spec : ∀ {p} → p ∈ honest-nodes → all-nodes p ≡ᴹ honest-node-spec
-    -- The channel of an honest node, component by component.  These are not
-    -- consequences of `honest-nodes-≡-spec`: that equates the tensors
-    -- `IOF p ⊗₀ AdvF p` and `IO ⊗₀ Adv`, and `_⊗₀_` — a sum of types — is not
-    -- injective, so the factors have to be given.  For a uniform deployment
-    -- (`IOF = const IO`, `AdvF = const Adv`) both are `λ _ → refl`.
     honest-IOF          : ∀ {p} → p ∈ honest-nodes → IOF p ≡ IO
     honest-AdvF         : ∀ {p} → p ∈ honest-nodes → AdvF p ≡ Adv
     network             : Machine I (n ⨂ⁿ Network ⊗₀ NAdv)
@@ -78,15 +73,8 @@ record Deployment (Block : Type) : Type₂ where
   safety : ℕ → Type₁
   safety k = ∀ {A} (E : Environment A) → Invariant (protocol E) (safeState k E)
 
--- | Witness that one `Spec` extends a given base `Spec`: the ext honest node
--- is an extension layer stacked (`_∘ᴷ_`) on the base honest node.  The layer
--- has its own adversary channel `AdvL`, so the ext adversary channel is the
--- base one next to the layer's.
---
--- The correspondence is a machine isomorphism (`_≅ᴹ_`), not propositional
--- equality: the two sides are built from different combinators and have
--- different `State` types, so `_≡_` between them is not provable, whereas
--- the transfer proofs only ever use the iso.
+-- | Witness that one `Spec` extends a given base `Spec`.
+-- The layer has its own adversary channel `AdvL`.
 record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
                    (base-spec : Spec BlockBase n Network)
                    (ext-spec  : Spec BlockExt  n Network) : Type₂ where
