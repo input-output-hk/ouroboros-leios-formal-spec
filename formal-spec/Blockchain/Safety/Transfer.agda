@@ -84,8 +84,7 @@ extPart p with p ∈? Ext.honest-nodes
 ... | yes hp = subst (λ x → Machine B.IO (x ⊗₀ AdvL)) (sym (honest-IOF hp)) ext-layer
 ... | no  _  = idᴷ
 
--- Reassembling an ext node's adversary channel from its base node's and its
--- layer's: a renaming for honest parties, the right unitor for the rest.
+-- Reassembling an ext node's adversary channel from its base node's and its layer's
 unpad : (p : Fin Ext.n) → Machine (base-AdvF p ⊗₀ extAdv p) (Ext.AdvF p)
 unpad p with p ∈? Ext.honest-nodes
 ... | yes hp = subst (Machine (B.Adv ⊗₀ AdvL)) (sym (honest-AdvF hp)) CC.id
@@ -147,16 +146,6 @@ module Main where
     transEnv : Base.Environment A
     transEnv = E CC.∘ transId CC.∘ ⨂ᴷ extPart ⊗₁ CC.id
 
-    -- Was: a propositional `_≡ᴹ_`, proven from the `ChannelCat` equations.
-    -- The shape of the chain is identical; every step is now a theorem
-    -- (`CategoricalCrypto.Machine.Iso`, `CategoricalCrypto.Machine.NAry`).
-    --
-    -- Opaque on purpose.  While `insert-id`/`⨂-absorb-env` were record fields
-    -- of a module parameter, `transState` below was a rigid term and
-    -- `transState E ?s ≟ transState E s` solved by first-order unification;
-    -- as theorems they unfold, and the unifier then has to compare two
-    -- normal forms of the whole isomorphism instead.  Nothing downstream needs
-    -- to see inside.
     opaque
       transProtocol : Ext.protocol E ≅ᴹ Base.protocol transEnv
       transProtocol =
