@@ -359,14 +359,13 @@ verifyStep' (Cert₁-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
   with certRequest s in eq
 ... | nothing = Err (Err-Cert₁-premises {c = c} λ { (_ , _ , creq , _ , _) → nothing≢just (trans (sym eq) creq) })
 ... | just eb
-  with ¿ (LeiosState.needsUpkeep s Base × (CertCheck ∈ˡ LeiosState.Upkeep s) × LeiosState.PendingQuery s ≡ just (hash eb) × AnswerMatches c (hash eb)) ¿
+  with ¿ (LeiosState.needsUpkeep s Base × (CertCheck ∈ˡ LeiosState.Upkeep s)
+          × LeiosState.PendingQuery s ≡ just (hash (LeiosState.currentRB s))
+          × AnswerMatches c (hash (LeiosState.currentRB s))) ¿
 ... | yes (upk , chk , peq , match) =
   Ok' (Cert₁ (upk , chk , eq , peq , match))
-... | no ¬p = Err (Err-Cert₁-premises λ { (upk , chk , creq , peq , match) →
-                let e = just-injective (trans (sym creq) eq)
-                in ¬p (upk , chk
-                      , subst (λ x → LeiosState.PendingQuery s ≡ just (hash x)) e peq
-                      , subst (λ x → AnswerMatches c (hash x)) e match) })
+... | no ¬p = Err (Err-Cert₁-premises λ { (upk , chk , _ , peq , match) →
+                ¬p (upk , chk , peq , match) })
 
 verifyStep' (Cert₂-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢CERT x)
 verifyStep' (Cert₂-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢CERT y)
@@ -394,12 +393,12 @@ verifyStep' (Cert₃-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
   with LeiosState.PendingQuery s in peq
 ... | nothing = Err (Err-Cert₃-premises λ { (_ , _ , _ , pq , _) → just≢nothing (trans (sym pq) peq) })
 ... | just r
-  with ¿ (LeiosState.needsUpkeep s Base × (CertCheck ∈ˡ LeiosState.Upkeep s) × hash eb ≢ r) ¿
+  with ¿ (LeiosState.needsUpkeep s Base × (CertCheck ∈ˡ LeiosState.Upkeep s)
+          × hash (LeiosState.currentRB s) ≢ r) ¿
 ... | yes (upk , chk , neq) = Ok' (Cert₃ {eb = eb} {r = r} (upk , chk , eq , peq , neq))
-... | no ¬p = Err (Err-Cert₃-premises λ { (upk , chk , creq , pq , neq) →
-                let e  = just-injective (trans (sym creq) eq)
-                    e' = just-injective (trans (sym pq) peq)
-                in ¬p (upk , chk , λ eqhr → neq (trans (trans (cong hash e) eqhr) (sym e'))) })
+... | no ¬p = Err (Err-Cert₃-premises λ { (upk , chk , _ , pq , neq) →
+                let e' = just-injective (trans (sym pq) peq)
+                in ¬p (upk , chk , λ eqhr → neq (trans eqhr (sym e'))) })
 
 verifyStep' (Ftch-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢FetchLdgI x)
 verifyStep' (Ftch-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢FetchLdgI y)

@@ -47,7 +47,7 @@ In order to build a test trace, an implementation for the `SpecStructure` needs 
 For the test trace, we rely on the implementation provided in `Test.Defaults`.
 ```agda
   -- TODO: why does Hashable-EndorserBlock not work instead of hpe...?
-  open import Test.Defaults params testParams using (d-SpecStructure; hpe)
+  open import Test.Defaults params testParams using (d-SpecStructure; hpe; hrb)
   open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
 ```
 #### TraceVerifier
@@ -79,17 +79,22 @@ Checking `hash` of EndorserBlocks
     verify-EB₁-hash : hash EB₁ ≡ 1 ∷ 2 ∷ 3 ∷ []
     verify-EB₁-hash = refl
 ```
-The certificate for `EB₁`, as answered by the voting functionality once the
-votes for `EB₁` reach a quorum.
-```agda
-    crt₁ : EBCert
-    crt₁ = hash EB₁
-```
 RankingBlocks that will be used in the test trace
 ```agda
-    RB₀ RB₁ RB₂ : RankingBlock
+    RB₀ RB₁ : RankingBlock
     RB₀ = record { txsOrEbCert = inj₁ (0 ∷ []) ; announcedEB = nothing }
     RB₁ = record { txsOrEbCert = inj₁ [] ; announcedEB = just (hash EB₁) }
+```
+The certificate for the votes on `EB₁`, as answered by the voting
+functionality once they reach a quorum. Votes bind the hash of the
+announcing ranking block, so the certificate is for `RB₁`, not for `EB₁`.
+```agda
+    crt₁ : EBCert
+    crt₁ = hash ⦃ hrb ⦄ RB₁
+```
+`RB₂` carries that certificate.
+```agda
+    RB₂ : RankingBlock
     RB₂ = record { txsOrEbCert = inj₂ crt₁ ; announcedEB = just (hash EB₂) }
 ```
 Votes: a vote is a pair of the voter and the hash of the endorser block it
@@ -244,8 +249,9 @@ for EB₁.
 ### The certificate fires
 The node casts its own vote at slot 104 (`VT-Role`, sent to the voting
 functionality) and the vote `VT₁` diffuses at slot 105; from slot 107 the
-node's base upkeep queries the voting functionality for a certificate for
-`EB₁` (`Base₃`) and embeds the positive answer `crt₁` in the RB it submits
+node's base upkeep queries the voting functionality for a certificate on
+the tip `RB₁`, which announces `EB₁` (`Base₃`), and embeds the positive
+answer `crt₁` in the RB it submits
 (`Cert₁`) — the certificate is never stored, it exists only inside RBs.
 Once the base chain delivers `RB₂` carrying the certificate, the ledger
 resolves it to `EB₁`'s transactions.
@@ -273,16 +279,17 @@ passed as of slot 200.
     EB₄ : EndorserBlock
     EB₄ = mkEB 190 fzero tt (EB , tt) (200 ∷ [])
 ```
-The certificate for `EB₃`, as it would be answered before the tip moves on.
-```agda
-    crt₃ : EBCert
-    crt₃ = hash EB₃
-```
 `RB₃` announces `EB₃`, `RB₄` announces `EB₄`.
 ```agda
     RB₃ RB₄ : RankingBlock
     RB₃ = record { txsOrEbCert = inj₁ [] ; announcedEB = just (hash EB₃) }
     RB₄ = record { txsOrEbCert = inj₁ [] ; announcedEB = just (hash EB₄) }
+```
+The certificate for the votes on `EB₃`, keyed by its announcing block `RB₃`,
+as it would be answered before the tip moves on.
+```agda
+    crt₃ : EBCert
+    crt₃ = hash ⦃ hrb ⦄ RB₃
 ```
 Starting at slot 200, with the chain tip announcing `EB₃`.
 ```agda
