@@ -148,7 +148,7 @@ data d-BaseRel : machine-type d-BaseState d-BaseChannel where
         (just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ BaseAbstract.SLOT slot))
         (blocks , slot)
 
-open Blockchain.IsBlockchain (Fin 1)
+open Blockchain.IsBlockchain
 
 helper : BlockChainInfo RankingBlock → BaseAbstract.BaseIOF d-Base CategoricalCrypto.Out
 helper = let open BaseAbstract.BaseIOF in λ where
@@ -211,6 +211,12 @@ d-BaseFunctionality =
           ; producer = λ _ → Fin.zero
           ; slotOf   = λ _ → 0
           }
+    ; qI        = helper
+    ; qO        = λ where {Chain} rankingBlocks → BaseAbstract.BASE-LDG rankingBlocks
+                          {Slot}  slot          → BaseAbstract.SLOT slot
+    ; queryI-IO = λ _ → refl
+    ; queryO-IO = λ where {Chain} _ → refl
+                          {Slot}  _ → refl
     }
 
 open import Leios.FFD public

@@ -8,12 +8,8 @@ open import Leios.Config
 open import CategoricalCrypto hiding (id)
 import CategoricalCrypto as CC
 open import CategoricalCrypto.Channel.Selection
-open import CategoricalCrypto.Machine.Iso using (≅ᴹ-refl)
 
-open import Blockchain.Safety
-import Blockchain.IsBlockchain as IsBC
-import Blockchain.Safety.Transfer as Transfer
-import Blockchain.Liveness.Transfer as LTransfer
+open import Tactic.Defaults
 
 open import Data.Product.Properties
 
@@ -25,6 +21,11 @@ module Network.Leios
   (HashCorrect-irrel : ∀ rb eb → Irrelevant (HashCorrectB rb eb))
   (hash-unique : (rb : RankingBlock) → (eb₁ eb₂ : Maybe EndorserBlock)
     → HashCorrectB rb eb₁ → HashCorrectB rb eb₂ → eb₁ ≡ eb₂)
+  -- The EB a ranking block determines.  `hash-unique` already makes it a
+  -- function of the block; naming it lets the deployed node answer a chain
+  -- query with Leios blocks.
+  (ebOf : RankingBlock → Maybe EndorserBlock)
+  (ebOf-correct : ∀ rb → HashCorrectB rb (ebOf rb))
     where
 
 open import Leios.Linear ⋯ params
@@ -76,14 +77,105 @@ NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 spec : Machine DD.M ((Network ⊗₀ BaseIO) ⊗₀ BaseAdv)
 spec = ⊗-assoc⃖ CC.∘ (CC.id ⊗₁ B.m) CC.∘ NetTranslate
 
--- The extension layer, with `Adv` as its adversary channel
-ext-spec : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ Adv)
-ext-spec = LinearLeios CC.∘ (Shim ⊗₁ CC.id)
+-- The node's query port.  The base layer's queries are asked of the deployed
+-- node here and answered here; its own channel type keeps the port a distinct
+-- atom for the wiring solver, although its messages are the base layer's.
+data QryT : Mode → Type where
+  ask : BaseIOF Out → QryT Out
+  ans : BaseIOF In  → QryT In
+
+QIO : Channel
+QIO = simpleChannel QryT
+
+-- The base layer has one IO port and two users, the Leios node and whoever
+-- queries the deployed node.  `Mux` shares it: every request is forwarded
+-- down, and for the ones the base layer answers it remembers whom to hand the
+-- answer to.  The memory is a stack, pushed by a request and popped by its
+-- answer, so that a query finds the multiplexer in any state and leaves it as
+-- it found it; a request and its answer never straddle a step of the composite.
+module Mux where
+
+  data Requester : Type where
+    node query : Requester
+
+  State = List Requester
+
+  -- The requests the base layer answers.  `SUBMIT` is fire-and-forget.
+  pend : BaseIOF Out → State → State
+  pend FTCH-LDG  rs = node ∷ rs
+  pend FTCH-SLOT rs = node ∷ rs
+  pend _         rs = rs
+
+  private variable
+    rs : State
+    x  : BaseIOF Out
+    y  : BaseIOF In
+
+  data WithState_receive_return_newState_ : MachineType BaseIO (BaseIO ⊗₀ QIO) State where
+
+    Req :                                                -- the node asks the base layer
+      WithState rs
+      receive L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ x
+      return just (ϵ ⊗R ↑ₒ x)
+      newState (pend x rs)
+
+    Ans :                                                -- and is answered
+      WithState (node ∷ rs)
+      receive ϵ ⊗R ↑ᵢ y
+      return just (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ y)
+      newState rs
+
+    Ask :                                                -- a query for the base layer
+      WithState rs
+      receive L⊗ (L⊗ ϵ) ᵗ¹ ↑ₒ ask x
+      return just (ϵ ⊗R ↑ₒ x)
+      newState (query ∷ rs)
+
+    Tell :                                               -- and its answer
+      WithState (query ∷ rs)
+      receive ϵ ⊗R ↑ᵢ y
+      return just (L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ ans y)
+      newState rs
+
+Mux : Machine BaseIO (BaseIO ⊗₀ QIO)
+Mux .Machine.State   = _
+Mux .Machine.stepRel = Mux.WithState_receive_return_newState_
+
+-- The extension layer, with `Adv` as its adversary channel.  From the base
+-- spec's IO up: the network shim next to the multiplexer, which splits the
+-- base layer's port into the node's and the query port; a reassociation that
+-- puts the node's two channels together; the node; and a regrouping that
+-- gathers the layer's IO, `ExtIO`, next to its adversary channel.  The query
+-- port passes through the node untouched.
+ExtIO : Channel
+ExtIO = IO ⊗₀ QIO
+
+mux-layer : Machine (Network ⊗₀ BaseIO) (FFD ⊗₀ (BaseIO ⊗₀ QIO))
+mux-layer = Shim ⊗₁ Mux
+
+mux-shuffle : Machine (FFD ⊗₀ (BaseIO ⊗₀ QIO)) ((FFD ⊗₀ BaseIO) ⊗₀ QIO)
+mux-shuffle = ⊗-assoc⃖
+
+node-layer : Machine ((FFD ⊗₀ BaseIO) ⊗₀ QIO) ((IO ⊗₀ Adv) ⊗₀ QIO)
+node-layer = LinearLeios ⊗₁ CC.id
+
+-- The solver does not unfold names, so its goals spell `ExtIO` out.
+regroup-extᵢ : ((IO ⊗₀ Adv) ⊗₀ QIO) [ In ]⇒[ In ] ((IO ⊗₀ QIO) ⊗₀ Adv)
+regroup-extᵢ = ⇒-solver
+
+regroup-extₒ : ((IO ⊗₀ QIO) ⊗₀ Adv) [ Out ]⇒[ Out ] ((IO ⊗₀ Adv) ⊗₀ QIO)
+regroup-extₒ = ⇒-solver
+
+regroup-ext : Machine ((IO ⊗₀ Adv) ⊗₀ QIO) (ExtIO ⊗₀ Adv)
+regroup-ext = TotalFunctionMachine' regroup-extᵢ regroup-extₒ
+
+ext-spec : Machine (Network ⊗₀ BaseIO) (ExtIO ⊗₀ Adv)
+ext-spec = regroup-ext CC.∘ (node-layer CC.∘ (mux-shuffle CC.∘ mux-layer))
 
 -- The node as deployed: the extension layer stacked on the base spec. Its
 -- adversary channel is the base functionality's, `BaseAdv`, next to
 -- `LinearLeios`'s own, `Adv`
-Leios1 : Machine DD.M (IO ⊗₀ BaseAdv ⊗₀ Adv)
+Leios1 : Machine DD.M (ExtIO ⊗₀ BaseAdv ⊗₀ Adv)
 Leios1 = ext-spec ∘ᴷ spec
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
@@ -97,95 +189,13 @@ hash-unique' : (rb : RankingBlock) → (eb₁ eb₂ : Maybe EndorserBlock)
 hash-unique' rb eb₁ eb₂ hc₁ hc₂ =
   Σ-≡,≡→≡ (hash-unique rb eb₁ eb₂ hc₁ hc₂ , HashCorrect-irrel _ _ _ _)
 
+-- A ranking block as a Leios block.
+toLeiosBlock : RankingBlock → LeiosBlock
+toLeiosBlock rb = record { rb = rb ; eb = ebOf rb ; correct = ebOf-correct rb }
+
 LeiosBlock-Injective : Injective _≡_ _≡_ LeiosBlock.rb
 LeiosBlock-Injective
   {record { rb = rb ; eb = eb₁ ; correct = correct₁ }}
   {record { rb = rb ; eb = eb₂ ; correct = correct₂ }} refl =
   subst (λ (eb , correct) → _ ≡ record { rb = rb ; eb = eb ; correct = correct })
     (hash-unique' rb eb₁ eb₂ correct₁ correct₂) refl
-
-module _ (IOF AdvF : Participant → Channel)
-  (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honest-Nodes
-  (honest-Node : {p : Participant} → p ∈ honest-Nodes → nodesF p ≡ᴹ Leios1)
-  (honest-IOF  : {p : Participant} → p ∈ honest-Nodes → IOF p ≡ IO)
-  (honest-AdvF : {p : Participant} → p ∈ honest-Nodes → AdvF p ≡ BaseAdv ⊗₀ Adv)
-  (isConstrained-Leios : IsConstrained Leios1 (IsBC.bciQueryType Participant {Block = LeiosBlock}))
-  (isPure-Leios        : IsPure isConstrained-Leios)
-  (IsBlockchain-base : IsBC.IsBlockchain Participant RankingBlock spec)
-    where
-
-  private
-    module IBB = IsBC.IsBlockchain IsBlockchain-base
-
-  IsBlockchain-Leios : IsBC.IsBlockchain Participant LeiosBlock Leios1
-  IsBlockchain-Leios = record
-    { isConstrained = isConstrained-Leios
-    ; isPure        = isPure-Leios
-    ; producer      = λ b → IBB.producer (LeiosBlock.rb b)
-    ; slotOf        = λ b → IBB.slotOf   (LeiosBlock.rb b)
-    }
-
-  safetyS : Deployment LeiosBlock
-  safetyS = record
-    { n                   = numberOfParties
-    ; Network             = _
-    ; spec                = record
-        { IO                = _
-        ; Adv               = _
-        ; honest-node-spec  = Leios1
-        ; spec-IsBlockchain = IsBlockchain-Leios
-        }
-    ; NAdv                = _
-    ; IOF                 = IOF
-    ; AdvF                = AdvF
-    ; all-nodes           = nodesF
-    ; honest-nodes        = honest-Nodes
-    ; honest-nodes-≡-spec = honest-Node
-    ; honest-IOF          = honest-IOF
-    ; honest-AdvF         = honest-AdvF
-    ; network             = DD.Network
-    }
-
-  module S = Deployment safetyS
-
-  base-spec : Spec RankingBlock S.n S.Network
-  base-spec = record
-    { IO                = _
-    ; Adv               = _
-    ; honest-node-spec  = spec
-    ; spec-IsBlockchain = IsBlockchain-base
-    }
-
-  extension : IsExtension base-spec (Deployment.spec safetyS)
-  extension = record
-    { AdvL             = Adv
-    ; ext-Adv≡base-Adv⊗AdvL = refl
-    ; ext-layer        = ext-spec
-    ; is-extension     = ≅ᴹ-refl
-    ; getBaseBlock     = LeiosBlock.rb
-    ; getBaseBlock-inj = LeiosBlock-Injective
-    }
-
-  private
-    module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-      safetyS base-spec extension
-    module TrM = Tr.Main
-
-  leiosSafety : (∀ {A} (E : Deployment.Environment safetyS A) → TrM.ChainLemma-ty E)
-              → Deployment.safety Tr.base k → S.safety k
-  leiosSafety = TrM.transfer k
-
-  private
-    module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-      safetyS base-spec extension (λ _ → refl) (λ _ → refl)
-    module LTrM = LTr.Main
-
-  leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-           → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-           → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
-  leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
-
-  leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-           → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-           → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
-  leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL

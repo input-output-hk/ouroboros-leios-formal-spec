@@ -25,7 +25,7 @@ record Deployment (Block : Type) : Type₂ where
     Network : Channel
     spec    : Spec Block n Network
   open Spec spec public
-  open IsBC (Fin n) public
+  open IsBC public
   field
     NAdv                : Channel
     IOF AdvF            : Fin n → Channel
@@ -36,9 +36,9 @@ record Deployment (Block : Type) : Type₂ where
     honest-AdvF         : ∀ {p} → p ∈ honest-nodes → AdvF p ≡ Adv
     network             : Machine I (n ⨂ⁿ Network ⊗₀ NAdv)
 
-  honest-nodes-blockchain : ∀ {p} → p ∈ honest-nodes → IsBlockchain Block (all-nodes p)
+  honest-nodes-blockchain : ∀ {p} → p ∈ honest-nodes → IsBlockchain (Fin n) Block (all-nodes p)
   honest-nodes-blockchain p-honest =
-    ≡ᴹ-subst (IsBlockchain Block) (≡ᴹ-sym (honest-nodes-≡-spec p-honest)) spec-IsBlockchain
+    ≡ᴹ-subst (IsBlockchain (Fin n) Block) (≡ᴹ-sym (honest-nodes-≡-spec p-honest)) spec-IsBlockchain
 
   nodes : Machine (n ⨂ⁿ Network) (⨂ IOF ⊗₀ ⨂ AdvF)
   nodes = ⨂ᴷ all-nodes
