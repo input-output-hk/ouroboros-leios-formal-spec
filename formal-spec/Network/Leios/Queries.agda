@@ -238,15 +238,14 @@ IsBlockchain-spec base-party = record
 
 -- Queries and answers over Leios blocks are the base layer's over ranking
 -- blocks.
+-- The shared re-tagging of `Blockchain.IsBlockchain`, at these block types.
 baseQ : BlockChainInfo LeiosBlock → BlockChainInfo RankingBlock
-baseQ Chain = Chain
-baseQ Slot  = Slot
+baseQ = IsBC.baseQ
 
-mapBase : ∀ q → bciQueryType {Block = LeiosBlock} q → bciQueryType {Block = RankingBlock} (baseQ q)
-mapBase Chain = map LeiosBlock.rb
-mapBase Slot  = λ n → n
+mapBase : ∀ q → bciQueryType {Block = LeiosBlock} q → bciQueryType (baseQ q)
+mapBase = IsBC.mapAnswer LeiosBlock.rb
 
-mapExt : ∀ q → bciQueryType {Block = RankingBlock} (baseQ q) → bciQueryType {Block = LeiosBlock} q
+mapExt : ∀ q → bciQueryType (baseQ q) → bciQueryType {Block = LeiosBlock} q
 mapExt Chain = map toLeiosBlock
 mapExt Slot  = λ n → n
 

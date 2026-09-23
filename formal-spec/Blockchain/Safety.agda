@@ -6,6 +6,7 @@ open import CategoricalCrypto hiding (id; _∘_)
 open import CategoricalCrypto.Machine.Iso using (_≅ᴹ_)
 
 import Blockchain.IsBlockchain as IsBC
+open import CategoricalCrypto.Ext using (subst-≡ᴹ-out)
 
 module Blockchain.Safety where
 
@@ -73,6 +74,36 @@ record Deployment (Block : Type) : Type₂ where
   safety : ℕ → Type₁
   safety k = ∀ {A} (E : Environment A) → Invariant (protocol E) (safeState k E)
 
+-- Observation helpers for an extension, defined outside `IsExtension` so that
+-- they may be used in the type of its last field.
+module ExtObs {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
+              (base-spec : Spec BlockBase n Network)
+              (ext-spec  : Spec BlockExt  n Network) where
+  private
+    module B = Spec base-spec
+    module E = Spec ext-spec
+
+  -- The base node's state inside an ext node's: what the extension
+  -- isomorphism exposes, once the layer's own state is dropped.
+  baseState : (AdvL : Channel) (layer : Machine B.IO (E.IO ⊗₀ AdvL))
+              (eq : E.Adv ≡ B.Adv ⊗₀ AdvL)
+            → E.honest-node-spec ≅ᴹ subst (λ A → Machine Network (E.IO ⊗₀ A))
+                                          (sym eq) (layer ∘ᴷ B.honest-node-spec)
+            → Machine.State E.honest-node-spec → Machine.State B.honest-node-spec
+  baseState AdvL layer eq iso σ =
+    proj₁ (proj₁ (state-subst (subst-≡ᴹ-out (sym eq) (layer ∘ᴷ B.honest-node-spec))
+                              (_≅ᴹ_.to iso σ)))
+
+  extAns : (bci : IsBC.BlockChainInfo BlockExt)
+         → Machine.State E.honest-node-spec → IsBC.bciQueryType bci
+  extAns bci σ = proj₁ (IsConstrained.queryCompute
+    (IsBC.IsBlockchain.isConstrained E.spec-IsBlockchain) bci σ)
+
+  baseAns : (bci : IsBC.BlockChainInfo BlockBase)
+          → Machine.State B.honest-node-spec → IsBC.bciQueryType bci
+  baseAns bci σ = proj₁ (IsConstrained.queryCompute
+    (IsBC.IsBlockchain.isConstrained B.spec-IsBlockchain) bci σ)
+
 -- | Witness that one `Spec` extends a given base `Spec`.
 -- The layer has its own adversary channel `AdvL`.
 record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
@@ -81,6 +112,7 @@ record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
   private
     module B = Spec base-spec
     module E = Spec ext-spec
+    module O = ExtObs base-spec ext-spec
   field
     AdvL             : Channel
     ext-layer        : Machine B.IO (E.IO ⊗₀ AdvL)
@@ -92,3 +124,20 @@ record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
                  ≅ᴹ subst (λ A → Machine Network (E.IO ⊗₀ A))
                           (sym ext-Adv≡base-Adv⊗AdvL)
                           (ext-layer ∘ᴷ B.honest-node-spec)
+
+    -- Observations are preserved: asking the ext node is asking the base node
+    -- it is stacked on.  This is what makes the chain and slot lemmas true,
+    -- and it is genuinely extra data — `is-extension` relates the two nodes as
+    -- MACHINES and says nothing about their `IsBlockchain` structures, which a
+    -- machine does not determine (see `Blockchain.QueryChoice`).
+    query-compat : ∀ bci σ
+      → IsBC.mapAnswer getBaseBlock bci (O.extAns bci σ)
+      ≡ O.baseAns (IsBC.baseQ bci)
+          (O.baseState AdvL ext-layer ext-Adv≡base-Adv⊗AdvL is-extension σ)
+
+  baseStateOf : Machine.State E.honest-node-spec → Machine.State B.honest-node-spec
+  baseStateOf = O.baseState AdvL ext-layer ext-Adv≡base-Adv⊗AdvL is-extension
+
+  mapAnswer : (bci : IsBC.BlockChainInfo BlockExt)
+            → IsBC.bciQueryType bci → IsBC.bciQueryType (IsBC.baseQ {Block₂ = BlockBase} bci)
+  mapAnswer = IsBC.mapAnswer getBaseBlock

@@ -4,7 +4,8 @@ open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import Blockchain.Safety
 import Blockchain.IsBlockchain as IsBC
 open import CategoricalCrypto.Machine.NAry
-  using (⨂-reshape-env-helper; ⨂-absorb-env-helper; unit-∘ᴷ; ⨂-reshape-env; ⨂-absorb-env)
+  using (⨂-reshape-env-helper; ⨂-absorb-env-helper; unit-∘ᴷ; ⨂-reshape-env; ⨂-absorb-env
+        ; ⨂-reshape-env-sub; ⨂-absorb-env-sub)
 
 open import CategoricalCrypto hiding (id)
 import CategoricalCrypto as CC
@@ -162,6 +163,64 @@ module Main where
     transTrace : {s₁ s₂ : Machine.State (Ext.protocol E)} → Trace (Ext.protocol E) s₁ s₂
       → Trace (Base.protocol transEnv) (transState s₁) (transState s₂)
     transTrace = Trace-map transProtocol
+
+    -- The nodes' component of a protocol state, on each side.  Named with
+    -- explicit types: `single-protocol p` is defined by `with p ∈? honest-nodes`
+    -- and so is stuck at a variable `p`, which leaves a bare `proj₁` nothing
+    -- to elaborate against.
+    nodesOf : Machine.State (Ext.protocol E) → Machine.State Ext.nodes
+    nodesOf S = proj₁ (proj₂ (proj₁ (proj₁ S)))
+
+    baseNodesOf : Machine.State (Base.protocol transEnv) → Machine.State Base.nodes
+    baseNodesOf S = proj₁ (proj₂ (proj₁ (proj₁ S)))
+
+    baseCompOf : ∀ p
+      → Machine.State ((CC.id ⊗₁ unpad p) CC.∘ (extPart p ∘ᴷ base-all-nodes p))
+      → Machine.State (base-all-nodes p)
+    baseCompOf _ X = proj₁ (proj₁ (proj₁ X))
+
+    extCompOf : ∀ p
+      → Machine.State ((CC.id ⊗₁ unpad p) CC.∘ (extPart p ∘ᴷ base-all-nodes p))
+      → Machine.State (extPart p ∘ᴷ base-all-nodes p)
+    extCompOf _ X = proj₁ X
+
+    -- Sub-state transport: the transfer carries node `p`'s state to the base
+    -- component that `single-protocol p` splits out of it.  Together with
+    -- `query-compat` this is what makes the chain and slot lemmas true.
+    opaque
+      unfolding transProtocol
+
+      transState-nodes : ∀ p s
+        → ⨂ᴷ-sub-state {f = base-all-nodes} p (baseNodesOf (transState s))
+          ≡ baseCompOf p (_≅ᴹ_.from (single-protocol p)
+              (⨂ᴷ-sub-state {f = Ext.all-nodes} p (nodesOf s)))
+      transState-nodes p (((sNet , (sNodes , _)) , _) , sE) =
+        trans absorbEq (cong (λ z → proj₁ (proj₁ z)) reshapeEq)
+        where
+          extBase : (q : Fin Ext.n) → Machine Ext.Network (Ext.IOF q ⊗₀ (base-AdvF q ⊗₀ extAdv q))
+          extBase q = extPart q ∘ᴷ base-all-nodes q
+
+          αAbs : Machine (⨂ Ext.IOF ⊗₀ (Ext.NAdv ⊗₀ ⨂ (λ q → base-AdvF q ⊗₀ extAdv q))) A
+          αAbs = E CC.∘ ⨂-reshape-env-helper {n = Ext.n}
+                          {E₂' = λ q → base-AdvF q ⊗₀ extAdv q} {E₂ = Ext.AdvF} unpad
+
+          step₁ : Machine.State (αAbs CC.∘ (⨂ᴷ extBase ∘ᴷ Ext.network))
+          step₁ = _≅ᴹ_.to (⨂-reshape-env Ext.all-nodes extBase unpad single-protocol
+                                          Ext.network E)
+                          (((sNet , (sNodes , tt)) , tt) , sE)
+
+          reshapeEq : ⨂ᴷ-sub-state {f = extBase} p (proj₁ (proj₂ (proj₁ (proj₁ step₁))))
+                    ≡ extCompOf p (_≅ᴹ_.from (single-protocol p)
+                        (⨂ᴷ-sub-state {f = Ext.all-nodes} p sNodes))
+          reshapeEq = ⨂-reshape-env-sub Ext.all-nodes extBase unpad single-protocol
+                                        Ext.network E p sNet sNodes sE
+
+          absorbEq : ⨂ᴷ-sub-state {f = base-all-nodes} p
+                       (baseNodesOf (transState (((sNet , (sNodes , tt)) , tt) , sE)))
+                   ≡ proj₁ (proj₁ (⨂ᴷ-sub-state {f = extBase} p
+                       (proj₁ (proj₂ (proj₁ (proj₁ step₁))))))
+          absorbEq = ⨂-absorb-env-sub extPart base-all-nodes Ext.network αAbs
+                       p (proj₁ step₁) (proj₂ step₁)
 
   ChainLemma-ty : ∀ {A : Channel} → Ext.Environment A → Type
   ChainLemma-ty {A} E = ∀ {p : Fin Ext.n} {s} (p-honest : p ∈ Ext.honest-nodes)

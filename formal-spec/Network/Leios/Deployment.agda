@@ -93,6 +93,10 @@ module _ (IOF AdvF : Participant → Channel)
     ; is-extension     = ≅ᴹ-refl
     ; getBaseBlock     = LeiosBlock.rb
     ; getBaseBlock-inj = LeiosBlock-Injective
+    -- `mapAnswer` and `mapBase` agree only after the query is cased on, so
+    -- the two shapes are matched here rather than handed over wholesale.
+    ; query-compat     = λ where Chain σ → node-compat Chain σ
+                                 Slot  σ → node-compat Slot  σ
     }
 
   private
