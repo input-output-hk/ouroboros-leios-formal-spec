@@ -287,9 +287,13 @@ module Main where
     → Base.getChain (transEnv E) (transState E s) p-honest
     ≡ map getBaseBlock (Ext.getChain E s p-honest)
 
+  -- The chain lemma, discharged: `Chain` instance of the square.
+  ChainLemma : ∀ {A} (E : Ext.Environment A) → ChainLemma-ty E
+  ChainLemma E hp = query-lemma E IsBC.Chain hp
+
   module ≼-Reasoning {A} = Relation.Binary.Reasoning.PartialOrder (Poset-≼ {A})
 
-  module _ {A : Channel} (E : Ext.Environment A) (CL : ChainLemma-ty E) (s : Machine.State (Ext.protocol E)) where
+  module _ {A : Channel} (E : Ext.Environment A) (s : Machine.State (Ext.protocol E)) where
     open ≼-Reasoning
 
     private
@@ -299,27 +303,23 @@ module Main where
 
     safeState-ext⇒base : (k : ℕ) → Ext.safeState k E s → Base.safeState k (transEnv E) (transState E s)
     safeState-ext⇒base k safe hp hp' = begin
-        prune k (Base.getChain (transEnv E) (transState E s) hp)   ≡⟨ cong (prune k) (CL hp) ⟩
+        prune k (Base.getChain (transEnv E) (transState E s) hp)   ≡⟨ cong (prune k) (ChainLemma E hp) ⟩
         prune k (map getBaseBlock (Ext.getChain E s hp))           ≡⟨ prune-map {k = k} ⟩
         map getBaseBlock (prune k (Ext.getChain E s hp))           ≤⟨ map-≼ (safe hp hp') ⟩
-        map getBaseBlock (Ext.getChain E s hp')                    ≡⟨ CL hp' ⟨
+        map getBaseBlock (Ext.getChain E s hp')                    ≡⟨ ChainLemma E hp' ⟨
         Base.getChain (transEnv E) (transState E s) hp'            ∎
 
     safeState-base⇒ext : (k : ℕ) → Base.safeState k (transEnv E) (transState E s) → Ext.safeState k E s
     safeState-base⇒ext k safe hp hp' = inj-≼ $ begin
         map getBaseBlock (prune k (Ext.getChain E s hp))           ≡⟨ prune-map {k = k} ⟨
-        prune k (map getBaseBlock (Ext.getChain E s hp))           ≡⟨ cong (prune k) (CL hp) ⟨
+        prune k (map getBaseBlock (Ext.getChain E s hp))           ≡⟨ cong (prune k) (ChainLemma E hp) ⟨
         prune k (Base.getChain (transEnv E) (transState E s) hp)   ≤⟨ safe hp hp' ⟩
-        Base.getChain (transEnv E) (transState E s) hp'            ≡⟨ CL hp' ⟩
+        Base.getChain (transEnv E) (transState E s) hp'            ≡⟨ ChainLemma E hp' ⟩
         map getBaseBlock (Ext.getChain E s hp')                    ∎
-
-  -- The chain lemma, discharged: `Chain` instance of the square.
-  ChainLemma : ∀ {A} (E : Ext.Environment A) → ChainLemma-ty E
-  ChainLemma E hp = query-lemma E IsBC.Chain hp
 
   transfer : (k : ℕ) → Base.safety k → Ext.safety k
   transfer k baseSafety E init final trace safeInit =
-    safeState-base⇒ext E (ChainLemma E) final k
+    safeState-base⇒ext E final k
       (baseSafety (transEnv E) (transState E init) (transState E final)
                   (transTrace E trace)
-                  (safeState-ext⇒base E (ChainLemma E) init k safeInit))
+                  (safeState-ext⇒base E init k safeInit))

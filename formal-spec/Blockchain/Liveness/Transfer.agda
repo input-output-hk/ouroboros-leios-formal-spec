@@ -87,6 +87,10 @@ module Main where
     → Base.getSlot (transEnv E) (transState E s) p-honest
     ≡ Ext.getSlot E s p-honest
 
+  -- The slot lemma, discharged: `Slot` instance of the same square.
+  SlotLemma : ∀ {A} (E : Ext.Environment A) → SlotLemma-ty E
+  SlotLemma E hp = query-lemma E IsBC.Slot hp
+
   recent-map : ∀ T s (l : List BlockExt)
     → BL.recent T s (map getBaseBlock l) ≡ map getBaseBlock (EL.recent T s l)
   recent-map T s l =
@@ -99,7 +103,6 @@ module Main where
                       l))
 
   module _ {A : Channel} (E : Ext.Environment A)
-           (CL : ChainLemma-ty E) (SL : SlotLemma-ty E)
            (s : Machine.State (Ext.protocol E)) where
 
     -- HCG -----------------------------------------------------------------
@@ -109,7 +112,7 @@ module Main where
       → BL.hcgState τ (transEnv E) (transState E s)
     hcgState-ext⇒base τ ext-hcg-s {p} hp {pref} {suff} {b} base-eq honest-b =
       case map-split (Ext.getChain E s hp) pref b suff
-             (trans (sym (CL hp)) base-eq) of λ where
+             (trans (sym (ChainLemma E hp)) base-eq) of λ where
         (pref' , b' , suff' , ext-eq , _ , fb'≡ , msuff≡) →
           H.result pref' b' suff' ext-eq fb'≡ msuff≡
       where
@@ -129,7 +132,7 @@ module Main where
 
           slot-eq : Ext.getSlot E s hp
                   ≡ Base.getSlot (transEnv E) (transState E s) hp
-          slot-eq = sym (SL hp)
+          slot-eq = sym (SlotLemma E hp)
 
           slotOf-eq : Ext.slotOf b' ≡ Base.slotOf b
           slotOf-eq = trans (slotOf-compat b') (cong Base.slotOf fb'≡)
@@ -169,7 +172,7 @@ module Main where
 
           base-eq : Base.getChain (transEnv E) (transState E s) hp
                   ≡ map getBaseBlock pref ++ getBaseBlock b ∷ map getBaseBlock suff
-          base-eq = trans (CL hp)
+          base-eq = trans (ChainLemma E hp)
                           (trans (cong (map getBaseBlock) ext-eq)
                                  (map-++ getBaseBlock pref (b ∷ suff)))
 
@@ -180,7 +183,7 @@ module Main where
 
           slot-eq : Base.getSlot (transEnv E) (transState E s) hp
                   ≡ Ext.getSlot E s hp
-          slot-eq = SL hp
+          slot-eq = SlotLemma E hp
 
           length-eq : length (map getBaseBlock suff) ≡ length suff
           length-eq = length-map getBaseBlock suff
@@ -213,7 +216,7 @@ module Main where
 
           mapped-any = subst (λ x → Any.Any EL.isHonestBlock
                                        (EL.recent T x (Ext.getChain E s hp)))
-                             (sym (SL hp)) ext-any
+                             (sym (SlotLemma E hp)) ext-any
 
           -- Transport honesty along `producer-compat`.
           any-base-honest = Any.map
@@ -231,7 +234,7 @@ module Main where
 
       in subst (λ cs → Any.Any BL.isHonestBlock
                          (BL.recent T (Base.getSlot (transEnv E) (transState E s) hp) cs))
-               (sym (CL hp))
+               (sym (ChainLemma E hp))
                any-base-recent
 
     ∃cqState-base⇒ext : ∀ T
@@ -243,7 +246,7 @@ module Main where
           -- Rewrite base chain → map getBaseBlock of ext chain.
           step₁ = subst (λ cs → Any.Any BL.isHonestBlock
                                   (BL.recent T (Base.getSlot (transEnv E) (transState E s) hp) cs))
-                        (CL hp) base-any
+                        (ChainLemma E hp) base-any
 
           -- Pull `map getBaseBlock` out of `recent`.
           step₂ = subst (Any.Any BL.isHonestBlock)
@@ -260,24 +263,20 @@ module Main where
             step₃
       in subst (λ x → Any.Any EL.isHonestBlock
                          (EL.recent T x (Ext.getChain E s hp)))
-               (SL hp) step₄
+               (SlotLemma E hp) step₄
 
   -- Transfer the hcg and ∃cq invariants.
 
-  -- The slot lemma, discharged: `Slot` instance of the same square.
-  SlotLemma : ∀ {A} (E : Ext.Environment A) → SlotLemma-ty E
-  SlotLemma E hp = query-lemma E IsBC.Slot hp
-
   hcg-transfer : ∀ τ → BL.hcg τ → EL.hcg τ
   hcg-transfer τ base-hcg E init final trace hcg-init =
-    hcgState-base⇒ext E (ChainLemma E) (SlotLemma E) final τ
+    hcgState-base⇒ext E final τ
       (base-hcg (transEnv E) (transState E init) (transState E final)
                 (transTrace E trace)
-                (hcgState-ext⇒base E (ChainLemma E) (SlotLemma E) init τ hcg-init))
+                (hcgState-ext⇒base E init τ hcg-init))
 
   ∃cq-transfer : ∀ T → BL.∃cq T → EL.∃cq T
   ∃cq-transfer T base-∃cq E init final trace ∃cq-init =
-    ∃cqState-base⇒ext E (ChainLemma E) (SlotLemma E) final T
+    ∃cqState-base⇒ext E final T
       (base-∃cq (transEnv E) (transState E init) (transState E final)
                 (transTrace E trace)
-                (∃cqState-ext⇒base E (ChainLemma E) (SlotLemma E) init T ∃cq-init))
+                (∃cqState-ext⇒base E init T ∃cq-init))
