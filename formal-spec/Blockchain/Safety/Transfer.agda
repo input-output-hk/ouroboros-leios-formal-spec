@@ -4,7 +4,6 @@ open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import Blockchain.Safety
 open import CategoricalCrypto.Ext using (subst-≡ᴹ-out; ≡ᴹ-irrel)
 open import CategoricalCrypto.Machine.Reindex.Post using (Pair-Post)
-open import CategoricalCrypto.Machine.Forwarder using (tag₁)
 import Blockchain.IsBlockchain as IsBC
 open import Blockchain.IsBlockchain using (query-≡ᴹ)
 open import CategoricalCrypto.Machine.NAry
@@ -131,7 +130,7 @@ private
   -- What `single-honest` does to the base half of a state.  The three
   -- equalities are matched here, in isolation.
   opaque
-    unfolding destruct-⊗ tag₁ Pair-Post
+    unfolding destruct-⊗ Pair-Post
 
     single-honest-base : ∀ {X Y Z} (eX : X ≡ Ext.IO) (eY : Y ≡ Z) (eZ : Z ≡ B.Adv ⊗₀ AdvL)
       (N : Machine Ext.Network (X ⊗₀ Y)) (S : Machine Ext.Network (Ext.IO ⊗₀ Z))
