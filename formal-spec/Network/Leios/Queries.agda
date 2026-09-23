@@ -11,7 +11,8 @@ open CategoricalCrypto.Step.Raw using (inj₁-inj; inj₂-inj; inj₁≢inj₂)
 import Blockchain.IsBlockchain as IsBC
 
 open import Data.Maybe.Properties using (just-injective)
-open import Data.List.Properties using (∷-injectiveˡ; ∷-injectiveʳ)
+open import Data.List.Properties using (∷-injectiveˡ; ∷-injectiveʳ; map-injective)
+open import CategoricalCrypto.Ext using (queryCompute-answer)
 
 -- The query interfaces of the base functionality as deployed, `spec`, and of
 -- the deployed node, `Leios1`.
@@ -748,3 +749,57 @@ IsBlockchain-Leios1 base-party = record
   ; producer      = λ b → base-party (B.producer (LeiosBlock.rb b))
   ; slotOf        = λ b → B.slotOf (LeiosBlock.rb b)
   }
+
+------------------------------------------------------------------------
+-- The two interfaces agree: the deployed node's answer is the base spec's,
+-- read as Leios blocks.  This is the chain and slot lemmas' content at the
+-- level of a single node; what the generic transfer still needs on top is
+-- that the transfer carries a node's state to its base component.
+
+-- The base spec's state inside the deployed node's.
+specOf : Machine.State Leios1 → Machine.State spec
+specOf ((sS , _) , _) = sS
+
+private
+  opaque
+    unfolding _⊗₀_
+
+    a₃-inj : ∀ {y y'} → a₃ y ≡ a₃ y' → y ≡ y'
+    a₃-inj refl = refl
+
+    f₀-inj : ∀ {w w'} → f₀ w ≡ f₀ w' → w ≡ w'
+    f₀-inj refl = refl
+
+  ans-inj : ∀ {y y'} → ans y ≡ ans y' → y ≡ y'
+  ans-inj refl = refl
+
+  -- Both answer messages determine their answer, because the base layer's
+  -- does (`B.qO-inj`) and `LeiosBlock.rb` is injective.
+  queryOₛ-inj : ∀ {q} {r r' : bciQueryType {Block = RankingBlock} q}
+              → queryOₛ r ≡ queryOₛ r' → r ≡ r'
+  queryOₛ-inj eq = B.qO-inj (a₃-inj (outᶜ-inj eq))
+
+  mapBase-inj : ∀ q {v v' : bciQueryType {Block = LeiosBlock} q}
+              → mapBase q v ≡ mapBase q v' → v ≡ v'
+  mapBase-inj Chain = map-injective LeiosBlock-Injective
+  mapBase-inj Slot  = λ eq → eq
+
+  queryOₗ-inj : ∀ {q} {v v' : bciQueryType {Block = LeiosBlock} q}
+              → queryOₗ {q} v ≡ queryOₗ {q} v' → v ≡ v'
+  queryOₗ-inj {q} eq = mapBase-inj q (B.qO-inj (ans-inj (f₀-inj (outᶜ-inj eq))))
+
+  module ICₛ = IsConstrained spec-isConstrained
+  module ICₗ = IsConstrained Leios1-isConstrained
+
+-- The node answers a query with `mapExt` of what the base spec answers: both
+-- computations bottom out in the same `spec-completeness` witness, so the
+-- hypothesis of `queryCompute-answer` holds by computation.
+node-answer : ∀ q (σ : Machine.State Leios1)
+  → proj₁ (ICₗ.queryCompute q σ) ≡ mapExt q (proj₁ (ICₛ.queryCompute (baseQ q) (specOf σ)))
+node-answer q σ = queryCompute-answer Leios1-isConstrained queryOₗ-inj refl
+
+-- Hence the two answers agree under the block-level projection: for `Chain`
+-- this is `map LeiosBlock.rb`, for `Slot` the identity.
+node-compat : ∀ q (σ : Machine.State Leios1)
+  → mapBase q (proj₁ (ICₗ.queryCompute q σ)) ≡ proj₁ (ICₛ.queryCompute (baseQ q) (specOf σ))
+node-compat q σ = trans (cong (mapBase q) (node-answer q σ)) (mapBase∘mapExt q _)

@@ -145,4 +145,8 @@ or equal than the slot of the last processed block
           queryI-IO : ∀ q → queryI q ≡ L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ qI q
           queryO-IO : ∀ {q} (r : bciQueryType {Block = RankingBlock} q)
                     → queryO {q} r ≡ L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ qO r
+          -- Answers are determined by the message reporting them, so that a
+          -- deployment relaying a query can read the answer back off it.
+          qO-inj    : ∀ {q} {r r' : bciQueryType {Block = RankingBlock} q}
+                    → qO r ≡ qO r' → r ≡ r'
 ```

@@ -217,6 +217,8 @@ d-BaseFunctionality =
     ; queryI-IO = λ _ → refl
     ; queryO-IO = λ where {Chain} _ → refl
                           {Slot}  _ → refl
+    ; qO-inj    = λ where {Chain} refl → refl
+                          {Slot}  refl → refl
     }
 
 open import Leios.FFD public

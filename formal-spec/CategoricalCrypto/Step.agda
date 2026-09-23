@@ -88,7 +88,7 @@ module Raw where
   trace-view (p Trace∷ₒ tr₀) = inj₂ (inj₁ (_ , _ , p , tr₀))
   trace-view (p Trace∷ᵢ tr₀) = inj₂ (inj₂ (_ , _ , p , tr₀))
 
-  comp-view :
+  tensor-split :
     ∀ {A B C D} {M₁ : Machine A B} {M₂ : Machine C D}
       {sp : Machine.State M₁ × Machine.State M₂} {x y sp'}
     → Tensor.CompRel M₁ M₂ sp x y sp'
@@ -100,8 +100,8 @@ module Raw where
          (x ≡ (L⊗ ϵ) ↑ᵢ mᵢ) × (y ≡ ((L⊗ ϵ) ↑ₒ_ <$> mo))
          × (proj₁ sp' ≡ proj₁ sp)
          × Machine.stepRel M₂ (proj₂ sp) mᵢ mo (proj₂ sp'))
-  comp-view (Tensor.Step₁ q) = inj₁ (_ , _ , refl , refl , refl , q)
-  comp-view (Tensor.Step₂ q) = inj₂ (_ , _ , refl , refl , refl , q)
+  tensor-split (Tensor.Step₁ q) = inj₁ (_ , _ , refl , refl , refl , q)
+  tensor-split (Tensor.Step₂ q) = inj₂ (_ , _ , refl , refl , refl , q)
 
 open Raw
 
@@ -303,7 +303,7 @@ module Tensor′ {A B C D : Channel} (M₁ : Machine A B) (M₂ : Machine C D) w
              ( (o ≡ nothing × step₁ s₁ (inj₁ a) nothing s₁')
              ⊎ (∃[ a' ] (o ≡ just (inj₁ (inj₁ a'))) × step₁ s₁ (inj₁ a) (just (inj₁ a')) s₁')
              ⊎ (∃[ b' ] (o ≡ just (inj₂ (inj₁ b'))) × step₁ s₁ (inj₁ a) (just (inj₂ b')) s₁'))
-      go o st with comp-view st
+      go o st with tensor-split st
       go o st | inj₂ (_ , _ , xeq , _) = inj₁≢inj₂ xeq
       go nothing st | inj₁ (mᵢ , nothing , xeq , yeq , seq , q) =
         proj₁ s' , cong (proj₁ s' ,_) seq , inj₁ (refl , subst (λ u → step₁ s₁ u nothing (proj₁ s')) (sym (inj₁-inj xeq)) q)
@@ -332,7 +332,7 @@ module Tensor′ {A B C D : Channel} (M₁ : Machine A B) (M₂ : Machine C D) w
              ( (o ≡ nothing × step₁ s₁ (inj₂ b) nothing s₁')
              ⊎ (∃[ a' ] (o ≡ just (inj₁ (inj₁ a'))) × step₁ s₁ (inj₂ b) (just (inj₁ a')) s₁')
              ⊎ (∃[ b' ] (o ≡ just (inj₂ (inj₁ b'))) × step₁ s₁ (inj₂ b) (just (inj₂ b')) s₁'))
-      go o st with comp-view st
+      go o st with tensor-split st
       go o st | inj₂ (_ , _ , xeq , _) = inj₁≢inj₂ xeq
       go nothing st | inj₁ (mᵢ , nothing , xeq , yeq , seq , q) =
         proj₁ s' , cong (proj₁ s' ,_) seq , inj₁ (refl , subst (λ u → step₁ s₁ u nothing (proj₁ s')) (sym (inj₁-inj xeq)) q)
@@ -361,7 +361,7 @@ module Tensor′ {A B C D : Channel} (M₁ : Machine A B) (M₂ : Machine C D) w
              ( (o ≡ nothing × step₂ s₂ (inj₁ c) nothing s₂')
              ⊎ (∃[ c' ] (o ≡ just (inj₁ (inj₂ c'))) × step₂ s₂ (inj₁ c) (just (inj₁ c')) s₂')
              ⊎ (∃[ d' ] (o ≡ just (inj₂ (inj₂ d'))) × step₂ s₂ (inj₁ c) (just (inj₂ d')) s₂'))
-      go o st with comp-view st
+      go o st with tensor-split st
       go o st | inj₁ (_ , _ , xeq , _) = inj₁≢inj₂ (sym xeq)
       go nothing st | inj₂ (mᵢ , nothing , xeq , yeq , seq , q) =
         proj₂ s' , cong (_, proj₂ s') seq , inj₁ (refl , subst (λ u → step₂ s₂ u nothing (proj₂ s')) (sym (inj₂-inj xeq)) q)
@@ -390,7 +390,7 @@ module Tensor′ {A B C D : Channel} (M₁ : Machine A B) (M₂ : Machine C D) w
              ( (o ≡ nothing × step₂ s₂ (inj₂ d) nothing s₂')
              ⊎ (∃[ c' ] (o ≡ just (inj₁ (inj₂ c'))) × step₂ s₂ (inj₂ d) (just (inj₁ c')) s₂')
              ⊎ (∃[ d' ] (o ≡ just (inj₂ (inj₂ d'))) × step₂ s₂ (inj₂ d) (just (inj₂ d')) s₂'))
-      go o st with comp-view st
+      go o st with tensor-split st
       go o st | inj₁ (_ , _ , xeq , _) = inj₁≢inj₂ (sym xeq)
       go nothing st | inj₂ (mᵢ , nothing , xeq , yeq , seq , q) =
         proj₂ s' , cong (_, proj₂ s') seq , inj₁ (refl , subst (λ u → step₂ s₂ u nothing (proj₂ s')) (sym (inj₂-inj xeq)) q)
@@ -531,7 +531,7 @@ module Compose {A B C : Channel} (M₁ : Machine B C) (M₂ : Machine A B) where
          ⊎ (∃[ s₂' ] ∃[ a' ] (s' ≡ (s₂' , s₁)) × (o ≡ just (inj₁ a')) × step₂ s₂ (inj₁ a) (just (inj₁ a')) s₂')
          ⊎ (∃[ s₂' ] ∃[ b' ] step₂ s₂ (inj₁ a) (just (inj₂ b')) s₂' × Mid₁ (s₂' , s₁) b' o s')
       go o st with trace-view st
-      go o st | inj₁ p with comp-view p
+      go o st | inj₁ p with tensor-split p
       go o st | inj₁ p | inj₂ (_ , _ , xeq , _) = inj₁≢inj₂ xeq
       go nothing st | inj₁ p | inj₁ (mᵢ , nothing , xeq , yeq , seq , q) =
         inj₁ (proj₁ s' , cong (proj₁ s' ,_) seq , refl , subst (λ u → step₂ s₂ u nothing (proj₁ s')) (sym (inj₁-inj xeq)) q)
@@ -541,11 +541,11 @@ module Compose {A B C : Channel} (M₁ : Machine B C) (M₂ : Machine A B) where
         inj₂ (inj₁ (proj₁ s' , a' , cong (proj₁ s' ,_) seq , refl ,
           subst₂ (λ u v → step₂ s₂ u (just v) (proj₁ s')) (sym (inj₁-inj xeq)) (sym (inj₁-inj (just-inj yeq))) q))
       go (just (inj₂ _)) st | inj₁ p | inj₁ (_ , just _ , _ , yeq , _ , _) = inj₁≢inj₂ (sym (just-inj yeq))
-      go o st | inj₂ (inj₁ (_ , _ , p , _)) with comp-view p
+      go o st | inj₂ (inj₁ (_ , _ , p , _)) with tensor-split p
       go o st | inj₂ (inj₁ (_ , _ , p , _)) | inj₂ (_ , _ , xeq , _) = inj₁≢inj₂ xeq
       go o st | inj₂ (inj₁ (_ , _ , p , _)) | inj₁ (_ , nothing , _ , yeq , _ , _) = just≢nothing yeq
       go o st | inj₂ (inj₁ (_ , _ , p , _)) | inj₁ (_ , just _ , _ , yeq , _ , _) = inj₁≢inj₂ (sym (just-inj yeq))
-      go o st | inj₂ (inj₂ (s₁' , inC , p , rest)) with comp-view p
+      go o st | inj₂ (inj₂ (s₁' , inC , p , rest)) with tensor-split p
       go o st | inj₂ (inj₂ (s₁' , inC , p , rest)) | inj₂ (_ , _ , xeq , _) = inj₁≢inj₂ xeq
       go o st | inj₂ (inj₂ (s₁' , inC , p , rest)) | inj₁ (_ , nothing , _ , yeq , _ , _) = just≢nothing yeq
       go o st | inj₂ (inj₂ (s₁' , inC , p , rest)) | inj₁ (mᵢ , just w , xeq , yeq , seq , q) =
@@ -565,7 +565,7 @@ module Compose {A B C : Channel} (M₁ : Machine B C) (M₂ : Machine A B) where
          ⊎ (∃[ s₁' ] ∃[ c' ] (s' ≡ (s₂ , s₁')) × (o ≡ just (inj₂ c')) × step₁ s₁ (inj₂ c) (just (inj₂ c')) s₁')
          ⊎ (∃[ s₁' ] ∃[ b ] step₁ s₁ (inj₂ c) (just (inj₁ b)) s₁' × Mid₂ (s₂ , s₁') b o s')
       go o st with trace-view st
-      go o st | inj₁ p with comp-view p
+      go o st | inj₁ p with tensor-split p
       go o st | inj₁ p | inj₁ (_ , _ , xeq , _) = inj₁≢inj₂ (sym xeq)
       go nothing st | inj₁ p | inj₂ (mᵢ , nothing , xeq , yeq , seq , q) =
         inj₁ (proj₂ s' , cong (_, proj₂ s') seq , refl , subst (λ u → step₁ s₁ u nothing (proj₂ s')) (sym (inj₂-inj xeq)) q)
@@ -575,14 +575,14 @@ module Compose {A B C : Channel} (M₁ : Machine B C) (M₂ : Machine A B) where
         inj₂ (inj₁ (proj₂ s' , c' , cong (_, proj₂ s') seq , refl ,
           subst₂ (λ u v → step₁ s₁ u (just v) (proj₂ s')) (sym (inj₂-inj xeq)) (sym (inj₂-inj (just-inj yeq))) q))
       go (just (inj₁ _)) st | inj₁ p | inj₂ (_ , just _ , _ , yeq , _ , _) = inj₁≢inj₂ (just-inj yeq)
-      go o st | inj₂ (inj₁ (s₁' , outC , p , rest)) with comp-view p
+      go o st | inj₂ (inj₁ (s₁' , outC , p , rest)) with tensor-split p
       go o st | inj₂ (inj₁ (s₁' , outC , p , rest)) | inj₁ (_ , _ , xeq , _) = inj₁≢inj₂ (sym xeq)
       go o st | inj₂ (inj₁ (s₁' , outC , p , rest)) | inj₂ (_ , nothing , _ , yeq , _ , _) = just≢nothing yeq
       go o st | inj₂ (inj₁ (s₁' , outC , p , rest)) | inj₂ (mᵢ , just w , xeq , yeq , seq , q) =
         inj₂ (inj₂ (proj₂ s₁' , outC ,
           subst₂ (λ u v → step₁ s₁ u (just v) (proj₂ s₁')) (sym (inj₂-inj xeq)) (sym (inj₂-inj (just-inj yeq))) q ,
           subst (λ z → Mid₂ z outC o s') (cong (_, proj₂ s₁') seq) rest))
-      go o st | inj₂ (inj₂ (_ , _ , p , _)) with comp-view p
+      go o st | inj₂ (inj₂ (_ , _ , p , _)) with tensor-split p
       go o st | inj₂ (inj₂ (_ , _ , p , _)) | inj₁ (_ , _ , xeq , _) = inj₁≢inj₂ (sym xeq)
       go o st | inj₂ (inj₂ (_ , _ , p , _)) | inj₂ (_ , nothing , _ , yeq , _ , _) = just≢nothing yeq
       go o st | inj₂ (inj₂ (_ , _ , p , _)) | inj₂ (_ , just _ , _ , yeq , _ , _) = inj₁≢inj₂ (just-inj yeq)
@@ -599,7 +599,7 @@ module Compose {A B C : Channel} (M₁ : Machine B C) (M₂ : Machine A B) where
          ⊎ (∃[ s₁' ] ∃[ c' ] (s' ≡ (s₂ , s₁')) × (o ≡ just (inj₂ c')) × step₁ s₁ (inj₁ b') (just (inj₂ c')) s₁')
          ⊎ (∃[ s₁' ] ∃[ b ] step₁ s₁ (inj₁ b') (just (inj₁ b)) s₁' × Mid₂ (s₂ , s₁') b o s')
       go o st with trace-view st
-      go o st | inj₁ p with comp-view p
+      go o st | inj₁ p with tensor-split p
       go o st | inj₁ p | inj₁ (_ , _ , xeq , _) = inj₁≢inj₂ (sym xeq)
       go nothing st | inj₁ p | inj₂ (mᵢ , nothing , xeq , yeq , seq , q) =
         inj₁ (proj₂ s' , cong (_, proj₂ s') seq , refl , subst (λ u → step₁ s₁ u nothing (proj₂ s')) (sym (inj₂-inj xeq)) q)
@@ -609,14 +609,14 @@ module Compose {A B C : Channel} (M₁ : Machine B C) (M₂ : Machine A B) where
         inj₂ (inj₁ (proj₂ s' , c' , cong (_, proj₂ s') seq , refl ,
           subst₂ (λ u v → step₁ s₁ u (just v) (proj₂ s')) (sym (inj₂-inj xeq)) (sym (inj₂-inj (just-inj yeq))) q))
       go (just (inj₁ _)) st | inj₁ p | inj₂ (_ , just _ , _ , yeq , _ , _) = inj₁≢inj₂ (just-inj yeq)
-      go o st | inj₂ (inj₁ (s₁' , outC , p , rest)) with comp-view p
+      go o st | inj₂ (inj₁ (s₁' , outC , p , rest)) with tensor-split p
       go o st | inj₂ (inj₁ (s₁' , outC , p , rest)) | inj₁ (_ , _ , xeq , _) = inj₁≢inj₂ (sym xeq)
       go o st | inj₂ (inj₁ (s₁' , outC , p , rest)) | inj₂ (_ , nothing , _ , yeq , _ , _) = just≢nothing yeq
       go o st | inj₂ (inj₁ (s₁' , outC , p , rest)) | inj₂ (mᵢ , just w , xeq , yeq , seq , q) =
         inj₂ (inj₂ (proj₂ s₁' , outC ,
           subst₂ (λ u v → step₁ s₁ u (just v) (proj₂ s₁')) (sym (inj₂-inj xeq)) (sym (inj₂-inj (just-inj yeq))) q ,
           subst (λ z → Mid₂ z outC o s') (cong (_, proj₂ s₁') seq) rest))
-      go o st | inj₂ (inj₂ (_ , _ , p , _)) with comp-view p
+      go o st | inj₂ (inj₂ (_ , _ , p , _)) with tensor-split p
       go o st | inj₂ (inj₂ (_ , _ , p , _)) | inj₁ (_ , _ , xeq , _) = inj₁≢inj₂ (sym xeq)
       go o st | inj₂ (inj₂ (_ , _ , p , _)) | inj₂ (_ , nothing , _ , yeq , _ , _) = just≢nothing yeq
       go o st | inj₂ (inj₂ (_ , _ , p , _)) | inj₂ (_ , just _ , _ , yeq , _ , _) = inj₁≢inj₂ (just-inj yeq)
@@ -633,7 +633,7 @@ module Compose {A B C : Channel} (M₁ : Machine B C) (M₂ : Machine A B) where
          ⊎ (∃[ s₂' ] ∃[ a' ] (s' ≡ (s₂' , s₁)) × (o ≡ just (inj₁ a')) × step₂ s₂ (inj₂ b) (just (inj₁ a')) s₂')
          ⊎ (∃[ s₂' ] ∃[ b' ] step₂ s₂ (inj₂ b) (just (inj₂ b')) s₂' × Mid₁ (s₂' , s₁) b' o s')
       go o st with trace-view st
-      go o st | inj₁ p with comp-view p
+      go o st | inj₁ p with tensor-split p
       go o st | inj₁ p | inj₂ (_ , _ , xeq , _) = inj₁≢inj₂ xeq
       go nothing st | inj₁ p | inj₁ (mᵢ , nothing , xeq , yeq , seq , q) =
         inj₁ (proj₁ s' , cong (proj₁ s' ,_) seq , refl , subst (λ u → step₂ s₂ u nothing (proj₁ s')) (sym (inj₁-inj xeq)) q)
@@ -643,11 +643,11 @@ module Compose {A B C : Channel} (M₁ : Machine B C) (M₂ : Machine A B) where
         inj₂ (inj₁ (proj₁ s' , a' , cong (proj₁ s' ,_) seq , refl ,
           subst₂ (λ u v → step₂ s₂ u (just v) (proj₁ s')) (sym (inj₁-inj xeq)) (sym (inj₁-inj (just-inj yeq))) q))
       go (just (inj₂ _)) st | inj₁ p | inj₁ (_ , just _ , _ , yeq , _ , _) = inj₁≢inj₂ (sym (just-inj yeq))
-      go o st | inj₂ (inj₁ (_ , _ , p , _)) with comp-view p
+      go o st | inj₂ (inj₁ (_ , _ , p , _)) with tensor-split p
       go o st | inj₂ (inj₁ (_ , _ , p , _)) | inj₂ (_ , _ , xeq , _) = inj₁≢inj₂ xeq
       go o st | inj₂ (inj₁ (_ , _ , p , _)) | inj₁ (_ , nothing , _ , yeq , _ , _) = just≢nothing yeq
       go o st | inj₂ (inj₁ (_ , _ , p , _)) | inj₁ (_ , just _ , _ , yeq , _ , _) = inj₁≢inj₂ (sym (just-inj yeq))
-      go o st | inj₂ (inj₂ (s₁' , inC , p , rest)) with comp-view p
+      go o st | inj₂ (inj₂ (s₁' , inC , p , rest)) with tensor-split p
       go o st | inj₂ (inj₂ (s₁' , inC , p , rest)) | inj₂ (_ , _ , xeq , _) = inj₁≢inj₂ xeq
       go o st | inj₂ (inj₂ (s₁' , inC , p , rest)) | inj₁ (_ , nothing , _ , yeq , _ , _) = just≢nothing yeq
       go o st | inj₂ (inj₂ (s₁' , inC , p , rest)) | inj₁ (mᵢ , just w , xeq , yeq , seq , q) =
