@@ -2,7 +2,11 @@
 
 open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import Blockchain.Safety
+open import CategoricalCrypto.Ext using (subst-≡ᴹ-out; ≡ᴹ-irrel)
+open import CategoricalCrypto.Machine.Reindex.Post using (Pair-Post)
+open import CategoricalCrypto.Machine.Forwarder using (tag₁)
 import Blockchain.IsBlockchain as IsBC
+open import Blockchain.IsBlockchain using (query-≡ᴹ)
 open import CategoricalCrypto.Machine.NAry
   using (⨂-reshape-env-helper; ⨂-absorb-env-helper; unit-∘ᴷ; ⨂-reshape-env; ⨂-absorb-env
         ; ⨂-reshape-env-sub; ⨂-absorb-env-sub)
@@ -13,6 +17,7 @@ open import CategoricalCrypto.Machine.Iso
   using (_≅ᴹ_; ≅ᴹ-refl; ≅ᴹ-sym; ≅ᴹ-trans; ∘-resp-≅ᴹ)
 open import CategoricalCrypto.Machine.Monoidal using (⊗₁-id)
 
+import Relation.Binary.HeterogeneousEquality as H
 import Relation.Binary.Reasoning.PartialOrder
 open import Relation.Binary using (Poset)
 
@@ -123,6 +128,23 @@ private
     (≅ᴹ-trans ∘-identityˡ-≅ᴹ
     (≅ᴹ-trans (≅ᴹ-sym iso) (≡ᴹ→≅ᴹ (≡ᴹ-sym eq))))
 
+  -- What `single-honest` does to the base half of a state.  The three
+  -- equalities are matched here, in isolation.
+  opaque
+    unfolding destruct-⊗ tag₁ Pair-Post
+
+    single-honest-base : ∀ {X Y Z} (eX : X ≡ Ext.IO) (eY : Y ≡ Z) (eZ : Z ≡ B.Adv ⊗₀ AdvL)
+      (N : Machine Ext.Network (X ⊗₀ Y)) (S : Machine Ext.Network (Ext.IO ⊗₀ Z))
+      (eq : N ≡ᴹ S)
+      (iso : S ≅ᴹ subst (λ A → Machine Ext.Network (Ext.IO ⊗₀ A)) (sym eZ)
+                        (ext-layer ∘ᴷ B.honest-node-spec))
+      (σ : Machine.State N)
+      → proj₁ (proj₁ (proj₁ (_≅ᴹ_.from (single-honest eX eY eZ N S eq iso) σ)))
+      ≡ proj₁ (proj₁ (state-subst (subst-≡ᴹ-out (sym eZ) (ext-layer ∘ᴷ B.honest-node-spec))
+                        (_≅ᴹ_.to iso (state-subst eq σ))))
+    single-honest-base refl refl refl N .N
+      record { A≡C = refl ; B≡D = refl ; M₁≡M₂ = H.refl } iso σ = refl
+
 -- Each ext node is its extension layer stacked on its base node, once the
 -- adversary channel is reassembled
 single-protocol : ∀ p
@@ -131,6 +153,33 @@ single-protocol p with p ∈? Ext.honest-nodes
 ... | no  _  = unit-∘ᴷ (Ext.all-nodes p)
 ... | yes hp = single-honest (honest-IOF hp) (Ext.honest-AdvF hp) ext-Adv≡base-Adv⊗AdvL
   (Ext.all-nodes p) Ext.honest-node-spec (Ext.honest-nodes-≡-spec hp) is-extension
+
+-- The two components `single-protocol` splits an ext node's state into.
+baseCompOf : ∀ p
+  → Machine.State ((CC.id ⊗₁ unpad p) CC.∘ (extPart p ∘ᴷ base-all-nodes p))
+  → Machine.State (base-all-nodes p)
+baseCompOf _ X = proj₁ (proj₁ (proj₁ X))
+
+extCompOf : ∀ p
+  → Machine.State ((CC.id ⊗₁ unpad p) CC.∘ (extPart p ∘ᴷ base-all-nodes p))
+  → Machine.State (extPart p ∘ᴷ base-all-nodes p)
+extCompOf _ X = proj₁ X
+
+-- The base state `single-protocol` exposes is the one `IsExtension` names.
+-- The `p ∈? honest-nodes` case is matched here: unlike in `Main`, no opaque
+-- definition hides an occurrence of the scrutinee, so the abstraction is
+-- well-typed.
+single-protocol-base : ∀ {p} (hp : p ∈ Ext.honest-nodes) (σ : Machine.State (Ext.all-nodes p))
+  → state-subst (base-honest-≡-spec hp) (baseCompOf p (_≅ᴹ_.from (single-protocol p) σ))
+  ≡ baseStateOf (state-subst (Ext.honest-nodes-≡-spec hp) σ)
+single-protocol-base {p} hp σ with p ∈? Ext.honest-nodes
+... | no ¬hp = contradiction hp ¬hp
+... | yes a  =
+  trans (single-honest-base (honest-IOF a) (Ext.honest-AdvF a)
+           ext-Adv≡base-Adv⊗AdvL (Ext.all-nodes p) Ext.honest-node-spec
+           (Ext.honest-nodes-≡-spec a) is-extension σ)
+        (cong (λ e → baseStateOf (state-subst e σ))
+              (≡ᴹ-irrel (Ext.honest-nodes-≡-spec a) (Ext.honest-nodes-≡-spec hp)))
 
 module Main where
 
@@ -174,16 +223,6 @@ module Main where
     baseNodesOf : Machine.State (Base.protocol transEnv) → Machine.State Base.nodes
     baseNodesOf S = proj₁ (proj₂ (proj₁ (proj₁ S)))
 
-    baseCompOf : ∀ p
-      → Machine.State ((CC.id ⊗₁ unpad p) CC.∘ (extPart p ∘ᴷ base-all-nodes p))
-      → Machine.State (base-all-nodes p)
-    baseCompOf _ X = proj₁ (proj₁ (proj₁ X))
-
-    extCompOf : ∀ p
-      → Machine.State ((CC.id ⊗₁ unpad p) CC.∘ (extPart p ∘ᴷ base-all-nodes p))
-      → Machine.State (extPart p ∘ᴷ base-all-nodes p)
-    extCompOf _ X = proj₁ X
-
     -- Sub-state transport: the transfer carries node `p`'s state to the base
     -- component that `single-protocol p` splits out of it.  Together with
     -- `query-compat` this is what makes the chain and slot lemmas true.
@@ -222,6 +261,28 @@ module Main where
           absorbEq = ⨂-absorb-env-sub extPart base-all-nodes Ext.network αAbs
                        p (proj₁ step₁) (proj₂ step₁)
 
+    -- The square: observing before or after the transfer gives the same
+    -- answer, projected.  `Chain` and `Slot` are its two instances.
+    query-lemma : ∀ (bci : IsBC.BlockChainInfo BlockExt) {p} {s} (hp : p ∈ Ext.honest-nodes)
+      → Base.query (IsBC.baseQ bci) transEnv (transState s) hp
+      ≡ mapAnswer bci (Ext.query bci E s hp)
+    query-lemma bci {p} {s} hp =
+      trans (query-≡ᴹ (base-honest-≡-spec hp) B.spec-IsBlockchain (IsBC.baseQ bci)
+               (⨂ᴷ-sub-state {f = base-all-nodes} p (baseNodesOf (transState s))))
+      (trans (cong (λ z → baseAnswer (state-subst (base-honest-≡-spec hp) z))
+                   (transState-nodes p s))
+      (trans (cong baseAnswer (single-protocol-base hp σ))
+      (trans (sym (query-compat bci (state-subst (Ext.honest-nodes-≡-spec hp) σ)))
+             (cong (mapAnswer bci)
+                   (sym (query-≡ᴹ (Ext.honest-nodes-≡-spec hp) Ext.spec-IsBlockchain bci σ))))))
+      where
+        σ : Machine.State (Ext.all-nodes p)
+        σ = ⨂ᴷ-sub-state {f = Ext.all-nodes} p (nodesOf s)
+
+        baseAnswer : Machine.State B.honest-node-spec → IsBC.bciQueryType (IsBC.baseQ bci)
+        baseAnswer z = proj₁ (IsConstrained.queryCompute
+          (IsBC.IsBlockchain.isConstrained B.spec-IsBlockchain) (IsBC.baseQ bci) z)
+
   ChainLemma-ty : ∀ {A : Channel} → Ext.Environment A → Type
   ChainLemma-ty {A} E = ∀ {p : Fin Ext.n} {s} (p-honest : p ∈ Ext.honest-nodes)
     → Base.getChain (transEnv E) (transState E s) p-honest
@@ -253,11 +314,13 @@ module Main where
         Base.getChain (transEnv E) (transState E s) hp'            ≡⟨ CL hp' ⟩
         map getBaseBlock (Ext.getChain E s hp')                    ∎
 
-  transfer : (k : ℕ)
-           → (∀ {A} (E : Ext.Environment A) → ChainLemma-ty E)
-           → Base.safety k → Ext.safety k
-  transfer k CL baseSafety E init final trace safeInit =
-    safeState-base⇒ext E (CL E) final k
+  -- The chain lemma, discharged: `Chain` instance of the square.
+  ChainLemma : ∀ {A} (E : Ext.Environment A) → ChainLemma-ty E
+  ChainLemma E hp = query-lemma E IsBC.Chain hp
+
+  transfer : (k : ℕ) → Base.safety k → Ext.safety k
+  transfer k baseSafety E init final trace safeInit =
+    safeState-base⇒ext E (ChainLemma E) final k
       (baseSafety (transEnv E) (transState E init) (transState E final)
                   (transTrace E trace)
-                  (safeState-ext⇒base E (CL E) init k safeInit))
+                  (safeState-ext⇒base E (ChainLemma E) init k safeInit))

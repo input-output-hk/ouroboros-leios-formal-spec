@@ -2,6 +2,7 @@
 
 open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import Blockchain.Safety
+import Blockchain.IsBlockchain as IsBC
 import Blockchain.Liveness
 
 open import CategoricalCrypto hiding (id)
@@ -79,7 +80,7 @@ open BL using (ℕ→ℚ)
 module Main where
 
   module TrM = Tr.Main
-  open TrM using (transEnv; transState; transTrace; ChainLemma-ty)
+  open TrM using (transEnv; transState; transTrace; ChainLemma-ty; ChainLemma; query-lemma)
 
   SlotLemma-ty : ∀ {A : Channel} → Ext.Environment A → Type
   SlotLemma-ty {A} E = ∀ {p : Fin Ext.n} {s} (p-honest : p ∈ Ext.honest-nodes)
@@ -263,22 +264,20 @@ module Main where
 
   -- Transfer the hcg and ∃cq invariants.
 
-  hcg-transfer : ∀ τ
-    → (∀ {A} (E : Ext.Environment A) → ChainLemma-ty E)
-    → (∀ {A} (E : Ext.Environment A) → SlotLemma-ty E)
-    → BL.hcg τ → EL.hcg τ
-  hcg-transfer τ CL SL base-hcg E init final trace hcg-init =
-    hcgState-base⇒ext E (CL E) (SL E) final τ
+  -- The slot lemma, discharged: `Slot` instance of the same square.
+  SlotLemma : ∀ {A} (E : Ext.Environment A) → SlotLemma-ty E
+  SlotLemma E hp = query-lemma E IsBC.Slot hp
+
+  hcg-transfer : ∀ τ → BL.hcg τ → EL.hcg τ
+  hcg-transfer τ base-hcg E init final trace hcg-init =
+    hcgState-base⇒ext E (ChainLemma E) (SlotLemma E) final τ
       (base-hcg (transEnv E) (transState E init) (transState E final)
                 (transTrace E trace)
-                (hcgState-ext⇒base E (CL E) (SL E) init τ hcg-init))
+                (hcgState-ext⇒base E (ChainLemma E) (SlotLemma E) init τ hcg-init))
 
-  ∃cq-transfer : ∀ T
-    → (∀ {A} (E : Ext.Environment A) → ChainLemma-ty E)
-    → (∀ {A} (E : Ext.Environment A) → SlotLemma-ty E)
-    → BL.∃cq T → EL.∃cq T
-  ∃cq-transfer T CL SL base-∃cq E init final trace ∃cq-init =
-    ∃cqState-base⇒ext E (CL E) (SL E) final T
+  ∃cq-transfer : ∀ T → BL.∃cq T → EL.∃cq T
+  ∃cq-transfer T base-∃cq E init final trace ∃cq-init =
+    ∃cqState-base⇒ext E (ChainLemma E) (SlotLemma E) final T
       (base-∃cq (transEnv E) (transState E init) (transState E final)
                 (transTrace E trace)
-                (∃cqState-ext⇒base E (CL E) (SL E) init T ∃cq-init))
+                (∃cqState-ext⇒base E (ChainLemma E) (SlotLemma E) init T ∃cq-init))

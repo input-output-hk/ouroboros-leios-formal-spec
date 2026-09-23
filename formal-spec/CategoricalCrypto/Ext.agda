@@ -46,3 +46,12 @@ queryCompute-answer : ∀ {A B} {m : Machine A B} {Query : Type} {QueryReturnTyp
 queryCompute-answer ic qO-inj {q} {s} eq =
   qO-inj (trans (sym (just-injective (proj₂ (correctness (proj₂ (proj₂ (completeness {q} {s}))))))) eq)
   where open IsConstrained ic
+
+-- | Machine equalities are unique.  Their three components are all identity
+-- proofs, so this is axiom K, which this development has.  Needed because
+-- `p ∈ honest-nodes` proofs are NOT unique — membership is an abstract field
+-- of the set theory — so a `with` on `p ∈? honest-nodes` binds its own proof
+-- and the caller's has to be reconciled with it.
+≡ᴹ-irrel : ∀ {A B C D} {M₁ : Machine A B} {M₂ : Machine C D} (e e' : M₁ ≡ᴹ M₂) → e ≡ e'
+≡ᴹ-irrel record { A≡C = refl ; B≡D = refl ; M₁≡M₂ = H.refl }
+         record { A≡C = refl ; B≡D = refl ; M₁≡M₂ = H.refl } = refl

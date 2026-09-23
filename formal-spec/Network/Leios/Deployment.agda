@@ -104,8 +104,11 @@ module _ (IOF AdvF : Participant → Channel)
       safetyS base-spec extension
     module TrM = Tr.Main
 
-  leiosSafety : (∀ {A} (E : Deployment.Environment safetyS A) → TrM.ChainLemma-ty E)
-              → Deployment.safety Tr.base k → S.safety k
+  -- The chain and slot lemmas are no longer hypotheses: they are discharged
+  -- in `Blockchain.Safety.Transfer` from `query-compat` and the sub-state
+  -- transport.  What is left to assume is the base layer's own safety and
+  -- liveness.
+  leiosSafety : Deployment.safety Tr.base k → S.safety k
   leiosSafety = TrM.transfer k
 
   private
@@ -113,12 +116,8 @@ module _ (IOF AdvF : Participant → Channel)
       safetyS base-spec extension (λ _ → refl) (λ _ → refl)
     module LTrM = LTr.Main
 
-  leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-           → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-           → ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
-  leiosHCG CL SL τ = LTrM.hcg-transfer τ CL SL
+  leiosHCG : ∀ τ → LTr.BL.hcg τ → LTr.EL.hcg τ
+  leiosHCG τ = LTrM.hcg-transfer τ
 
-  leios∃CQ : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
-           → (∀ {A} (E : S.Environment A) → LTrM.SlotLemma-ty E)
-           → ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
-  leios∃CQ CL SL T = LTrM.∃cq-transfer T CL SL
+  leios∃CQ : ∀ T → LTr.BL.∃cq T → LTr.EL.∃cq T
+  leios∃CQ T = LTrM.∃cq-transfer T

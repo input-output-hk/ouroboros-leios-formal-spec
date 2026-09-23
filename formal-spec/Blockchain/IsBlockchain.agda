@@ -2,6 +2,7 @@
 
 open import Leios.Prelude
 open import CategoricalCrypto
+import Relation.Binary.HeterogeneousEquality as H
 
 -- | Typeclass for machines that behave like a blockchain
 --
@@ -41,3 +42,17 @@ record IsBlockchain (Participant Block : Type) {A B : Channel} (m : Machine A B)
     isPure        : IsPure isConstrained
     producer      : Block → Participant
     slotOf        : Block → ℕ
+
+-- Moving a query across a machine equality.  Matched here, in isolation: an
+-- inline `with` on the same witness desynchronises from the definitions that
+-- case on it (`base-all-nodes`, `single-protocol`, …), which is ill-typed.
+query-≡ᴹ : ∀ {Participant Block : Type} {A B C D}
+           {m : Machine A B} {m' : Machine C D}
+           (e : m ≡ᴹ m') (ib : IsBlockchain Participant Block m')
+           (bci : BlockChainInfo Block) (s : Machine.State m)
+  → proj₁ (IsConstrained.queryCompute
+             (IsBlockchain.isConstrained
+               (≡ᴹ-subst (IsBlockchain Participant Block) (≡ᴹ-sym e) ib)) bci s)
+  ≡ proj₁ (IsConstrained.queryCompute
+             (IsBlockchain.isConstrained ib) bci (state-subst e s))
+query-≡ᴹ record { A≡C = refl ; B≡D = refl ; M₁≡M₂ = H.refl } ib bci s = refl
