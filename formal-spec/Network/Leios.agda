@@ -13,6 +13,78 @@ open import Tactic.Defaults
 
 open import Data.Product.Properties
 
+-- | The Leios node as deployed: the extension layer stacked on the base
+-- functionality, `Leios1 = ext-spec ∘ᴷ spec`.
+--
+--               ExtIO = IO ⊗₀ QIO
+--          ┌──────────┴──────────┐
+--          IO                   QIO            Adv           BaseAdv
+--          ↕                     ↕              ↕               ↕
+--          │                     │              │               │
+--    ┌─────┴─────────────────┐   │              │               │
+--    │      LinearLeios      ├───┼──────────────┘               │
+--    └──↕─────────────────↕──┘   │                              │
+--      FFD             BaseIO    │                              │
+--       │                 │      │                              │
+--    ┌──┴───┐          ┌──┴──────┴──┐                           │
+--    │ Shim │          │    Mux     │                           │
+--    └──↕───┘          └──────↕─────┘                           │
+--       │                  BaseIO                               │
+--       │                     │                                 │
+--       │              ┌──────┴──────┐                          │
+--       │              │  B.m (base) ├──────────────────────────┘
+--       │              └──────↕──────┘
+--       │                 BaseNetwork
+--       │                     │
+--    ┌──┴─────────────────────┴──┐
+--    │        NetTranslate       │
+--    └─────────────↕─────────────┘
+--                  │
+--                DD.M
+--
+-- Every wire is a channel, so each carries messages in BOTH directions; the
+-- vertical arrangement says only which machine's domain a wire leaves and
+-- which machine's codomain it enters.  Uniformly, `inType` travels UP the
+-- diagram and `outType` DOWN — note that `_ᵀ` on `IO` and `FFD` flips which
+-- is which relative to their `Mode`:
+--
+--   ExtIO        IO ⊗₀ QIO
+--   IO       ↑   FetchLdgO (List Tx)
+--            ↓   SubmitTxs (List Tx) | FetchLdgI
+--   QIO      ↑   ans (y : BaseIOF In)
+--            ↓   ask (x : BaseIOF Out)
+--   Adv          I — empty, the layer has no adversary messages yet
+--   BaseAdv      abstract, a field of `BaseAbstract`
+--   FFD      ↑   FFD-OUT (List (Header ⊎ Body)) | SLOT | FTCH
+--            ↓   FFD-IN FFDA.Input
+--   BaseIO   ↑   BASE-LDG (List RankingBlock) | SLOT ℕ | STAKE StakeDistr | EMPTY
+--            ↓   FTCH-LDG | FTCH-SLOT | SUBMIT RankingBlock | INIT …
+--   Network  ↑   Activate (List (Header ⊎ Body))
+--            ↓   Done (List (Header ⊎ Body))
+--   BaseNetwork  List BaseMsg, both ways
+--   DD.M     ↑   Deliver (List Message')
+--            ↓   Diffuse (List Message)
+--
+-- `ext-spec` is everything above the `Network`/`BaseIO` cut; `spec` is
+-- `NetTranslate` and the base functionality below it, with `BaseAdv` routed
+-- past the layer.  The `∘ᴷ` joining them is what collects the two adversary
+-- channels side by side at the top.
+--
+-- Elided: three forwarders that carry no state and change no messages, only
+-- their routing — `⊗-assoc⃖` inside `spec`, `mux-shuffle` (also `⊗-assoc⃖`),
+-- and `regroup-ext`, which gathers `IO` and `QIO` into `ExtIO` next to `Adv`.
+--
+-- A query runs down the right-hand side and back inside a SINGLE composite
+-- step, since `_∘_`'s step relation is a trace:
+--
+--   QIO ── ask (FTCH-LDG) ──▶ Mux ──▶ B.m ──▶ Mux ── ans (BASE-LDG rbs) ──▶ QIO
+--
+-- `LinearLeios` never sees it: in `node-layer = LinearLeios ⊗₁ id` the `QIO`
+-- wire passes the node on the identity side.  So the answer is the base
+-- layer's current chain and not the node's cached `RBs`, which is why the
+-- chain and slot lemmas hold at every state rather than only at quiescent
+-- ones.  `Mux`'s stack is pushed by the request and popped by the answer, so
+-- a query leaves the multiplexer as it found it — what `Leios1-isPure` needs.
 module Network.Leios
   (⋯ : SpecStructure) (let open SpecStructure ⋯)
   (params : Params) (let open Params params)

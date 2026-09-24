@@ -30,16 +30,29 @@ module Leios.Protocol
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open GenFFD
 ```
-High level structure:
+High level structure.  `LinearLeios` stands on the header and body diffusion
+layer and on the base protocol, and both are reached through the network.
+Every wire is a channel, so each carries messages in both directions:
+uniformly, `inType` travels up the diagram and `outType` down.
 <pre>
-                                       Linear Leios
-                                       /         |
-+-------------------------------------+          |
-| Header Diffusion     Body Diffusion |          |
-+-------------------------------------+       Base Protocol
-                                       \      /
-                                       Network
+                       IO                  Adv
+                        ↕                   ↕
+           ┌────────────┴───────────────────┴───┐
+           │             Linear Leios           │
+           └──────↕───────────────────↕─────────┘
+                 FFD                BaseIO
+                  │                    │
+     ┌────────────┴───────────┐  ┌─────┴────────┐
+     │ header & body diffusion│  │ base protocol│
+     └────────────↕───────────┘  └─────↕────────┘
+                  │                    │
+                  └──────────↕─────────┘
+                          network
 </pre>
+
+`Network.Leios` gives the concrete wiring, and a diagram of it: the diffusion
+layer is `Shim`, the base protocol is the `BaseMachine`, and the network is
+delayed diffusion, split between the two by `NetTranslate`.
 ```agda
 data LeiosInput : Type where
   INIT     : VTy → LeiosInput
