@@ -70,6 +70,7 @@ Category-theoretic approach to cryptography
 ```agda
 open import CategoricalCrypto
 import CategoricalCrypto.Ext
+import CategoricalCrypto.Step
 ```
 ### Blockchain abstractions
 ```agda
@@ -80,6 +81,8 @@ Basic broadcast networking primitives
 ```agda
 open import Network.BasicBroadcast
 open import Network.Leios
+import Network.Leios.Queries
+import Network.Leios.Deployment
 ```
 ### Verification and Testing
 Trace verification for protocol properties

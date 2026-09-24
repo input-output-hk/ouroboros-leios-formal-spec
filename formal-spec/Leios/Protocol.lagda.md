@@ -30,39 +30,46 @@ module Leios.Protocol
 open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open GenFFD
 ```
-High level structure:
+High level structure.  `LinearLeios` stands on the header and body diffusion
+layer and on the base protocol, and both are reached through the network.
+Every wire is a channel, so each carries messages in both directions:
+uniformly, `inType` travels up the diagram and `outType` down.
 <pre>
-                                       Linear Leios
-                                       /         |
-+-------------------------------------+          |
-| Header Diffusion     Body Diffusion |          |
-+-------------------------------------+       Base Protocol
-                                       \      /
-                                       Network
+                       IO                  Adv
+                        ↕                   ↕
+           ┌────────────┴───────────────────┴───┐
+           │             Linear Leios           │
+           └──────↕───────────────────↕─────────┘
+                 FFD                BaseIO
+                  │                    │
+     ┌────────────┴───────────┐  ┌─────┴────────┐
+     │ header & body diffusion│  │ base protocol│
+     └────────────↕───────────┘  └─────↕────────┘
+                  │                    │
+                  └──────────↕─────────┘
+                          network
 </pre>
+
+`Network.Leios` gives the concrete wiring, and a diagram of it: the diffusion
+layer is `Shim`, the base protocol is the `BaseMachine`, and the network is
+delayed diffusion, split between the two by `NetTranslate`.
 ```agda
-data LeiosInput : Type where
-  INIT     : VTy → LeiosInput
-  SUBMIT   : EndorserBlock ⊎ List Tx → LeiosInput
-  FFD-OUT  : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract) → LeiosInput
-  SLOT     : LeiosInput
-  FTCH-LDG : LeiosInput
-
-data LeiosOutput : Type where
-  FTCH-LDG : List Tx → LeiosOutput
-  FFD-IN   : FFDAbstract.Input ffdAbstract → LeiosOutput
-  EMPTY    : LeiosOutput
-
-Block = RankingBlock ⊎ EndorserBlock
-
 record LeiosState : Type where
   field V            : VTy
         SD           : StakeDistr
-        {- RBs: the party's base chain, oldest first.  The list grows at the
-           back, so `last RBs` is the tip and `take` keeps a prefix towards
-           genesis.  This is the order `Blockchain.Safety` requires, since it
-           compares chains with `prune k = take (length ∸ k)` under the list
-           prefix order, and the order `Ledger` needs to replay transactions. -}
+```
+RBs: what this party KNOWS of the base chain, oldest first.  The
+list grows at the back, so `last RBs` is the tip and `take` keeps a
+prefix towards genesis — the order `Ledger` needs to replay
+transactions in.
+
+It is refreshed only when the base layer reports (`Slot₂`), so
+between the base chain advancing and that report it lags.  The lag
+is deliberate: a party votes on the tip it has heard about, and
+reading the base layer's true tip instead would hand every party
+instantaneous knowledge of it, which is a strictly stronger
+assumption than the protocol gives them.
+```agda
         RBs          : List RankingBlock
         ToPropose    : List Tx
         {- EBs': EBs together with the slot in which we received them -}
@@ -98,12 +105,6 @@ record LeiosState : Type where
   Ledger = flip L.concatMap RBs λ rb → case RankingBlock.txsOrEbCert rb of λ where
     (inj₁ txs) → txs
     (inj₂ ebCert) → lookupTxsC (getEBHash ebCert)
-
-  hasRB : RankingBlock → Type
-  hasRB = _∈ RBs
-
-  hasTx : Tx → Type
-  hasTx = _∈ Ledger
 
   needsUpkeep : SlotUpkeep → Type
   needsUpkeep = _∉ˡ Upkeep
@@ -276,12 +277,4 @@ module Types (params : Params) (let open Params params) where
 
   FFD : Channel
   FFD = simpleChannel FFDT ᵀ
-
-  data BaseT : Mode → Type where
-    FTCH-LDG : BaseT In
-    SUBMIT   : RankingBlock → BaseT In
-    BASE-LDG : List RankingBlock → BaseT Out
-
-  BaseC : Channel
-  BaseC = simpleChannel BaseT ᵀ
 ```

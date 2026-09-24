@@ -125,10 +125,28 @@ or equal than the slot of the last processed block
   record BaseMachine : Type₂ where
     field n : ℕ
 
-    open IsBC (Fin n) public
+    open IsBC public
 
     field m             : Machine BaseNetwork (BaseIO ⊗₀ BaseAdv)
-          is-blockchain : IsBlockchain RankingBlock m
+          is-blockchain : IsBlockchain (Fin n) RankingBlock m
 
     open Machine m renaming (stepRel to _-⟦_/_⟧⇀_) public
+    open IsBlockchain is-blockchain public
+    open IsConstrained isConstrained public using (queryI; queryO)
+
+    -- The queries are requests on the base layer's IO channel, answered
+    -- there.  `IsConstrained` only asks for `queryI`/`queryO` to be messages
+    -- on the machine's channel, which for `m` is `BaseNetwork ⊗ᵀ (BaseIO ⊗₀
+    -- BaseAdv)`; a query arriving on `BaseNetwork` could not be relayed by a
+    -- deployment that reaches the base layer only through `BaseIO`, and
+    -- nothing rules that out.  So the port is part of the interface.
+    field qI        : BlockChainInfo RankingBlock → BaseIOF Out
+          qO        : ∀ {q} → bciQueryType {Block = RankingBlock} q → BaseIOF In
+          queryI-IO : ∀ q → queryI q ≡ L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ qI q
+          queryO-IO : ∀ {q} (r : bciQueryType {Block = RankingBlock} q)
+                    → queryO {q} r ≡ L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ qO r
+          -- Answers are determined by the message reporting them, so that a
+          -- deployment relaying a query can read the answer back off it.
+          qO-inj    : ∀ {q} {r r' : bciQueryType {Block = RankingBlock} q}
+                    → qO r ≡ qO r' → r ≡ r'
 ```
