@@ -4,7 +4,7 @@ open import Leios.Prelude hiding (id; _⊗_; _∘_)
 open import CategoricalCrypto hiding (id; _∘_)
 import Blockchain.IsBlockchain as IsBC
 
--- | Why the chain and slot lemmas are assumptions and not theorems.
+-- | Why `IsExtension.query-compat` has to be a field.
 --
 -- `Blockchain.Safety.Deployment.getChain` reads a chain out of a state by
 -- asking the node through its `IsBlockchain` structure.  That structure is
@@ -13,9 +13,10 @@ import Blockchain.IsBlockchain as IsBC
 -- from the same state.
 --
 -- `IsExtension` relates an ext node to its base node as MACHINES and says
--- nothing about their `IsBlockchain` structures, so no chain lemma can follow
--- from `IsExtension` alone: the two sides of the square are free to disagree,
--- exactly as the two interfaces here do.
+-- nothing about their `IsBlockchain` structures, so their agreement cannot
+-- follow from the rest of `IsExtension`: the two sides of the square are free
+-- to disagree, exactly as the two interfaces here do.  Hence `query-compat`,
+-- from which the chain and slot lemmas are then proved.
 module Blockchain.QueryChoice where
 
 open IsBC using (BlockChainInfo; bciQueryType; IsBlockchain)

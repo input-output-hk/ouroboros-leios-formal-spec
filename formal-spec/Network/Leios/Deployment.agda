@@ -13,10 +13,11 @@ import Blockchain.Safety.Transfer as Transfer
 import Blockchain.Liveness.Transfer as LTransfer
 
 -- The Leios deployment and its safety and liveness, transferred from the base
--- layer's.  The query interface of the base spec is the derived one of
--- `Network.Leios.Queries`; what remains hypothetical are the deployed node's
--- own query interface, the chain and slot lemmas relating the two through the
--- transfer, and the base layer's safety and liveness.
+-- layer's.  Both query interfaces — the base spec's and the deployed node's —
+-- are the derived ones of `Network.Leios.Queries`, and the chain and slot
+-- lemmas relating them through the transfer are proved in
+-- `Blockchain.Safety.Transfer`.  The base layer's own safety and liveness are
+-- all that is assumed.
 module Network.Leios.Deployment
   (⋯ : SpecStructure) (let open SpecStructure ⋯)
   (params : Params) (let open Params params)

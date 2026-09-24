@@ -23,8 +23,10 @@ open import Relation.Binary using (Poset)
 -- | Generic safety transfer.
 --
 -- Given an ext `Deployment` and an `IsExtension` witness (the base-side spec,
--- channel/layer equipment, and block-level projection), safety of the
--- derived base `Deployment` implies safety of the ext `Deployment`.
+-- channel/layer equipment, the block-level projection, and agreement of the
+-- two nodes' observations), safety of the derived base `Deployment` implies
+-- safety of the ext `Deployment`.  The chain lemma this needs is proved here,
+-- from that agreement and the sub-state transport, rather than assumed.
 module Blockchain.Safety.Transfer
   {BlockExt BlockBase : Type}
   (ext                : Deployment BlockExt)

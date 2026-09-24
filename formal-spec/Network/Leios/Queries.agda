@@ -752,8 +752,9 @@ IsBlockchain-Leios1 base-party = record
 ------------------------------------------------------------------------
 -- The two interfaces agree: the deployed node's answer is the base spec's,
 -- read as Leios blocks.  This is the chain and slot lemmas' content at the
--- level of a single node; what the generic transfer still needs on top is
--- that the transfer carries a node's state to its base component.
+-- level of a single node.  The other half is
+-- `Blockchain.Safety.Transfer.transState-nodes`, that the transfer carries a
+-- node's state to its base component.
 
 -- The base spec's state inside the deployed node's.
 specOf : Machine.State Leios1 → Machine.State spec

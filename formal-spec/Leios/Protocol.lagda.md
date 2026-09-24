@@ -58,11 +58,24 @@ Block = RankingBlock ⊎ EndorserBlock
 record LeiosState : Type where
   field V            : VTy
         SD           : StakeDistr
-        {- RBs: the party's base chain, oldest first.  The list grows at the
-           back, so `last RBs` is the tip and `take` keeps a prefix towards
-           genesis.  This is the order `Blockchain.Safety` requires, since it
-           compares chains with `prune k = take (length ∸ k)` under the list
-           prefix order, and the order `Ledger` needs to replay transactions. -}
+        {- RBs: what this party KNOWS of the base chain, oldest first.  The
+           list grows at the back, so `last RBs` is the tip and `take` keeps a
+           prefix towards genesis — the order `Ledger` needs to replay
+           transactions in.
+
+           It is refreshed only when the base layer reports (`Slot₂`), so
+           between the base chain advancing and that report it lags.  The lag
+           is deliberate: a party votes on the tip it has heard about, and
+           reading the base layer's true tip instead would hand every party
+           instantaneous knowledge of it, which is a strictly stronger
+           assumption than the protocol gives them.
+
+           The lag is invisible to the transfer theorems.  A chain or slot
+           QUERY does not read this field: it is relayed to the base spec
+           through the multiplexer on the query port (`Network.Leios.Queries`),
+           so the chain and slot lemmas hold at every state rather than only
+           at quiescent ones.  This field is the party's own view, used only
+           where the protocol should act on what the party knows. -}
         RBs          : List RankingBlock
         ToPropose    : List Tx
         {- EBs': EBs together with the slot in which we received them -}
@@ -98,12 +111,6 @@ record LeiosState : Type where
   Ledger = flip L.concatMap RBs λ rb → case RankingBlock.txsOrEbCert rb of λ where
     (inj₁ txs) → txs
     (inj₂ ebCert) → lookupTxsC (getEBHash ebCert)
-
-  hasRB : RankingBlock → Type
-  hasRB = _∈ RBs
-
-  hasTx : Tx → Type
-  hasTx = _∈ Ledger
 
   needsUpkeep : SlotUpkeep → Type
   needsUpkeep = _∉ˡ Upkeep
