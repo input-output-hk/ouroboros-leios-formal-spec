@@ -75,7 +75,6 @@ import CategoricalCrypto.Step
 ### Blockchain abstractions
 ```agda
 import Blockchain.Liveness.Transfer
-import Blockchain.QueryChoice
 ```
 ### Network Layer
 Basic broadcast networking primitives
