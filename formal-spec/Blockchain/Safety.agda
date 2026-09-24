@@ -126,10 +126,16 @@ record IsExtension {BlockBase BlockExt : Type} {n : ℕ} {Network : Channel}
                           (ext-layer ∘ᴷ B.honest-node-spec)
 
     -- Observations are preserved: asking the ext node is asking the base node
-    -- it is stacked on.  This is what makes the chain and slot lemmas true,
-    -- and it is genuinely extra data — `is-extension` relates the two nodes as
-    -- MACHINES and says nothing about their `IsBlockchain` structures, which a
-    -- machine does not determine (see `Blockchain.QueryChoice`).
+    -- it is stacked on.  This is what makes the chain and slot lemmas true.
+    --
+    -- It has to be data, and cannot be derived from the rest of this record.
+    -- `IsBlockchain` is a record of DATA, not a property, so a machine does
+    -- not determine it: give one machine two query pairs that it answers with
+    -- different things, and `getChain` reports different chains for the same
+    -- state.  `is-extension` relates the ext and base nodes as MACHINES and
+    -- says nothing about their `IsBlockchain` structures, so their agreement
+    -- has to be assumed here — and then the chain and slot lemmas follow from
+    -- it in `Blockchain.Safety.Transfer`.
     query-compat : ∀ bci σ
       → IsBC.mapAnswer getBaseBlock bci (O.extAns bci σ)
       ≡ O.baseAns (IsBC.baseQ bci)

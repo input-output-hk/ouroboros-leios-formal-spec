@@ -54,41 +54,22 @@ uniformly, `inType` travels up the diagram and `outType` down.
 layer is `Shim`, the base protocol is the `BaseMachine`, and the network is
 delayed diffusion, split between the two by `NetTranslate`.
 ```agda
-data LeiosInput : Type where
-  INIT     : VTy → LeiosInput
-  SUBMIT   : EndorserBlock ⊎ List Tx → LeiosInput
-  FFD-OUT  : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract) → LeiosInput
-  SLOT     : LeiosInput
-  FTCH-LDG : LeiosInput
-
-data LeiosOutput : Type where
-  FTCH-LDG : List Tx → LeiosOutput
-  FFD-IN   : FFDAbstract.Input ffdAbstract → LeiosOutput
-  EMPTY    : LeiosOutput
-
-Block = RankingBlock ⊎ EndorserBlock
-
 record LeiosState : Type where
   field V            : VTy
         SD           : StakeDistr
-        {- RBs: what this party KNOWS of the base chain, oldest first.  The
-           list grows at the back, so `last RBs` is the tip and `take` keeps a
-           prefix towards genesis — the order `Ledger` needs to replay
-           transactions in.
+```
+RBs: what this party KNOWS of the base chain, oldest first.  The
+list grows at the back, so `last RBs` is the tip and `take` keeps a
+prefix towards genesis — the order `Ledger` needs to replay
+transactions in.
 
-           It is refreshed only when the base layer reports (`Slot₂`), so
-           between the base chain advancing and that report it lags.  The lag
-           is deliberate: a party votes on the tip it has heard about, and
-           reading the base layer's true tip instead would hand every party
-           instantaneous knowledge of it, which is a strictly stronger
-           assumption than the protocol gives them.
-
-           The lag is invisible to the transfer theorems.  A chain or slot
-           QUERY does not read this field: it is relayed to the base spec
-           through the multiplexer on the query port (`Network.Leios.Queries`),
-           so the chain and slot lemmas hold at every state rather than only
-           at quiescent ones.  This field is the party's own view, used only
-           where the protocol should act on what the party knows. -}
+It is refreshed only when the base layer reports (`Slot₂`), so
+between the base chain advancing and that report it lags.  The lag
+is deliberate: a party votes on the tip it has heard about, and
+reading the base layer's true tip instead would hand every party
+instantaneous knowledge of it, which is a strictly stronger
+assumption than the protocol gives them.
+```agda
         RBs          : List RankingBlock
         ToPropose    : List Tx
         {- EBs': EBs together with the slot in which we received them -}
@@ -296,12 +277,4 @@ module Types (params : Params) (let open Params params) where
 
   FFD : Channel
   FFD = simpleChannel FFDT ᵀ
-
-  data BaseT : Mode → Type where
-    FTCH-LDG : BaseT In
-    SUBMIT   : RankingBlock → BaseT In
-    BASE-LDG : List RankingBlock → BaseT Out
-
-  BaseC : Channel
-  BaseC = simpleChannel BaseT ᵀ
 ```
