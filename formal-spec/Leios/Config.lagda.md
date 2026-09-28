@@ -42,11 +42,11 @@ module _ (params : Params) where
     allStakes = L.tabulate (TotalMap.lookup stakeDistribution)
 
     totalStake : ℕ
-    totalStake = L.sum allStakes
+    totalStake = N.sum allStakes
 
     -- stake held by pools with strictly more stake than the given one
     richerStake : ℕ → ℕ
-    richerStake st = L.sum (L.filter (st <?_) allStakes)
+    richerStake st = N.sum (L.filter (st <?_) allStakes)
 ```
 Voting-committee membership by stake-based truncation: order pools by
 stake descending and accumulate until the cumulative stake covers the σc

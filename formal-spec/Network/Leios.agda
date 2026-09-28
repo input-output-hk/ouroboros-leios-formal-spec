@@ -6,11 +6,12 @@ open import Leios.SpecStructure
 open import Leios.Config
 
 open import CategoricalCrypto hiding (id)
+import CategoricalCrypto as CC
 open import CategoricalCrypto.Channel.Selection
+open import CategoricalCrypto.Machine.Iso using (≅ᴹ-refl)
 
 open import Blockchain.Safety
 import Blockchain.IsBlockchain as IsBC
-open import Leios.ChannelCat
 import Blockchain.Safety.Transfer as Transfer
 import Blockchain.Liveness.Transfer as LTransfer
 
@@ -31,7 +32,6 @@ module Network.Leios
   -- parameters of the real voting implementation
   (voter     : Vote → Fin numberOfParties)
   (Valid     : Vote → Type) ⦃ _ : Valid ⁇¹ ⦄
-  (cc : ChannelCat) (let open ChannelCat cc)
     where
 
 open import Leios.Linear ⋯ params
@@ -145,19 +145,30 @@ NetTranslateV : Machine DD.M ((Network ⊗₀ BaseNetwork) ⊗₀ Voter.VoteNet)
 NetTranslateV .Machine.State   = _
 NetTranslateV .Machine.stepRel = NetTranslateV.WithState_receive_return_newState_
 
--- The Leios node: the voting channel is part of the node's domain and is
--- passed through to the shared functionalities when assembling the protocol.
--- The `I` padding in the codomain is leftover from the Kleisli combinators:
--- `A ⊗₀ I ≡ A` is not provable, so the units cannot be normalized away. The
--- real fix is to work up to trace equivalence in a monoidal category of
--- machines, where the unitors are coherence isos and the padding disappears;
--- this is work in progress on the `yveshauser/machine-category` branch.
-Leios1 : Machine (DD.M ⊗₀ VotingC) (IO ⊗₀ (((I ⊗₀ I) ⊗₀ ((I ⊗₀ BaseAdv) ⊗₀ I)) ⊗₀ Adv))
-Leios1 = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ B.m) ⊗ᴷ idᴷ) ∘ᴷ (liftᴷ NetTranslate ⊗ᴷ idᴷ)
+-- Regroups the base functionality's adversary channel past the voting channel
+spec-rewire : Machine ((Network ⊗₀ (BaseIO ⊗₀ BaseAdv)) ⊗₀ VotingC)
+                      (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ BaseAdv)
+spec-rewire = ⊗-assoc⃖ CC.∘ (CC.id ⊗₁ ⊗-symₘ) CC.∘ ⊗-assoc CC.∘ (⊗-assoc⃖ ⊗₁ CC.id)
+
+-- The base functionality as seen through the multiplexed network. Voting is
+-- passed through untouched: the base protocol is voting-oblivious
+spec : Machine (DD.M ⊗₀ VotingC) (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ BaseAdv)
+spec = spec-rewire CC.∘ ((CC.id ⊗₁ B.m) ⊗₁ CC.id) CC.∘ (NetTranslate ⊗₁ CC.id)
+
+-- The extension layer, with `Adv` as its adversary channel
+ext-spec : Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ Adv)
+ext-spec = LinearLeios CC.∘ ((Shim ⊗₁ CC.id) ⊗₁ CC.id)
+
+-- The node as deployed: the extension layer stacked on the base spec. The
+-- voting channel is part of the node's domain and is passed through to the
+-- shared functionalities when assembling the protocol. Its adversary channel
+-- is the base functionality's, `BaseAdv`, next to `LinearLeios`'s own, `Adv`
+Leios1 : Machine (DD.M ⊗₀ VotingC) (IO ⊗₀ BaseAdv ⊗₀ Adv)
+Leios1 = ext-spec ∘ᴷ spec
 
 -- The real Leios node: same protocol core, but the voting channel is served
--- *locally* by a voter component wired into the node (the `idᴷ` slot of
--- `Leios1`). Votes travel over the same diffusion network as everything
+-- *locally* by a voter component wired into the node (the `VotingC` slot
+-- of `Leios1`). Votes travel over the same diffusion network as everything
 -- else, framed as `vtHeader` FFD messages: `NetTranslateV` diverts them to
 -- the voter on delivery and frames the voter's casts on the way out — the
 -- node itself never sees vote messages. Certificate queries are answered
@@ -185,20 +196,6 @@ LeiosBlock-Injective
   subst (λ (eb , correct) → _ ≡ record { rb = rb ; eb = eb ; correct = correct })
     (hash-unique' rb eb₁ eb₂ correct₁ correct₂) refl
 
--- The base node over the same channels: voting is passed through untouched,
--- the base protocol is voting-oblivious.
-spec : Machine (DD.M ⊗₀ VotingC)
-               (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ ((I ⊗₀ I) ⊗₀ ((I ⊗₀ BaseAdv) ⊗₀ I)))
-spec = ((idᴷ ⊗ᴷ B.m) ⊗ᴷ idᴷ) ∘ᴷ (liftᴷ NetTranslate ⊗ᴷ idᴷ)
-
-ext-spec : Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ I)
-ext-spec = subst (λ x → Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ x)) eq body
-  where
-    eq : ((I ⊗₀ I) ⊗₀ I) ⊗₀ I ≡ I
-    eq = trans ⊗-identityʳ (trans ⊗-identityʳ ⊗-identityʳ)
-    body : Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ (((I ⊗₀ I) ⊗₀ I) ⊗₀ I))
-    body = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ idᴷ) ⊗ᴷ idᴷ)
-
 --------------------------------------------------------------------------------
 -- Shared functionalities
 --
@@ -225,13 +222,13 @@ shuffle : ∀ n (A B : Channel) → Machine ((n ⨂ⁿ A) ⊗₀ (n ⨂ⁿ B)) (
 shuffle n A B = TotalFunctionMachine' (zip⇒ n A B) (unzip⇒ n A B)
 
 module _ (IOF AdvF : Participant → Channel)
-  (nodesF : (p : Participant) → Machine (DD.M ⊗₀ VotingC) (IOF p ⊗₀ AdvF p)) honestNodes
-  (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
+  (nodesF : (p : Participant) → Machine (DD.M ⊗₀ VotingC) (IOF p ⊗₀ AdvF p)) honest-Nodes
+  (honest-Node : {p : Participant} → p ∈ honest-Nodes → nodesF p ≡ᴹ Leios1)
+  (honest-IOF  : {p : Participant} → p ∈ honest-Nodes → IOF p ≡ IO)
+  (honest-AdvF : {p : Participant} → p ∈ honest-Nodes → AdvF p ≡ BaseAdv ⊗₀ Adv)
   (isConstrained-Leios : IsConstrained Leios1 (IsBC.bciQueryType Participant {Block = LeiosBlock}))
   (isPure-Leios        : IsPure isConstrained-Leios)
   (IsBlockchain-base : IsBC.IsBlockchain Participant RankingBlock spec)
-  (is-extension-eq :
-    idᴷ ∘ᴷ Leios1 ≡ subst (λ A → Machine (DD.M ⊗₀ VotingC) (IO ⊗₀ (A ⊗₀ I))) (sym ⊗-identityʳ) (ext-spec ∘ᴷ spec))
     where
 
   private
@@ -259,8 +256,10 @@ module _ (IOF AdvF : Participant → Channel)
     ; IOF                 = IOF
     ; AdvF                = AdvF
     ; all-nodes           = nodesF
-    ; honest-nodes        = honestNodes
+    ; honest-nodes        = honest-Nodes
     ; honest-nodes-≡-spec = honest-Node
+    ; honest-IOF          = honest-IOF
+    ; honest-AdvF         = honest-AdvF
     ; network             = liftᴷ {E = I} (shuffle numberOfParties DD.M VotingC) ∘ᴷ ((DD.Network ⊗ᴷ Certifier.Functionality) ∘ idᴷ)
     }
 
@@ -276,16 +275,17 @@ module _ (IOF AdvF : Participant → Channel)
 
   extension : IsExtension base-spec (Deployment.spec safetyS)
   extension = record
-    { ext-Adv≡base-Adv = ⊗-identityʳ
+    { AdvL             = Adv
+    ; ext-Adv≡base-Adv⊗AdvL = refl
     ; ext-layer        = ext-spec
-    ; is-extension     = is-extension-eq
+    ; is-extension     = ≅ᴹ-refl
     ; getBaseBlock     = LeiosBlock.rb
     ; getBaseBlock-inj = LeiosBlock-Injective
     }
 
   private
     module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-      safetyS base-spec cc extension
+      safetyS base-spec extension
     module TrM = Tr.Main
 
   leiosSafety : (∀ {A} (E : Deployment.Environment safetyS A) → TrM.ChainLemma-ty E)
@@ -294,7 +294,7 @@ module _ (IOF AdvF : Participant → Channel)
 
   private
     module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-      safetyS base-spec cc extension (λ _ → refl) (λ _ → refl)
+      safetyS base-spec extension (λ _ → refl) (λ _ → refl)
     module LTrM = LTr.Main
 
   leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
