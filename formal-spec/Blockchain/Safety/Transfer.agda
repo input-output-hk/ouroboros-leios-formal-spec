@@ -9,7 +9,7 @@ open import CategoricalCrypto.Machine.NAry
 open import CategoricalCrypto hiding (id)
 import CategoricalCrypto as CC
 open import CategoricalCrypto.Machine.Iso
-  using (_≅ᴹ_; ≅ᴹ-refl; ≅ᴹ-sym; ≅ᴹ-trans; ∘-resp-≅ᴹ; ∘-identityˡ-≅ᴹ)
+  using (_≅ᴹ_; ≅ᴹ-refl; ≅ᴹ-sym; ≅ᴹ-trans; ∘-resp-≅ᴹ)
 open import CategoricalCrypto.Machine.Monoidal using (⊗₁-id)
 
 import Relation.Binary.Reasoning.PartialOrder
