@@ -6,11 +6,12 @@ open import Leios.SpecStructure
 open import Leios.Config
 
 open import CategoricalCrypto hiding (id)
+import CategoricalCrypto as CC
 open import CategoricalCrypto.Channel.Selection
+open import CategoricalCrypto.Machine.Iso using (≅ᴹ-refl)
 
 open import Blockchain.Safety
 import Blockchain.IsBlockchain as IsBC
-open import Leios.ChannelCat
 import Blockchain.Safety.Transfer as Transfer
 import Blockchain.Liveness.Transfer as LTransfer
 
@@ -24,7 +25,6 @@ module Network.Leios
   (HashCorrect-irrel : ∀ rb eb → Irrelevant (HashCorrectB rb eb))
   (hash-unique : (rb : RankingBlock) → (eb₁ eb₂ : Maybe EndorserBlock)
     → HashCorrectB rb eb₁ → HashCorrectB rb eb₂ → eb₁ ≡ eb₂)
-  (cc : ChannelCat) (let open ChannelCat cc)
     where
 
 open import Leios.Linear ⋯ params
@@ -72,8 +72,19 @@ NetTranslate : Machine DD.M (Network ⊗₀ BaseNetwork)
 NetTranslate .Machine.State   = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
-Leios1 : Machine DD.M (IO ⊗₀ ((I ⊗₀ I ⊗₀ BaseAdv) ⊗₀ Adv))
-Leios1 = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
+-- The base functionality as seen through the multiplexed network
+spec : Machine DD.M ((Network ⊗₀ BaseIO) ⊗₀ BaseAdv)
+spec = ⊗-assoc⃖ CC.∘ (CC.id ⊗₁ B.m) CC.∘ NetTranslate
+
+-- The extension layer, with `Adv` as its adversary channel
+ext-spec : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ Adv)
+ext-spec = LinearLeios CC.∘ (Shim ⊗₁ CC.id)
+
+-- The node as deployed: the extension layer stacked on the base spec. Its
+-- adversary channel is the base functionality's, `BaseAdv`, next to
+-- `LinearLeios`'s own, `Adv`
+Leios1 : Machine DD.M (IO ⊗₀ BaseAdv ⊗₀ Adv)
+Leios1 = ext-spec ∘ᴷ spec
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
 record LeiosBlock : Type where
@@ -93,25 +104,14 @@ LeiosBlock-Injective
   subst (λ (eb , correct) → _ ≡ record { rb = rb ; eb = eb ; correct = correct })
     (hash-unique' rb eb₁ eb₂ correct₁ correct₂) refl
 
-spec : Machine DD.M ((Network ⊗₀ BaseIO) ⊗₀ (I ⊗₀ I ⊗₀ BaseAdv))
-spec = (idᴷ ⊗ᴷ B.m) ∘ᴷ liftᴷ NetTranslate
-
-ext-spec : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ I)
-ext-spec = subst (λ x → Machine (Network ⊗₀ BaseIO) (IO ⊗₀ x)) eq body
-  where
-    eq : (I ⊗₀ I) ⊗₀ I ≡ I
-    eq = trans ⊗-identityʳ ⊗-identityʳ
-    body : Machine (Network ⊗₀ BaseIO) (IO ⊗₀ ((I ⊗₀ I) ⊗₀ I))
-    body = LinearLeios ∘ᴷ (liftᴷ Shim ⊗ᴷ idᴷ)
-
 module _ (IOF AdvF : Participant → Channel)
-  (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honestNodes
-  (honest-Node : {p : Participant} → p ∈ honestNodes → nodesF p ≡ᴹ Leios1)
+  (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honest-Nodes
+  (honest-Node : {p : Participant} → p ∈ honest-Nodes → nodesF p ≡ᴹ Leios1)
+  (honest-IOF  : {p : Participant} → p ∈ honest-Nodes → IOF p ≡ IO)
+  (honest-AdvF : {p : Participant} → p ∈ honest-Nodes → AdvF p ≡ BaseAdv ⊗₀ Adv)
   (isConstrained-Leios : IsConstrained Leios1 (IsBC.bciQueryType Participant {Block = LeiosBlock}))
   (isPure-Leios        : IsPure isConstrained-Leios)
   (IsBlockchain-base : IsBC.IsBlockchain Participant RankingBlock spec)
-  (is-extension-eq :
-    idᴷ ∘ᴷ Leios1 ≡ subst (λ A → Machine DD.M (IO ⊗₀ (A ⊗₀ I))) (sym ⊗-identityʳ) (ext-spec ∘ᴷ spec))
     where
 
   private
@@ -139,8 +139,10 @@ module _ (IOF AdvF : Participant → Channel)
     ; IOF                 = IOF
     ; AdvF                = AdvF
     ; all-nodes           = nodesF
-    ; honest-nodes        = honestNodes
+    ; honest-nodes        = honest-Nodes
     ; honest-nodes-≡-spec = honest-Node
+    ; honest-IOF          = honest-IOF
+    ; honest-AdvF         = honest-AdvF
     ; network             = DD.Network
     }
 
@@ -156,16 +158,17 @@ module _ (IOF AdvF : Participant → Channel)
 
   extension : IsExtension base-spec (Deployment.spec safetyS)
   extension = record
-    { ext-Adv≡base-Adv = ⊗-identityʳ
+    { AdvL             = Adv
+    ; ext-Adv≡base-Adv⊗AdvL = refl
     ; ext-layer        = ext-spec
-    ; is-extension     = is-extension-eq
+    ; is-extension     = ≅ᴹ-refl
     ; getBaseBlock     = LeiosBlock.rb
     ; getBaseBlock-inj = LeiosBlock-Injective
     }
 
   private
     module Tr = Transfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-      safetyS base-spec cc extension
+      safetyS base-spec extension
     module TrM = Tr.Main
 
   leiosSafety : (∀ {A} (E : Deployment.Environment safetyS A) → TrM.ChainLemma-ty E)
@@ -174,7 +177,7 @@ module _ (IOF AdvF : Participant → Channel)
 
   private
     module LTr = LTransfer {BlockExt = LeiosBlock} {BlockBase = RankingBlock}
-      safetyS base-spec cc extension (λ _ → refl) (λ _ → refl)
+      safetyS base-spec extension (λ _ → refl) (λ _ → refl)
     module LTrM = LTr.Main
 
   leiosHCG : (∀ {A} (E : S.Environment A) → LTrM.TrM.ChainLemma-ty E)
