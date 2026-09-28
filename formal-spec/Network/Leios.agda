@@ -166,17 +166,21 @@ ext-spec = LinearLeios CC.∘ ((Shim ⊗₁ CC.id) ⊗₁ CC.id)
 Leios1 : Machine (DD.M ⊗₀ VotingC) (IO ⊗₀ BaseAdv ⊗₀ Adv)
 Leios1 = ext-spec ∘ᴷ spec
 
--- The real Leios node: same protocol core, but the voting channel is served
--- *locally* by a voter component wired into the node (the `VotingC` slot
--- of `Leios1`). Votes travel over the same diffusion network as everything
+-- The base functionality with the voting channel served *locally*: a voter
+-- component fills the `VotingC` slot that `spec` passes through
+specʳ : Machine DD.M (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ BaseAdv)
+specʳ = spec-rewire CC.∘ ((CC.id ⊗₁ B.m) ⊗₁ Voter.Voter) CC.∘ NetTranslateV
+
+-- The real Leios node: the same extension layer as `Leios1`, stacked on
+-- `specʳ` instead of `spec`. Votes travel over the same diffusion network as everything
 -- else, framed as `vtHeader` FFD messages: `NetTranslateV` diverts them to
 -- the voter on delivery and frames the voter's casts on the way out — the
 -- node itself never sees vote messages. Certificate queries are answered
 -- synchronously from the voter's local vote log, so the voter needs no
 -- adversary port. Relating a deployment of these nodes over `DD.Network`
 -- to `Leios1` + `Certifier.Functionality` is the open UC-realization step.
-Leios1ʳ : Machine DD.M (IO ⊗₀ ((I ⊗₀ ((I ⊗₀ BaseAdv) ⊗₀ I)) ⊗₀ Adv))
-Leios1ʳ = LinearLeios ∘ᴷ ((liftᴷ Shim ⊗ᴷ B.m) ⊗ᴷ liftᴷ Voter.Voter) ∘ᴷ liftᴷ NetTranslateV
+Leios1ʳ : Machine DD.M (IO ⊗₀ BaseAdv ⊗₀ Adv)
+Leios1ʳ = ext-spec ∘ᴷ specʳ
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
 record LeiosBlock : Type where
