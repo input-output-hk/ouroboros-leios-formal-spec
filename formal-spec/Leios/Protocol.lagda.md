@@ -58,6 +58,11 @@ Block = RankingBlock ⊎ EndorserBlock
 record LeiosState : Type where
   field V            : VTy
         SD           : StakeDistr
+        {- RBs: the party's base chain, oldest first.  The list grows at the
+           back, so `last RBs` is the tip and `take` keeps a prefix towards
+           genesis.  This is the order `Blockchain.Safety` requires, since it
+           compares chains with `prune k = take (length ∸ k)` under the list
+           prefix order, and the order `Ledger` needs to replay transactions. -}
         RBs          : List RankingBlock
         ToPropose    : List Tx
         {- EBs': EBs together with the slot in which we received them -}
@@ -65,6 +70,8 @@ record LeiosState : Type where
         VotedEBs     : List Hash
         slot         : ℕ
         Upkeep       : List SlotUpkeep
+        {- proposedEB: the EB this party diffused in the current slot, if any -}
+        proposedEB   : Maybe Hash
         Upkeep-Stage : ℙ StageUpkeep
         {- the certificate query awaiting an answer, recorded so that the
            answer can be correlated with the request -}
@@ -74,7 +81,7 @@ record LeiosState : Type where
   -- ideally we'd require a non-empty list, but this also works for now
   currentRB : RankingBlock
   currentRB = maybe (λ x → x) (record { txsOrEbCert = inj₁ [] ; announcedEB = nothing })
-                (head RBs)
+                (L.last RBs)
 
   EBs : List EndorserBlock
   EBs = map proj₂ EBs'
@@ -102,6 +109,15 @@ record LeiosState : Type where
   needsUpkeep : SlotUpkeep → Type
   needsUpkeep = _∉ˡ Upkeep
 
+  hasUpkeep : SlotUpkeep → Type
+  hasUpkeep = _∈ˡ Upkeep
+
+  needs : ∀ {u l} → Upkeep ≡ l → u ∉ˡ l → needsUpkeep u
+  needs {u} eq n = subst (u ∉ˡ_) (sym eq) n
+
+  has : ∀ {u l} → Upkeep ≡ l → u ∈ˡ l → hasUpkeep u
+  has {u} eq h = subst (u ∈ˡ_) (sym eq) h
+
   needsUpkeep-Stage : StageUpkeep → Set
   needsUpkeep-Stage = _∉ Upkeep-Stage
 
@@ -125,6 +141,7 @@ initLeiosState V SD pks = record
   ; VotedEBs     = []
   ; slot         = initSlot V
   ; Upkeep       = []
+  ; proposedEB   = nothing
   ; Upkeep-Stage = ∅
   ; PendingQuery = nothing
   ; PubKeys      = pks

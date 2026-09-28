@@ -79,6 +79,7 @@ getAction (Roles₂ {u = Base} (_ , _ , x , _))                = ⊥-elim (x ref
 getAction (Roles₂ {u = CertCheck} (_ , _ , _ , x))           = ⊥-elim (x refl) -- ... and the `CertCheck` duty
 getAction (Roles₂ {s} {u = EB-Role} _)                       = No-EB-Role-Action (LeiosState.slot s)
 getAction (Roles₂ {s} {u = VT-Role} _)                       = No-VT-Role-Action (LeiosState.slot s)
+getAction (Roles₃ {s} _)                                     = No-VT-Role-Action (LeiosState.slot s)
 ```
 ```agda
 getSlot : Action → ℕ
@@ -208,6 +209,7 @@ opaque
   input-sound (inj₁ SLOT) (Roles₂ {u = CertCheck} (_ , _ , _ , x)) = ⊥-elim (x refl)
   input-sound (inj₁ SLOT) (Roles₂ {u = EB-Role} _)        = refl
   input-sound (inj₁ SLOT) (Roles₂ {u = VT-Role} _)        = refl
+  input-sound (inj₁ SLOT) (Roles₃ _)                      = refl
   input-sound (inj₁ FTCH) ()
   input-sound (inj₁ (FFD-OUT _)) (Slot₁ _)                = refl
   input-sound (inj₂ (inj₁ (BASE-LDG _))) Slot₂            = refl
@@ -230,7 +232,8 @@ data Err-verifyStep (σ : Action) (i : TestInput) (s : LeiosState) : Type where
   Err-Slot : getSlot σ ≢ LeiosState.slot s → Err-verifyStep σ i s
   Err-EB-Role-premises : ∀ {π} → ¬ (
     toProposeEB s π ≡ just eb ×
-    canProduceEB (LeiosState.slot s) sk-EB (stake s) π) →
+    canProduceEB (LeiosState.slot s) sk-EB (stake s) π ×
+    LeiosState.needsUpkeep s EB-Role) →
     Err-verifyStep σ i s
   Err-VT-Role-premises : ∀ {ebHash slot'} → let open LeiosState s in ¬ (
     getCurrentEBHash s ≡ just ebHash ×
@@ -240,11 +243,12 @@ data Err-verifyStep (σ : Action) (i : TestInput) (s : LeiosState) : Type where
     isValid s (inj₁ (ebHeader eb)) ×
     slot' ≤ slotNumber eb + Lhdr ×
     slotNumber eb + 3 * Lhdr ≤ slot ×
-    slot ≡ slotNumber eb + (3 * Lhdr ⊔ validityCheckTime eb) ×
-    validityCheckTime eb ≤ 3 * Lhdr + Lvote ×
+    slot ≤ slotNumber eb + 3 * Lhdr + Lvote ×
+    isValidityChecked slot eb ×
     EndorserBlockOSig.txs eb ≢ [] ×
     needsUpkeep VT-Role ×
-    canProduceV (slotNumber eb) sk-VT (stake s)) →
+    inVotingCommittee params (stake s) ×
+    id ∈ˡ L.map poolID PubKeys) →
     Err-verifyStep σ i s
   Err-AllDone : ¬ (allDone s) → Err-verifyStep σ i s
   Err-Cert₁-premises : ∀ {c} → (∀ {eb} → ¬ (Cert₁-premises {s = s} {eb = eb} {c = c} .proj₁)) → Err-verifyStep σ i s
@@ -360,7 +364,7 @@ verifyStep' (Cert₁-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
 ... | just eb
   with ¿ (LeiosState.needsUpkeep s Base × (CertCheck ∈ˡ LeiosState.Upkeep s) × LeiosState.PendingQuery s ≡ just (hash eb) × AnswerMatches c (hash eb)) ¿
 ... | yes (upk , chk , peq , match) =
-  Ok' (Cert₁ {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} (upk , chk , eq , peq , match))
+  Ok' (Cert₁ (upk , chk , eq , peq , match))
 ... | no ¬p = Err (Err-Cert₁-premises λ { (upk , chk , creq , peq , match) →
                 let e = just-injective (trans (sym creq) eq)
                 in ¬p (upk , chk
@@ -380,7 +384,7 @@ verifyStep' (Cert₂-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
 ... | nothing = Err (Err-Cert₂-premises λ { (_ , _ , _ , pq) → just≢nothing (trans (sym pq) peq) })
 ... | just r
   with ¿ (LeiosState.needsUpkeep s Base × (CertCheck ∈ˡ LeiosState.Upkeep s)) ¿
-... | yes (upk , chk) = Ok' (Cert₂ {r = r} {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} (upk , chk , eq , peq))
+... | yes (upk , chk) = Ok' (Cert₂ {r = r} (upk , chk , eq , peq))
 ... | no ¬p = Err (Err-Cert₂-premises λ { (upk , chk , _ , _) → ¬p (upk , chk) })
 verifyStep' (Cert₂-Action _) (inj₂ (inj₂ (inj₂ ACK))) _ _           = Mismatch λ ()
 
@@ -435,18 +439,19 @@ verifyStep' (Base₁-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _         =
 verifyStep' (Base₁-Action _) (inj₂ (inj₂ (inj₂ ACK))) _ _              = Mismatch λ ()
 verifyStep' (Base₂-Action _) (inj₁ SLOT) s refl
   with ¿ Base₂-premises {s = s} .proj₁ ¿
-... | yes p = Ok' (Base₂ {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} p)
+... | yes p = Ok' (Base₂ p)
 ... | no ¬p = Err (Err-Base₂-premises ¬p)
 verifyStep' (Base₂-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (Base₂-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (Base₂-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (Base₃-Action _) (inj₁ SLOT) s refl
   with certRequest s in eq
-... | nothing = Err (Err-Base₃-premises λ { (_ , q) → just≢nothing (trans (sym q) eq) })
+... | nothing = Err (Err-Base₃-premises λ { (_ , _ , q) → just≢nothing (trans (sym q) eq) })
 ... | just eb
-  with ¿ LeiosState.needsUpkeep s CertCheck ¿
-... | yes p = Ok' (Base₃ (p , eq))
-... | no ¬p = Err (Err-Base₃-premises λ { (p , _) → ¬p p })
+  with ¿ LeiosState.needsUpkeep s CertCheck ¿ | ¿ LeiosState.hasUpkeep s EB-Role ¿
+... | yes p | yes u = Ok' (Base₃ (p , u , eq))
+... | no ¬p | _     = Err (Err-Base₃-premises λ { (p , _) → ¬p p })
+... | yes _ | no ¬u = Err (Err-Base₃-premises λ { (_ , u , _) → ¬u u })
 verifyStep' (Base₃-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (Base₃-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (Base₃-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
@@ -458,9 +463,10 @@ verifyStep' (No-EB-Role-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (No-EB-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (No-EB-Role-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (No-VT-Role-Action _) (inj₁ SLOT) s refl
-  with ¿ Roles₂-premises {s = s} {u = VT-Role} .proj₁ ¿
-... | yes p = Ok' (Roles₂ p)
-... | no ¬p = Err (Err-Roles₂-premises ¬p)
+  with ¿ Roles₂-premises {s = s} {u = VT-Role} .proj₁ ¿ | ¿ Roles₃-premises {s = s} .proj₁ ¿
+... | yes p | _     = Ok' (Roles₂ p)
+... | no _  | yes q = Ok' (Roles₃ q)
+... | no ¬p | no _  = Err (Err-Roles₂-premises ¬p)
 verifyStep' (No-VT-Role-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (No-VT-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (No-VT-Role-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
@@ -527,8 +533,8 @@ module _
     iErr-verifyStep {i} {s} .errorMsg (Err-Cert₁-premises _)              = printf "%u : Err-Cert₁-premises" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg (Err-Cert₂-premises _)              = printf "%u : Err-Cert₂-premises" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg (Err-Cert₃-premises _)              = printf "%u : Err-Cert₃-premises" (LeiosState.slot s)
-    iErr-verifyStep {i} {s} .errorMsg (Err-Base₂-premises _)              = printf "%u : Err-Base₂-premises" (LeiosState.slot s)
-    iErr-verifyStep {i} {s} .errorMsg (Err-Base₃-premises _)              = printf "%u : Err-Base₃-premises" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorMsg (Err-Base₂-premises _)              = printf "%u : Err-Base₂-premises: Base or CertCheck upkeep spent, EB role not yet settled, or the tip calls for a certificate" (LeiosState.slot s)
+    iErr-verifyStep {i} {s} .errorMsg (Err-Base₃-premises _)              = printf "%u : Err-Base₃-premises: CertCheck upkeep spent, EB role not yet settled, or the tip calls for no certificate" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg (Err-Roles₂-premises _)             = printf "%u : Err-Roles₂-premises: no applicable role step to skip" (LeiosState.slot s)
     iErr-verifyStep {i} {s} .errorMsg {a} (Err-InputMismatch _)           = printf "%u : Err-InputMismatch: input channel does not match action %s" (LeiosState.slot s) (actionName a)
     iErr-verifyStep {i} {s} .errorMsg (Err-VT-Role-premises {eb = eb} {ebHash = ebHash} {slot' = slot'} _)
@@ -553,11 +559,11 @@ module _
       with ¿ slotNumber eb + 3 * Lhdr ≤ (LeiosState.slot s) ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ (slotNumber eb + 3 * Lhdr ≤ (LeiosState.slot s))" (LeiosState.slot s)
     ... | yes p
-      with ¿ (LeiosState.slot s) ≡ slotNumber eb + validityCheckTime eb ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ ((LeiosState.slot s) ≡ slotNumber eb + validityCheckTime eb)" (LeiosState.slot s)
+      with ¿ (LeiosState.slot s) ≤ slotNumber eb + 3 * Lhdr + Lvote ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ ((LeiosState.slot s) ≤ slotNumber eb + 3 * Lhdr + Lvote)" (LeiosState.slot s)
     ... | yes p
-      with ¿ validityCheckTime eb ≤ 3 * Lhdr + Lvote ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises: ¬ (validityCheckTime eb ≤ 3 * Lhdr + Lvote)" (LeiosState.slot s)
+      with ¿ isValidityChecked (LeiosState.slot s) eb ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: EB validation not completed (isValidityChecked)" (LeiosState.slot s)
     ... | yes p
       with ¿ EndorserBlockOSig.txs eb ≢ [] ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: No transactions in EB" (LeiosState.slot s)
@@ -565,8 +571,11 @@ module _
       with ¿ LeiosState.needsUpkeep s VT-Role ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: VT-Role already done" (LeiosState.slot s)
     ... | yes p
-      with ¿ canProduceV (slotNumber eb) sk-VT (stake s) ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises: Can not produce vote" (LeiosState.slot s)
+      with ¿ inVotingCommittee params (stake s) ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: Not in the voting committee" (LeiosState.slot s)
+    ... | yes p
+      with ¿ id ∈ˡ L.map poolID (LeiosState.PubKeys s) ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: No registered voting key (keyless committee seat)" (LeiosState.slot s)
     ... | yes p = printf "%u : Impossible!" (LeiosState.slot s)
 
     iErr-verifyTrace : ∀ {s} → IsError (λ t → Err-verifyTrace t s)
