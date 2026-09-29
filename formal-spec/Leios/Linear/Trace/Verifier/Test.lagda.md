@@ -321,3 +321,59 @@ submits the RB without a certificate.
     test₄ : IsOk (verifyTrace (L.reverse stale-cert-trace) s₂₀₀)
     test₄ = _
 ```
+### Rejected traces
+Each of the following traces breaks one premise of the certificate rules,
+and the verifier reports it.
+```agda
+    verdict : TestTrace → LeiosState → String
+    verdict t s = case verifyTrace (L.reverse t) s of λ where
+      (Ok _)  → "ok"
+      (Err e) → errorMsg e
+```
+`Base₂` cannot submit while the tip calls for a certificate.
+```agda
+    test₅ : verdict ((No-EB-Role-Action 200 , inj₁ SLOT) ∷ (Base₂-Action 200 , inj₁ SLOT) ∷ []) s₂₀₀
+          ≡ "200 : Err-Base₂-premises: Base or CertCheck upkeep spent, EB role not yet settled, or the tip calls for a certificate"
+    test₅ = refl
+```
+A positive answer must certify the queried EB.
+```agda
+    test₆ : verdict ((No-EB-Role-Action 200 , inj₁ SLOT)
+                   ∷ (Base₃-Action      200 , inj₁ SLOT)
+                   ∷ (Cert₁-Action      200 , inj₂ (inj₂ (inj₂ (CERT (just (hash EB₄))))))
+                   ∷ []) s₂₀₀
+          ≡ "200 : Err-Cert₁-premises"
+    test₆ = refl
+```
+An answer is only accepted while a query is outstanding.
+```agda
+    test₇ : verdict ((No-EB-Role-Action 200 , inj₁ SLOT)
+                   ∷ (Cert₁-Action      200 , inj₂ (inj₂ (inj₂ (CERT (just crt₃)))))
+                   ∷ []) s₂₀₀
+          ≡ "200 : Err-Cert₁-premises"
+    test₇ = refl
+```
+`Cert₃` re-queries only if the tip has moved to a different EB.
+```agda
+    test₈ : verdict ((No-EB-Role-Action 200 , inj₁ SLOT)
+                   ∷ (Base₃-Action      200 , inj₁ SLOT)
+                   ∷ (Cert₃-Action      200 , inj₂ (inj₂ (inj₂ (CERT nothing))))
+                   ∷ []) s₂₀₀
+          ≡ "200 : Err-Cert₃-premises"
+    test₈ = refl
+```
+`Base₃` queries at most once per slot.
+```agda
+    test₉ : verdict ((No-EB-Role-Action 200 , inj₁ SLOT)
+                   ∷ (Base₃-Action      200 , inj₁ SLOT)
+                   ∷ (Base₃-Action      200 , inj₁ SLOT)
+                   ∷ []) s₂₀₀
+          ≡ "200 : Err-Base₃-premises: CertCheck upkeep spent, EB role not yet settled, or the tip calls for no certificate"
+    test₉ = refl
+```
+A certificate rule only consumes a `CERT` input.
+```agda
+    test₁₀ : verdict ((Cert₁-Action 200 , inj₁ SLOT) ∷ []) s₂₀₀
+           ≡ "200 : Err-InputMismatch: input channel does not match action Cert₁-Action"
+    test₁₀ = refl
+```
