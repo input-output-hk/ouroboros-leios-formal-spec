@@ -43,6 +43,7 @@ The house standard `CLAUDE.md` does not exist in this repository; the review use
 - e935198 Assume that a certificate names its reference — maintainer-approved (was a Statement-audit suggestion): module parameter `mkCert-hash : ∀ r → getEBHash (mkCert r) ≡ r`, plus `mkCert-matches` showing a positive answer satisfies `AnswerMatches`.
 - 29f4cd2 State the voter's certificate correctness over its log — maintainer-approved (was a Statement-audit suggestion): `vih`/`cc` now range over `log s'`; body is `real-cert-correct` directly.
 - 5ca614c Say why a certificate step was refused — maintainer-approved (was a Public API suggestion): the `Err-Cert*` messages list the premises that can fail, as `Base₂`/`Base₃` do; the pinned tests are updated.
+- e160ea2 Replace `AnswerMatches` with `Maybe.All` — maintainer-approved (was a Public API suggestion): `Cert₁`'s premise is `Maybe.All (λ c → getEBHash c ≡ hash currentRB) c`, decided by the library's `Dec-MAll`.
 
 ## Suggestions (need your call)
 
@@ -61,7 +62,6 @@ The house standard `CLAUDE.md` does not exist in this repository; the review use
 - formal-spec/Leios/Linear/Trace/Verifier.lagda.md :: Ok' — `Ok'`, `Mismatch`, the nine `inj…≢…` lemmas and `verifyStep'` are unused downstream; candidates for `private`.
 - formal-spec/Leios/Linear.lagda.md :: π-unique — `P`, `P?`, `not-found`, `subst'`, `π-unique` are `Dec-↝` helpers only; candidates for `private`.
 - formal-spec/Leios/Linear.lagda.md :: Slot₂-premises — `Slot₂-premises` and `Base₁-premises` have zero uses.
-- formal-spec/Leios/Linear.lagda.md :: AnswerMatches — it is stdlib `Data.Maybe.Relation.Unary.All ((_≡ r) ∘ getEBHash)`; the swap renames its constructors (`matches-nothing` is used in Progress).
 - formal-spec/Leios/Linear/Progress.agda :: base-step — state the result as `Upkeep s' ≡ Base ∷ CertCheck ∷ Upkeep s` (both tails become `refl`); `upkeep-step`/`base-step`/`slot-step` could be `private`.
 - formal-spec/Leios/Voting/Certifier.lagda.md :: castMsg — `castMsg`/`queryMsg`/`certMsg` could be `private`; `init` has zero uses.
 - formal-spec/Leios/Voting/Real.lagda.md :: α-init — zero uses.
