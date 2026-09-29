@@ -163,6 +163,28 @@ ext-spec = LinearLeios CC.∘ ((Shim ⊗₁ CC.id) ⊗₁ CC.id)
 -- voting channel is part of the node's domain and is passed through to the
 -- shared functionalities when assembling the protocol. Its adversary channel
 -- is the base functionality's, `BaseAdv`, next to `LinearLeios`'s own, `Adv`
+--
+--              IO                                  Adv (= I)
+--               ▲                                     ▲
+--      ┌────────┴─────────────────────────────────────┴──┐
+--      │                   LinearLeios                   │
+--      └────▲───────────────────▲────────────────▲───────┘
+--          FFD                BaseIO           VotingC
+--       ┌───┴───┐               │                │              ext-spec
+--       │ Shim  │               │                │
+--       └───▲───┘               │                │
+--  ─ ─ ─ ─ ─┼─ ─ ─ ─ ─ ─ ─ ─ ─ ─┼─ ─ ─ ─ ─ ─ ─ ─ ┼ ─ ─ ─ ─ ─ ─ ─ ─ ─
+--        Network             ┌──┴──┐             │              spec
+--           │                │ B.m ├─────────────┼────────▶ BaseAdv
+--           │                └──▲──┘             │
+--           │             BaseNetwork            │
+--      ┌────┴───────────────────┴───┐            │
+--      │        NetTranslate        │            │
+--      └─────────────▲──────────────┘            │
+--                   DD.M                      VotingC
+--                    │                           │
+--        ────────────┴───────────────────────────┴────────────
+--         shared: shuffle ∘ (DD.Network ⊗ Certifier.Functionality)
 Leios1 : Machine (DD.M ⊗₀ VotingC) (IO ⊗₀ BaseAdv ⊗₀ Adv)
 Leios1 = ext-spec ∘ᴷ spec
 
@@ -179,6 +201,28 @@ specʳ = spec-rewire CC.∘ ((CC.id ⊗₁ B.m) ⊗₁ Voter.Voter) CC.∘ NetTr
 -- synchronously from the voter's local vote log, so the voter needs no
 -- adversary port. Relating a deployment of these nodes over `DD.Network`
 -- to `Leios1` + `Certifier.Functionality` is the open UC-realization step.
+--
+--              IO                                  Adv (= I)
+--               ▲                                     ▲
+--      ┌────────┴─────────────────────────────────────┴──┐
+--      │                   LinearLeios                   │
+--      └────▲───────────────────▲────────────────▲───────┘
+--          FFD                BaseIO           VotingC
+--       ┌───┴───┐               │            ┌───┴───┐          ext-spec
+--       │ Shim  │               │            │ Voter │
+--       └───▲───┘               │            └───▲───┘
+--  ─ ─ ─ ─ ─┼─ ─ ─ ─ ─ ─ ─ ─ ─ ─┼─ ─ ─ ─ ─ ─ ─ ─ ┼ ─ ─ ─ ─ ─ ─ ─ ─ ─
+--        Network             ┌──┴──┐          VoteNet           specʳ
+--           │                │ B.m ├─────────────┼────────▶ BaseAdv
+--           │                └──▲──┘             │
+--           │             BaseNetwork            │
+--      ┌────┴───────────────────┴────────────────┴───┐
+--      │                NetTranslateV                │
+--      └──────────────────────▲──────────────────────┘
+--                            DD.M
+--                             │
+--        ─────────────────────┴───────────────────────────────
+--                          DD.Network
 Leios1ʳ : Machine DD.M (IO ⊗₀ BaseAdv ⊗₀ Adv)
 Leios1ʳ = ext-spec ∘ᴷ specʳ
 
