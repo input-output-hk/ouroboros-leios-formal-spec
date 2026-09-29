@@ -26,29 +26,23 @@ module Leios.Linear (⋯ : SpecStructure)
 ```
 -->
 
-This document is a specification of Linear Leios. It removes
-concurrency at the transaction level by producing one (large) EB for
-every Praos block.
-
-In addition to the expected paramaters, we assume a two functions:
-
-- `splitTxs`: produces a pair of a list of transactions that can be
-  included in an RB and a list of transactions that can be included in
-  an EB
-- `isValidityChecked`: whether validation of a given EB has completed by a
-  given slot
+This document is a specification of Linear Leios.  It removes
+concurrency at the transaction level by producing at most one (large) EB
+for every Praos block.
 
 ### Upkeep
 
 A node that never produces a block even though it could is not
 supposed to be an honest node, and we prevent that by tracking whether
 a node has checked if it can make a block in a particular slot.
-`LeiosState` contains a set of `SlotUpkeep` and we ensure that this
-set contains all elements before we can advance to the next slot,
-resetting this field to the empty set.
+`LeiosState` records the settled duties in `Upkeep`, and `Slot₁`
+requires all of them before advancing the slot, resetting `Upkeep` to
+`[]`.
 
-`CertCheck` records that the node has checked the voting functionality
-for a certificate before producing its RB.
+`CertCheck` is settled once the node has decided whether its RB carries
+a certificate: by `Base₂` when none is called for, or by `Base₃`, which
+queries the voting functionality.  `Base` is settled only when the RB is
+submitted, which after a query waits for the answer.
 ```agda
 data SlotUpkeep : Type where
   Base CertCheck EB-Role VT-Role : SlotUpkeep
@@ -75,16 +69,10 @@ private variable s s' : LeiosState
 
 ### Block/Vote production
 
-We now define the rules for block production given by the relation `_↝_`. These are split in two:
-
-1. Positive rules, when we do need to create a block.
-2. Negative rules, when we cannot create a block.
-
-The purpose of the negative rules is to properly adjust the upkeep if
-we cannot make a block.
-
-Note that `_↝_`, starting with an empty upkeep can always make exactly
-three steps corresponding to the three types of Leios specific blocks.
+The relation `_↝_` gives the positive rules: a role actually producing
+an EB or a vote.  The negative rules `Roles₂` and `Roles₃` of the main
+relation let a node settle a role it cannot (or, for voting, need not
+yet) perform.
 
 ```agda
 toProposeEB : LeiosState → VrfPf → Maybe EndorserBlock
@@ -112,10 +100,7 @@ mkRB s mc = let open LeiosState s in record
   { announcedEB = proposedEB
   ; txsOrEbCert = maybe inj₂ (inj₁ (proj₁ (splitTxs ToPropose))) mc
   }
-```
-A positive answer to a certificate query must certify the requested EB;
-a negative answer trivially matches any request.
-```agda
+
 data AnswerMatches : Maybe EBCert → EBRef → Type where
   matches-just    : ∀ {c r} → getEBHash c ≡ r → AnswerMatches (just c) r
   matches-nothing : ∀ {r} → AnswerMatches nothing r
@@ -129,23 +114,18 @@ instance
 rememberVote : LeiosState → EndorserBlock → LeiosState
 rememberVote s@(record { VotedEBs = vebs }) eb = record s { VotedEBs = hash eb ∷ vebs }
 
--- Record the EB this party is diffusing, so that `Base₂` announces the block
--- that actually went out rather than recomputing a candidate from `ToPropose`.
 rememberProposal : LeiosState → EndorserBlock → LeiosState
 rememberProposal s eb = record s { proposedEB = just (hash eb) }
-```
-The output of a block-production step: either a message for the FFD
-functionality (announcing a block) or a vote cast to the voting functionality.
-```agda
+
 data _↝_ : LeiosState → LeiosState × (FFDAbstract.Input ffdAbstract ⊎ Vote) → Type where
 ```
 #### Positive rules
 
 In this specification, we don't want to peek behind the base chain
-abstraction. This means that we assume instead that the `canProduceEB`
-predicate is satisfied if and only if we can make an RB. In that case,
-we send out an EB with the transactions currently stored in the
-mempool.
+abstraction.  We therefore assume that the `canProduceEB` predicate
+holds if and only if we can make an RB.  In that case the node diffuses
+an EB with the EB share of `splitTxs ToPropose`, if that share is
+non-empty.
 
 ```agda
   EB-Role : let open LeiosState s in
@@ -172,15 +152,12 @@ mempool.
           ∙ EndorserBlockOSig.txs eb ≢ []
           ∙ needsUpkeep VT-Role
           ∙ inVotingCommittee params (stake s)
-          -- Only a pool with a registered voting key may sign
+          -- Committee membership is by stake; signing also needs a registered key
           ∙ id ∈ˡ L.map poolID PubKeys
           ───────────────────────────────────────────────────────
           s ↝ (rememberVote (addUpkeep s VT-Role) eb
               , inj₂ (vote sk-VT (hash currentRB)))
-```
-Predicate needed for slot transition. Special care needs to be taken when starting from
-genesis.
-```agda
+
 allDone : LeiosState → Type
 allDone record { Upkeep = u } = VT-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ u × CertCheck ∈ˡ u
 ```
@@ -200,7 +177,6 @@ voteDeadline s = let open LeiosState s in
       (just (_ , eb)) → slotNumber eb + 3 * Lhdr + Lvote
 ```
 ### Linear Leios transitions
-The relation describing the transition given input and state
 
 ```agda
 open Types params
@@ -232,18 +208,18 @@ data _-⟦_/_⟧⇀_ : MachineType ((FFD ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗�
 ```
 #### Base chain
 
-Note: Submitted data to the base chain is only taken into account
-      if the party submitting is the block producer on the base chain
-      for the given slot
+Submitted data is only taken into account by the base chain if the
+submitting party is the base chain's block producer for the given slot.
 
-`Base₂` announces the EB recorded by `EB-Role`, not a candidate recomputed
-from `ToPropose`. The premise `hasUpkeep EB-Role` makes the party settle its
-EB role for the slot first, either by producing (which sets `proposedEB`) or
-by declining through `Roles₂`; without it a `Base₂` step scheduled early in
-the slot would announce `nothing` and strand the EB the party goes on to
-diffuse. `Base₃` carries the same premise, so that the RB eventually
-submitted by `Cert₁` or `Cert₂` announces the settled EB too: those rules
-only fire once a query is outstanding, which only `Base₃` makes it.
+`Base₂` announces the EB recorded by `EB-Role` in `proposedEB`.  The
+premise `hasUpkeep EB-Role` makes the party settle its EB role for the
+slot first, either by producing (which sets `proposedEB`) or by declining
+through `Roles₂`; without it a `Base₂` step scheduled early in the slot
+would announce `nothing` and strand the EB the party goes on to diffuse.
+`Base₃` carries the same premise, so that the RB later submitted by
+`Cert₁` or `Cert₂` announces the settled EB too: those rules need an
+outstanding query, and only `Base₃` opens one (`Cert₃` merely replaces
+it).
 ```agda
   Base₁   :
           ───────────────────────────────────────────────────────────────────────────
@@ -258,8 +234,8 @@ only fire once a query is outstanding, which only `Base₃` makes it.
           s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s nothing) ⟧⇀
             addUpkeep (addUpkeep s CertCheck) Base
 ```
-If the chain tip announces an EB whose voting window has passed, the node
-instead queries the voting functionality for a certificate before it submits:
+If the chain tip announces an EB whose voting window closed at least
+`Ldiff` slots ago (see `certRequest`), the node instead queries the voting functionality for a certificate before it submits:
 the `Base` upkeep stays open until the answer arrives.
 ```agda
   Base₃   : let open LeiosState s in
@@ -277,28 +253,26 @@ the `Base` upkeep stays open until the answer arrives.
         ───────────────────────────────────────────────────────────────────
         s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ CAST v ⟧⇀ s'
 ```
-The answer is correlated with the request recorded in `PendingQuery`: the
-rule only accepts an answer while a query is outstanding, a positive answer
-must certify the requested EB, and the request is cleared on submission.
+`Cert₁` correlates the answer with the request recorded in
+`PendingQuery`: it only accepts an answer while a query is outstanding, a
+positive answer must certify the requested EB, and the request is cleared
+on submission.
 
 Since the chain tip may change between query and answer (`Slot₂` has no
-premises), the rule also re-validates the request at submission time: the
+premises), `Cert₁` also re-validates the request at submission time: the
 pending query must still be for the EB the *current* tip calls for, so a
-stale answer cannot be embedded. This re-validation, combined with
-`needsUpkeep CertCheck` in `Base₂` and `Base₃` (each fires only once per
-slot), would otherwise leave `Base` stuck open forever if the tip changes
-between query and answer: `Cert₁` refuses the stale answer, `Base₂` requires
-`certRequest s ≡ nothing`, and `Base₃` can no longer fire since `CertCheck`
-upkeep is already spent. Two further rules make every `CERT` answer lead
-somewhere:
+stale answer cannot be embedded.  `Base₂` and `Base₃` both need
+`CertCheck` unsettled, so neither can fire again in the slot, and without
+further rules a tip change between query and answer would leave `Base`
+open forever.  The two further rules are as follows:
 
 - `Cert₂`: the tip no longer calls for a certificate at all
-  (`certRequest s ≡ nothing`). The stale answer is discarded and the RB is
-  submitted without a certificate, discharging `Base` — mirroring `Base₂`'s
-  action.
-- `Cert₃`: the tip now calls for a certificate on a *different* EB than the
-  one queried. The stale answer is discarded and a fresh query is issued for
-  the new EB; `Base` stays open until that query is answered.
+  (`certRequest s ≡ nothing`).  The stale answer is discarded and the RB
+  is submitted without a certificate, discharging `Base` as `Base₂`
+  would.
+- `Cert₃`: the tip now calls for a certificate on a *different* EB than
+  the one queried.  The stale answer is discarded and a fresh query is
+  issued for the new EB; `Base` stays open until that query is answered.
 ```agda
   Cert₁ : let open LeiosState s in
         ∙ needsUpkeep Base

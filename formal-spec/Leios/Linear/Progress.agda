@@ -10,11 +10,13 @@ open import CategoricalCrypto.Ext
 
 open import Data.Nat.Properties
 
--- Progress for the bare Linear Leios node: from any state whose slot upkeep
--- is complete, the node can run through a whole slot.
---
--- Safety and liveness are stated as `Invariant`s, i.e. preservation along `Trace`s.
--- In addition `enough-traces` shows progress, i.e. that every future slot is reachable.
+-- Progress for the bare Linear Leios node.  Safety and liveness are stated
+-- as `Invariant`s, i.e. preservation along `Trace`s, so they say nothing
+-- unless enough traces exist; `enough-traces` shows that from any state
+-- whose slot upkeep is complete every future slot is reachable.  The
+-- inputs (network messages, ledger, certificate answers) are chosen by the
+-- trace, so this is a witness of progress, not a liveness argument for a
+-- composite deployment.
 module Leios.Linear.Progress (⋯ : SpecStructure)
   (let open SpecStructure ⋯)
   (params : Params)
@@ -28,7 +30,6 @@ open LeiosState
 private variable
   s s' : LeiosState
 
--- The block-production rules leave the slot alone.
 ↝-slot : ∀ {i} → s ↝ (s' , i) → slot s' ≡ slot s
 ↝-slot (EB-Role _) = refl
 ↝-slot (VT-Role _) = refl
@@ -58,10 +59,6 @@ private
   VT-Role∉ (there (there (here ())))
   VT-Role∉ (there (there (there ())))
 
--- One upkeep step for a role, positive (`Roles₁` for a block, `Vote₁` for a
--- vote) if the role can act and negative (`Roles₂`) otherwise; `Dec-↝`
--- decides which.  Either way the role is added to the upkeep and the slot is
--- unchanged.
 upkeep-step : ∀ s u → u ≢ Base → u ≢ CertCheck → needsUpkeep s u
             → ∃[ s' ] ∃[ o ] (s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / o ⟧⇀ s')
                     × Upkeep s' ≡ u ∷ Upkeep s
@@ -71,10 +68,8 @@ upkeep-step s u u≢Base u≢CertCheck nu with ¿ ∃[ s'×i ] (s ↝ s'×i × (
 ... | yes ((s' , inj₂ v) , st , eq) = s' , _ , Vote₁ st , sym eq , ↝-slot st
 ... | no ¬p                         = addUpkeep s u , _ , Roles₂ (¬p , nu , u≢Base , u≢CertCheck) , refl , refl
 
--- The base step, once the EB role is settled.  If the tip calls for no
--- certificate, `Base₂` submits at once; otherwise `Base₃` queries the voting
--- functionality, and a negative answer lets `Cert₁` submit.  Either way both
--- `CertCheck` and `Base` are discharged.
+-- When the tip calls for a certificate, the trace answers `Base₃`'s query
+-- with `CERT nothing`, which `Cert₁` accepts for any request.
 base-step : ∀ s → Upkeep s ≡ EB-Role ∷ []
           → ∃[ s' ] Trace LinearLeios s s'
                   × Upkeep s' ≡ Base ∷ CertCheck ∷ EB-Role ∷ []
@@ -90,9 +85,7 @@ base-step s eq with certRequest s in eqc
                   (needs s₁ (cong (CertCheck ∷_) eq) Base∉′ , here refl , eqc , refl , matches-nothing) ⟩)
        , cong (λ l → Base ∷ CertCheck ∷ l) eq , refl
 
--- The four upkeep items of a slot, in the order `Base₂` and `Base₃` require:
--- the EB role first, then the base step (which checks for a certificate),
--- then the vote.
+-- The EB role goes first, because `Base₂` and `Base₃` require it settled.
 upkeep : ∀ s → Upkeep s ≡ []
        → ∃[ s' ] Trace LinearLeios s s' × allDone s' × slot s' ≡ slot s
 upkeep s eq₀ =
@@ -105,14 +98,11 @@ upkeep s eq₀ =
    , allDone-of s₅ (trans eq₅ (cong (VT-Role ∷_) eq₄))
    , trans sl₅ (trans sl₄ sl₃)
 
--- The slot transition: the network's messages arrive and the ledger is
--- fetched, leaving the upkeep empty and the slot advanced.
 slot-step : ∀ s msgs rbs → allDone s
           → ∃[ s' ] Trace LinearLeios s s' × Upkeep s' ≡ [] × slot s' ≡ suc (slot s)
 slot-step s msgs rbs done =
   _ , (([] ∷ʳ⟨ _ , _ , Slot₁ {s = s} {msgs = msgs} done ⟩) ∷ʳ⟨ _ , _ , Slot₂ {rbs = rbs} ⟩) , refl , refl
 
--- One whole slot.
 tick : ∀ s msgs rbs → allDone s
      → ∃[ s' ] Trace LinearLeios s s' × allDone s' × slot s' ≡ suc (slot s)
 tick s msgs rbs done =
@@ -120,7 +110,6 @@ tick s msgs rbs done =
       s' , t' , done' , sl' = upkeep s₂ up₂
   in s' , Trace-trans t₂ t' , done' , trans sl' sl₂
 
--- `n` slots, with the inputs of each slot chosen by slot number.
 ticks : ∀ n s (msgsAt : ℕ → List (FFDA.Header ⊎ FFDA.Body)) (rbsAt : ℕ → List RankingBlock)
       → allDone s
       → ∃[ s' ] Trace LinearLeios s s' × allDone s' × slot s' ≡ n + slot s
@@ -130,7 +119,6 @@ ticks (suc n) s msgsAt rbsAt done =
       s' , t' , done' , sl' = ticks n s₁ msgsAt rbsAt done₁
   in s' , Trace-trans t₁ t' , done' , trans sl' (trans (cong (n +_) sl₁) (+-suc n _))
 
--- The requirement itself: every future slot is reachable.
 enough-traces : ∀ s n → allDone s → ∃[ s' ] slot s + n ≡ slot s' × Trace LinearLeios s s'
 enough-traces s n done =
   let s' , t , _ , eq = ticks n s (λ _ → []) (λ _ → []) done

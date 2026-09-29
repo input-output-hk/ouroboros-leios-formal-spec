@@ -1,11 +1,12 @@
 ## Leios.Protocol
 
-This module defines the core Leios protocol state machine, including:
-- Input/output message types
-- Protocol state representation and operations
-- Block and transaction validation
-- State transition logic for processing headers and block bodies
-  The protocol integrates header/body diffusion with the underlying base protocol.
+This module defines the following building blocks shared by the Leios
+variants:
+
+- the protocol state `LeiosState` and its operations,
+- header and body validation,
+- the state update on receiving headers and bodies (`_↑_`), and
+- the channel types (`Types`), including the voting interface.
 <!--
 ```agda
 {-# OPTIONS --safe #-}
@@ -73,12 +74,11 @@ record LeiosState : Type where
         {- proposedEB: the EB this party diffused in the current slot, if any -}
         proposedEB   : Maybe Hash
         Upkeep-Stage : ℙ StageUpkeep
-        {- the certificate query awaiting an answer, recorded so that the
-           answer can be correlated with the request -}
+        {- PendingQuery: the certificate query awaiting an answer, if any -}
         PendingQuery : Maybe EBRef
         PubKeys      : List PubKey
 
-  -- ideally we'd require a non-empty list, but this also works for now
+  -- An empty chain has a dummy tip that announces no EB.
   currentRB : RankingBlock
   currentRB = maybe (λ x → x) (record { txsOrEbCert = inj₁ [] ; announcedEB = nothing })
                 (L.last RBs)
@@ -215,14 +215,11 @@ module _ (s : LeiosState)  where
     isValid? (inj₁ h) = headerValid? h
     isValid? (inj₂ b) = bodyValid? b
 ```
-Update the LeiosState upon receiving a message
+Vote messages are ignored: votes are the voting functionality's
+business, and in the real node `Network.Leios.NetTranslateV` diverts
+them to the voter before they reach the node.
 ```agda
 module _ (s : LeiosState) (open LeiosState s) where
-```
-Vote messages are not consumed by the node: vote bookkeeping is the
-voting functionality's job (resp. the local voter component's, which
-receives the votes before they ever reach the node).
-```agda
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs' = (slot , eb) ∷ EBs' }
   upd _                    = s
@@ -260,7 +257,6 @@ module Types (params : Params) (let open Params params) where
     FetchLdgI : IOT In
     FetchLdgO : List Tx → IOT Out
 
-  -- mempool
   IO : Channel
   IO = simpleChannel IOT ᵀ
 
@@ -285,10 +281,6 @@ module Types (params : Params) (let open Params params) where
 
   BaseC : Channel
   BaseC = simpleChannel BaseT ᵀ
-```
-The interface to the voting functionality: a node casts votes and,
-at RB production, queries for a certificate for the endorser block
-it wants to endorse.
-```agda
+
   open import Leios.Voting.Channel Vote EBRef EBCert public
 ```

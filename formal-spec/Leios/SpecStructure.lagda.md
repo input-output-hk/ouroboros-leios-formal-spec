@@ -54,16 +54,13 @@ record SpecStructure : Type₂ where
   module B   = BaseAbstract.BaseMachine BM
   module K   = KeyRegistrationAbstract.Functionality KF
   module FFD = FFDAbstract.Functionality FFD'
-```
-```agda
-  field -- Whether validation of the given EB has completed by the given slot.
-        -- Replaces the former `validityCheckTime : EndorserBlock → ℕ` oracle:
-        -- validation latency is a property of the node and its environment,
-        -- not of the EB alone, so the spec only assumes an observable
-        -- completion predicate (monotone in the slot in intended
-        -- instantiations). Eventually to be provided by an asynchronous
-        -- validation functionality (Valid/Invalid/InProgress with bounded
-        -- InProgress).
-        isValidityChecked  : ℕ → EndorserBlock → Type
+
+  -- Whether validation of the given EB has completed by the given slot.
+  -- Validation latency is a property of the node and its environment, not
+  -- of the EB alone, so the spec only assumes an observable completion
+  -- predicate (monotone in the slot in intended instantiations).
+  -- Eventually to be provided by an asynchronous validation functionality
+  -- (Valid/Invalid/InProgress with bounded InProgress).
+  field isValidityChecked  : ℕ → EndorserBlock → Type
         isValidityChecked? : ∀ n eb → Dec (isValidityChecked n eb)
 ```
