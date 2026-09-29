@@ -16,6 +16,7 @@ open import CategoricalCrypto hiding (id; _∘_; eval)
 open import CategoricalCrypto.Channel.Selection
 
 open import Data.Maybe.Properties
+import Data.Maybe.Relation.Unary.All as Maybe
 
 open import Prelude.STS.GenPremises
 
@@ -105,19 +106,9 @@ Certificates are keyed by the hash of the *announcing* ranking block, the
 same hash `VT-Role` signs (CIP-0164, "Vote Structure"), so that a query can
 be answered from the votes as cast.  `certRequest` still selects the EB, but
 only to decide *whether* a certificate is called for; the reference asked
-for is `hash currentRB`.  A positive answer must certify that reference; a
-negative answer trivially matches any request.
+for is `hash currentRB`.  A positive answer must certify that reference
+(`Maybe.All`, in `Cert₁`); a negative answer trivially matches any request.
 ```agda
-data AnswerMatches : Maybe EBCert → EBRef → Type where
-  matches-just    : ∀ {c r} → getEBHash c ≡ r → AnswerMatches (just c) r
-  matches-nothing : ∀ {r} → AnswerMatches nothing r
-
-instance
-  Dec-AnswerMatches : ∀ {c r} → AnswerMatches c r ⁇
-  Dec-AnswerMatches {c = just c} {r} .dec =
-    map′ matches-just (λ where (matches-just p) → p) (getEBHash c ≟ r)
-  Dec-AnswerMatches {c = nothing} .dec = yes matches-nothing
-
 rememberVote : LeiosState → EndorserBlock → LeiosState
 rememberVote s@(record { VotedEBs = vebs }) eb = record s { VotedEBs = hash eb ∷ vebs }
 
@@ -290,7 +281,7 @@ follows:
         ∙ CertCheck ∈ˡ Upkeep
         ∙ certRequest s ≡ just eb
         ∙ PendingQuery ≡ just (hash currentRB)
-        ∙ AnswerMatches c (hash currentRB)
+        ∙ Maybe.All (λ c → getEBHash c ≡ hash currentRB) c
         ───────────────────────────────────────────────────────────────────
         s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s c) ⟧⇀
           record (addUpkeep s Base) { PendingQuery = nothing }

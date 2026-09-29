@@ -9,6 +9,7 @@ open import CategoricalCrypto.Channel.Selection
 open import CategoricalCrypto.Ext
 
 open import Data.Nat.Properties
+import Data.Maybe.Relation.Unary.All as Maybe
 
 -- Progress for the bare Linear Leios node.  Safety and liveness are stated
 -- as `Invariant`s, i.e. preservation along `Trace`s, so they say nothing
@@ -82,7 +83,7 @@ base-step s eq with certRequest s in eqc
   let s₁ = record (addUpkeep s CertCheck) { PendingQuery = just (hash eb) }
   in _ , (([] ∷ʳ⟨ _ , _ , Base₃ (needs s eq CertCheck∉ , has s eq (here refl) , eqc) ⟩)
             ∷ʳ⟨ _ , _ , Cert₁ {c = nothing}
-                  (needs s₁ (cong (CertCheck ∷_) eq) Base∉′ , here refl , eqc , refl , matches-nothing) ⟩)
+                  (needs s₁ (cong (CertCheck ∷_) eq) Base∉′ , here refl , eqc , refl , Maybe.nothing) ⟩)
        , cong (λ l → Base ∷ CertCheck ∷ l) eq , refl
 
 -- The EB role goes first, because `Base₂` and `Base₃` require it settled.

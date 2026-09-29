@@ -7,6 +7,7 @@ open import Leios.Config
 
 open import CategoricalCrypto hiding (id)
 import CategoricalCrypto as CC
+import Data.Maybe.Relation.Unary.All as Maybe
 
 open import Blockchain.Safety
 import Blockchain.IsBlockchain as IsBC
@@ -24,7 +25,7 @@ module Network.Leios
   (forEB     : Vote → EBRef)
   (mkCert    : EBRef → EBCert)
   -- a certificate names the reference it was made for, so that a positive
-  -- answer to a query can match the query (`AnswerMatches`)
+  -- answer to a query can match the query
   (mkCert-hash : ∀ r → getEBHash (mkCert r) ≡ r)
   (threshold : ℕ)
   (voter     : Vote → Fin numberOfParties)
@@ -206,8 +207,8 @@ Leios1ʳ = ext-spec ∘ᴷ specʳ
 
 -- A positive answer from the certifier or the voter, `CERT (just (mkCert r))`
 -- to `QUERY r`, is one `Cert₁` accepts
-mkCert-matches : ∀ r → AnswerMatches (just (mkCert r)) r
-mkCert-matches r = matches-just (mkCert-hash r)
+mkCert-matches : ∀ r → Maybe.All (λ c → getEBHash c ≡ r) (just (mkCert r))
+mkCert-matches r = Maybe.just (mkCert-hash r)
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
 record LeiosBlock : Type where
