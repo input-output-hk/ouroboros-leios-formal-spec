@@ -6,8 +6,7 @@ open import CategoricalCrypto hiding (id; _∘_)
 -- The interface channel between a Leios node and the voting functionality:
 -- a node casts votes, and — when producing a ranking block — queries the
 -- functionality for a certificate for the endorser block it wants to endorse.
--- A cast is acknowledged with `ACK`, handing control back to the caller
--- rather than silently dropping it. The functionality answers a query
+-- A cast is not answered. The functionality answers a query
 -- synchronously from its vote log: `CERT (just c)` if the votes certify the
 -- block, `CERT nothing` otherwise. The module is parameterized so that the
 -- node (via `Leios.Protocol.Types`) and the voting functionalities
@@ -18,7 +17,6 @@ data VotingT : Mode → Type where
   CAST  : Vote → VotingT Out
   QUERY : EBRef → VotingT Out
   CERT  : Maybe EBCert → VotingT In
-  ACK   : VotingT In
 
 VotingC : Channel
 VotingC = simpleChannel VotingT

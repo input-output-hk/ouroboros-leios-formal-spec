@@ -164,7 +164,7 @@ data InputC : Type where
   cSLOT cFTCH cFFD-OUT           : InputC  -- FFDT Out
   cBASE-LDG cSTAKE cEMPTY cbSLOT : InputC  -- BaseIOF In
   cSubmitTxs cFetchLdgI          : InputC  -- IOT In
-  cCERT cACK                     : InputC  -- VotingT In
+  cCERT                          : InputC  -- VotingT In
 
 inputC : TestInput → InputC
 inputC (inj₁ SLOT)                        = cSLOT
@@ -177,7 +177,6 @@ inputC (inj₂ (inj₁ (SLOT _)))             = cbSLOT
 inputC (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) = cSubmitTxs
 inputC (inj₂ (inj₂ (inj₁ FetchLdgI)))     = cFetchLdgI
 inputC (inj₂ (inj₂ (inj₂ (CERT _))))      = cCERT
-inputC (inj₂ (inj₂ (inj₂ ACK)))           = cACK
 
 -- The input constructor each action's transition rule consumes.
 expectedInput : Action → InputC
@@ -284,7 +283,6 @@ inj₂≢SLOT (inj₁ (SLOT _))             ()
 inj₂≢SLOT (inj₂ (inj₁ (SubmitTxs _))) ()
 inj₂≢SLOT (inj₂ (inj₁ FetchLdgI))     ()
 inj₂≢SLOT (inj₂ (inj₂ (CERT _)))      ()
-inj₂≢SLOT (inj₂ (inj₂ ACK))           ()
 
 inj₂≢FFD-OUT : ∀ y → inputC (inj₂ y) ≢ cFFD-OUT
 inj₂≢FFD-OUT (inj₁ (BASE-LDG _))         ()
@@ -294,7 +292,6 @@ inj₂≢FFD-OUT (inj₁ (SLOT _))             ()
 inj₂≢FFD-OUT (inj₂ (inj₁ (SubmitTxs _))) ()
 inj₂≢FFD-OUT (inj₂ (inj₁ FetchLdgI))     ()
 inj₂≢FFD-OUT (inj₂ (inj₂ (CERT _)))      ()
-inj₂≢FFD-OUT (inj₂ (inj₂ ACK))           ()
 
 inj₁≢BASE-LDG : ∀ x → inputC (inj₁ x) ≢ cBASE-LDG
 inj₁≢BASE-LDG SLOT        ()
@@ -370,7 +367,6 @@ verifyStep' (Cert₁-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
                 in ¬p (upk , chk
                       , subst (λ x → LeiosState.PendingQuery s ≡ just (hash x)) e peq
                       , subst (λ x → AnswerMatches c (hash x)) e match) })
-verifyStep' (Cert₁-Action _) (inj₂ (inj₂ (inj₂ ACK))) _ _           = Mismatch λ ()
 
 verifyStep' (Cert₂-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢CERT x)
 verifyStep' (Cert₂-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢CERT y)
@@ -386,7 +382,6 @@ verifyStep' (Cert₂-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
   with ¿ (LeiosState.needsUpkeep s Base × (CertCheck ∈ˡ LeiosState.Upkeep s)) ¿
 ... | yes (upk , chk) = Ok' (Cert₂ {r = r} (upk , chk , eq , peq))
 ... | no ¬p = Err (Err-Cert₂-premises λ { (upk , chk , _ , _) → ¬p (upk , chk) })
-verifyStep' (Cert₂-Action _) (inj₂ (inj₂ (inj₂ ACK))) _ _           = Mismatch λ ()
 
 verifyStep' (Cert₃-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢CERT x)
 verifyStep' (Cert₃-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢CERT y)
@@ -405,14 +400,12 @@ verifyStep' (Cert₃-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
                 let e  = just-injective (trans (sym creq) eq)
                     e' = just-injective (trans (sym pq) peq)
                 in ¬p (upk , chk , λ eqhr → neq (trans (trans (cong hash e) eqhr) (sym e'))) })
-verifyStep' (Cert₃-Action _) (inj₂ (inj₂ (inj₂ ACK))) _ _           = Mismatch λ ()
 
 verifyStep' (Ftch-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢FetchLdgI x)
 verifyStep' (Ftch-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢FetchLdgI y)
 verifyStep' (Ftch-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mismatch λ ()
 verifyStep' (Ftch-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) s refl  = Ok Ftch-step
 verifyStep' (Ftch-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _      = Mismatch λ ()
-verifyStep' (Ftch-Action _) (inj₂ (inj₂ (inj₂ ACK))) _ _          = Mismatch λ ()
 
 verifyStep' (Slot₁-Action _) (inj₁ SLOT) _ _ = Mismatch λ ()
 verifyStep' (Slot₁-Action _) (inj₁ FTCH) _ _ = Mismatch λ ()
@@ -429,14 +422,12 @@ verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (SLOT _))) _ _                = M
 verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _    = Mismatch λ ()
 verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _        = Mismatch λ ()
 verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _         = Mismatch λ ()
-verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (inj₂ ACK))) _ _              = Mismatch λ ()
 
 verifyStep' (Base₁-Action _) (inj₁ x) _ _                              = Mismatch (inj₁≢SubmitTxs x)
 verifyStep' (Base₁-Action _) (inj₂ (inj₁ y)) _ _                       = Mismatch (inj₂inj₁≢SubmitTxs y)
 verifyStep' (Base₁-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _        = Mismatch λ ()
 verifyStep' (Base₁-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ refl = Ok' Base₁
 verifyStep' (Base₁-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _         = Mismatch λ ()
-verifyStep' (Base₁-Action _) (inj₂ (inj₂ (inj₂ ACK))) _ _              = Mismatch λ ()
 verifyStep' (Base₂-Action _) (inj₁ SLOT) s refl
   with ¿ Base₂-premises {s = s} .proj₁ ¿
 ... | yes p = Ok' (Base₂ p)
