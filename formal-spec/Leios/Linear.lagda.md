@@ -421,18 +421,6 @@ subst' {s} {ebHash = ebHash} {eb = eb} eq₁₁ eq₁₂ eq₂₁ eq₂₂
   with find (λ (_ , eb') → hash eb' ≟ ebHash) (LeiosState.EBs' s) | eq₁₂ | eq₂₂
 ... | _ | refl | refl = refl
 
-Base≢EB-Role : SlotUpkeep.Base ≢ SlotUpkeep.EB-Role
-Base≢EB-Role = λ ()
-
-Base≢VT-Role : SlotUpkeep.Base ≢ SlotUpkeep.VT-Role
-Base≢VT-Role = λ ()
-
-CertCheck≢EB-Role : SlotUpkeep.CertCheck ≢ SlotUpkeep.EB-Role
-CertCheck≢EB-Role = λ ()
-
-CertCheck≢VT-Role : SlotUpkeep.CertCheck ≢ SlotUpkeep.VT-Role
-CertCheck≢VT-Role = λ ()
-
 π-unique : ∀ {s π} → canProduceEB (LeiosState.slot s) sk-EB (stake s) π → π ≡ (proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s)))
 π-unique (_ , refl) = refl
 
@@ -475,12 +463,12 @@ instance
   ... | no ¬p = no λ where (_ , VT-Role (x , y , p) , _) → ¬p $ subst
                              (λ where (eb , ebHash , slot) → VT-Role-premises {s} {eb} {ebHash} {slot} .proj₁)
                              (subst' {s} x y eq₂ eq₃) (x , y , p)
-  Dec-↝ {s} {Base} .dec = no λ where
-    (_ , EB-Role _ , x) → Base≢EB-Role (∷-injectiveˡ (trans x refl))
-    (_ , VT-Role _ , x) → Base≢VT-Role (∷-injectiveˡ (trans x refl))
-  Dec-↝ {s} {CertCheck} .dec = no λ where
-    (_ , EB-Role _ , x) → CertCheck≢EB-Role (∷-injectiveˡ (trans x refl))
-    (_ , VT-Role _ , x) → CertCheck≢VT-Role (∷-injectiveˡ (trans x refl))
+  Dec-↝ {u = Base} .dec = no λ where
+    (_ , EB-Role _ , ())
+    (_ , VT-Role _ , ())
+  Dec-↝ {u = CertCheck} .dec = no λ where
+    (_ , EB-Role _ , ())
+    (_ , VT-Role _ , ())
 
 unquoteDecl Roles₂-premises = genPremises Roles₂-premises (quote Roles₂)
 unquoteDecl Roles₃-premises = genPremises Roles₃-premises (quote Roles₃)
