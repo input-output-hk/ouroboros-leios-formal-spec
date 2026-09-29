@@ -106,17 +106,8 @@ every honest vote in `α rs` is backed by a validation.
   α-WF : ∀ {rs}
        → (∀ {v} → v ∈ˡ rs → Valid v → honest (voter v) → Validated (voter v) (forEB v))
        → I.WF (α rs)
-  α-WF {rs} vih {p} {eb} p∈ hp with ∈-map⁻ vote⇒ideal p∈
-  ... | v , v∈filter , pq with ∈-filter⁻ ¿ Valid ¿¹ v∈filter
-  ... | v∈rs , validv =
-    let p≡  : p ≡ voter v
-        p≡  = cong proj₁ pq
-        eb≡ : eb ≡ forEB v
-        eb≡ = cong proj₂ pq
-        val : Validated (voter v) (forEB v)
-        val = vih v∈rs validv (subst honest p≡ hp)
-    in subst (λ q → Validated q eb) (sym p≡)
-         (subst (λ w → Validated (voter v) w) (sym eb≡) val)
+  α-WF vih p∈ hp with ∈-map⁻ vote⇒ideal p∈
+  ... | _ , v∈filter , refl = uncurry vih (∈-filter⁻ ¿ Valid ¿¹ v∈filter) hp
 ```
 
 Every real certificate abstracts to an ideal certificate on `α rs`.
@@ -155,9 +146,6 @@ some honest node validated the block, provided the adversary controls fewer than
     I.cert-correct (α-WF vih) corrupt covers bound (realCert⇒idealCert rc)
     where
       covers : ∀ {p} → I.Voted p eb (α rs) → ¬ honest p → p ∈ˡ corrupt
-      covers {p} p∈ ¬hp with ∈-map⁻ vote⇒ideal p∈
-      ... | v , v∈filter , pq with ∈-filter⁻ ¿ Valid ¿¹ v∈filter
-      ... | v∈rs , validv =
-        subst (_∈ˡ corrupt) (sym (cong proj₁ pq))
-          (cc v∈rs validv (λ hv → ¬hp (subst honest (sym (cong proj₁ pq)) hv)))
+      covers p∈ ¬hp with ∈-map⁻ vote⇒ideal p∈
+      ... | _ , v∈filter , refl = uncurry cc (∈-filter⁻ ¿ Valid ¿¹ v∈filter) ¬hp
 ```

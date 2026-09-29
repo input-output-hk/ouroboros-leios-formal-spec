@@ -195,13 +195,10 @@ module _ (corrupt : List Party) {lg : List (Party × Vote)} where
 
     wf : Id.WF α
     wf p∈ _ with ∈-map⁻ voteRef p∈
-    ... | _ , qv∈lg , eq =
-      Any.map (λ where refl → sym (cong proj₁ eq) , sym (cong proj₂ eq)) qv∈lg
+    ... | _ , qv∈lg , refl = Any.map (λ where refl → refl , refl) qv∈lg
 
     covers : ∀ {p eb} → Id.Voted p eb α → ¬ honest p → p ∈ˡ corrupt
-    covers {p} _ ¬h with Any.any? (p ≟_) corrupt
-    ... | yes p∈  = p∈
-    ... | no  ¬p∈ = ⊥-elim (¬h ¬p∈)
+    covers {p} _ = decidable-stable (Any.any? (p ≟_) corrupt)
 
     toIdealCert : ∀ {eb} → Certified lg eb → Id.Certified α eb
     toIdealCert {eb} cert = record

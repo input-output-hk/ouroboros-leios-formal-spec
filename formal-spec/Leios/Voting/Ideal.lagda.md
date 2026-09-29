@@ -132,7 +132,7 @@ voters must be honest.
   → ∃[ p ] (p ∈ˡ voters × honest p)
 ∃honestVoter voters uniq corrupt corrupt<voters cov with Any.any? ¿ honest ¿¹ voters
 ... | yes h = find∈ h
-... | no ¬h = ⊥-elim (N.<-irrefl refl (N.≤-<-trans (unique-⊆⇒length≤ uniq sub) corrupt<voters))
+... | no ¬h = ⊥-elim (N.≤⇒≯ (unique-⊆⇒length≤ uniq sub) corrupt<voters)
   where
     sub : ∀ {z} → z ∈ˡ voters → z ∈ˡ corrupt
     sub {z} z∈ = cov z∈ (All.lookup (¬Any⇒All¬ voters ¬h) z∈)
