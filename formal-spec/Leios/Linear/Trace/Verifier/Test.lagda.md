@@ -303,13 +303,13 @@ and the verifier reports it.
           ≡ "200 : Err-Base₂-premises: Base or CertCheck upkeep spent, EB role not yet settled, or the tip calls for a certificate"
     test₅ = refl
 ```
-A positive answer must certify the queried EB.
+A positive answer must certify the queried ranking block.
 ```agda
     test₆ : verdict ((No-EB-Role-Action 200 , inj₁ SLOT)
                    ∷ (Base₃-Action      200 , inj₁ SLOT)
                    ∷ (Cert₁-Action      200 , inj₂ (inj₂ (inj₂ (CERT (just (hash EB₄))))))
                    ∷ []) s₂₀₀
-          ≡ "200 : Err-Cert₁-premises"
+          ≡ "200 : Err-Cert₁-premises: Base upkeep spent, no certificate query made this slot, the tip calls for no certificate, the pending query is not for the current tip, or the answer does not certify it"
     test₆ = refl
 ```
 An answer is only accepted while a query is outstanding.
@@ -317,16 +317,16 @@ An answer is only accepted while a query is outstanding.
     test₇ : verdict ((No-EB-Role-Action 200 , inj₁ SLOT)
                    ∷ (Cert₁-Action      200 , inj₂ (inj₂ (inj₂ (CERT (just crt₃)))))
                    ∷ []) s₂₀₀
-          ≡ "200 : Err-Cert₁-premises"
+          ≡ "200 : Err-Cert₁-premises: Base upkeep spent, no certificate query made this slot, the tip calls for no certificate, the pending query is not for the current tip, or the answer does not certify it"
     test₇ = refl
 ```
-`Cert₃` re-queries only if the tip has moved to a different EB.
+`Cert₃` re-queries only if the tip has moved to a different ranking block.
 ```agda
     test₈ : verdict ((No-EB-Role-Action 200 , inj₁ SLOT)
                    ∷ (Base₃-Action      200 , inj₁ SLOT)
                    ∷ (Cert₃-Action      200 , inj₂ (inj₂ (inj₂ (CERT nothing))))
                    ∷ []) s₂₀₀
-          ≡ "200 : Err-Cert₃-premises"
+          ≡ "200 : Err-Cert₃-premises: Base upkeep spent, no certificate query made this slot, the tip calls for no certificate, no query is pending, or the pending query is already for the current tip"
     test₈ = refl
 ```
 `Base₃` queries at most once per slot.
