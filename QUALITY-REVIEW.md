@@ -40,11 +40,11 @@ The house standard `CLAUDE.md` does not exist in this repository; the review use
 - 10c1ce9 Draw the voter inside `specʳ` in the `Leios1ʳ` diagram — moves `Voter`, a component of `specʳ`, out of `ext-spec`.
 - a761f11 Trim the comments in `Network.Leios` and the index — with `Leios1ʳ` as the single site of the open realization note.
 - f9598c1 Key certificate queries by the announcing RB's hash — maintainer-approved (was a Statement-audit suggestion): `VT-Role` signs `hash currentRB`, so `Base₃`/`Cert₁`/`Cert₃` now query and correlate on it; merged into `yveshauser/voting`, whole project green.
+- e935198 Assume that a certificate names its reference — maintainer-approved (was a Statement-audit suggestion): module parameter `mkCert-hash : ∀ r → getEBHash (mkCert r) ≡ r`, plus `mkCert-matches` showing a positive answer satisfies `AnswerMatches`.
 
 ## Suggestions (need your call)
 
 ### Statement audit
-- formal-spec/Network/Leios.agda :: mkCert — no premise `∀ r → getEBHash (mkCert r) ≡ r`.  Without it a positive answer satisfies none of `Cert₁`/`Cert₂`/`Cert₃`, `Base` never closes and the node deadlocks.  Proposal: add the law as a module parameter next to `mkCert` (`Test.Defaults` satisfies it with `mkCert = id`).
 - formal-spec/Leios/Voting/Voter.lagda.md :: Correctness.answered-cert-correct — the `vih`/`cc` hypotheses quantify over every `Vote`, not over the log, which for any signature-like `Valid` makes the premise near-unsatisfiable and the result near-trivial.  Proposal: `∀ {v} → v ∈ˡ log s' → Valid v → …` for both, body `real-cert-correct vih corrupt cc bound (cert-answered-certified stp deq)`; spiked green.
 - formal-spec/Leios/Voting/Certifier.lagda.md :: cert-correct — pigeonhole only: `Validated := HasVoteFor` makes `WF` and `covers` trivial, and `corrupt` is not tied to the deployment's `honest-Nodes`.  The prose now says so.  The intended property needs a trace lemma in `Network.Leios` linking logged votes on honest slots to `VT-Role` steps.
 - formal-spec/Leios/Voting/Certifier.lagda.md :: Certified — the quorum is a count of distinct slots, ignoring stake, committee membership and signer validity; `length corrupt < threshold` is count-based while CIP-0164 is stake-based.  Document `threshold` as a stand-in, or parameterize by a weight.
