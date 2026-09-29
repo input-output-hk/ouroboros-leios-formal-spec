@@ -100,15 +100,11 @@ endorses. `VT₁` is a vote by the other party (party 1) for `EB₁`.
 ```
 Starting at slot 100
 ```agda
+    s₀ : LeiosState
+    s₀ = initLeiosState tt stakeDistribution ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
+
     s₁₀₀ : LeiosState
-    s₁₀₀ = record s₀
-             { slot = 100
-             ; ToPropose = 0 ∷ 1 ∷ 2 ∷ []
-             ; PubKeys = (fzero , tt) ∷ (fsuc fzero , tt) ∷ []
-             }
-      where
-        s₀ : LeiosState
-        s₀ = initLeiosState tt stakeDistribution ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
+    s₁₀₀ = record s₀ { slot = 100 ; ToPropose = 0 ∷ 1 ∷ 2 ∷ [] }
 ```
 ### Build a test trace
 ```agda
@@ -288,14 +284,10 @@ Starting at slot 200, with the chain tip announcing `EB₃`.
 ```agda
     s₂₀₀ : LeiosState
     s₂₀₀ = record s₀
-             { slot    = 200
-             ; EBs'    = (0 , EB₃) ∷ (0 , EB₄) ∷ []
-             ; RBs     = [ RB₃ ]
-             ; PubKeys = (fzero , tt) ∷ (fsuc fzero , tt) ∷ []
+             { slot = 200
+             ; EBs' = (0 , EB₃) ∷ (0 , EB₄) ∷ []
+             ; RBs  = [ RB₃ ]
              }
-      where
-        s₀ : LeiosState
-        s₀ = initLeiosState tt stakeDistribution ((fzero , tt) ∷ (fsuc fzero , tt) ∷ [])
 ```
 The EB role is settled first, as `Base₃` requires; `Base₃` then queries for
 `EB₃` (`certRequest s₂₀₀ ≡ just EB₃`), and the tip moves
