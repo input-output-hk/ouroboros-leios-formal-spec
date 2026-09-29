@@ -320,7 +320,7 @@ open forever.  The two further rules are as follows:
 ```
 Deferral of the VT-Role: abstaining from voting is permitted while the
 current EB's voting window is still open, even when a positive VT-Role
-step could fire. Together with `Roles₂` this yields bounded liveness:
+step could fire.  Together with `Roles₂` this yields bounded liveness:
 at the deadline slot neither `Roles₃` (window closes) nor `Roles₂` (a vote can still fire)
 applies, so a vote must be cast by then.
 ```agda
