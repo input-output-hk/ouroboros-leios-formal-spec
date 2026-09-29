@@ -7,8 +7,6 @@ open import Leios.Config
 
 open import CategoricalCrypto hiding (id)
 import CategoricalCrypto as CC
-open import CategoricalCrypto.Channel.Selection
-open import CategoricalCrypto.Machine.Iso using (≅ᴹ-refl)
 
 open import Blockchain.Safety
 import Blockchain.IsBlockchain as IsBC
@@ -54,8 +52,6 @@ module NetTranslate where
   record State : Type where
     field inBuffer  : Maybe (List LeiosMsg)
           outBuffer : Maybe (List BaseMsg)
-
-  private variable s : State
 
   data WithState_receive_return_newState_ : MachineType DD.M (Network ⊗₀ BaseNetwork) State where
 
@@ -110,8 +106,6 @@ module NetTranslateV where
           inBase   : Maybe (List BaseMsg)
           outBase  : Maybe (List BaseMsg)
           outVotes : Maybe (List Vote)
-
-  private variable s : State
 
   data WithState_receive_return_newState_ :
     MachineType DD.M ((Network ⊗₀ BaseNetwork) ⊗₀ Voter.VoteNet) State where

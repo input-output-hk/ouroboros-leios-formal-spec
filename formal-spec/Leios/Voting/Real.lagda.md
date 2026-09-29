@@ -14,10 +14,9 @@ validated the block.
 
 open import Leios.Prelude hiding (Unique)
 
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-map⁻; ∈-filter⁺; ∈-filter⁻)
-open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
-open import Data.List.Relation.Unary.All.Properties using (map⁺)
-import Data.List.Relation.Unary.All as All
+open import Data.List.Membership.Propositional.Properties
+open import Data.List.Relation.Unary.Unique.Propositional
+open import Data.List.Relation.Unary.All.Properties
 
 import Leios.Voting.Ideal
 ```

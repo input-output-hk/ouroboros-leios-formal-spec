@@ -36,10 +36,10 @@ which the library does not support yet.
 ```agda
 {-# OPTIONS --safe #-}
 
-open import Leios.Prelude hiding (_⊗_)
+open import Leios.Prelude
 open import CategoricalCrypto
 
-open import Relation.Binary.Construct.Closure.ReflexiveTransitive using (Star; _◅_; _◅◅_)
+open import Relation.Binary.Construct.Closure.ReflexiveTransitive
   renaming (ε to εˢ)
 
 import Leios.Voting.Channel

@@ -20,14 +20,14 @@ open import Leios.SpecStructure
 
 open import CategoricalCrypto hiding (_∘_; id)
 
-open import Network.BasicBroadcast using (NetworkT; RcvMessage; SndMessage; Activate)
+open import Network.BasicBroadcast using (NetworkT)
 
 module Leios.Protocol
   (⋯           : SpecStructure) (open SpecStructure ⋯)
   (SlotUpkeep  : Type         )
   (StageUpkeep : Type         ) where
 
-open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
+open BaseAbstract B' using (VTy; initSlot)
 open GenFFD
 ```
 High level structure:

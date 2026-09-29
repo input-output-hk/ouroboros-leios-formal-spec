@@ -7,7 +7,7 @@ open import Prelude.Errors
 open import Prelude.Result
 open import Leios.Prelude hiding (id)
 open import Leios.Config
-open import Leios.SpecStructure using (SpecStructure)
+open import Leios.SpecStructure
 ```
 -->
 ```agda

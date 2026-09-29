@@ -11,8 +11,6 @@ open import Leios.VRF
 import Leios.Base
 import Leios.Blocks
 import Leios.KeyRegistration
-
-open import Data.Fin
 ```
 -->
 ```agda

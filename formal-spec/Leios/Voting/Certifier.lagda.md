@@ -31,13 +31,12 @@ must be backed by a vote cast through a slot the adversary does not control.
 ```agda
 {-# OPTIONS --safe #-}
 
-open import Leios.Prelude hiding (_⊗_; Unique)
+open import Leios.Prelude hiding (Unique)
 open import CategoricalCrypto
 
-open import Data.List.Membership.Propositional.Properties using (∈-map⁺; ∈-map⁻)
-open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
-open import Data.List.Properties using (length-map)
-import Data.List.Relation.Unary.All as All
+open import Data.List.Membership.Propositional.Properties
+open import Data.List.Relation.Unary.Unique.Propositional
+open import Data.List.Properties
 
 import Leios.Voting.Ideal
 import Leios.Voting.Channel

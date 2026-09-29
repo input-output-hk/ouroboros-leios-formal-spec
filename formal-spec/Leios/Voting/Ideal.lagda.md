@@ -22,12 +22,11 @@ library lacks a workable `≈ℰ` proof principle.
 open import Leios.Prelude hiding (Unique)
 
 open import Data.List.Membership.Propositional using () renaming (find to find∈)
-open import Data.List.Membership.Propositional.Properties using (∈-∃++; ∈-++⁻; ∈-++⁺ˡ; ∈-++⁺ʳ)
-open import Data.List.Relation.Unary.Unique.Propositional using (Unique)
-open import Data.List.Relation.Unary.All.Properties using (¬Any⇒All¬)
-import Data.List.Relation.Unary.All as All
+open import Data.List.Membership.Propositional.Properties
+open import Data.List.Relation.Unary.Unique.Propositional
+open import Data.List.Relation.Unary.All.Properties
 import Data.List.Relation.Unary.AllPairs as AllPairs
-open import Data.List.Properties using (length-++)
+open import Data.List.Properties
 ```
 -->
 ```agda

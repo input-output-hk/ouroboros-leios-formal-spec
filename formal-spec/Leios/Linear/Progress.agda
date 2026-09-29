@@ -6,9 +6,9 @@ open import Leios.SpecStructure
 
 open import CategoricalCrypto hiding (id; _∘_; eval)
 open import CategoricalCrypto.Channel.Selection
-open import CategoricalCrypto.Ext using (Trace-trans)
+open import CategoricalCrypto.Ext
 
-open import Data.Nat.Properties using (+-suc; +-comm)
+open import Data.Nat.Properties
 
 -- Progress for the bare Linear Leios node: from any state whose slot upkeep
 -- is complete, the node can run through a whole slot.
@@ -22,9 +22,8 @@ module Leios.Linear.Progress (⋯ : SpecStructure)
 
 open import Leios.Linear ⋯ params
 open Types params
-open BaseAbstract B'
 
-open LeiosState using (slot; Upkeep; needs; has)
+open LeiosState
 
 private variable
   s s' : LeiosState

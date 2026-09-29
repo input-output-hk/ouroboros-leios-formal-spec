@@ -1,7 +1,7 @@
 {-# OPTIONS --safe #-}
 
-open import Leios.Prelude hiding (id; _⊗_)
-open import CategoricalCrypto hiding (id; _∘_)
+open import Leios.Prelude
+open import CategoricalCrypto
 
 -- The interface channel between a Leios node and the voting functionality:
 -- a node casts votes, and — when producing a ranking block — queries the

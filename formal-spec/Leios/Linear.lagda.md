@@ -15,7 +15,6 @@ open import Tactic.Derive.DecEq
 open import CategoricalCrypto hiding (id; _∘_; eval)
 open import CategoricalCrypto.Channel.Selection
 
-open import Data.List.Properties
 open import Data.Maybe.Properties
 
 open import Prelude.STS.GenPremises
@@ -59,26 +58,18 @@ data SlotUpkeep : Type where
 unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
 
 open import Leios.Protocol (⋯) SlotUpkeep ⊥ public
-open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
 
-private variable s s'   : LeiosState
-                 ffds'  : FFD.State
-                 π      : VrfPf
-                 ks ks' : K.State
-                 msgs   : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract)
-                 i      : FFDAbstract.Input ffdAbstract
-                 eb     : EndorserBlock
-                 ebs    : List EndorserBlock
-                 rbs    : List RankingBlock
-                 txs    : List Tx
-                 V      : VTy
-                 SD     : StakeDistr
-                 pks    : List PubKey
-                 cert   : EBCert
-                 c      : Maybe EBCert
-                 r      : EBRef
+private variable s s' : LeiosState
+                 π     : VrfPf
+                 msgs  : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract)
+                 i     : FFDAbstract.Input ffdAbstract
+                 eb    : EndorserBlock
+                 rbs   : List RankingBlock
+                 txs   : List Tx
+                 c     : Maybe EBCert
+                 r     : EBRef
 ```
 -->
 

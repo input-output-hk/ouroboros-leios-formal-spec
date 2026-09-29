@@ -5,15 +5,13 @@
 
 open import Leios.Prelude hiding (id; _>>=_; return; _⊗_)
 open import Leios.Config
-open import Leios.SpecStructure using (SpecStructure)
+open import Leios.SpecStructure
 
 open import Prelude.Result
 open import CategoricalCrypto hiding (id; _∘_; eval)
 open import CategoricalCrypto.Channel.Selection
 
-open import Data.List.Properties
 open import Data.Maybe.Properties
-open import Data.Product.Properties
 ```
 -->
 ```agda
@@ -23,7 +21,6 @@ module Leios.Linear.Trace.Verifier (⋯ : SpecStructure) (let open SpecStructure
   where
 
 open import Leios.Linear ⋯ params public
-open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
 open Types params
 open BaseAbstract B'
@@ -57,10 +54,7 @@ private variable
   σ    : Action
   σs   : TestTrace
   eb   : EndorserBlock
-  ebs  : List EndorserBlock
-  vt   : List Vote
   i    : TestInput
-  o    : FFDT In
 ```
 ```agda
 getAction : ∀ {i o} → s -⟦ i / o ⟧⇀ s′ → Action

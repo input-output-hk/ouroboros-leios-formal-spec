@@ -13,26 +13,14 @@ open import Leios.Prelude hiding (_⊗_)
 open import Leios.Abstract
 open import Leios.Config
 open import Leios.SpecStructure
-open import Blockchain.Safety
 import Blockchain.IsBlockchain
-
-open import Axiom.Set.Properties th
-open import Data.Nat.Show as N
-open import Data.Integer hiding (_≟_)
-open import Data.String as S using (intersperse)
-open import Function.Related.TypeIsomorphisms
-open import Relation.Binary.Structures
 
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
 
-open import LibExt
-
 open import CategoricalCrypto using (I ; Machine ; machine-type ; Channel ; _⊗ᵀ_)
 open import CategoricalCrypto.Channel.Core
 open import CategoricalCrypto.Channel.Selection
-
-open Equivalence
 
 -- The module contains very simple implementations for the functionalities
 -- that allow to build examples for traces for the different Leios variants
