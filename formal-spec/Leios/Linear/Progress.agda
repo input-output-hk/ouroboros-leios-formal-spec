@@ -79,8 +79,8 @@ base-step s eq with certRequest s in eqc
 ... | nothing =
   _ , ([] ∷ʳ⟨ _ , _ , Base₂ (needs s eq Base∉ , needs s eq CertCheck∉ , has s eq (here refl) , eqc) ⟩)
     , cong (λ l → Base ∷ CertCheck ∷ l) eq , refl
-... | just eb =
-  let s₁ = record (addUpkeep s CertCheck) { PendingQuery = just (hash eb) }
+... | just _ =
+  let s₁ = record (addUpkeep s CertCheck) { PendingQuery = just (hash (LeiosState.currentRB s)) }
   in _ , (([] ∷ʳ⟨ _ , _ , Base₃ (needs s eq CertCheck∉ , has s eq (here refl) , eqc) ⟩)
             ∷ʳ⟨ _ , _ , Cert₁ {c = nothing}
                   (needs s₁ (cong (CertCheck ∷_) eq) Base∉′ , here refl , eqc , refl , Maybe.nothing) ⟩)
