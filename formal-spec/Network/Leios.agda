@@ -23,6 +23,9 @@ module Network.Leios
     → HashCorrectB rb eb₁ → HashCorrectB rb eb₂ → eb₁ ≡ eb₂)
   (forEB     : Vote → EBRef)
   (mkCert    : EBRef → EBCert)
+  -- a certificate names the reference it was made for, so that a positive
+  -- answer to a query can match the query (`AnswerMatches`)
+  (mkCert-hash : ∀ r → getEBHash (mkCert r) ≡ r)
   (threshold : ℕ)
   (voter     : Vote → Fin numberOfParties)
   (Valid     : Vote → Type) ⦃ _ : Valid ⁇¹ ⦄
@@ -200,6 +203,11 @@ specʳ = spec-rewire ∘ ((CC.id ⊗₁ B.m) ⊗₁ Voter.Voter) ∘ NetTranslat
 --                          DD.Network
 Leios1ʳ : Machine DD.M (IO ⊗₀ BaseAdv ⊗₀ Adv)
 Leios1ʳ = ext-spec ∘ᴷ specʳ
+
+-- A positive answer from the certifier or the voter, `CERT (just (mkCert r))`
+-- to `QUERY r`, is one `Cert₁` accepts
+mkCert-matches : ∀ r → AnswerMatches (just (mkCert r)) r
+mkCert-matches r = matches-just (mkCert-hash r)
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it
 record LeiosBlock : Type where
