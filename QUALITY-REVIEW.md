@@ -42,6 +42,7 @@ The house standard `CLAUDE.md` does not exist in this repository; the review use
 - f9598c1 Key certificate queries by the announcing RB's hash — maintainer-approved (was a Statement-audit suggestion): `VT-Role` signs `hash currentRB`, so `Base₃`/`Cert₁`/`Cert₃` now query and correlate on it; merged into `yveshauser/voting`, whole project green.
 - e935198 Assume that a certificate names its reference — maintainer-approved (was a Statement-audit suggestion): module parameter `mkCert-hash : ∀ r → getEBHash (mkCert r) ≡ r`, plus `mkCert-matches` showing a positive answer satisfies `AnswerMatches`.
 - 29f4cd2 State the voter's certificate correctness over its log — maintainer-approved (was a Statement-audit suggestion): `vih`/`cc` now range over `log s'`; body is `real-cert-correct` directly.
+- 5ca614c Say why a certificate step was refused — maintainer-approved (was a Public API suggestion): the `Err-Cert*` messages list the premises that can fail, as `Base₂`/`Base₃` do; the pinned tests are updated.
 
 ## Suggestions (need your call)
 
@@ -57,7 +58,6 @@ The house standard `CLAUDE.md` does not exist in this repository; the review use
 
 ### Public API / module layout
 - formal-spec/Leios/Linear/Trace/Verifier.lagda.md :: Err-EB-Role-premises — restate `Err-EB-Role-premises`/`Err-VT-Role-premises` as `¬ (EB-Role-premises … .proj₁)` like the certificate ones; definitionally equal, but it changes public constructor text.
-- formal-spec/Leios/Linear/Trace/Verifier.lagda.md :: Err-Cert₁-premises — the `Err-Cert*` messages print a bare tag while `Base₂`/`Base₃` say why; richer texts change downstream-visible strings.
 - formal-spec/Leios/Linear/Trace/Verifier.lagda.md :: Ok' — `Ok'`, `Mismatch`, the nine `inj…≢…` lemmas and `verifyStep'` are unused downstream; candidates for `private`.
 - formal-spec/Leios/Linear.lagda.md :: π-unique — `P`, `P?`, `not-found`, `subst'`, `π-unique` are `Dec-↝` helpers only; candidates for `private`.
 - formal-spec/Leios/Linear.lagda.md :: Slot₂-premises — `Slot₂-premises` and `Base₁-premises` have zero uses.
