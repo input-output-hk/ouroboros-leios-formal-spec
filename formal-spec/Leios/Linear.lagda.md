@@ -235,8 +235,9 @@ it).
             addUpkeep (addUpkeep s CertCheck) Base
 ```
 If the chain tip announces an EB whose voting window closed at least
-`Ldiff` slots ago (see `certRequest`), the node instead queries the voting functionality for a certificate before it submits:
-the `Base` upkeep stays open until the answer arrives.
+`Ldiff` slots ago (see `certRequest`), the node instead queries the voting
+functionality for a certificate before it submits: the `Base` upkeep stays
+open until the answer arrives.
 ```agda
   Base₃   : let open LeiosState s in
           ∙ needsUpkeep CertCheck
