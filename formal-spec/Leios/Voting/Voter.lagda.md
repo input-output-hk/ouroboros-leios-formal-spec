@@ -68,6 +68,7 @@ module Leios.Voting.Voter
 open Leios.Voting.Channel Vote EBRef EBCert
 
 module Real = Leios.Voting.Real Party EBRef threshold Vote voter forEB Valid
+open Real
 ```
 
 ### Channels
@@ -96,7 +97,7 @@ the certificate.
 
 ```agda
 record VoterState : Type where
-  field log     : Real.RealState
+  field log     : RealState
         pending : List Vote
 
 open VoterState
@@ -115,15 +116,15 @@ data WithState_receive_return_newState_ : MachineType VoteNet VotingC VoterState
     return just (ϵ ⊗R ↑ₒ Diffuse (pending s))
     newState record { log = vs ++ log s ; pending = [] }
 
-  Query-step : ∀ {s} {eb : EBRef} →
-    Real.RealCertified (log s) eb →
+  Query-step : ∀ {s eb} →
+    RealCertified (log s) eb →
     WithState s
     receive L⊗ ϵ ᵗ¹ ↑ₒ QUERY eb
     return just (L⊗ ϵ ᵗ¹ ↑ᵢ CERT (just (mkCert eb)))
     newState s
 
-  QueryNo-step : ∀ {s} {eb : EBRef} →
-    ¬ Real.RealCertified (log s) eb →
+  QueryNo-step : ∀ {s eb} →
+    ¬ RealCertified (log s) eb →
     WithState s
     receive L⊗ ϵ ᵗ¹ ↑ₒ QUERY eb
     return just (L⊗ ϵ ᵗ¹ ↑ᵢ CERT nothing)
@@ -141,15 +142,15 @@ log, so the voter's reachable logs are exactly the vote logs of the real
 scheme.
 
 ```agda
-Recv* : ∀ rs vs → Star Real.Step rs (vs ++ rs)
-Recv* rs []       = εˢ
-Recv* rs (v ∷ vs) = Recv* rs vs ◅◅ (Real.Recv v ◅ εˢ)
+Recv* : ∀ {rs} vs → Star Step rs (vs ++ rs)
+Recv* []       = εˢ
+Recv* (v ∷ vs) = Recv* vs ◅◅ Recv v ◅ εˢ
 
 machine⇒steps : ∀ {s i o s'}
               → WithState s receive i return o newState s'
-              → Star Real.Step (log s) (log s')
-machine⇒steps (Cast-step v)     = Real.Recv v ◅ εˢ
-machine⇒steps (Deliver-step vs) = Recv* _ vs
+              → Star Step (log s) (log s')
+machine⇒steps (Cast-step v)     = Recv v ◅ εˢ
+machine⇒steps (Deliver-step vs) = Recv* vs
 machine⇒steps (Query-step _)    = εˢ
 machine⇒steps (QueryNo-step _)  = εˢ
 ```
@@ -172,7 +173,7 @@ AnswersCert (QueryNo-step _)          = nothing
 cert-answered-certified : ∀ {s i o s' eb}
   → (stp : WithState s receive i return o newState s')
   → AnswersCert stp ≡ just eb
-  → Real.RealCertified (log s') eb
+  → RealCertified (log s') eb
 cert-answered-certified (Query-step rc) refl = rc
 ```
 
@@ -188,7 +189,7 @@ module Correctness
   (Validated  : Party → EBRef → Type)
   where
 
-  open Real.Refines honest Validated
+  open Refines honest Validated
 
   answered-cert-correct : ∀ {s i o s' eb}
     → (stp : WithState s receive i return o newState s')
