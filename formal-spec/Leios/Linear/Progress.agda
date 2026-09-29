@@ -62,7 +62,7 @@ private
 -- vote) if the role can act and negative (`Roles₂`) otherwise; `Dec-↝`
 -- decides which.  Either way the role is added to the upkeep and the slot is
 -- unchanged.
-upkeep-step : ∀ s u → u ≢ Base → u ≢ CertCheck → LeiosState.needsUpkeep s u
+upkeep-step : ∀ s u → u ≢ Base → u ≢ CertCheck → needsUpkeep s u
             → ∃[ s' ] ∃[ o ] (s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / o ⟧⇀ s')
                     × Upkeep s' ≡ u ∷ Upkeep s
                     × slot s' ≡ slot s
@@ -97,11 +97,7 @@ upkeep : ∀ s → Upkeep s ≡ []
        → ∃[ s' ] Trace LinearLeios s s' × allDone s' × slot s' ≡ slot s
 upkeep s eq₀ =
   let s₃ , _ , st₃ , eq₃ , sl₃ = upkeep-step s EB-Role (λ ()) (λ ()) (needs s eq₀ λ ())
-
-      eq₃' : Upkeep s₃ ≡ EB-Role ∷ []
-      eq₃' = trans eq₃ (cong (EB-Role ∷_) eq₀)
-
-      s₄ , t₄ , eq₄ , sl₄ = base-step s₃ eq₃'
+      s₄ , t₄ , eq₄ , sl₄ = base-step s₃ (trans eq₃ (cong (EB-Role ∷_) eq₀))
 
       s₅ , _ , st₅ , eq₅ , sl₅ = upkeep-step s₄ VT-Role (λ ()) (λ ()) (needs s₄ eq₄ VT-Role∉)
   in s₅

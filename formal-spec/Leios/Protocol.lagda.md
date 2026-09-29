@@ -225,8 +225,7 @@ receives the votes before they ever reach the node).
 ```agda
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs' = (slot , eb) ∷ EBs' }
-  upd (inj₁ (vtHeader _))  = s
-  upd (inj₂ _)             = s
+  upd _                    = s
 
 module _ {s s'} (open LeiosState s') where
 

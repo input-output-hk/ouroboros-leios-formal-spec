@@ -110,9 +110,7 @@ certRequest s = let open LeiosState s in
 mkRB : LeiosState → Maybe EBCert → RankingBlock
 mkRB s mc = let open LeiosState s in record
   { announcedEB = proposedEB
-  ; txsOrEbCert = case mc of λ where
-      (just c) → inj₂ c
-      nothing  → inj₁ (proj₁ (splitTxs ToPropose))
+  ; txsOrEbCert = maybe inj₂ (inj₁ (proj₁ (splitTxs ToPropose))) mc
   }
 ```
 A positive answer to a certificate query must certify the requested EB;
@@ -124,9 +122,8 @@ data AnswerMatches : Maybe EBCert → EBRef → Type where
 
 instance
   Dec-AnswerMatches : ∀ {c r} → AnswerMatches c r ⁇
-  Dec-AnswerMatches {c = just c} {r} .dec with getEBHash c ≟ r
-  ... | yes p = yes (matches-just p)
-  ... | no ¬p = no λ where (matches-just q) → ¬p q
+  Dec-AnswerMatches {c = just c} {r} .dec =
+    map′ matches-just (λ where (matches-just p) → p) (getEBHash c ≟ r)
   Dec-AnswerMatches {c = nothing} .dec = yes matches-nothing
 
 rememberVote : LeiosState → EndorserBlock → LeiosState
@@ -276,10 +273,9 @@ the `Base` upkeep stays open until the answer arrives.
 #### Voting
 ```agda
   Vote₁ : ∀ {v} →
-         ∙ s ↝ (s' , inj₂ v)
-         ────────────────────────────────────────────────────────────
-         s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ CAST v ⟧⇀ s'
-
+        ∙ s ↝ (s' , inj₂ v)
+        ───────────────────────────────────────────────────────────────────
+        s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ CAST v ⟧⇀ s'
 ```
 The answer is correlated with the request recorded in `PendingQuery`: the
 rule only accepts an answer while a query is outstanding, a positive answer
@@ -449,8 +445,7 @@ instance
       in just≢nothing $ trans (sym y) (subst (not-found s) (sym ji) eq₃)
   ... | just (slot' , eb)
     with ¿ VT-Role-premises {s} {eb} {ebHash} {slot'} .proj₁ ¿
-  ... | yes p = yes ((rememberVote (addUpkeep s VT-Role) eb , inj₂ (vote sk-VT (hash (LeiosState.currentRB s)))) ,
-                      VT-Role p , refl)
+  ... | yes p = yes (_ , VT-Role p , refl)
   ... | no ¬p = no λ where (_ , VT-Role (x , y , p) , _) → ¬p $ subst
                              (λ where (eb , ebHash , slot) → VT-Role-premises {s} {eb} {ebHash} {slot} .proj₁)
                              (subst' {s} x y eq₂ eq₃) (x , y , p)
