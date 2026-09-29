@@ -43,7 +43,7 @@ Message  = LeiosMsg ⊎ BaseMsg
 
 import Network.DelayedDiffuse numberOfParties Message k as DD
 import Leios.Voting.Certifier numberOfParties Vote EBRef EBCert forEB mkCert threshold as Certifier
-import Leios.Voting.Voter (Fin numberOfParties) EBRef threshold Vote voter forEB Valid EBCert mkCert as Voter
+import Leios.Voting.Voter Participant EBRef threshold Vote voter forEB Valid EBCert mkCert as Voter
 
 -- multiplexing the network for the base & leios functionality
 -- this is somewhat awkward because we require a strict order on
@@ -82,9 +82,7 @@ NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 -- like any other FFD header. `splitVotes` carves the round's votes out of
 -- the Leios message stream.
 splitVotes : List LeiosMsg → List Vote × List LeiosMsg
-splitVotes ms =
-  let (vss , rest) = partitionSumsWith isVote ms
-  in L.concat vss , rest
+splitVotes ms = map₁ L.concat (partitionSumsWith isVote ms)
   where
     isVote : LeiosMsg → List Vote ⊎ LeiosMsg
     isVote (inj₁ (GenFFD.vtHeader vs)) = inj₁ vs
@@ -142,16 +140,16 @@ NetTranslateV .Machine.stepRel = NetTranslateV.WithState_receive_return_newState
 -- Regroups the base functionality's adversary channel past the voting channel
 spec-rewire : Machine ((Network ⊗₀ (BaseIO ⊗₀ BaseAdv)) ⊗₀ VotingC)
                       (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ BaseAdv)
-spec-rewire = ⊗-assoc⃖ CC.∘ (CC.id ⊗₁ ⊗-symₘ) CC.∘ ⊗-assoc CC.∘ (⊗-assoc⃖ ⊗₁ CC.id)
+spec-rewire = ⊗-assoc⃖ ∘ (CC.id ⊗₁ ⊗-symₘ) ∘ ⊗-assoc ∘ ⊗-assoc⃖ ⊗₁ CC.id
 
 -- The base functionality as seen through the multiplexed network. Voting is
 -- passed through untouched: the base protocol is voting-oblivious
 spec : Machine (DD.M ⊗₀ VotingC) (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ BaseAdv)
-spec = spec-rewire CC.∘ ((CC.id ⊗₁ B.m) ⊗₁ CC.id) CC.∘ (NetTranslate ⊗₁ CC.id)
+spec = spec-rewire ∘ ((CC.id ⊗₁ B.m) ⊗₁ CC.id) ∘ NetTranslate ⊗₁ CC.id
 
 -- The extension layer, with `Adv` as its adversary channel
 ext-spec : Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ Adv)
-ext-spec = LinearLeios CC.∘ ((Shim ⊗₁ CC.id) ⊗₁ CC.id)
+ext-spec = LinearLeios ∘ (Shim ⊗₁ CC.id) ⊗₁ CC.id
 
 -- The node as deployed: the extension layer stacked on the base spec. The
 -- voting channel is part of the node's domain and is passed through to the
@@ -185,7 +183,7 @@ Leios1 = ext-spec ∘ᴷ spec
 -- The base functionality with the voting channel served *locally*: a voter
 -- component fills the `VotingC` slot that `spec` passes through
 specʳ : Machine DD.M (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ BaseAdv)
-specʳ = spec-rewire CC.∘ ((CC.id ⊗₁ B.m) ⊗₁ Voter.Voter) CC.∘ NetTranslateV
+specʳ = spec-rewire ∘ ((CC.id ⊗₁ B.m) ⊗₁ Voter.Voter) ∘ NetTranslateV
 
 -- The real Leios node: the same extension layer as `Leios1`, stacked on
 -- `specʳ` instead of `spec`. Votes travel over the same diffusion network as everything
@@ -302,7 +300,8 @@ module _ (IOF AdvF : Participant → Channel)
     ; honest-nodes-≡-spec = honest-Node
     ; honest-IOF          = honest-IOF
     ; honest-AdvF         = honest-AdvF
-    ; network             = liftᴷ {E = I} (shuffle numberOfParties DD.M VotingC) ∘ᴷ ((DD.Network ⊗ᴷ Certifier.Functionality) ∘ idᴷ)
+    ; network             = liftᴷ {E = I} (shuffle numberOfParties DD.M VotingC)
+                              ∘ᴷ (DD.Network ⊗ᴷ Certifier.Functionality) ∘ idᴷ
     }
 
   module S = Deployment safetyS
@@ -315,7 +314,7 @@ module _ (IOF AdvF : Participant → Channel)
     ; spec-IsBlockchain = IsBlockchain-base
     }
 
-  extension : IsExtension base-spec (Deployment.spec safetyS)
+  extension : IsExtension base-spec S.spec
   extension = record
     { AdvL             = Adv
     ; ext-Adv≡base-Adv⊗AdvL = refl
@@ -330,7 +329,7 @@ module _ (IOF AdvF : Participant → Channel)
       safetyS base-spec extension
     module TrM = Tr.Main
 
-  leiosSafety : (∀ {A} (E : Deployment.Environment safetyS A) → TrM.ChainLemma-ty E)
+  leiosSafety : (∀ {A} (E : S.Environment A) → TrM.ChainLemma-ty E)
               → Deployment.safety Tr.base k → S.safety k
   leiosSafety = TrM.transfer k
 
