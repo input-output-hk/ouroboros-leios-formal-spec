@@ -13,8 +13,6 @@ import Blockchain.IsBlockchain as IsBC
 import Blockchain.Safety.Transfer as Transfer
 import Blockchain.Liveness.Transfer as LTransfer
 
-open import Data.Product.Properties
-
 module Network.Leios
   (⋯ : SpecStructure) (let open SpecStructure ⋯)
   (params : Params) (let open Params params)
@@ -224,17 +222,10 @@ record LeiosBlock : Type where
         eb : Maybe EndorserBlock
         correct : HashCorrectB rb eb
 
-hash-unique' : (rb : RankingBlock) → (eb₁ eb₂ : Maybe EndorserBlock)
-  → (hc₁ : HashCorrectB rb eb₁) → (hc₂ : HashCorrectB rb eb₂) → (eb₁ , hc₁) ≡ (eb₂ , hc₂)
-hash-unique' rb eb₁ eb₂ hc₁ hc₂ =
-  Σ-≡,≡→≡ (hash-unique rb eb₁ eb₂ hc₁ hc₂ , HashCorrect-irrel _ _ _ _)
-
 LeiosBlock-Injective : Injective _≡_ _≡_ LeiosBlock.rb
-LeiosBlock-Injective
-  {record { rb = rb ; eb = eb₁ ; correct = correct₁ }}
-  {record { rb = rb ; eb = eb₂ ; correct = correct₂ }} refl =
-  subst (λ (eb , correct) → _ ≡ record { rb = rb ; eb = eb ; correct = correct })
-    (hash-unique' rb eb₁ eb₂ correct₁ correct₂) refl
+LeiosBlock-Injective {record { rb = rb ; eb = eb₁ ; correct = c₁ }} {record { eb = eb₂ ; correct = c₂ }} refl
+  with refl ← hash-unique rb eb₁ eb₂ c₁ c₂
+  with refl ← HashCorrect-irrel rb eb₁ c₁ c₂ = refl
 
 --------------------------------------------------------------------------------
 -- Shared functionalities
