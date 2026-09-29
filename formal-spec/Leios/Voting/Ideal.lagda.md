@@ -40,10 +40,10 @@ module Leios.Voting.Ideal
 
 private
   ∈-remove : ∀ {A : Type} {z x : A} (ys zs : List A)
-           → z ∈ˡ ys ++ x ∷ zs → z ≢ x → z ∈ˡ ys ++ zs
-  ∈-remove ys zs z∈ z≢x with ∈-++⁻ ys z∈
+           → z ∈ˡ ys ++ x ∷ zs → x ≢ z → z ∈ˡ ys ++ zs
+  ∈-remove ys zs z∈ x≢z with ∈-++⁻ ys z∈
   ... | inj₁ z∈ys         = ∈-++⁺ˡ z∈ys
-  ... | inj₂ (here z≡x)   = ⊥-elim (z≢x z≡x)
+  ... | inj₂ (here refl)  = ⊥-elim (x≢z refl)
   ... | inj₂ (there z∈zs) = ∈-++⁺ʳ ys z∈zs
 
   unique-⊆⇒length≤ : ∀ {A : Type} {xs ys : List A}
@@ -51,16 +51,11 @@ private
   unique-⊆⇒length≤ {xs = []}     _                _   = N.z≤n
   unique-⊆⇒length≤ {xs = x ∷ xs} (x≢ AllPairs.∷ u) sub with ∈-∃++ (sub (here refl))
   ... | ys₁ , ys₂ , refl =
-    subst (λ n → suc (length xs) N.≤ n)
-          (sym (trans (length-++ ys₁) (N.+-suc (length ys₁) (length ys₂))))
-          (N.s≤s (subst (λ n → length xs N.≤ n) (length-++ ys₁) (unique-⊆⇒length≤ u sub')))
-    where
-      sub' : ∀ {z} → z ∈ˡ xs → z ∈ˡ ys₁ ++ ys₂
-      sub' {z} z∈ = ∈-remove ys₁ ys₂ (sub (there z∈)) (λ z≡x → All.lookup x≢ z∈ (sym z≡x))
+    subst (suc (length xs) N.≤_) (sym (length-++-sucʳ ys₁ x ys₂))
+      (N.s≤s (unique-⊆⇒length≤ u λ z∈ → ∈-remove ys₁ ys₂ (sub (there z∈)) (All.lookup x≢ z∈)))
 ```
 
 ### The ideal functionality
-
 
 ```agda
 Vote : Type
@@ -100,10 +95,10 @@ wf-init : WF init
 wf-init ()
 
 wf-step : ∀ {st st'} → WF st → Step st st' → WF st'
-wf-step wf (CastHonest hp val) (here refl) hq = val
-wf-step wf (CastHonest hp val) (there v)   hq = wf v hq
-wf-step wf (CastAdv ¬hp)       (here refl) hq = ⊥-elim (¬hp hq)
-wf-step wf (CastAdv ¬hp)       (there v)   hq = wf v hq
+wf-step _  (CastHonest _ val) (here refl) _  = val
+wf-step wf (CastHonest _ _)   (there v)   hq = wf v hq
+wf-step _  (CastAdv ¬hp)      (here refl) hq = ⊥-elim (¬hp hq)
+wf-step wf (CastAdv _)        (there v)   hq = wf v hq
 ```
 
 ### Certificates and correctness
@@ -134,7 +129,7 @@ voters must be honest.
 ... | no ¬h = ⊥-elim (N.≤⇒≯ (unique-⊆⇒length≤ uniq sub) corrupt<voters)
   where
     sub : ∀ {z} → z ∈ˡ voters → z ∈ˡ corrupt
-    sub {z} z∈ = cov z∈ (All.lookup (¬Any⇒All¬ voters ¬h) z∈)
+    sub z∈ = cov z∈ (All.lookup (¬Any⇒All¬ voters ¬h) z∈)
 ```
 
 The main property: a certificate implies an honest node validated the block. The
@@ -150,10 +145,10 @@ cert-correct : ∀ {st x}
   → length corrupt N.< threshold
   → Certified st x
   → ∃[ p ] (honest p × Validated p x)
-cert-correct {st} {x} wf corrupt corrupt-covers bound cert =
+cert-correct wf corrupt corrupt-covers bound cert =
   let open Certified cert
       (p , p∈voters , hp) =
         ∃honestVoter voters unique corrupt (N.<-≤-trans bound quorum)
-          (λ q∈ ¬hq → corrupt-covers (All.lookup voted q∈) ¬hq)
+          (λ q∈ → corrupt-covers (All.lookup voted q∈))
   in p , hp , wf (All.lookup voted p∈voters) hp
 ```

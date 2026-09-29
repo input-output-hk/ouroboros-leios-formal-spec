@@ -92,7 +92,7 @@ module Refines
 
 ```agda
   α : RealState → I.IdealState
-  α rs = I.⟨ L.map vote⇒ideal (L.filter ¿ Valid ¿¹ rs) ⟩
+  α rs = I.⟨ L.map vote⇒ideal (filter Valid rs) ⟩
 
   α-init : α [] ≡ I.init
   α-init = refl
@@ -113,18 +113,15 @@ Every real certificate abstracts to an ideal certificate on `α rs`.
 
 ```agda
   realCert⇒idealCert : ∀ {rs eb} → RealCertified rs eb → I.Certified (α rs) eb
-  realCert⇒idealCert {rs} {eb} rc = record
+  realCert⇒idealCert {rs} rc = record
     { voters = L.map voter votes
     ; unique = uniqueVoters
-    ; voted  = map⁺ voted-votes
-    ; quorum = quorum
-    }
-    where
-      open RealCertified rc
-      voted-votes : All.All (λ v → I.Voted (voter v) eb (α rs)) votes
-      voted-votes = All.tabulate λ {v} v∈votes →
+    ; voted  = map⁺ $ All.tabulate λ {v} v∈votes →
         subst (λ w → I.Voted (voter v) w (α rs)) (All.lookup allFor v∈votes)
           (∈-map⁺ vote⇒ideal (∈-filter⁺ ¿ Valid ¿¹ (sub v∈votes) (All.lookup allValid v∈votes)))
+    ; quorum = quorum
+    }
+    where open RealCertified rc
 ```
 
 ### Correctness transfers to the real scheme
@@ -137,7 +134,7 @@ some honest node validated the block, provided the adversary controls fewer than
   real-cert-correct : ∀ {rs eb}
     → (validated-if-honest : ∀ {v} → v ∈ˡ rs → Valid v → honest (voter v) → Validated (voter v) (forEB v))
     → (corrupt : List Party)
-    → (corrupt-covers   : ∀ {v} → v ∈ˡ rs → Valid v → ¬ honest (voter v) → voter v ∈ˡ corrupt)
+    → (corrupt-covers : ∀ {v} → v ∈ˡ rs → Valid v → ¬ honest (voter v) → voter v ∈ˡ corrupt)
     → length corrupt N.< threshold
     → RealCertified rs eb
     → ∃[ p ] (honest p × Validated p eb)
