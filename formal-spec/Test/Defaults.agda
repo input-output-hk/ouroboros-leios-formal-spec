@@ -1,13 +1,7 @@
 {-# OPTIONS --safe #-}
-{- Module: Test.Defaults
-
-   This module provides simple default implementations for the core components
-   and functionalities of the Leios protocol. These defaults are intended for
-   building examples and traces for different Leios variants, and include
-   basic instances for abstract types, VRF, key registration, base layer,
-   and FFD buffers. The implementations are minimal and primarily
-   for testing and illustration purposes.
--}
+{- Minimal default implementations of the Leios abstractions (abstract
+   types, VRF, key registration, base layer and FFD buffers), for building
+   example traces of the Leios variants. -}
 
 open import Leios.Prelude hiding (_⊗_)
 open import Leios.Abstract
@@ -22,8 +16,6 @@ open import CategoricalCrypto using (I ; Machine ; machine-type ; Channel ; _⊗
 open import CategoricalCrypto.Channel.Core
 open import CategoricalCrypto.Channel.Selection
 
--- The module contains very simple implementations for the functionalities
--- that allow to build examples for traces for the different Leios variants
 module Test.Defaults
   (params : Params) (let open Params params)
   (testParams : TestParams params) (let open TestParams testParams) where
@@ -304,8 +296,6 @@ d-SpecStructure = record
       ; BM                        = d-BaseFunctionality
       ; K'                        = d-KeyRegistration
       ; KF                        = d-KeyRegistrationFunctionality
-      -- Validation is not modelled in the test defaults: every EB counts as
-      -- checked at every slot.
       ; isValidityChecked         = λ _ _ → ⊤
       ; isValidityChecked?        = λ _ _ → yes tt
       }

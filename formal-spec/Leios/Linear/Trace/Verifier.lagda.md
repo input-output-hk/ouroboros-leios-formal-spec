@@ -25,7 +25,7 @@ open GenFFD
 open Types params
 open BaseAbstract B'
 ```
-An `Action` provides input to the relational semantics
+An `Action` names the rule a trace step is expected to take, tagged with its slot.
 ```agda
 data Action : Type where
   EB-Role-Action    : ℕ → EndorserBlock → Action
@@ -42,7 +42,7 @@ data Action : Type where
   No-EB-Role-Action : ℕ → Action
   No-VT-Role-Action : ℕ → Action
 ```
-A `TestTrace` is a list of actions togther with channels related to the other functionalities
+A `TestTrace` pairs each action with the input its step consumes.
 ```agda
 TestInput = FFDT Out ⊎ BaseIOF In ⊎ IOT In ⊎ VotingT In
 
@@ -69,8 +69,8 @@ getAction (Cert₂ {s} _)                                      = Cert₂-Action 
 getAction (Cert₃ {s} _)                                      = Cert₃-Action (LeiosState.slot s)
 getAction (Roles₁ (EB-Role {s} {eb = eb} _))                 = EB-Role-Action (LeiosState.slot s) eb
 getAction (Vote₁ (VT-Role {s} {eb = eb} {slot' = slot'} _))  = VT-Role-Action (LeiosState.slot s) eb slot'
-getAction (Roles₂ {u = Base} (_ , _ , x , _))                = ⊥-elim (x refl) -- Roles₂ excludes the `Base` role
-getAction (Roles₂ {u = CertCheck} (_ , _ , _ , x))           = ⊥-elim (x refl) -- ... and the `CertCheck` duty
+getAction (Roles₂ {u = Base} (_ , _ , x , _))                = ⊥-elim (x refl)
+getAction (Roles₂ {u = CertCheck} (_ , _ , _ , x))           = ⊥-elim (x refl)
 getAction (Roles₂ {s} {u = EB-Role} _)                       = No-EB-Role-Action (LeiosState.slot s)
 getAction (Roles₂ {s} {u = VT-Role} _)                       = No-VT-Role-Action (LeiosState.slot s)
 getAction (Roles₃ {s} _)                                     = No-VT-Role-Action (LeiosState.slot s)
@@ -91,7 +91,7 @@ getSlot (Base₁-Action x)       = x
 getSlot (Base₂-Action x)       = x
 getSlot (Base₃-Action x)       = x
 ```
-NOTE: this goes backwards, from the current state to the initial state
+`_—→_` runs backwards, from the later state to the earlier one.
 ```agda
 data _—→_ : LeiosState → LeiosState → Type where
 
@@ -137,7 +137,6 @@ data ValidTrace (es : TestTrace) (s : LeiosState) : Type where
   Valid : (tr : s′ —↠ s) → es ≈ tr → ValidTrace es s
 ```
 ### Error handling
-Errors that occur when verifying a step
 ```agda
 getNewState : ∀ {es s} → ValidTrace es s → LeiosState
 getNewState (Valid {s′ = s} _ _) = s
@@ -151,14 +150,14 @@ every derivable step consumes the input constructor its action's rule expects, s
 mismatch refutes the step.
 
 The premise-less `Ftch` rule reads its input through an output-typed channel selection, which
-nevertheless coincides with `toRcvType (inj₂ (inj₂ FetchLdgI))` once the selections reduce;
+nevertheless coincides with `toRcvType (inj₂ (inj₂ (inj₁ FetchLdgI)))` once the selections reduce;
 `Ftch-step` witnesses this inside the unfolding block, letting `verifyStep'` accept the pairing.
 ```agda
 data InputC : Type where
-  cSLOT cFTCH cFFD-OUT           : InputC  -- FFDT Out
-  cBASE-LDG cSTAKE cEMPTY cbSLOT : InputC  -- BaseIOF In
-  cSubmitTxs cFetchLdgI          : InputC  -- IOT In
-  cCERT                          : InputC  -- VotingT In
+  cSLOT cFTCH cFFD-OUT           : InputC
+  cBASE-LDG cSTAKE cEMPTY cbSLOT : InputC
+  cSubmitTxs cFetchLdgI          : InputC
+  cCERT                          : InputC
 
 inputC : TestInput → InputC
 inputC (inj₁ SLOT)                        = cSLOT
@@ -172,7 +171,6 @@ inputC (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) = cSubmitTxs
 inputC (inj₂ (inj₂ (inj₁ FetchLdgI)))     = cFetchLdgI
 inputC (inj₂ (inj₂ (inj₂ (CERT _))))      = cCERT
 
--- The input constructor each action's transition rule consumes.
 expectedInput : Action → InputC
 expectedInput (EB-Role-Action _ _)   = cSLOT
 expectedInput (VT-Role-Action _ _ _) = cSLOT
@@ -250,10 +248,7 @@ data Err-verifyStep (σ : Action) (i : TestInput) (s : LeiosState) : Type where
   Err-Base₂-premises : ¬ (Base₂-premises {s = s} .proj₁) → Err-verifyStep σ i s
   Err-Base₃-premises : (∀ {eb} → ¬ (Base₃-premises {s = s} {eb = eb} .proj₁)) → Err-verifyStep σ i s
   Err-Roles₂-premises : ∀ {u} → ¬ (Roles₂-premises {s = s} {u = u} .proj₁) → Err-verifyStep σ i s
-  Err-InputMismatch : ¬ ValidStep (σ , i) s → Err-verifyStep σ i s -- no step consumes this input for this action
-```
-Errors when verifying a trace
-```agda
+  Err-InputMismatch : ¬ ValidStep (σ , i) s → Err-verifyStep σ i s
 data Err-verifyTrace : TestTrace → LeiosState → Type where
   Err-StepOk : Err-verifyTrace σs s → Err-verifyTrace ((σ , i) ∷ σs) s
   Err-Step   : Err-verifyStep σ i s′ → Err-verifyTrace ((σ , i) ∷ σs) s
@@ -266,9 +261,6 @@ Ok' a = Ok (Valid _ (FromAction _ a))
 Mismatch : ∀ {a i s} → inputC i ≢ expectedInput a
          → Result (Err-verifyStep a i s) (ValidStep (a , i) s)
 Mismatch neq = Err (Err-InputMismatch (input-mismatch neq))
-```
-Reusable witnesses for the mismatching input families:
-```agda
 inj₂≢SLOT : ∀ y → inputC (inj₂ y) ≢ cSLOT
 inj₂≢SLOT (inj₁ (BASE-LDG _))         ()
 inj₂≢SLOT (inj₁ (STAKE _))            ()
@@ -463,7 +455,7 @@ verifyTrace ((a , i) ∷ σs) s = do
     _Valid∷ʳ_ : ∀ {e es s} → (σs : ValidTrace es s) → ValidStep e (getNewState σs) → ValidTrace (e ∷ es) s
     Valid tr x Valid∷ʳ Valid (ActionStep as) (FromAction a _) = Valid (_ —→⟨ ActionStep as ⟩ tr) (FromAction a x as)
 ```
-#### Error handling
+#### Error messages
 ```agda
 open import Prelude.Errors
 open import Text.Printf
