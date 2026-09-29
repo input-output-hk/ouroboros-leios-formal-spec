@@ -175,7 +175,7 @@ d-BaseFunctionality =
     { n = 1
     ; m =
         record
-          { State = (List RankingBlock × ℕ)
+          { State = d-BaseState
           ; stepRel = d-BaseRel
           }
     ; is-blockchain = let open BaseAbstract.BaseIOF in
@@ -217,9 +217,7 @@ instance
 
   -- Votes sign the announcing RB's hash: body payload plus announced-EB hash.
   hrb : Hashable RankingBlock Hash
-  hrb .hash rb = case RankingBlock.txsOrEbCert rb of λ where
-    (inj₁ txs)  → txs  ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
-    (inj₂ cert) → cert ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+  hrb .hash rb = let open RankingBlock rb in [ id , id ]′ txsOrEbCert ++ maybe id [] announcedEB
 
 record FFDBuffers : Type where
   field inEBs : List EndorserBlock
@@ -273,13 +271,13 @@ instance
   Dec-SimpleFFD : ∀ {s i o s'} → SimpleFFD s i o s' ⁇
   Dec-SimpleFFD {s} {FFDAbstract.Send h b} {FFDAbstract.SendRes} {s'} with s' ≟ proj₁ (send-total {s} {h} {b})
   ... | yes p rewrite p = ⁇ yes (proj₂ send-total)
-  ... | no ¬p = ⁇ no λ x → ⊥-elim (¬p (send-complete x))
+  ... | no ¬p = ⁇ no (¬p ∘ send-complete)
   Dec-SimpleFFD {_} {FFDAbstract.Send _ _} {FFDAbstract.FetchRes _} {_} = ⁇ no λ ()
   Dec-SimpleFFD {s} {FFDAbstract.Fetch} {FFDAbstract.FetchRes r} {s'}
     with s' ≟ proj₁ (proj₂ (fetch-total {s})) | r ≟ proj₁ (fetch-total {s}) -- TODO: improve performance
   ... | yes p | yes q rewrite p rewrite q = ⁇ yes (proj₂ (proj₂ (fetch-total {s})))
-  ... | _     | no ¬q = ⁇ no λ x → ⊥-elim (¬q (fetch-complete₂ x))
-  ... | no ¬p | _     = ⁇ no λ x → ⊥-elim (¬p (fetch-complete₁ x))
+  ... | _     | no ¬q = ⁇ no (¬q ∘ fetch-complete₂)
+  ... | no ¬p | _     = ⁇ no (¬p ∘ fetch-complete₁)
   Dec-SimpleFFD {_} {FFDAbstract.Fetch} {FFDAbstract.SendRes} {_} = ⁇ no λ ()
 
 d-FFDFunctionality : FFDAbstract.Functionality ffdAbstract
