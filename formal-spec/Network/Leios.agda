@@ -21,11 +21,9 @@ module Network.Leios
   (HashCorrect-irrel : ∀ rb eb → Irrelevant (HashCorrectB rb eb))
   (hash-unique : (rb : RankingBlock) → (eb₁ eb₂ : Maybe EndorserBlock)
     → HashCorrectB rb eb₁ → HashCorrectB rb eb₂ → eb₁ ≡ eb₂)
-  -- parameters of the voting functionality
   (forEB     : Vote → EBRef)
   (mkCert    : EBRef → EBCert)
   (threshold : ℕ)
-  -- parameters of the real voting implementation
   (voter     : Vote → Fin numberOfParties)
   (Valid     : Vote → Type) ⦃ _ : Valid ⁇¹ ⦄
     where
@@ -75,10 +73,8 @@ NetTranslate : Machine DD.M (Network ⊗₀ BaseNetwork)
 NetTranslate .Machine.State   = _
 NetTranslate .Machine.stepRel = NetTranslate.WithState_receive_return_newState_
 
--- For the real voting implementation votes are diffused over the same
--- network in the FFD wire format: a vote batch is a `vtHeader` message,
--- like any other FFD header. `splitVotes` carves the round's votes out of
--- the Leios message stream.
+-- Votes travel over the same network in the FFD wire format: a vote batch
+-- is a `vtHeader` message, like any other FFD header.
 splitVotes : List LeiosMsg → List Vote × List LeiosMsg
 splitVotes ms = map₁ L.concat (partitionSumsWith isVote ms)
   where
@@ -86,16 +82,13 @@ splitVotes ms = map₁ L.concat (partitionSumsWith isVote ms)
     isVote (inj₁ (GenFFD.vtHeader vs)) = inj₁ vs
     isVote m                           = inj₂ m
 
--- An empty round of casts produces no message.
 voteMsgs : List Vote → List Message
 voteMsgs [] = []
 voteMsgs cs = [ inj₁ (inj₁ (GenFFD.vtHeader cs)) ]
 
--- The vote-aware network multiplexer: same strict round protocol as
--- `NetTranslate`, with one extra hop — the round's votes are diverted to
--- the voter (the node never sees them), and the voter's response (its
--- pending casts) is folded into the round's outgoing diffuse as a
--- `vtHeader` message.
+-- `NetTranslate` with a vote hop: the round's votes go to the voter, never
+-- to the node, and the voter's pending casts join the round's outgoing
+-- diffuse as a `vtHeader` message.
 module NetTranslateV where
   record State : Type where
     field inLeios  : Maybe (List LeiosMsg)
@@ -135,24 +128,19 @@ NetTranslateV : Machine DD.M ((Network ⊗₀ BaseNetwork) ⊗₀ Voter.VoteNet)
 NetTranslateV .Machine.State   = _
 NetTranslateV .Machine.stepRel = NetTranslateV.WithState_receive_return_newState_
 
--- Regroups the base functionality's adversary channel past the voting channel
 spec-rewire : Machine ((Network ⊗₀ (BaseIO ⊗₀ BaseAdv)) ⊗₀ VotingC)
                       (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ BaseAdv)
 spec-rewire = ⊗-assoc⃖ ∘ (CC.id ⊗₁ ⊗-symₘ) ∘ ⊗-assoc ∘ ⊗-assoc⃖ ⊗₁ CC.id
 
--- The base functionality as seen through the multiplexed network. Voting is
--- passed through untouched: the base protocol is voting-oblivious
+-- The base functionality as seen through the multiplexed network.  Voting is
+-- passed through untouched: the base protocol is voting-oblivious.
 spec : Machine (DD.M ⊗₀ VotingC) (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ BaseAdv)
 spec = spec-rewire ∘ ((CC.id ⊗₁ B.m) ⊗₁ CC.id) ∘ NetTranslate ⊗₁ CC.id
 
--- The extension layer, with `Adv` as its adversary channel
 ext-spec : Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ Adv)
 ext-spec = LinearLeios ∘ (Shim ⊗₁ CC.id) ⊗₁ CC.id
 
--- The node as deployed: the extension layer stacked on the base spec. The
--- voting channel is part of the node's domain and is passed through to the
--- shared functionalities when assembling the protocol. Its adversary channel
--- is the base functionality's, `BaseAdv`, next to `LinearLeios`'s own, `Adv`
+-- The node as deployed, over the shared functionalities:
 --
 --              IO                                  Adv (= I)
 --               ▲                                     ▲
@@ -178,19 +166,14 @@ ext-spec = LinearLeios ∘ (Shim ⊗₁ CC.id) ⊗₁ CC.id
 Leios1 : Machine (DD.M ⊗₀ VotingC) (IO ⊗₀ BaseAdv ⊗₀ Adv)
 Leios1 = ext-spec ∘ᴷ spec
 
--- The base functionality with the voting channel served *locally*: a voter
--- component fills the `VotingC` slot that `spec` passes through
 specʳ : Machine DD.M (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ BaseAdv)
 specʳ = spec-rewire ∘ ((CC.id ⊗₁ B.m) ⊗₁ Voter.Voter) ∘ NetTranslateV
 
--- The real Leios node: the same extension layer as `Leios1`, stacked on
--- `specʳ` instead of `spec`. Votes travel over the same diffusion network as everything
--- else, framed as `vtHeader` FFD messages: `NetTranslateV` diverts them to
--- the voter on delivery and frames the voter's casts on the way out — the
--- node itself never sees vote messages. Certificate queries are answered
--- synchronously from the voter's local vote log, so the voter needs no
--- adversary port. Relating a deployment of these nodes over `DD.Network`
--- to `Leios1` + `Certifier.Functionality` is the open UC-realization step.
+-- The real Leios node, with a local voter in place of the shared certifier.
+-- The voter answers certificate queries from its own vote log, so it needs
+-- no adversary port.  Relating a deployment of these nodes to `Leios1` over
+-- the shared functionalities is open; it needs a synchrony premise relating
+-- the diffusion delay `k` to `Ldiff`.
 --
 --              IO                                  Adv (= I)
 --               ▲                                     ▲
@@ -229,12 +212,9 @@ LeiosBlock-Injective {record { rb = rb ; eb = eb₁ ; correct = c₁ }} {record 
   with refl ← hash-unique rb eb₁ eb₂ c₁ c₂
   with refl ← HashCorrect-irrel rb eb₁ c₁ c₂ = refl
 
---------------------------------------------------------------------------------
--- Shared functionalities
---
--- The deployment's `network` is the tensor of the diffusion network and the
--- voting functionality: each node sees one composite channel `DD.M ⊗₀ VotingC`,
--- and `shuffle` interleaves the two n-fold functionality channels accordingly.
+-- `shuffle` regroups the n-fold diffusion network and the n-fold certifier
+-- into one `DD.M ⊗₀ VotingC` channel per node, as the deployment's `network`
+-- needs.
 
 ⊗-interchange : ∀ {m} {A B C D : Channel}
               → (A ⊗₀ B) ⊗₀ (C ⊗₀ D) [ m ]⇒[ m ] (A ⊗₀ C) ⊗₀ (B ⊗₀ D)

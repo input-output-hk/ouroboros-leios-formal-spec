@@ -8,8 +8,6 @@ It imports all the core modules that together define the complete Leios protocol
 ```agda
 module formal-spec where
 ```
-The specification is organized into several key areas
-
 ### Prelude
 TODO: move into iog-agda-prelude
 ```agda
@@ -17,7 +15,7 @@ open import Prelude.Result
 open import Prelude.Errors
 ```
 ### Core Protocol Components
-Abstract interface, specifing core types and functions
+Abstract interface, specifying core types and functions
 ```agda
 open import Leios.Abstract
 ```
@@ -88,6 +86,10 @@ import Blockchain.Liveness.Transfer
 Basic broadcast networking primitives
 ```agda
 open import Network.BasicBroadcast
+```
+The Leios deployment over the diffusion network, and the transfer of safety
+and liveness from the base chain
+```agda
 open import Network.Leios
 ```
 ### Verification and Testing
