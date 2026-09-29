@@ -68,8 +68,8 @@ One `VotingC` per party, and an adversary channel for observing the vote log.
 
 ```agda
 data AdvT : Mode → Type where
-  Read      : AdvT Out
-  ReadRes   : List (Party × Vote) → AdvT In
+  Read    : AdvT Out
+  ReadRes : List (Party × Vote) → AdvT In
 
 Adv : Channel
 Adv = simpleChannel AdvT
@@ -129,20 +129,20 @@ certMsg p c = app (sel {m = In} p) (CERT c)
 
 data WithState_receive_return_newState_ : MachineType I CertifierChannel CertifierState where
 
-  Cast-step : ∀ {s} (p : Party) (v : Vote) →
+  Cast-step : ∀ {s} p v →
     WithState s
     receive castMsg p v
     return nothing
     newState ⟨ (p , v) ∷ log s ⟩
 
-  Query-step : ∀ {s} {p : Party} {eb : EBRef} →
+  Query-step : ∀ {s p eb} →
     Certified (log s) eb →
     WithState s
     receive queryMsg p eb
     return just (certMsg p (just (mkCert eb)))
     newState s
 
-  QueryNo-step : ∀ {s} {p : Party} {eb : EBRef} →
+  QueryNo-step : ∀ {s p eb} →
     ¬ Certified (log s) eb →
     WithState s
     receive queryMsg p eb
@@ -181,16 +181,13 @@ module _ (corrupt : List Party) {lg : List (Party × Vote)} where
     honest : Party → Type
     honest p = p ∉ˡ corrupt
 
-    Dec-honest : honest ⁇¹
-    Dec-honest {p} .dec = ¬? (Any.any? (p ≟_) corrupt)
-
-    module Id = Leios.Voting.Ideal Party EBRef honest ⦃ Dec-honest ⦄ (HasVoteFor lg) threshold
+    module Id = Leios.Voting.Ideal Party EBRef honest (HasVoteFor lg) threshold
 
     voteRef : Party × Vote → Party × EBRef
     voteRef qv = proj₁ qv , forEB (proj₂ qv)
 
     α : Id.IdealState
-    α = record { voteLog = L.map voteRef lg }
+    α = Id.⟨ L.map voteRef lg ⟩
 
     wf : Id.WF α
     wf p∈ _ with ∈-map⁻ voteRef p∈
@@ -210,10 +207,9 @@ module _ (corrupt : List Party) {lg : List (Party × Vote)} where
         open Certified cert
         voted∈ : ∀ {p} → p ∈ˡ L.map proj₁ votes → Id.Voted p eb α
         voted∈ p∈ with ∈-map⁻ proj₁ p∈
-        ... | qv , qv∈votes , p≡ =
-          subst (_∈ˡ L.map voteRef lg)
-                (cong₂ _,_ (sym p≡) (All.lookup forEB≡ qv∈votes))
-                (∈-map⁺ voteRef (votes⊆ qv∈votes))
+        ... | qv , qv∈votes , refl =
+          subst (λ e → (proj₁ qv , e) ∈ˡ L.map voteRef lg) (All.lookup forEB≡ qv∈votes)
+            (∈-map⁺ voteRef (votes⊆ qv∈votes))
 
   cert-correct : ∀ {eb}
     → length corrupt N.< threshold
