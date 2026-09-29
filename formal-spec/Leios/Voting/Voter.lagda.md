@@ -6,31 +6,21 @@ component*: a per-node machine that implements the same interface by sending
 votes across the diffusion network.
 
 The voter sits between its node and the network translation layer
-(`NetTranslateV` in `Network.Leios`), which multiplexes votes into the
-diffusion network's message type. The network delivers one *list* of votes
-per round, and the round protocol is a strict request-response chain, so:
+(`NetTranslateV` in `Network.Leios`).  The network delivers one list of votes
+per round, and the round protocol is a strict request-response chain, so the
+voter behaves as follows:
 
-- a `CAST` from the node is recorded and buffered (`pending`) — the voter
-  cannot send on its own initiative,
+- a `CAST` from the node is recorded and buffered in `pending`, since the
+  voter cannot send on its own initiative,
 - when the network delivers the round's votes (`Deliver`), the voter records
-  them and *responds* with its buffered casts (`Diffuse`), which the
-  translation layer folds into the round's outgoing messages,
-- a certificate `QUERY` from the node is answered synchronously from the
-  vote log: positively — with an assembled certificate — iff the recorded
-  votes contain a real certificate (`Real.RealCertified`: a quorum of valid
-  votes by distinct voters). This matches the protocol, where the RB
-  producer assembles the certificate locally from the votes it holds; the
-  certificate is never a network object.
+  them and responds with its buffered casts (`Diffuse`),
+- a certificate `QUERY` is answered synchronously from the vote log,
+  positively iff the log contains a real certificate (`Real.RealCertified`);
+  as in the protocol, the RB producer assembles the certificate locally, and
+  it is never a network object.
 
-The voter's vote log is `Real.RealState` from `Leios.Voting.Real` and every
-step is a (sequence of) `Real.Step`s, so the state-level refinement into the
-ideal model applies verbatim: every positive query answer is backed by a
-vote of an honest party (`Correctness.answered-cert-correct`).
-
-What this module does *not* provide is the UC-level statement that `n`
-voters wired through a diffusion network realize the `Certifier`
-functionality — that requires relating machines up to trace equivalence,
-which the library does not support yet.
+That `n` voters over the diffusion network realize `Leios.Voting.Certifier`
+is open; see `Leios1ʳ` in `Network.Leios`.
 
 <!--
 ```agda
@@ -46,11 +36,6 @@ import Leios.Voting.Channel
 import Leios.Voting.Real
 ```
 -->
-
-The parameters are those of `Leios.Voting.Real`, extended by the concrete
-certificate type and constructor used on the `VotingC` interface. Honesty
-and validation are not needed to build the machine; they parameterize the
-`Correctness` module at the end.
 
 ```agda
 module Leios.Voting.Voter
@@ -73,10 +58,8 @@ open Real
 
 ### Channels
 
-Upward the voter speaks `VotingC` — the same channel the node already uses
-towards the certifier. Downward it speaks the per-round vote-diffusion
-channel: a delivered batch of votes is answered with the batch of pending
-casts.
+Upward the voter speaks `VotingC`, the channel the node also uses towards
+the certifier.
 
 ```agda
 data VoteNetT : Mode → Type where
@@ -89,11 +72,8 @@ VoteNet = simpleChannel VoteNetT
 
 ### The machine
 
-The state is the log of votes seen so far (own casts and delivered ones)
-together with the casts not yet handed to the network. A vote carries its
-claimed voter and block inside the `Vote` value; the network is not assumed
-to authenticate anything — validity is only checked where it matters, in
-the certificate.
+The network authenticates nothing: a vote's voter and block are claims
+inside the `Vote` value, and validity is checked only in the certificate.
 
 ```agda
 record VoterState : Type where
@@ -137,9 +117,8 @@ Voter .Machine.stepRel = WithState_receive_return_newState_
 
 ### Refinement into the real transition system
 
-Every machine step corresponds to a sequence of `Real.Step`s on the vote
-log, so the voter's reachable logs are exactly the vote logs of the real
-scheme.
+Every machine step is a sequence of `Real.Step`s on the vote log, so every
+log the voter reaches is reachable in the real scheme.
 
 ```agda
 Recv* : ∀ {rs} vs → Star Step rs (vs ++ rs)
@@ -157,10 +136,8 @@ machine⇒steps (QueryNo-step _)  = εˢ
 
 ### Certificate soundness
 
-`AnswersCert` reads off the block a step answers a certificate query for
-positively, if any. A positive answer is always backed by a real
-certificate on the vote log — it is a premise of the only rule that gives
-one.
+`AnswersCert` gives the block a step positively answers a query for, if
+any.
 
 ```agda
 AnswersCert : ∀ {s i o s'}

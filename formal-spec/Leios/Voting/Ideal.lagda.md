@@ -6,15 +6,11 @@ the central correctness property:
 > If a certificate for a block exists, then at least one honest node has
 > validated that block.
 
-The ideal functionality records a vote for a block only under the premise that the
-voter validated the block (for honest parties) or that the voter is dishonest (for
-adversarial parties). A *certificate* is a quorum of `threshold`-many distinct
-voters. As long as the adversary controls fewer than `threshold` parties, any
-certifying set must contain an honest voter, whose recorded vote carries the
-validation evidence and therefore the property holds by construction.
-
-TODO: What remains is the UC-level statement `Real ≤'UC Ideal`, for which the
-library lacks a workable `≈ℰ` proof principle.
+The functionality records a vote only if the voter is honest and validated
+the block, or is dishonest.  A *certificate* is a quorum of `threshold`-many
+distinct voters.  As long as the adversary controls fewer than `threshold`
+parties, every certifying set contains an honest voter, whose validation the
+invariant `WF` provides.
 <!--
 ```agda
 {-# OPTIONS --safe #-}
@@ -82,9 +78,6 @@ data Step : IdealState → IdealState → Type where
              → Step st ⟨ (p , x) ∷ voteLog st ⟩
 ```
 
-The functionality maintains the invariant that every honest recorded vote is backed
-by a validation. This is what makes the ideal model *ideal*.
-
 ### Well-formed
 
 ```agda
@@ -103,9 +96,6 @@ wf-step wf (CastAdv _)        (there v)   hq = wf v hq
 
 ### Certificates and correctness
 
-A certificate is a quorum of `threshold`-many *distinct* parties that have all voted
-for the block.
-
 ```agda
 record Certified (st : IdealState) (x : Subject) : Type where
   field
@@ -113,12 +103,7 @@ record Certified (st : IdealState) (x : Subject) : Type where
     unique : Unique voters
     voted  : All.All (λ p → Voted p x st) voters
     quorum : threshold N.≤ length voters
-```
 
-If the certificate's quorum is larger than the set of corrupt parties, one of the
-voters must be honest.
-
-```agda
 ∃honestVoter :
     (voters : List Party) → Unique voters
   → (corrupt : List Party) → length corrupt N.< length voters
@@ -132,10 +117,9 @@ voters must be honest.
     sub z∈ = cov z∈ (All.lookup (¬Any⇒All¬ voters ¬h) z∈)
 ```
 
-The main property: a certificate implies an honest node validated the block. The
-adversary is modelled by a list of parties it controls, assumed smaller than the
-quorum threshold (this is the honest-participation assumption); every dishonest
-voter must be one of them.
+The adversary is modelled by a list `corrupt` of the parties it controls,
+shorter than the threshold (the honest-participation assumption); every
+dishonest voter must be in it.
 
 ```agda
 cert-correct : ∀ {st x}

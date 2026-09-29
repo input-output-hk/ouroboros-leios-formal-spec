@@ -1,12 +1,12 @@
 ## The real voting scheme and its refinement of the ideal model
 
-The real scheme collects concrete votes. A vote carries no honesty/validation
-evidence, it is just a signature. An adversary may submit any vote it can
-produce. We relate it to the ideal model by a **forward simulation**:
-an abstraction `α : RealState → IdealState` that keeps the valid votes, and
-under which the real certificate predicate refines the ideal one. The
-correctness property then transfers: a real certificate implies an honest node
-validated the block.
+The real scheme collects concrete votes.  A vote carries no honesty or
+validation evidence, and an adversary may submit any vote it can produce.  The
+abstraction `α : RealState → IdealState` keeps the valid votes, and under it
+every real certificate is an ideal one.  The ideal correctness property then
+transfers: provided every valid vote of an honest voter is backed by a
+validation (`validated-if-honest`), a real certificate implies that an honest
+party validated the block.
 
 <!--
 ```agda
@@ -22,12 +22,8 @@ import Leios.Voting.Ideal
 ```
 -->
 
-The real scheme itself needs no notion of honesty or validation — only the
-concrete vote type together with the ways to read off the voter and the
-referenced block from a vote, and a decidable notion of vote validity.
-Honesty and validation enter only in the refinement into the ideal model
-(`Refines` below), so that implementations of the real scheme (such as
-`Leios.Voting.Voter`) can be instantiated without them.
+Honesty and validation enter only in `Refines` below, so that implementations
+such as `Leios.Voting.Voter` can be instantiated without them.
 
 ```agda
 module Leios.Voting.Real
@@ -43,9 +39,6 @@ module Leios.Voting.Real
 
 ### The real functionality
 
-The state is the multiset (list) of votes received so far; the only step is
-receiving a vote, which may come from anyone.
-
 ```agda
 RealState : Type
 RealState = List Vote
@@ -55,9 +48,6 @@ data Step : RealState → RealState → Type where
 ```
 
 ### Real certificates
-
-A real certificate is a quorum of valid votes for the block, cast by distinct
-parties.
 
 ```agda
 record RealCertified (rs : RealState) (eb : EBRef) : Type where
@@ -75,9 +65,6 @@ vote⇒ideal v = voter v , forEB v
 
 ### Refinement into the ideal model
 
-The refinement is parameterized by the honesty predicate and the validation
-relation of the ideal functionality.
-
 ```agda
 module Refines
   (honest     : Party → Type) ⦃ _ : honest ⁇¹ ⦄
@@ -85,33 +72,19 @@ module Refines
   where
 
   module I = Leios.Voting.Ideal Party EBRef honest Validated threshold
-```
 
-`α` forgets everything but the *valid* votes, projecting each to the ideal vote
-`(voter , block)`.
-
-```agda
   α : RealState → I.IdealState
   α rs = I.⟨ L.map vote⇒ideal (filter Valid rs) ⟩
 
   α-init : α [] ≡ I.init
   α-init = refl
-```
 
-Under `validated-if-honest`, the abstraction lands in a well-formed ideal state:
-every honest vote in `α rs` is backed by a validation.
-
-```agda
   α-WF : ∀ {rs}
        → (∀ {v} → v ∈ˡ rs → Valid v → honest (voter v) → Validated (voter v) (forEB v))
        → I.WF (α rs)
   α-WF vih p∈ hp with ∈-map⁻ vote⇒ideal p∈
   ... | _ , v∈filter , refl = uncurry vih (∈-filter⁻ ¿ Valid ¿¹ v∈filter) hp
-```
 
-Every real certificate abstracts to an ideal certificate on `α rs`.
-
-```agda
   realCert⇒idealCert : ∀ {rs eb} → RealCertified rs eb → I.Certified (α rs) eb
   realCert⇒idealCert {rs} rc = record
     { voters = L.map voter votes
@@ -125,10 +98,6 @@ Every real certificate abstracts to an ideal certificate on `α rs`.
 ```
 
 ### Correctness transfers to the real scheme
-
-Combining the abstraction with the ideal `cert-correct`: a real certificate implies
-some honest node validated the block, provided the adversary controls fewer than
-`threshold` parties (every dishonest valid voter is one of them).
 
 ```agda
   real-cert-correct : ∀ {rs eb}

@@ -1,32 +1,26 @@
 ## The voting certifier
 
-This module defines the voting functionality that is wired into the Leios
-deployment as a functionality shared between all nodes, tensored with the
-diffusion network.
+The voting functionality shared between all nodes of the Leios deployment,
+where `Network.Leios` tensors it with the diffusion network.
 
-The certifier exposes one `VotingC` channel *per party* (`n ⨂ⁿ VotingC`):
-slot `p` of the tensor is party `p`'s channel. A vote cast on slot `p`
-therefore *is* party `p`'s vote — the caster's identity is structural, given
-by the wiring, and the functionality needs no honesty predicate: an adversary
-can only cast through the slots of the parties it controls.
+The certifier exposes one `VotingC` channel per party (`n ⨂ⁿ VotingC`), and a
+vote cast on slot `p` is party `p`'s vote.  The caster's identity is thus given
+by the wiring, so the functionality needs no honesty predicate: an adversary
+can cast only through the slots of the parties it controls.
 
-The functionality
+The functionality does the following:
 
-- records casts without answering them, as the node's local voter does
-  (`Cast-step`),
-- answers a party's certificate query synchronously from the vote log:
-  positively iff the recorded votes certify the block
-  (`Query-step`/`QueryNo-step`) — there is no delivery event to schedule,
-  matching the protocol, where a certificate is assembled locally at RB
-  production and travels only inside the RB,
-- lets the adversary observe the vote log (`Read-step`); votes are public.
+- it records casts without answering them (`Cast-step`),
+- it answers a certificate query synchronously from the vote log, positively
+  iff the recorded votes certify the block (`Query-step`/`QueryNo-step`); no
+  certificate is delivered as an event, since in the protocol it is assembled
+  at RB production and travels only inside the RB,
+- it lets the adversary read the vote log (`Read-step`), as votes are public.
 
-Certificate correctness (`cert-correct`) is obtained by mapping the
-certifier's vote log into the refined ideal functionality `Leios.Voting.Ideal`,
-instantiating `honest` with "not controlled by the adversary" and `Validated`
-with "has a recorded vote for the block", and reusing `Ideal.cert-correct`:
-if the adversary controls fewer than `threshold` parties, any certificate
-must be backed by a vote cast through a slot the adversary does not control.
+Certificate correctness (`cert-correct`) reuses `Leios.Voting.Ideal.cert-correct`:
+if the adversary controls fewer than `threshold` parties, every certificate is
+backed by a vote cast through a slot it does not control.  This is a counting
+argument over slots; that such a voter validated the block is not proved here.
 <!--
 ```agda
 {-# OPTIONS --safe #-}
@@ -42,9 +36,6 @@ import Leios.Voting.Ideal
 import Leios.Voting.Channel
 ```
 -->
-The certifier is parameterized by the number of parties, the concrete vote
-and certificate types, the block reference a vote endorses, a certificate
-constructor and the quorum threshold.
 ```agda
 module Leios.Voting.Certifier
   (n         : ℕ)
@@ -64,8 +55,6 @@ Party = Fin n
 
 ### Channels
 
-One `VotingC` per party, and an adversary channel for observing the vote log.
-
 ```agda
 data AdvT : Mode → Type where
   Read    : AdvT Out
@@ -79,10 +68,6 @@ CertifierChannel = (n ⨂ⁿ VotingC) ⊗₀ Adv
 ```
 
 ### State and certification
-
-The state is the log of cast votes, each tagged with the *slot* it arrived
-on. A block is certified by a quorum of `threshold`-many votes for it, cast
-through distinct slots.
 
 ```agda
 record CertifierState : Type where
@@ -104,11 +89,6 @@ record Certified (lg : List (Party × Vote)) (eb : EBRef) : Type where
 ```
 
 ### The functionality
-
-Messages on party `p`'s slot are addressed via the generic selection
-`⨂⇒ p` into the `n`-fold tensor; `castMsg`/`queryMsg` inject a cast/query
-received from, and `certMsg` a query answer sent to, party `p` into the
-machine channel.
 
 ```agda
 private
@@ -162,17 +142,14 @@ Functionality .Machine.stepRel = WithState_receive_return_newState_
 
 ### Certificate correctness
 
-A vote for `eb` recorded on party `p`'s slot:
-
 ```agda
 HasVoteFor : List (Party × Vote) → Party → EBRef → Type
 HasVoteFor lg p eb = Any.Any (λ qv → proj₁ qv ≡ p × forEB (proj₂ qv) ≡ eb) lg
 ```
 
-The certifier log maps into the refined ideal functionality: `honest` becomes "not
-one of the corrupt parties" and `Validated p eb` becomes `HasVoteFor lg p eb`
-— under which *every* logged vote is trivially well-formed, so
-`Ideal.cert-correct` applies unconditionally.
+The log maps into `Leios.Voting.Ideal` with `honest` as "not corrupt" and
+`Validated` as `HasVoteFor lg`.  Under that choice every logged vote is
+well-formed by construction, so `wf` and `covers` hold for any log.
 
 ```agda
 module _ (corrupt : List Party) {lg : List (Party × Vote)} where
