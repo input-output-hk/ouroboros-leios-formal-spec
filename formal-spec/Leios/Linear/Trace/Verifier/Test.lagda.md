@@ -48,7 +48,7 @@ with an RB.
 The `SpecStructure` comes from `Test.Defaults`.
 ```agda
   -- TODO: why does Hashable-EndorserBlock not work instead of hpe...?
-  open import Test.Defaults params testParams using (d-SpecStructure; hpe)
+  open import Test.Defaults params testParams using (d-SpecStructure; hpe; hrb)
   open SpecStructure d-SpecStructure hiding (Hashable-EndorserBlock)
   open import Leios.Linear.Trace.Verifier d-SpecStructure params
 ```
@@ -73,11 +73,12 @@ The `SpecStructure` comes from `Test.Defaults`.
     verify-EB₁-hash : hash EB₁ ≡ 1 ∷ 2 ∷ 3 ∷ []
     verify-EB₁-hash = refl
 ```
-In `Test.Defaults` a certificate is the hash of the EB it certifies.
+A certificate is keyed by the announcing RB, the hash the votes sign, so
+`crt₁` certifies the votes on `EB₁` under `hash RB₁`.
 ```agda
-    crt₁ : EBCert
-    crt₁ = hash EB₁
     RB₀ RB₁ RB₂ : RankingBlock
+    crt₁ : EBCert
+    crt₁ = hash ⦃ hrb ⦄ RB₁
     RB₀ = record { txsOrEbCert = inj₁ (0 ∷ []) ; announcedEB = nothing }
     RB₁ = record { txsOrEbCert = inj₁ [] ; announcedEB = just (hash EB₁) }
     RB₂ = record { txsOrEbCert = inj₂ crt₁ ; announcedEB = just (hash EB₂) }
@@ -251,11 +252,11 @@ passed as of slot 200.
 
     EB₄ : EndorserBlock
     EB₄ = mkEB 190 fzero tt (EB , tt) (200 ∷ [])
-    crt₃ : EBCert
-    crt₃ = hash EB₃
     RB₃ RB₄ : RankingBlock
     RB₃ = record { txsOrEbCert = inj₁ [] ; announcedEB = just (hash EB₃) }
     RB₄ = record { txsOrEbCert = inj₁ [] ; announcedEB = just (hash EB₄) }
+    crt₃ : EBCert
+    crt₃ = hash ⦃ hrb ⦄ RB₃
     s₂₀₀ : LeiosState
     s₂₀₀ = record s₀
              { slot = 200
@@ -264,10 +265,11 @@ passed as of slot 200.
              }
 ```
 The EB role is settled first, as `Base₃` requires; `Base₃` then queries for
-`EB₃` (`certRequest s₂₀₀ ≡ just EB₃`), and the tip moves to `RB₄` (`Slot₂`),
-so the answer for `EB₃` is stale and `Cert₃` re-queries for `EB₄`.  The
-chain then becomes empty, so no certificate is called for, the answer for
-`EB₄` is discarded and `Cert₂` submits the RB without a certificate.
+a certificate on `RB₃` (`certRequest s₂₀₀ ≡ just EB₃`), and the tip moves to
+`RB₄` (`Slot₂`), so the answer for `RB₃` is stale and `Cert₃` re-queries for
+`RB₄`.  The chain then becomes empty, so no certificate is called for, the
+answer for `RB₄` is discarded and `Cert₂` submits the RB without a
+certificate.
 ```agda
     stale-cert-trace : TestTrace
     stale-cert-trace =

@@ -100,7 +100,14 @@ mkRB s mc = let open LeiosState s in record
   { announcedEB = proposedEB
   ; txsOrEbCert = maybe inj₂ (inj₁ (proj₁ (splitTxs ToPropose))) mc
   }
-
+```
+Certificates are keyed by the hash of the *announcing* ranking block, the
+same hash `VT-Role` signs (CIP-0164, "Vote Structure"), so that a query can
+be answered from the votes as cast.  `certRequest` still selects the EB, but
+only to decide *whether* a certificate is called for; the reference asked
+for is `hash currentRB`.  A positive answer must certify that reference; a
+negative answer trivially matches any request.
+```agda
 data AnswerMatches : Maybe EBCert → EBRef → Type where
   matches-just    : ∀ {c r} → getEBHash c ≡ r → AnswerMatches (just c) r
   matches-nothing : ∀ {r} → AnswerMatches nothing r
@@ -244,8 +251,8 @@ open until the answer arrives.
           ∙ hasUpkeep EB-Role
           ∙ certRequest s ≡ just eb
           ───────────────────────────────────────────────────────────────────────────
-          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ QUERY (hash eb) ⟧⇀
-            record (addUpkeep s CertCheck) { PendingQuery = just (hash eb) }
+          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ QUERY (hash currentRB) ⟧⇀
+            record (addUpkeep s CertCheck) { PendingQuery = just (hash currentRB) }
 ```
 #### Voting
 ```agda
@@ -256,31 +263,34 @@ open until the answer arrives.
 ```
 `Cert₁` correlates the answer with the request recorded in
 `PendingQuery`: it only accepts an answer while a query is outstanding, a
-positive answer must certify the requested EB, and the request is cleared
-on submission.
+positive answer must certify the requested ranking block, and the request
+is cleared on submission.
 
 Since the chain tip may change between query and answer (`Slot₂` has no
 premises), `Cert₁` also re-validates the request at submission time: the
-pending query must still be for the EB the *current* tip calls for, so a
-stale answer cannot be embedded.  `Base₂` and `Base₃` both need
-`CertCheck` unsettled, so neither can fire again in the slot, and without
-further rules a tip change between query and answer would leave `Base`
-open forever.  The two further rules are as follows:
+pending query must still name the *current* tip, so a stale answer cannot
+be embedded.  Keying on the tip rather than on the EB it announces also
+catches a tip that moves to a different RB announcing the same EB.
+`Base₂` and `Base₃` both need `CertCheck` unsettled, so neither can fire
+again in the slot, and without further rules a tip change between query
+and answer would leave `Base` open forever.  The two further rules are as
+follows:
 
 - `Cert₂`: the tip no longer calls for a certificate at all
   (`certRequest s ≡ nothing`).  The stale answer is discarded and the RB
   is submitted without a certificate, discharging `Base` as `Base₂`
   would.
-- `Cert₃`: the tip now calls for a certificate on a *different* EB than
-  the one queried.  The stale answer is discarded and a fresh query is
-  issued for the new EB; `Base` stays open until that query is answered.
+- `Cert₃`: the tip has moved, so it calls for a certificate on a
+  *different* ranking block than the one queried.  The stale answer is
+  discarded and a fresh query is issued for the new tip; `Base` stays open
+  until that query is answered.
 ```agda
   Cert₁ : let open LeiosState s in
         ∙ needsUpkeep Base
         ∙ CertCheck ∈ˡ Upkeep
         ∙ certRequest s ≡ just eb
-        ∙ PendingQuery ≡ just (hash eb)
-        ∙ AnswerMatches c (hash eb)
+        ∙ PendingQuery ≡ just (hash currentRB)
+        ∙ AnswerMatches c (hash currentRB)
         ───────────────────────────────────────────────────────────────────
         s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s c) ⟧⇀
           record (addUpkeep s Base) { PendingQuery = nothing }
@@ -299,10 +309,10 @@ open forever.  The two further rules are as follows:
         ∙ CertCheck ∈ˡ Upkeep
         ∙ certRequest s ≡ just eb
         ∙ PendingQuery ≡ just r
-        ∙ hash eb ≢ r
+        ∙ hash currentRB ≢ r
         ───────────────────────────────────────────────────────────────────
-        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ (L⊗ ϵ) ⊗R ↑ₒ QUERY (hash eb) ⟧⇀
-          record s { PendingQuery = just (hash eb) }
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ (L⊗ ϵ) ⊗R ↑ₒ QUERY (hash currentRB) ⟧⇀
+          record s { PendingQuery = just (hash currentRB) }
 ```
 #### Protocol rules
 ```agda

@@ -39,11 +39,11 @@ The house standard `CLAUDE.md` does not exist in this repository; the review use
 - 8878d0b Prove `LeiosBlock-Injective` by rewriting with the hash lemmas — deletes the single-use `hash-unique'` (no importer uses it).
 - 10c1ce9 Draw the voter inside `specʳ` in the `Leios1ʳ` diagram — moves `Voter`, a component of `specʳ`, out of `ext-spec`.
 - a761f11 Trim the comments in `Network.Leios` and the index — with `Leios1ʳ` as the single site of the open realization note.
+- f9598c1 Key certificate queries by the announcing RB's hash — maintainer-approved (was a Statement-audit suggestion): `VT-Role` signs `hash currentRB`, so `Base₃`/`Cert₁`/`Cert₃` now query and correlate on it; merged into `yveshauser/voting`, whole project green.
 
 ## Suggestions (need your call)
 
 ### Statement audit
-- formal-spec/Leios/Linear.lagda.md :: VT-Role / Base₃ / Cert₁ / Cert₃ — the certificate path is dead as stated.  `VT-Role` casts `vote sk-VT (hash currentRB)`, but `Base₃` queries `hash eb` and `Cert₁`/`Cert₃` correlate on it; a stateless `forEB : Vote → EBRef` cannot map an RB-hash vote to the EB hash, so no honest-backed positive answer exists and `Cert₁` only ever fires with `CERT nothing`.  Your commit 35ae877 on `yveshauser/voting-local` (not an ancestor) fixes it; spike: cherry-picked onto 2bdb8b2 with one conflict in the verifier (resolved to 35ae877's side minus its `ACK` clauses), whole project green, 45 s.  Kept as branch `spike/voting-rbkey` (f9598c1).
 - formal-spec/Network/Leios.agda :: mkCert — no premise `∀ r → getEBHash (mkCert r) ≡ r`.  Without it a positive answer satisfies none of `Cert₁`/`Cert₂`/`Cert₃`, `Base` never closes and the node deadlocks.  Proposal: add the law as a module parameter next to `mkCert` (`Test.Defaults` satisfies it with `mkCert = id`).
 - formal-spec/Leios/Voting/Voter.lagda.md :: Correctness.answered-cert-correct — the `vih`/`cc` hypotheses quantify over every `Vote`, not over the log, which for any signature-like `Valid` makes the premise near-unsatisfiable and the result near-trivial.  Proposal: `∀ {v} → v ∈ˡ log s' → Valid v → …` for both, body `real-cert-correct vih corrupt cc bound (cert-answered-certified stp deq)`; spiked green.
 - formal-spec/Leios/Voting/Certifier.lagda.md :: cert-correct — pigeonhole only: `Validated := HasVoteFor` makes `WF` and `covers` trivial, and `corrupt` is not tied to the deployment's `honest-Nodes`.  The prose now says so.  The intended property needs a trace lemma in `Network.Leios` linking logged votes on honest slots to `VT-Role` steps.
