@@ -156,9 +156,9 @@ cert-answered-certified (Query-step rc) refl = rc
 
 Combining with the refinement `Leios.Voting.Real` → `Leios.Voting.Ideal`:
 whenever the voter answers its node's certificate query positively, some
-honest party validated that block — provided honest valid votes are backed
-by validation, and the adversary controls fewer than `threshold` parties
-(covering all dishonest valid voters).
+honest party validated that block, provided the honest valid votes in the
+voter's log are backed by validation, and fewer than `threshold` parties
+cover all dishonest valid voters in the log.
 
 ```agda
 module Correctness
@@ -171,12 +171,11 @@ module Correctness
   answered-cert-correct : ∀ {s i o s' eb}
     → (stp : WithState s receive i return o newState s')
     → AnswersCert stp ≡ just eb
-    → (∀ v → Valid v → honest (voter v) → Validated (voter v) (forEB v))
+    → (∀ {v} → v ∈ˡ log s' → Valid v → honest (voter v) → Validated (voter v) (forEB v))
     → (corrupt : List Party)
-    → (∀ v → Valid v → ¬ honest (voter v) → voter v ∈ˡ corrupt)
+    → (∀ {v} → v ∈ˡ log s' → Valid v → ¬ honest (voter v) → voter v ∈ˡ corrupt)
     → length corrupt N.< threshold
     → ∃[ p ] (honest p × Validated p eb)
   answered-cert-correct stp deq vih corrupt cc bound =
-    real-cert-correct (λ {v} _ → vih v) corrupt (λ {v} _ → cc v) bound
-      (cert-answered-certified stp deq)
+    real-cert-correct vih corrupt cc bound (cert-answered-certified stp deq)
 ```
