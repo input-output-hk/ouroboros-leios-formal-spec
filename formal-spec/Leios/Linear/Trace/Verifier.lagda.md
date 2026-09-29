@@ -141,11 +141,11 @@ data ValidTrace (es : TestTrace) (s : LeiosState) : Type where
 getNewState : ∀ {es s} → ValidTrace es s → LeiosState
 getNewState (Valid {s′ = s} _ _) = s
 ```
-`Err-InputMismatch` carries the real refutation `¬ ValidStep (σ , i) s`. Deriving it requires
+`Err-InputMismatch` carries the real refutation `¬ ValidStep (σ , i) s`.  Deriving it requires
 inverting the transition's input index `toRcvType i`, whose channel selections are `opaque` in
 categorical-crypto; the lemmas below therefore sit in an `opaque unfolding _⊗₀_` block, where
 the selections reduce to constructor form and Agda can dismiss the impossible transition
-rules. The refutation is mediated by the *input-channel selector*: `input-sound` proves that
+rules.  The refutation is mediated by the *input-channel selector*: `input-sound` proves that
 every derivable step consumes the input constructor its action's rule expects, so a selector
 mismatch refutes the step.
 
