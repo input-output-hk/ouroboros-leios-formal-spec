@@ -53,6 +53,7 @@ data SlotUpkeep : Type where
 unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
 
 open import Leios.Protocol (⋯) SlotUpkeep ⊥ public
+open import Leios.Voting.Channel Vote EBRef EBCert public
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
 

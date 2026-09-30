@@ -214,11 +214,7 @@ module _ (s : LeiosState)  where
     isValid? : ∀ (x : Header ⊎ Body) → Dec (isValid x)
     isValid? (inj₁ h) = headerValid? h
     isValid? (inj₂ b) = bodyValid? b
-```
-Vote messages are ignored: votes are the voting functionality's
-business, and in the real node `Network.Leios.NetTranslateV` diverts
-them to the voter before they reach the node.
-```agda
+
 module _ (s : LeiosState) (open LeiosState s) where
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs' = (slot , eb) ∷ EBs' }
@@ -281,6 +277,4 @@ module Types (params : Params) (let open Params params) where
 
   BaseC : Channel
   BaseC = simpleChannel BaseT ᵀ
-
-  open import Leios.Voting.Channel Vote EBRef EBCert public
 ```
