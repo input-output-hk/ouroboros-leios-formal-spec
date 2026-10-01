@@ -144,25 +144,27 @@ spec = spec-rewire ∘ ((CC.id ⊗₁ B.m) ⊗₁ CC.id) ∘ NetTranslate ⊗₁
 ext-spec : Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ Adv)
 ext-spec = LinearLeios ∘ (Shim ⊗₁ CC.id) ⊗₁ CC.id
 
--- The node as deployed, over the shared functionalities:
+-- The node as deployed, over the shared functionalities.  Every wire is a
+-- channel, so each carries messages in both directions: uniformly, `inType`
+-- travels up the diagram and `outType` down.
 --
 --              IO                                  Adv (= I)
---               ▲                                     ▲
+--               ↕                                     ↕
 --      ┌────────┴─────────────────────────────────────┴──┐
 --      │                   LinearLeios                   │
---      └────▲───────────────────▲────────────────▲───────┘
+--      └────↕───────────────────↕────────────────↕───────┘
 --          FFD                BaseIO           VotingC
 --       ┌───┴───┐               │                │              ext-spec
 --       │ Shim  │               │                │
---       └───▲───┘               │                │
+--       └───↕───┘               │                │
 --  ─ ─ ─ ─ ─┼─ ─ ─ ─ ─ ─ ─ ─ ─ ─┼─ ─ ─ ─ ─ ─ ─ ─ ┼ ─ ─ ─ ─ ─ ─ ─ ─ ─
 --        Network             ┌──┴──┐             │              spec
---           │                │ B.m ├─────────────┼────────▶ BaseAdv
---           │                └──▲──┘             │
+--           │                │ B.m ├─────────────┼────────↔ BaseAdv
+--           │                └──↕──┘             │
 --           │             BaseNetwork            │
 --      ┌────┴───────────────────┴───┐            │
 --      │        NetTranslate        │            │
---      └─────────────▲──────────────┘            │
+--      └─────────────↕──────────────┘            │
 --                   DD.M                      VotingC
 --                    │                           │
 --        ────────────┴───────────────────────────┴────────────
@@ -180,24 +182,24 @@ specʳ = spec-rewire ∘ ((CC.id ⊗₁ B.m) ⊗₁ Voter.Voter) ∘ NetTranslat
 -- the diffusion delay `k` to `Ldiff`.
 --
 --              IO                                  Adv (= I)
---               ▲                                     ▲
+--               ↕                                     ↕
 --      ┌────────┴─────────────────────────────────────┴──┐
 --      │                   LinearLeios                   │
---      └────▲───────────────────▲────────────────▲───────┘
+--      └────↕───────────────────↕────────────────↕───────┘
 --          FFD                BaseIO           VotingC
 --       ┌───┴───┐               │                │              ext-spec
 --       │ Shim  │               │                │
---       └───▲───┘               │                │
+--       └───↕───┘               │                │
 --  ─ ─ ─ ─ ─┼─ ─ ─ ─ ─ ─ ─ ─ ─ ─┼─ ─ ─ ─ ─ ─ ─ ─ ┼ ─ ─ ─ ─ ─ ─ ─ ─ ─
 --        Network             ┌──┴──┐             │              specʳ
---           │                │ B.m ├─────────────┼────────▶ BaseAdv
---           │                └──▲──┘         ┌───┴───┐
+--           │                │ B.m ├─────────────┼────────↔ BaseAdv
+--           │                └──↕──┘         ┌───┴───┐
 --           │                   │            │ Voter │
---           │                   │            └───▲───┘
+--           │                   │            └───↕───┘
 --           │             BaseNetwork         VoteNet
 --      ┌────┴───────────────────┴────────────────┴───┐
 --      │                NetTranslateV                │
---      └──────────────────────▲──────────────────────┘
+--      └──────────────────────↕──────────────────────┘
 --                            DD.M
 --                             │
 --        ─────────────────────┴───────────────────────────────
