@@ -6,15 +6,18 @@ open import Leios.SpecStructure
 
 open import CategoricalCrypto hiding (id; _∘_; eval)
 open import CategoricalCrypto.Channel.Selection
-open import CategoricalCrypto.Ext using (Trace-trans)
+open import CategoricalCrypto.Ext
 
-open import Data.Nat.Properties using (+-suc; +-comm)
+open import Data.Nat.Properties
+import Data.Maybe.Relation.Unary.All as Maybe
 
--- Progress for the bare Linear Leios node: from any state whose slot upkeep
--- is complete, the node can run through a whole slot.
---
--- Safety and liveness are stated as `Invariant`s, i.e. preservation along `Trace`s.
--- In addition `enough-traces` shows progress, i.e. that every future slot is reachable.
+-- Progress for the bare Linear Leios node.  Safety and liveness are stated
+-- as `Invariant`s, i.e. preservation along `Trace`s, so they say nothing
+-- unless enough traces exist; `enough-traces` shows that from any state
+-- whose slot upkeep is complete every future slot is reachable.  The
+-- inputs (network messages, ledger, certificate answers) are chosen by the
+-- trace, so this is a witness of progress, not a liveness argument for a
+-- composite deployment.
 module Leios.Linear.Progress (⋯ : SpecStructure)
   (let open SpecStructure ⋯)
   (params : Params)
@@ -22,70 +25,85 @@ module Leios.Linear.Progress (⋯ : SpecStructure)
 
 open import Leios.Linear ⋯ params
 open Types params
-open BaseAbstract B'
 
-open LeiosState using (slot; Upkeep; needs; has)
-
-private variable
-  s s' : LeiosState
-
--- The block-production rules leave the slot alone.
-↝-slot : ∀ {i} → s ↝ (s' , i) → slot s' ≡ slot s
-↝-slot (EB-Role _) = refl
-↝-slot (VT-Role _) = refl
+open LeiosState
 
 private
-  allDone-of : ∀ s → Upkeep s ≡ VT-Role ∷ Base ∷ EB-Role ∷ [] → allDone s
-  allDone-of s eq = has s eq (here refl) , has s eq (there (there (here refl))) , has s eq (there (here refl))
+  allDone-of : ∀ s → Upkeep s ≡ VT-Role ∷ Base ∷ CertCheck ∷ EB-Role ∷ [] → allDone s
+  allDone-of s eq = has s eq (here refl)
+                  , has s eq (there (there (there (here refl))))
+                  , has s eq (there (here refl))
+                  , has s eq (there (there (here refl)))
 
   Base∉ : Base ∉ˡ EB-Role ∷ []
   Base∉ (here ())
   Base∉ (there ())
 
-  VT-Role∉ : VT-Role ∉ˡ Base ∷ EB-Role ∷ []
+  CertCheck∉ : CertCheck ∉ˡ EB-Role ∷ []
+  CertCheck∉ (here ())
+  CertCheck∉ (there ())
+
+  Base∉′ : Base ∉ˡ CertCheck ∷ EB-Role ∷ []
+  Base∉′ (here ())
+  Base∉′ (there p) = Base∉ p
+
+  VT-Role∉ : VT-Role ∉ˡ Base ∷ CertCheck ∷ EB-Role ∷ []
   VT-Role∉ (here ())
   VT-Role∉ (there (here ()))
-  VT-Role∉ (there (there ()))
+  VT-Role∉ (there (there (here ())))
+  VT-Role∉ (there (there (there ())))
 
--- One upkeep step for a role, positive (`Roles₁`) if the role can act and
--- negative (`Roles₂`) otherwise; `Dec-↝` decides which.  Either way the role
--- is added to the upkeep and the slot is unchanged.
-upkeep-step : ∀ s u → u ≢ Base → LeiosState.needsUpkeep s u
-            → ∃[ s' ] ∃[ o ] (s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / o ⟧⇀ s')
-                    × Upkeep s' ≡ u ∷ Upkeep s
-                    × slot s' ≡ slot s
-upkeep-step s u u≢Base nu with ¿ ∃[ s'×i ] (s ↝ s'×i × (u ∷ Upkeep s) ≡ Upkeep (proj₁ s'×i)) ¿
-... | yes ((s' , i) , st , eq) = s' , _ , Roles₁ st , sym eq , ↝-slot st
-... | no ¬p                    = addUpkeep s u , _ , Roles₂ (¬p , nu , u≢Base) , refl , refl
+-- A step on `SLOT` that settles the upkeep `u` within the slot.
+Settles : SlotUpkeep → LeiosState → Type
+Settles u s = ∃[ s' ] ∃[ o ] (s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / o ⟧⇀ s')
+                          × Upkeep s' ≡ u ∷ Upkeep s
+                          × slot s' ≡ slot s
 
--- The three upkeep items of a slot, in the order `Base₂` requires: the EB
--- role first, then the base step, then the vote.
+eb-step : ∀ s → needsUpkeep s EB-Role → Settles EB-Role s
+eb-step s nu with ¿ ∃₂ (CanProposeEB s) ¿
+... | yes (_ , _ , p) = _ , _ , EB-Role (p , nu) , refl , refl
+... | no ¬p           = _ , _ , No-EB-Role (¬p , nu) , refl , refl
+
+vt-step : ∀ s → needsUpkeep s VT-Role → Settles VT-Role s
+vt-step s nu with ¿ ∃[ eb ] ∃[ ebHash ] ∃[ slot' ] CanVote s eb ebHash slot' ¿
+... | yes (_ , _ , _ , p) = _ , _ , VT-Role (p , nu) , refl , refl
+... | no ¬p               = _ , _ , No-VT-Role (¬p , nu) , refl , refl
+
+-- When the tip calls for a certificate, the trace answers `Base₂`'s query
+-- with `CERT nothing`, which `Cert₁` accepts for any request.
+base-step : ∀ s → Upkeep s ≡ EB-Role ∷ []
+          → ∃[ s' ] Trace LinearLeios s s'
+                  × Upkeep s' ≡ Base ∷ CertCheck ∷ EB-Role ∷ []
+                  × slot s' ≡ slot s
+base-step s eq with certRequest s in eqc
+... | nothing =
+  _ , ([] ∷ʳ⟨ _ , _ , Base₁ (needs s eq Base∉ , needs s eq CertCheck∉ , has s eq (here refl) , eqc) ⟩)
+    , cong (λ l → Base ∷ CertCheck ∷ l) eq , refl
+... | just _ =
+  let s₁ = record (addUpkeep s CertCheck) { PendingQuery = just (hash (LeiosState.currentRB s)) }
+  in _ , (([] ∷ʳ⟨ _ , _ , Base₂ (needs s eq CertCheck∉ , has s eq (here refl) , eqc) ⟩)
+            ∷ʳ⟨ _ , _ , Cert₁ {c = nothing}
+                  (needs s₁ (cong (CertCheck ∷_) eq) Base∉′ , here refl , eqc , refl , Maybe.nothing) ⟩)
+       , cong (λ l → Base ∷ CertCheck ∷ l) eq , refl
+
+-- The EB role goes first, because `Base₁` and `Base₂` require it settled.
 upkeep : ∀ s → Upkeep s ≡ []
        → ∃[ s' ] Trace LinearLeios s s' × allDone s' × slot s' ≡ slot s
 upkeep s eq₀ =
-  let s₃ , _ , st₃ , eq₃ , sl₃ = upkeep-step s EB-Role (λ ()) (needs s eq₀ λ ())
+  let s₃ , _ , st₃ , eq₃ , sl₃ = eb-step s (needs s eq₀ λ ())
+      s₄ , t₄ , eq₄ , sl₄ = base-step s₃ (trans eq₃ (cong (EB-Role ∷_) eq₀))
 
-      eq₃' : Upkeep s₃ ≡ EB-Role ∷ []
-      eq₃' = trans eq₃ (cong (EB-Role ∷_) eq₀)
-
-      st₄ : s₃ -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / _ ⟧⇀ addUpkeep s₃ Base
-      st₄ = Base₂ (needs s₃ eq₃' Base∉ , has s₃ eq₃' (here refl))
-
-      s₅ , _ , st₅ , eq₅ , sl₅ = upkeep-step (addUpkeep s₃ Base) VT-Role (λ ())
-                                   (needs (addUpkeep s₃ Base) (cong (Base ∷_) eq₃') VT-Role∉)
+      s₅ , _ , st₅ , eq₅ , sl₅ = vt-step s₄ (needs s₄ eq₄ VT-Role∉)
   in s₅
-   , ((([] ∷ʳ⟨ _ , _ , st₃ ⟩) ∷ʳ⟨ _ , _ , st₄ ⟩) ∷ʳ⟨ _ , _ , st₅ ⟩)
-   , allDone-of s₅ (trans eq₅ (cong (λ l → VT-Role ∷ Base ∷ l) eq₃'))
-   , trans sl₅ sl₃
+   , Trace-trans ([] ∷ʳ⟨ _ , _ , st₃ ⟩) (t₄ ∷ʳ⟨ _ , _ , st₅ ⟩)
+   , allDone-of s₅ (trans eq₅ (cong (VT-Role ∷_) eq₄))
+   , trans sl₅ (trans sl₄ sl₃)
 
--- The slot transition: the network's messages arrive and the ledger is
--- fetched, leaving the upkeep empty and the slot advanced.
 slot-step : ∀ s msgs rbs → allDone s
           → ∃[ s' ] Trace LinearLeios s s' × Upkeep s' ≡ [] × slot s' ≡ suc (slot s)
 slot-step s msgs rbs done =
-  _ , (([] ∷ʳ⟨ _ , _ , Slot₁ {s = s} {msgs = msgs} done ⟩) ∷ʳ⟨ _ , _ , Slot₂ {rbs = rbs} ⟩) , refl , refl
+  _ , (([] ∷ʳ⟨ _ , _ , Slot {s = s} {msgs = msgs} done ⟩) ∷ʳ⟨ _ , _ , Chain {rbs = rbs} ⟩) , refl , refl
 
--- One whole slot.
 tick : ∀ s msgs rbs → allDone s
      → ∃[ s' ] Trace LinearLeios s s' × allDone s' × slot s' ≡ suc (slot s)
 tick s msgs rbs done =
@@ -93,7 +111,6 @@ tick s msgs rbs done =
       s' , t' , done' , sl' = upkeep s₂ up₂
   in s' , Trace-trans t₂ t' , done' , trans sl' sl₂
 
--- `n` slots, with the inputs of each slot chosen by slot number.
 ticks : ∀ n s (msgsAt : ℕ → List (FFDA.Header ⊎ FFDA.Body)) (rbsAt : ℕ → List RankingBlock)
       → allDone s
       → ∃[ s' ] Trace LinearLeios s s' × allDone s' × slot s' ≡ n + slot s
@@ -103,7 +120,6 @@ ticks (suc n) s msgsAt rbsAt done =
       s' , t' , done' , sl' = ticks n s₁ msgsAt rbsAt done₁
   in s' , Trace-trans t₁ t' , done' , trans sl' (trans (cong (n +_) sl₁) (+-suc n _))
 
--- The requirement itself: every future slot is reachable.
 enough-traces : ∀ s n → allDone s → ∃[ s' ] slot s + n ≡ slot s' × Trace LinearLeios s s'
 enough-traces s n done =
   let s' , t , _ , eq = ticks n s (λ _ → []) (λ _ → []) done
