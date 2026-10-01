@@ -33,12 +33,12 @@ data Action : Type where
   Cert₁-Action      : ℕ → Action
   Cert₂-Action      : ℕ → Action
   Cert₃-Action      : ℕ → Action
-  Ftch-Action       : ℕ → Action
-  Slot₁-Action      : ℕ → Action
-  Slot₂-Action      : ℕ → Action
+  Fetch-Action      : ℕ → Action
+  Slot-Action       : ℕ → Action
+  Chain-Action      : ℕ → Action
+  Mempool-Action    : ℕ → Action
   Base₁-Action      : ℕ → Action
   Base₂-Action      : ℕ → Action
-  Base₃-Action      : ℕ → Action
   No-EB-Role-Action : ℕ → Action
   No-VT-Role-Action : ℕ → Action
 ```
@@ -58,22 +58,20 @@ private variable
 ```
 ```agda
 getAction : ∀ {i o} → s -⟦ i / o ⟧⇀ s′ → Action
-getAction (Slot₁ {s} _)                                      = Slot₁-Action (LeiosState.slot s)
-getAction (Slot₂ {s})                                        = Slot₂-Action (LeiosState.slot s)
-getAction (Ftch {s})                                         = Ftch-Action (LeiosState.slot s)
-getAction (Base₁ {s})                                        = Base₁-Action (LeiosState.slot s)
+getAction (Slot {s} _)                                       = Slot-Action (LeiosState.slot s)
+getAction (Chain {s})                                        = Chain-Action (LeiosState.slot s)
+getAction (Fetch {s})                                        = Fetch-Action (LeiosState.slot s)
+getAction (Mempool {s})                                      = Mempool-Action (LeiosState.slot s)
+getAction (Base₁ {s} _)                                      = Base₁-Action (LeiosState.slot s)
 getAction (Base₂ {s} _)                                      = Base₂-Action (LeiosState.slot s)
-getAction (Base₃ {s} _)                                      = Base₃-Action (LeiosState.slot s)
 getAction (Cert₁ {s} _)                                      = Cert₁-Action (LeiosState.slot s)
 getAction (Cert₂ {s} _)                                      = Cert₂-Action (LeiosState.slot s)
 getAction (Cert₃ {s} _)                                      = Cert₃-Action (LeiosState.slot s)
-getAction (Roles₁ (EB-Role {s} {eb = eb} _))                 = EB-Role-Action (LeiosState.slot s) eb
-getAction (Vote₁ (VT-Role {s} {eb = eb} {slot' = slot'} _))  = VT-Role-Action (LeiosState.slot s) eb slot'
-getAction (Roles₂ {u = Base} (_ , _ , x , _))                = ⊥-elim (x refl)
-getAction (Roles₂ {u = CertCheck} (_ , _ , _ , x))           = ⊥-elim (x refl)
-getAction (Roles₂ {s} {u = EB-Role} _)                       = No-EB-Role-Action (LeiosState.slot s)
-getAction (Roles₂ {s} {u = VT-Role} _)                       = No-VT-Role-Action (LeiosState.slot s)
-getAction (Roles₃ {s} _)                                     = No-VT-Role-Action (LeiosState.slot s)
+getAction (EB-Role {s} {eb = eb} _)                          = EB-Role-Action (LeiosState.slot s) eb
+getAction (No-EB-Role {s} _)                                 = No-EB-Role-Action (LeiosState.slot s)
+getAction (VT-Role {s} {eb = eb} {slot' = slot'} _)          = VT-Role-Action (LeiosState.slot s) eb slot'
+getAction (No-VT-Role {s} _)                                 = No-VT-Role-Action (LeiosState.slot s)
+getAction (VT-Defer {s} _)                                   = No-VT-Role-Action (LeiosState.slot s)
 ```
 ```agda
 getSlot : Action → ℕ
@@ -84,12 +82,12 @@ getSlot (Cert₂-Action x)       = x
 getSlot (Cert₃-Action x)       = x
 getSlot (No-EB-Role-Action x)  = x
 getSlot (No-VT-Role-Action x)  = x
-getSlot (Ftch-Action x)        = x
-getSlot (Slot₁-Action x)       = x
-getSlot (Slot₂-Action x)       = x
+getSlot (Fetch-Action x)       = x
+getSlot (Slot-Action x)        = x
+getSlot (Chain-Action x)       = x
+getSlot (Mempool-Action x)     = x
 getSlot (Base₁-Action x)       = x
 getSlot (Base₂-Action x)       = x
-getSlot (Base₃-Action x)       = x
 ```
 `_—→_` runs backwards, from the later state to the earlier one.
 ```agda
@@ -149,9 +147,9 @@ rules.  The refutation is mediated by the *input-channel selector*: `input-sound
 every derivable step consumes the input constructor its action's rule expects, so a selector
 mismatch refutes the step.
 
-The premise-less `Ftch` rule reads its input through an output-typed channel selection, which
+The premise-less `Fetch` rule reads its input through an output-typed channel selection, which
 nevertheless coincides with `toRcvType (inj₂ (inj₂ (inj₁ FetchLdgI)))` once the selections reduce;
-`Ftch-step` witnesses this inside the unfolding block, letting `verifyStep'` accept the pairing.
+`Fetch-step` witnesses this inside the unfolding block, letting `verifyStep'` accept the pairing.
 ```agda
 data InputC : Type where
   cSLOT cFTCH cFFD-OUT           : InputC
@@ -176,12 +174,12 @@ expectedInput (EB-Role-Action _ _)   = cSLOT
 expectedInput (VT-Role-Action _ _ _) = cSLOT
 expectedInput (No-EB-Role-Action _)  = cSLOT
 expectedInput (No-VT-Role-Action _)  = cSLOT
+expectedInput (Base₁-Action _)       = cSLOT
 expectedInput (Base₂-Action _)       = cSLOT
-expectedInput (Base₃-Action _)       = cSLOT
-expectedInput (Slot₁-Action _)       = cFFD-OUT
-expectedInput (Slot₂-Action _)       = cBASE-LDG
-expectedInput (Base₁-Action _)       = cSubmitTxs
-expectedInput (Ftch-Action _)        = cFetchLdgI
+expectedInput (Slot-Action _)        = cFFD-OUT
+expectedInput (Chain-Action _)       = cBASE-LDG
+expectedInput (Mempool-Action _)     = cSubmitTxs
+expectedInput (Fetch-Action _)       = cFetchLdgI
 expectedInput (Cert₁-Action _)       = cCERT
 expectedInput (Cert₂-Action _)       = cCERT
 expectedInput (Cert₃-Action _)       = cCERT
@@ -192,23 +190,21 @@ opaque
   input-sound : ∀ (i : TestInput) {s s′ o}
                 (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
               → inputC i ≡ expectedInput (getAction σ)
+  input-sound (inj₁ SLOT) (Base₁ _)                       = refl
   input-sound (inj₁ SLOT) (Base₂ _)                       = refl
-  input-sound (inj₁ SLOT) (Base₃ _)                       = refl
-  input-sound (inj₁ SLOT) (Roles₁ (EB-Role _))            = refl
-  input-sound (inj₁ SLOT) (Vote₁ (VT-Role _))             = refl
-  input-sound (inj₁ SLOT) (Roles₂ {u = Base} (_ , _ , x , _))      = ⊥-elim (x refl)
-  input-sound (inj₁ SLOT) (Roles₂ {u = CertCheck} (_ , _ , _ , x)) = ⊥-elim (x refl)
-  input-sound (inj₁ SLOT) (Roles₂ {u = EB-Role} _)        = refl
-  input-sound (inj₁ SLOT) (Roles₂ {u = VT-Role} _)        = refl
-  input-sound (inj₁ SLOT) (Roles₃ _)                      = refl
+  input-sound (inj₁ SLOT) (EB-Role _)                     = refl
+  input-sound (inj₁ SLOT) (No-EB-Role _)                  = refl
+  input-sound (inj₁ SLOT) (VT-Role _)                     = refl
+  input-sound (inj₁ SLOT) (No-VT-Role _)                  = refl
+  input-sound (inj₁ SLOT) (VT-Defer _)                    = refl
   input-sound (inj₁ FTCH) ()
-  input-sound (inj₁ (FFD-OUT _)) (Slot₁ _)                = refl
-  input-sound (inj₂ (inj₁ (BASE-LDG _))) Slot₂            = refl
+  input-sound (inj₁ (FFD-OUT _)) (Slot _)                 = refl
+  input-sound (inj₂ (inj₁ (BASE-LDG _))) Chain            = refl
   input-sound (inj₂ (inj₁ (STAKE _))) ()
   input-sound (inj₂ (inj₁ EMPTY)) ()
   input-sound (inj₂ (inj₁ (SLOT _))) ()
-  input-sound (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) Base₁    = refl
-  input-sound (inj₂ (inj₂ (inj₁ FetchLdgI))) Ftch         = refl
+  input-sound (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) Mempool  = refl
+  input-sound (inj₂ (inj₂ (inj₁ FetchLdgI))) Fetch        = refl
   input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₁ _)     = refl
   input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₂ _)     = refl
   input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₃ _)     = refl
@@ -216,38 +212,23 @@ opaque
   input-mismatch : ∀ {a i s} → inputC i ≢ expectedInput a → ¬ ValidStep (a , i) s
   input-mismatch neq (Valid _ (FromAction i σ)) = neq (input-sound i σ)
 
-  Ftch-step : ∀ {s} → ValidStep (Ftch-Action (LeiosState.slot s) , inj₂ (inj₂ (inj₁ FetchLdgI))) s
-  Ftch-step = Valid _ (FromAction (inj₂ (inj₂ (inj₁ FetchLdgI))) Ftch)
+  Fetch-step : ∀ {s} → ValidStep (Fetch-Action (LeiosState.slot s) , inj₂ (inj₂ (inj₁ FetchLdgI))) s
+  Fetch-step = Valid _ (FromAction (inj₂ (inj₂ (inj₁ FetchLdgI))) Fetch)
 
 data Err-verifyStep (σ : Action) (i : TestInput) (s : LeiosState) : Type where
   Err-Slot : getSlot σ ≢ LeiosState.slot s → Err-verifyStep σ i s
-  Err-EB-Role-premises : ∀ {π} → ¬ (
-    toProposeEB s π ≡ just eb ×
-    canProduceEB (LeiosState.slot s) sk-EB (stake s) π ×
-    LeiosState.needsUpkeep s EB-Role) →
-    Err-verifyStep σ i s
-  Err-VT-Role-premises : ∀ {ebHash slot'} → let open LeiosState s in ¬ (
-    getCurrentEBHash s ≡ just ebHash ×
-    find (λ (_ , eb') → hash eb' ≟ ebHash) EBs' ≡ just (slot' , eb) ×
-    hash eb ∉ VotedEBs ×
-    ¬ isEquivocated s eb ×
-    isValid s (inj₁ (ebHeader eb)) ×
-    slot' ≤ slotNumber eb + Lhdr ×
-    slotNumber eb + 3 * Lhdr ≤ slot ×
-    slot ≤ slotNumber eb + 3 * Lhdr + Lvote ×
-    isValidityChecked slot eb ×
-    EndorserBlockOSig.txs eb ≢ [] ×
-    needsUpkeep VT-Role ×
-    inVotingCommittee params (stake s) ×
-    id ∈ˡ L.map poolID PubKeys) →
-    Err-verifyStep σ i s
+  Err-EB-Role-premises : ∀ {π} → ¬ (EB-Role-premises {s = s} {π = π} {eb = eb} .proj₁) → Err-verifyStep σ i s
+  Err-No-EB-Role-premises : ¬ (No-EB-Role-premises {s = s} .proj₁) → Err-verifyStep σ i s
+  Err-VT-Role-premises : ∀ {ebHash slot'}
+    → ¬ (VT-Role-premises {s = s} {eb = eb} {ebHash = ebHash} {slot' = slot'} .proj₁) → Err-verifyStep σ i s
+  Err-No-VT-Role-premises : ¬ (No-VT-Role-premises {s = s} .proj₁) → ¬ (VT-Defer-premises {s = s} .proj₁)
+    → Err-verifyStep σ i s
   Err-AllDone : ¬ (allDone s) → Err-verifyStep σ i s
   Err-Cert₁-premises : ∀ {c} → (∀ {eb} → ¬ (Cert₁-premises {s = s} {eb = eb} {c = c} .proj₁)) → Err-verifyStep σ i s
   Err-Cert₂-premises : (∀ {r} → ¬ (Cert₂-premises {s = s} {r = r} .proj₁)) → Err-verifyStep σ i s
   Err-Cert₃-premises : (∀ {eb r} → ¬ (Cert₃-premises {s = s} {eb = eb} {r = r} .proj₁)) → Err-verifyStep σ i s
-  Err-Base₂-premises : ¬ (Base₂-premises {s = s} .proj₁) → Err-verifyStep σ i s
-  Err-Base₃-premises : (∀ {eb} → ¬ (Base₃-premises {s = s} {eb = eb} .proj₁)) → Err-verifyStep σ i s
-  Err-Roles₂-premises : ∀ {u} → ¬ (Roles₂-premises {s = s} {u = u} .proj₁) → Err-verifyStep σ i s
+  Err-Base₁-premises : ¬ (Base₁-premises {s = s} .proj₁) → Err-verifyStep σ i s
+  Err-Base₂-premises : (∀ {eb} → ¬ (Base₂-premises {s = s} {eb = eb} .proj₁)) → Err-verifyStep σ i s
   Err-InputMismatch : ¬ ValidStep (σ , i) s → Err-verifyStep σ i s
 data Err-verifyTrace : TestTrace → LeiosState → Type where
   Err-StepOk : Err-verifyTrace σs s → Err-verifyTrace ((σ , i) ∷ σs) s
@@ -324,14 +305,14 @@ verifyStep' : (a : Action) →
   Result (Err-verifyStep a i s) (ValidStep (a , i) s)
 verifyStep' (EB-Role-Action _ _) (inj₁ SLOT) s refl
   with ¿ EB-Role-premises {s = s} {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} .proj₁ ¿
-... | yes p = Ok' (Roles₁ (EB-Role p))
+... | yes p = Ok' (EB-Role p)
 ... | no ¬p = Err (Err-EB-Role-premises ¬p)
 verifyStep' (EB-Role-Action _ _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (EB-Role-Action _ _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (EB-Role-Action _ _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (VT-Role-Action _ eb slot') (inj₁ SLOT) s refl
   with ¿ VT-Role-premises {s = s} {eb = eb} {ebHash = hash eb} {slot' = slot'} .proj₁ ¿
-... | yes p = Ok' (Vote₁ (VT-Role {ebHash = hash eb} {slot' = slot'} p))
+... | yes p = Ok' (VT-Role {ebHash = hash eb} {slot' = slot'} p)
 ... | no ¬p = Err (Err-VT-Role-premises ¬p)
 verifyStep' (VT-Role-Action _ _ _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (VT-Role-Action _ _ _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
@@ -377,62 +358,62 @@ verifyStep' (Cert₃-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
                 ¬p (subst₂ (λ e r' → Cert₃-premises {s = s} {eb = e} {r = r'} .proj₁)
                       (just-injective (trans (sym creq) eq)) (just-injective (trans (sym pq) peq)) p))
 
-verifyStep' (Ftch-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢FetchLdgI x)
-verifyStep' (Ftch-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢FetchLdgI y)
-verifyStep' (Ftch-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mismatch λ ()
-verifyStep' (Ftch-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ refl  = Ok Ftch-step
-verifyStep' (Ftch-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _      = Mismatch λ ()
+verifyStep' (Fetch-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢FetchLdgI x)
+verifyStep' (Fetch-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢FetchLdgI y)
+verifyStep' (Fetch-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mismatch λ ()
+verifyStep' (Fetch-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ refl  = Ok Fetch-step
+verifyStep' (Fetch-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _      = Mismatch λ ()
 
-verifyStep' (Slot₁-Action _) (inj₁ SLOT) _ _ = Mismatch λ ()
-verifyStep' (Slot₁-Action _) (inj₁ FTCH) _ _ = Mismatch λ ()
-verifyStep' (Slot₁-Action _) (inj₁ (FFD-OUT msgs)) s refl
-  with ¿ Slot₁-premises {s = s} .proj₁ ¿
-... | yes p = Ok' (Slot₁ {s = s} {msgs = msgs} p)
+verifyStep' (Slot-Action _) (inj₁ SLOT) _ _ = Mismatch λ ()
+verifyStep' (Slot-Action _) (inj₁ FTCH) _ _ = Mismatch λ ()
+verifyStep' (Slot-Action _) (inj₁ (FFD-OUT msgs)) s refl
+  with ¿ Slot-premises {s = s} .proj₁ ¿
+... | yes p = Ok' (Slot {s = s} {msgs = msgs} p)
 ... | no ¬p = Err (Err-AllDone ¬p)
-verifyStep' (Slot₁-Action _) (inj₂ y) _ _ = Mismatch (inj₂≢FFD-OUT y)
-verifyStep' (Slot₂-Action _) (inj₁ x) _ _ = Mismatch (inj₁≢BASE-LDG x)
-verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (BASE-LDG _))) _ refl         = Ok' Slot₂
-verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (STAKE _))) _ _               = Mismatch λ ()
-verifyStep' (Slot₂-Action _) (inj₂ (inj₁ EMPTY)) _ _                   = Mismatch λ ()
-verifyStep' (Slot₂-Action _) (inj₂ (inj₁ (SLOT _))) _ _                = Mismatch λ ()
-verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _    = Mismatch λ ()
-verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _        = Mismatch λ ()
-verifyStep' (Slot₂-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _         = Mismatch λ ()
+verifyStep' (Slot-Action _) (inj₂ y) _ _ = Mismatch (inj₂≢FFD-OUT y)
+verifyStep' (Chain-Action _) (inj₁ x) _ _ = Mismatch (inj₁≢BASE-LDG x)
+verifyStep' (Chain-Action _) (inj₂ (inj₁ (BASE-LDG _))) _ refl         = Ok' Chain
+verifyStep' (Chain-Action _) (inj₂ (inj₁ (STAKE _))) _ _               = Mismatch λ ()
+verifyStep' (Chain-Action _) (inj₂ (inj₁ EMPTY)) _ _                   = Mismatch λ ()
+verifyStep' (Chain-Action _) (inj₂ (inj₁ (SLOT _))) _ _                = Mismatch λ ()
+verifyStep' (Chain-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _    = Mismatch λ ()
+verifyStep' (Chain-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _        = Mismatch λ ()
+verifyStep' (Chain-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _         = Mismatch λ ()
 
-verifyStep' (Base₁-Action _) (inj₁ x) _ _                              = Mismatch (inj₁≢SubmitTxs x)
-verifyStep' (Base₁-Action _) (inj₂ (inj₁ y)) _ _                       = Mismatch (inj₂inj₁≢SubmitTxs y)
-verifyStep' (Base₁-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _        = Mismatch λ ()
-verifyStep' (Base₁-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ refl = Ok' Base₁
-verifyStep' (Base₁-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _         = Mismatch λ ()
+verifyStep' (Mempool-Action _) (inj₁ x) _ _                              = Mismatch (inj₁≢SubmitTxs x)
+verifyStep' (Mempool-Action _) (inj₂ (inj₁ y)) _ _                       = Mismatch (inj₂inj₁≢SubmitTxs y)
+verifyStep' (Mempool-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _        = Mismatch λ ()
+verifyStep' (Mempool-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ refl = Ok' Mempool
+verifyStep' (Mempool-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _         = Mismatch λ ()
+verifyStep' (Base₁-Action _) (inj₁ SLOT) s refl
+  with ¿ Base₁-premises {s = s} .proj₁ ¿
+... | yes p = Ok' (Base₁ p)
+... | no ¬p = Err (Err-Base₁-premises ¬p)
+verifyStep' (Base₁-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
+verifyStep' (Base₁-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
+verifyStep' (Base₁-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (Base₂-Action _) (inj₁ SLOT) s refl
-  with ¿ Base₂-premises {s = s} .proj₁ ¿
+  with certRequest s in eq
+... | nothing = Err (Err-Base₂-premises λ { (_ , _ , q) → just≢nothing (trans (sym q) eq) })
+... | just eb
+  with ¿ Base₂-premises {s = s} {eb = eb} .proj₁ ¿
 ... | yes p = Ok' (Base₂ p)
-... | no ¬p = Err (Err-Base₂-premises ¬p)
+... | no ¬p = Err (Err-Base₂-premises λ (p , u , _) → ¬p (p , u , eq))
 verifyStep' (Base₂-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (Base₂-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (Base₂-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
-verifyStep' (Base₃-Action _) (inj₁ SLOT) s refl
-  with certRequest s in eq
-... | nothing = Err (Err-Base₃-premises λ { (_ , _ , q) → just≢nothing (trans (sym q) eq) })
-... | just eb
-  with ¿ Base₃-premises {s = s} {eb = eb} .proj₁ ¿
-... | yes p = Ok' (Base₃ p)
-... | no ¬p = Err (Err-Base₃-premises λ (p , u , _) → ¬p (p , u , eq))
-verifyStep' (Base₃-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
-verifyStep' (Base₃-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
-verifyStep' (Base₃-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (No-EB-Role-Action _) (inj₁ SLOT) s refl
-  with ¿ Roles₂-premises {s = s} {u = EB-Role} .proj₁ ¿
-... | yes p = Ok' (Roles₂ p)
-... | no ¬p = Err (Err-Roles₂-premises ¬p)
+  with ¿ No-EB-Role-premises {s = s} .proj₁ ¿
+... | yes p = Ok' (No-EB-Role p)
+... | no ¬p = Err (Err-No-EB-Role-premises ¬p)
 verifyStep' (No-EB-Role-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (No-EB-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (No-EB-Role-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (No-VT-Role-Action _) (inj₁ SLOT) s refl
-  with ¿ Roles₂-premises {s = s} {u = VT-Role} .proj₁ ¿ | ¿ Roles₃-premises {s = s} .proj₁ ¿
-... | yes p | _     = Ok' (Roles₂ p)
-... | no _  | yes q = Ok' (Roles₃ q)
-... | no ¬p | no _  = Err (Err-Roles₂-premises ¬p)
+  with ¿ No-VT-Role-premises {s = s} .proj₁ ¿ | ¿ VT-Defer-premises {s = s} .proj₁ ¿
+... | yes p | _     = Ok' (No-VT-Role p)
+... | no _  | yes q = Ok' (VT-Defer q)
+... | no ¬p | no ¬q = Err (Err-No-VT-Role-premises ¬p ¬q)
 verifyStep' (No-VT-Role-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (No-VT-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (No-VT-Role-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
@@ -466,12 +447,12 @@ actionName (VT-Role-Action _ _ _) = "VT-Role-Action"
 actionName (Cert₁-Action _)       = "Cert₁-Action"
 actionName (Cert₂-Action _)       = "Cert₂-Action"
 actionName (Cert₃-Action _)       = "Cert₃-Action"
-actionName (Ftch-Action _)        = "Ftch-Action"
-actionName (Slot₁-Action _)       = "Slot₁-Action"
-actionName (Slot₂-Action _)       = "Slot₂-Action"
+actionName (Fetch-Action _)       = "Fetch-Action"
+actionName (Slot-Action _)        = "Slot-Action"
+actionName (Chain-Action _)       = "Chain-Action"
+actionName (Mempool-Action _)     = "Mempool-Action"
 actionName (Base₁-Action _)       = "Base₁-Action"
 actionName (Base₂-Action _)       = "Base₂-Action"
-actionName (Base₃-Action _)       = "Base₃-Action"
 actionName (No-EB-Role-Action _)  = "No-EB-Role-Action"
 actionName (No-VT-Role-Action _)  = "No-VT-Role-Action"
 
@@ -487,9 +468,10 @@ module _
     iErr-verifyStep {s = s} .errorMsg (Err-Cert₁-premises _)              = printf "%u : Err-Cert₁-premises: Base upkeep spent, no certificate query made this slot, the tip calls for no certificate, the pending query is not for the current tip, or the answer does not certify it" (LeiosState.slot s)
     iErr-verifyStep {s = s} .errorMsg (Err-Cert₂-premises _)              = printf "%u : Err-Cert₂-premises: Base upkeep spent, no certificate query made this slot, the tip still calls for a certificate, or no query is pending" (LeiosState.slot s)
     iErr-verifyStep {s = s} .errorMsg (Err-Cert₃-premises _)              = printf "%u : Err-Cert₃-premises: Base upkeep spent, no certificate query made this slot, the tip calls for no certificate, no query is pending, or the pending query is already for the current tip" (LeiosState.slot s)
-    iErr-verifyStep {s = s} .errorMsg (Err-Base₂-premises _)              = printf "%u : Err-Base₂-premises: Base or CertCheck upkeep spent, EB role not yet settled, or the tip calls for a certificate" (LeiosState.slot s)
-    iErr-verifyStep {s = s} .errorMsg (Err-Base₃-premises _)              = printf "%u : Err-Base₃-premises: CertCheck upkeep spent, EB role not yet settled, or the tip calls for no certificate" (LeiosState.slot s)
-    iErr-verifyStep {s = s} .errorMsg (Err-Roles₂-premises _)             = printf "%u : Err-Roles₂-premises: no applicable role step to skip" (LeiosState.slot s)
+    iErr-verifyStep {s = s} .errorMsg (Err-Base₁-premises _)              = printf "%u : Err-Base₁-premises: Base or CertCheck upkeep spent, EB role not yet settled, or the tip calls for a certificate" (LeiosState.slot s)
+    iErr-verifyStep {s = s} .errorMsg (Err-Base₂-premises _)              = printf "%u : Err-Base₂-premises: CertCheck upkeep spent, EB role not yet settled, or the tip calls for no certificate" (LeiosState.slot s)
+    iErr-verifyStep {s = s} .errorMsg (Err-No-EB-Role-premises _)         = printf "%u : Err-No-EB-Role-premises: EB role already settled, or an EB can be produced" (LeiosState.slot s)
+    iErr-verifyStep {s = s} .errorMsg (Err-No-VT-Role-premises _ _)       = printf "%u : Err-No-VT-Role-premises: VT role already settled, or a vote can be cast and the voting window has closed" (LeiosState.slot s)
     iErr-verifyStep {s = s} .errorMsg {a} (Err-InputMismatch _)           = printf "%u : Err-InputMismatch: input channel does not match action %s" (LeiosState.slot s) (actionName a)
     iErr-verifyStep {s = s} .errorMsg (Err-VT-Role-premises {eb = eb} {ebHash = ebHash} {slot' = slot'} _)
       with ¿ getCurrentEBHash s ≡ just ebHash ¿

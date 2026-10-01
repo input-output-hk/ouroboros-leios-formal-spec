@@ -206,7 +206,7 @@ Leios1ʳ : Machine DD.M (IO ⊗₀ BaseAdv ⊗₀ Adv)
 Leios1ʳ = ext-spec ∘ᴷ specʳ
 
 -- A positive answer from the certifier or the voter, `CERT (just (mkCert r))`
--- to `QUERY r`, is one `Cert₁` accepts
+-- to `QUERY r`, satisfies `Cert₁`'s premise on the answer.
 mkCert-matches : ∀ r → Maybe.All (λ c → getEBHash c ≡ r) (just (mkCert r))
 mkCert-matches r = Maybe.just (mkCert-hash r)
 
