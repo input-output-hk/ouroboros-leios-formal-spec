@@ -79,9 +79,11 @@ it could cast.
 
 ```agda
 toProposeEB : LeiosState → VrfPf → Maybe EndorserBlock
-toProposeEB s π = let open LeiosState s in case proj₂ (splitTxs ToPropose) of λ where
+toProposeEB s π = let open LeiosState s
+                      ebTxs = proj₂ (splitTxs ToPropose)
+                  in case ebTxs of λ where
   [] → nothing
-  _ → just $ mkEB slot id π sk-EB ToPropose
+  _ → just $ mkEB slot id π sk-EB ebTxs
 
 getCurrentEBHash : LeiosState → Maybe EBRef
 getCurrentEBHash s = let open LeiosState s in
