@@ -6,8 +6,8 @@ the central correctness property:
 > If a certificate for a block exists, then at least one honest node has
 > validated that block.
 
-The functionality records a vote only if the voter is honest and validated
-the block, or is dishonest.  A *certificate* is a quorum of `threshold`-many
+The functionality records a vote only if the voter validated the block
+whenever it is honest; a dishonest voter may vote on anything. A *certificate* is a quorum of `threshold`-many
 distinct voters.  As long as the adversary controls fewer than `threshold`
 parties, every certifying set contains an honest voter, whose validation the
 invariant `WF` provides.
@@ -71,11 +71,8 @@ Voted p x st = (p , x) ∈ˡ voteLog st
 
 data Step : IdealState → IdealState → Type where
 
-  CastHonest : ∀ {st p x} → honest p → Validated p x
-             → Step st ⟨ (p , x) ∷ voteLog st ⟩
-
-  CastAdv    : ∀ {st p x} → ¬ honest p
-             → Step st ⟨ (p , x) ∷ voteLog st ⟩
+  Cast : ∀ {st p x} → (honest p → Validated p x)
+       → Step st ⟨ (p , x) ∷ voteLog st ⟩
 ```
 
 ### Well-formed
@@ -88,10 +85,8 @@ wf-init : WF init
 wf-init ()
 
 wf-step : ∀ {st st'} → WF st → Step st st' → WF st'
-wf-step _  (CastHonest _ val) (here refl) _  = val
-wf-step wf (CastHonest _ _)   (there v)   hq = wf v hq
-wf-step _  (CastAdv ¬hp)      (here refl) hq = ⊥-elim (¬hp hq)
-wf-step wf (CastAdv _)        (there v)   hq = wf v hq
+wf-step _  (Cast val) (here refl) hq = val hq
+wf-step wf (Cast _)   (there v)   hq = wf v hq
 ```
 
 ### Certificates and correctness
