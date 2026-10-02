@@ -1,41 +1,21 @@
 {-# OPTIONS --safe #-}
-{- Module: Test.Defaults
-
-   This module provides simple default implementations for the core components
-   and functionalities of the Leios protocol. These defaults are intended for
-   building examples and traces for different Leios variants, and include
-   basic instances for abstract types, VRF, key registration, base layer,
-   FFD buffers, and voting. The implementations are minimal and primarily
-   for testing and illustration purposes.
--}
+{- Minimal default implementations of the Leios abstractions (abstract
+   types, VRF, key registration, base layer and FFD buffers), for building
+   example traces of the Leios variants. -}
 
 open import Leios.Prelude hiding (_⊗_)
 open import Leios.Abstract
 open import Leios.Config
 open import Leios.SpecStructure
-open import Blockchain.Safety
 import Blockchain.IsBlockchain
-
-open import Axiom.Set.Properties th
-open import Data.Nat.Show as N
-open import Data.Integer hiding (_≟_)
-open import Data.String as S using (intersperse)
-open import Function.Related.TypeIsomorphisms
-open import Relation.Binary.Structures
 
 open import Tactic.Defaults
 open import Tactic.Derive.DecEq
-
-open import LibExt
 
 open import CategoricalCrypto using (I ; Machine ; machine-type ; Channel ; _⊗ᵀ_)
 open import CategoricalCrypto.Channel.Core
 open import CategoricalCrypto.Channel.Selection
 
-open Equivalence
-
--- The module contains very simple implementations for the functionalities
--- that allow to build examples for traces for the different Leios variants
 module Test.Defaults
   (params : Params) (let open Params params)
   (testParams : TestParams params) (let open TestParams testParams) where
@@ -56,8 +36,8 @@ d-Abstract =
     ; Hash              = List ℕ
     ; EBCert            = List ℕ
     ; getEBHash         = id
-    ; Vote              = ⊤
-    ; vote              = λ _ _ → tt
+    ; Vote              = Fin numberOfParties × List ℕ
+    ; vote              = λ _ h → sutId , h
     ; sign              = λ _ _ → tt
     ; splitTxs          = λ l → [] , l
     }
@@ -187,7 +167,7 @@ d-BaseFunctionality =
     { n = 1
     ; m =
         record
-          { State = (List RankingBlock × ℕ)
+          { State = d-BaseState
           ; stepRel = d-BaseRel
           }
     ; is-blockchain = let open BaseAbstract.BaseIOF in
@@ -237,9 +217,7 @@ instance
 
   -- Votes sign the announcing RB's hash: body payload plus announced-EB hash.
   hrb : Hashable RankingBlock Hash
-  hrb .hash rb = case RankingBlock.txsOrEbCert rb of λ where
-    (inj₁ txs)  → txs  ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
-    (inj₂ cert) → cert ++ maybe (λ x → x) [] (RankingBlock.announcedEB rb)
+  hrb .hash rb = let open RankingBlock rb in [ id , id ]′ txsOrEbCert ++ maybe id [] announcedEB
 
 record FFDBuffers : Type where
   field inEBs : List EndorserBlock
@@ -293,13 +271,13 @@ instance
   Dec-SimpleFFD : ∀ {s i o s'} → SimpleFFD s i o s' ⁇
   Dec-SimpleFFD {s} {FFDAbstract.Send h b} {FFDAbstract.SendRes} {s'} with s' ≟ proj₁ (send-total {s} {h} {b})
   ... | yes p rewrite p = ⁇ yes (proj₂ send-total)
-  ... | no ¬p = ⁇ no λ x → ⊥-elim (¬p (send-complete x))
+  ... | no ¬p = ⁇ no (¬p ∘ send-complete)
   Dec-SimpleFFD {_} {FFDAbstract.Send _ _} {FFDAbstract.FetchRes _} {_} = ⁇ no λ ()
   Dec-SimpleFFD {s} {FFDAbstract.Fetch} {FFDAbstract.FetchRes r} {s'}
     with s' ≟ proj₁ (proj₂ (fetch-total {s})) | r ≟ proj₁ (fetch-total {s}) -- TODO: improve performance
   ... | yes p | yes q rewrite p rewrite q = ⁇ yes (proj₂ (proj₂ (fetch-total {s})))
-  ... | _     | no ¬q = ⁇ no λ x → ⊥-elim (¬q (fetch-complete₂ x))
-  ... | no ¬p | _     = ⁇ no λ x → ⊥-elim (¬p (fetch-complete₁ x))
+  ... | _     | no ¬q = ⁇ no (¬q ∘ fetch-complete₂)
+  ... | no ¬p | _     = ⁇ no (¬p ∘ fetch-complete₁)
   Dec-SimpleFFD {_} {FFDAbstract.Fetch} {FFDAbstract.SendRes} {_} = ⁇ no λ ()
 
 d-FFDFunctionality : FFDAbstract.Functionality ffdAbstract
@@ -308,16 +286,6 @@ d-FFDFunctionality =
     { State         = FFDBuffers
     ; initFFDState  = record { inEBs = []; inVTs = []; outEBs = []; outVTs = [] }
     ; _-⟦_/_⟧⇀_     = SimpleFFD
-    }
-
-open import Leios.Voting public
-
-d-VotingAbstract : VotingAbstract EndorserBlock
-d-VotingAbstract =
-  record
-    { VotingState     = ⊤
-    ; initVotingState = tt
-    ; isVoteCertified = λ _ _ → ⊤
     }
 
 d-SpecStructure : SpecStructure
@@ -336,10 +304,6 @@ d-SpecStructure = record
       ; BM                        = d-BaseFunctionality
       ; K'                        = d-KeyRegistration
       ; KF                        = d-KeyRegistrationFunctionality
-      ; va                        = d-VotingAbstract
-      ; getEBCert                 = λ _ → []
-      -- Validation is not modelled in the test defaults: every EB counts as
-      -- checked at every slot.
-      ; isValidityChecked          = λ _ _ → ⊤
-      ; isValidityChecked?         = λ _ _ → yes tt
+      ; isValidityChecked         = λ _ _ → ⊤
+      ; isValidityChecked?        = λ _ _ → yes tt
       }

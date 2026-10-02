@@ -55,3 +55,9 @@ queryCompute-answer ic qO-inj {q} {s} eq =
 ≡ᴹ-irrel : ∀ {A B C D} {M₁ : Machine A B} {M₂ : Machine C D} (e e' : M₁ ≡ᴹ M₂) → e ≡ e'
 ≡ᴹ-irrel record { A≡C = refl ; B≡D = refl ; M₁≡M₂ = H.refl }
          record { A≡C = refl ; B≡D = refl ; M₁≡M₂ = H.refl } = refl
+
+-- Traces compose.  `Trace` is a snoc list, so induct on the second one.
+Trace-trans : ∀ {A B} {M : Machine A B} {s₁ s₂ s₃}
+            → Trace M s₁ s₂ → Trace M s₂ s₃ → Trace M s₁ s₃
+Trace-trans t []                       = t
+Trace-trans t (t' ∷ʳ⟨ i , o , step ⟩) = Trace-trans t t' ∷ʳ⟨ i , o , step ⟩

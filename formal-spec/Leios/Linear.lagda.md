@@ -15,8 +15,8 @@ open import Tactic.Derive.DecEq
 open import CategoricalCrypto hiding (id; _∘_; eval)
 open import CategoricalCrypto.Channel.Selection
 
-open import Data.List.Properties
 open import Data.Maybe.Properties
+import Data.Maybe.Relation.Unary.All as Maybe
 
 open import Prelude.STS.GenPremises
 
@@ -27,75 +27,63 @@ module Leios.Linear (⋯ : SpecStructure)
 ```
 -->
 
-This document is a specification of Linear Leios. It removes
-concurrency at the transaction level by producing one (large) EB for
-every Praos block.
-
-In addition to the expected paramaters, we assume a two functions:
-
-- `splitTxs`: produces a pair of a list of transactions that can be
-  included in an RB and a list of transactions that can be included in
-  an EB
-- `isValidityChecked`: whether validation of a given EB has completed by a
-  given slot
+This document is a specification of Linear Leios.  It removes
+concurrency at the transaction level by producing at most one (large) EB
+for every Praos block.
 
 ### Upkeep
 
 A node that never produces a block even though it could is not
 supposed to be an honest node, and we prevent that by tracking whether
 a node has checked if it can make a block in a particular slot.
-`LeiosState` contains a set of `SlotUpkeep` and we ensure that this
-set contains all elements before we can advance to the next slot,
-resetting this field to the empty set.
+`LeiosState` records the settled duties in `Upkeep`, and `Slot`
+requires all of them before advancing the slot, resetting `Upkeep` to
+`[]`.
 
+`CertCheck` is settled once the node has decided whether its RB carries
+a certificate: by `Base₁` when none is called for, or by `Base₂`, which
+queries the voting functionality.  `Base` is settled only when the RB is
+submitted, which after a query waits for the answer.
 ```agda
 data SlotUpkeep : Type where
-  Base EB-Role VT-Role : SlotUpkeep
+  Base CertCheck EB-Role VT-Role : SlotUpkeep
 ```
 <!--
 ```agda
 unquoteDecl DecEq-SlotUpkeep = derive-DecEq ((quote SlotUpkeep , DecEq-SlotUpkeep) ∷ [])
 
 open import Leios.Protocol (⋯) SlotUpkeep ⊥ public
-open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
+open import Leios.Voting.Channel Vote EBRef EBCert public
 open FFD hiding (_-⟦_/_⟧⇀_)
 open GenFFD
 
-private variable s s'   : LeiosState
-                 ffds'  : FFD.State
-                 π      : VrfPf
-                 ks ks' : K.State
-                 msgs   : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract)
-                 i      : FFDAbstract.Input ffdAbstract
-                 eb     : EndorserBlock
-                 ebs    : List EndorserBlock
-                 rbs    : List RankingBlock
-                 txs    : List Tx
-                 V      : VTy
-                 SD     : StakeDistr
-                 pks    : List PubKey
-                 cert   : EBCert
+private variable s     : LeiosState
+                 π     : VrfPf
+                 msgs  : List (FFDAbstract.Header ffdAbstract ⊎ FFDAbstract.Body ffdAbstract)
+                 eb    : EndorserBlock
+                 rbs   : List RankingBlock
+                 txs   : List Tx
+                 c     : Maybe EBCert
+                 r     : EBRef
 ```
 -->
 
 ### Block/Vote production
 
-We now define the rules for block production given by the relation `_↝_`. These are split in two:
-
-1. Positive rules, when we do need to create a block.
-2. Negative rules, when we cannot create a block.
-
-The purpose of the negative rules is to properly adjust the upkeep if
-we cannot make a block.
-
-Note that `_↝_`, starting with an empty upkeep can always make exactly
-three steps corresponding to the three types of Leios specific blocks.
+A node settles each role once per slot, either by performing it or by
+declining it.  `CanProposeEB` and `CanVote` below state when a role can
+be performed.  The positive rules `EB-Role` and `VT-Role` require them,
+the negative rules `No-EB-Role` and `No-VT-Role` require that they fail
+for every choice of witness, and `VT-Defer` lets a node postpone a vote
+it could cast.
 
 ```agda
 toProposeEB : LeiosState → VrfPf → Maybe EndorserBlock
-toProposeEB s π = let open LeiosState s in case proj₂ (splitTxs ToPropose) of λ where
+toProposeEB s π = let open LeiosState s
+                      ebTxs = proj₂ (splitTxs ToPropose)
+                  in case ebTxs of λ where
   [] → nothing
-  _ → just $ mkEB slot id π sk-EB ToPropose
+  _ → just $ mkEB slot id π sk-EB ebTxs
 
 getCurrentEBHash : LeiosState → Maybe EBRef
 getCurrentEBHash s = let open LeiosState s in
@@ -103,67 +91,75 @@ getCurrentEBHash s = let open LeiosState s in
 
 isEquivocated : LeiosState → EndorserBlock → Type
 isEquivocated s eb = Any (areEquivocated eb) (toSet (LeiosState.EBs s))
+```
+The EB whose certificate the node would embed in the RB: the EB announced by
+the current chain tip, old enough for the votes on it to have diffused.
+```agda
+certRequest : LeiosState → Maybe EndorserBlock
+certRequest s = let open LeiosState s in
+  find (λ eb → ¿ just (hash eb) ≡ getCurrentEBHash s
+             × slotNumber eb + 3 * Lhdr + Lvote + Ldiff ≤ slot ¿) EBs
 
+mkRB : LeiosState → Maybe EBCert → RankingBlock
+mkRB s mc = let open LeiosState s in record
+  { announcedEB = proposedEB
+  ; txsOrEbCert = maybe inj₂ (inj₁ (proj₁ (splitTxs ToPropose))) mc
+  }
+```
+Certificates are keyed by the hash of the *announcing* ranking block, the
+same hash `VT-Role` signs (CIP-0164, "Vote Structure"), so that a query can
+be answered from the votes as cast.  `certRequest` still selects the EB, but
+only to decide *whether* a certificate is called for; the reference asked
+for is `hash currentRB`.  A positive answer must certify that reference
+(`Maybe.All`, in `Cert₁`); a negative answer trivially matches any request.
+```agda
 rememberVote : LeiosState → EndorserBlock → LeiosState
 rememberVote s@(record { VotedEBs = vebs }) eb = record s { VotedEBs = hash eb ∷ vebs }
 
--- Record the EB this party is diffusing, so that `Base₂` announces the block
--- that actually went out rather than recomputing a candidate from `ToPropose`.
 rememberProposal : LeiosState → EndorserBlock → LeiosState
 rememberProposal s eb = record s { proposedEB = just (hash eb) }
-
-data _↝_ : LeiosState → LeiosState × FFDAbstract.Input ffdAbstract → Type where
 ```
-#### Positive rules
-
 In this specification, we don't want to peek behind the base chain
-abstraction. This means that we assume instead that the `canProduceEB`
-predicate is satisfied if and only if we can make an RB. In that case,
-we send out an EB with the transactions currently stored in the
-mempool.
+abstraction.  We therefore assume that the `canProduceEB` predicate
+holds if and only if we can make an RB.  In that case the node diffuses
+an EB with the EB share of `splitTxs ToPropose`, if that share is
+non-empty.
+```agda
+CanProposeEB : LeiosState → VrfPf → EndorserBlock → Type
+CanProposeEB s π eb = let open LeiosState s in
+  toProposeEB s π ≡ just eb × canProduceEB slot sk-EB (stake s) π
+```
+A node can vote on the EB announced by the chain tip if it received
+the EB in time, has not voted on it yet, sees no equivocation, has
+validated it, and is inside the voting window, provided that the EB is
+not empty and that the node holds a committee seat with a registered
+key.
+```agda
+CanVote : LeiosState → EndorserBlock → EBRef → ℕ → Type
+CanVote s eb ebHash slot' = let open LeiosState s in
+    getCurrentEBHash s ≡ just ebHash
+  × find (λ (_ , eb') → hash eb' ≟ ebHash) EBs' ≡ just (slot' , eb)
+  × hash eb ∉ VotedEBs
+  × ¬ isEquivocated s eb
+  × isValid s (inj₁ (ebHeader eb))
+  × slot' ≤ slotNumber eb + Lhdr
+  × slotNumber eb + 3 * Lhdr ≤ slot
+  × slot ≤ slotNumber eb + 3 * Lhdr + Lvote
+  × isValidityChecked slot eb
+  × EndorserBlockOSig.txs eb ≢ []
+  × inVotingCommittee params (stake s)
+  -- Committee membership is by stake; signing also needs a registered key
+  × id ∈ˡ L.map poolID PubKeys
 
-```agda
-  EB-Role : let open LeiosState s in
-          ∙ toProposeEB s π ≡ just eb
-          ∙ canProduceEB slot sk-EB (stake s) π
-          ∙ needsUpkeep EB-Role
-          ───────────────────────────────────────────────────────
-          s ↝ (rememberProposal (addUpkeep s EB-Role) eb , Send (ebHeader eb) nothing)
-```
-```agda
-  VT-Role : ∀ {ebHash slot'}
-          → let open LeiosState s
-          in
-          ∙ getCurrentEBHash s ≡ just ebHash
-          ∙ find (λ (_ , eb') → hash eb' ≟ ebHash) EBs' ≡ just (slot' , eb)
-          ∙ hash eb ∉ VotedEBs
-          ∙ ¬ isEquivocated s eb
-          ∙ isValid s (inj₁ (ebHeader eb))
-          ∙ slot' ≤ slotNumber eb + Lhdr
-          ∙ slotNumber eb + 3 * Lhdr ≤ slot
-          ∙ slot ≤ slotNumber eb + 3 * Lhdr + Lvote
-          ∙ isValidityChecked slot eb
-          ∙ EndorserBlockOSig.txs eb ≢ []
-          ∙ needsUpkeep VT-Role
-          ∙ inVotingCommittee params (stake s)
-          -- Only a pool with a registered voting key may sign
-          ∙ id ∈ˡ L.map poolID PubKeys
-          ───────────────────────────────────────────────────────
-          s ↝ ( rememberVote (addUpkeep s VT-Role) eb
-              , Send (vtHeader [ vote sk-VT (hash currentRB) ]) nothing)
-```
-Predicate needed for slot transition. Special care needs to be taken when starting from
-genesis.
-```agda
 allDone : LeiosState → Type
-allDone record { Upkeep = u } = VT-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ u
+allDone record { Upkeep = u } = VT-Role ∈ˡ u × EB-Role ∈ˡ u × Base ∈ˡ u × CertCheck ∈ˡ u
 ```
 Voting happens within a window: it opens `3 * Lhdr` slots after the announcing
 RB's slot (the equivocation-detection period) and closes `Lvote` slots later.
 `voteDeadline` is the last slot at which the current EB may still be voted on;
 when there is no current EB (or it has not been received yet) the deadline is `0`,
-so the deferral rule `Roles₃` below is vacuously inapplicable and abstention is
-governed solely by `Roles₂`.
+so the deferral rule `VT-Defer` below is vacuously inapplicable and abstention is
+governed solely by `No-VT-Role`.
 ```agda
 voteDeadline : LeiosState → ℕ
 voteDeadline s = let open LeiosState s in
@@ -174,20 +170,19 @@ voteDeadline s = let open LeiosState s in
       (just (_ , eb)) → slotNumber eb + 3 * Lhdr + Lvote
 ```
 ### Linear Leios transitions
-The relation describing the transition given input and state
 
 ```agda
 open Types params
 open BaseAbstract B'
 
-data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗₀ BaseIO) (IO ⊗₀ Adv) LeiosState where
+data _-⟦_/_⟧⇀_ : MachineType ((FFD ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ Adv) LeiosState where
 ```
 #### Network and Ledger
 ```agda
-  Slot₁ : let open LeiosState s in
+  Slot : let open LeiosState s in
         ∙ allDone s
         ──────────────────────────────────────────────────────────────────
-        s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ FFD-OUT msgs / just $ (L⊗ ϵ) ⊗R ↑ₒ FTCH-LDG ⟧⇀
+        s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ FFD-OUT msgs / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ FTCH-LDG ⟧⇀
           let s' = s ↑ L.filter (isValid? s) msgs
           in record s'
                { slot       = suc slot
@@ -195,77 +190,164 @@ data _-⟦_/_⟧⇀_ : MachineType (FFD ⊗₀ BaseIO) (IO ⊗₀ Adv) LeiosStat
                ; proposedEB = nothing
                }
 
-  Slot₂ : let open LeiosState s in
+  Chain : let open LeiosState s in
         ───────────────────────────────────────────────────────────────────
-        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ BASE-LDG rbs / nothing ⟧⇀ record s { RBs = rbs }
+        s -⟦ ((L⊗ ϵ) ⊗R) ⊗R ↑ᵢ BASE-LDG rbs / nothing ⟧⇀ record s { RBs = rbs }
 ```
 ```agda
-  Ftch : let open LeiosState s in
-       ───────────────────────────────────────────────────────────────────────────
-       s -⟦ L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FetchLdgI / just $ L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ FetchLdgO Ledger ⟧⇀ s
+  Fetch : let open LeiosState s in
+        ───────────────────────────────────────────────────────────────────────────
+        s -⟦ L⊗ (ϵ ⊗R) ᵗ¹ ↑ₒ FetchLdgI / just $ L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ FetchLdgO Ledger ⟧⇀ s
+```
+#### Mempool
+
+The environment hands the node its current selection of transactions,
+which replaces `ToPropose`.  `EB-Role` takes the EB share of it and the
+RB-submitting rules the RB share; no rule removes the transactions they
+include, so the environment must not offer them again.
+```agda
+  Mempool :
+          ───────────────────────────────────────────────────────────────────────────
+          s -⟦ L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ SubmitTxs txs / nothing ⟧⇀ record s { ToPropose = txs }
 ```
 #### Base chain
 
-Note: Submitted data to the base chain is only taken into account
-      if the party submitting is the block producer on the base chain
-      for the given slot
+Submitted data is only taken into account by the base chain if the
+submitting party is the base chain's block producer for the given slot.
 
-`Base₂` announces the EB recorded by `EB-Role`, not a candidate recomputed
-from `ToPropose`. The premise `hasUpkeep EB-Role` makes the party settle its
-EB role for the slot first, either by producing (which sets `proposedEB`) or
-by declining through `Roles₂`; without it a `Base₂` step scheduled early in
-the slot would announce `nothing` and strand the EB the party goes on to
-diffuse.
+`Base₁` announces the EB recorded by `EB-Role` in `proposedEB`.  The
+premise `hasUpkeep EB-Role` makes the party settle its EB role for the
+slot first, either by producing (which sets `proposedEB`) or by declining
+through `No-EB-Role`; without it a `Base₁` step scheduled early in the slot
+would announce `nothing` and strand the EB the party goes on to diffuse.
+`Base₂` carries the same premise, so that the RB later submitted by
+`Cert₁` or `Cert₂` announces the settled EB too: those rules need an
+outstanding query, and only `Base₂` opens one (`Cert₃` merely replaces
+it).
 ```agda
-  Base₁   :
-          ───────────────────────────────────────────────────────────────────────────
-          s -⟦ L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ SubmitTxs txs / nothing ⟧⇀ record s { ToPropose = txs }
-
-  Base₂   : let open LeiosState s
-                currentCertEB = find (λ (eb , _) →
-                  ¿ just (hash eb) ≡ getCurrentEBHash s
-                  × slotNumber eb + 3 * Lhdr + Lvote + Ldiff ≤ slot ¿) ebsWithCert
-                rb = record
-                       { announcedEB = proposedEB
-                       ; txsOrEbCert = case currentCertEB of λ where
-                           (just (_ , cert)) → inj₂ cert
-                           nothing → inj₁ (proj₁ (splitTxs ToPropose))
-                       }
-          in
+  Base₁   : let open LeiosState s in
           ∙ needsUpkeep Base
+          ∙ needsUpkeep CertCheck
           ∙ hasUpkeep EB-Role
+          ∙ certRequest s ≡ nothing
           ───────────────────────────────────────────────────────────────────────────
-          s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ SUBMIT rb ⟧⇀ addUpkeep s Base
+          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s nothing) ⟧⇀
+            addUpkeep (addUpkeep s CertCheck) Base
 ```
-#### Protocol rules
+If the chain tip announces an EB whose voting window closed at least
+`Ldiff` slots ago (see `certRequest`), the node instead queries the voting
+functionality for a certificate before it submits: the `Base` upkeep stays
+open until the answer arrives.
 ```agda
-  Roles₁ :
-         ∙ s ↝ (s' , i)
-         ────────────────────────────────────────────────────────────
-         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / just $ (ϵ ⊗R) ⊗R ↑ₒ FFD-IN i ⟧⇀ s'
+  Base₂   : let open LeiosState s in
+          ∙ needsUpkeep CertCheck
+          ∙ hasUpkeep EB-Role
+          ∙ certRequest s ≡ just eb
+          ───────────────────────────────────────────────────────────────────────────
+          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ QUERY (hash currentRB) ⟧⇀
+            record (addUpkeep s CertCheck) { PendingQuery = just (hash currentRB) }
+```
+#### Certificates
 
-  Roles₂ : ∀ {u} → let open LeiosState in
-         ∙ ¬ (∃[ s'×i ] (s ↝ s'×i × Upkeep (addUpkeep s u) ≡ Upkeep (proj₁ s'×i)))
-         ∙ needsUpkeep s u
-         ∙ u ≢ Base
-         ──────────────────────────────────────────────────
-         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s u
-```
-Deferral of the VT-Role: abstaining from voting is permitted while the
-current EB's voting window is still open, even when a positive VT-Role
-step could fire. Together with `Roles₂` this yields bounded liveness:
-at the deadline slot neither `Roles₃` (window closes) nor `Roles₂` (a vote can still fire)
-applies, so a vote must be cast by then.
+`Cert₁` correlates the answer with the request recorded in
+`PendingQuery`: it only accepts an answer while a query is outstanding, a
+positive answer must certify the requested ranking block, and the request
+is cleared on submission.
+
+Since the chain tip may change between query and answer (`Chain` has no
+premises), `Cert₁` also re-validates the request at submission time: the
+pending query must still name the *current* tip, so a stale answer cannot
+be embedded.  Keying on the tip rather than on the EB it announces also
+catches a tip that moves to a different RB announcing the same EB.
+`Base₁` and `Base₂` both need `CertCheck` unsettled, so neither can fire
+again in the slot, and without further rules a tip change between query
+and answer would leave `Base` open forever.  The two further rules are as
+follows:
+
+- `Cert₂`: the tip no longer calls for a certificate at all
+  (`certRequest s ≡ nothing`).  The stale answer is discarded and the RB
+  is submitted without a certificate, discharging `Base` as `Base₁`
+  would.
+- `Cert₃`: the tip has moved, so it calls for a certificate on a
+  *different* ranking block than the one queried.  The stale answer is
+  discarded and a fresh query is issued for the new tip; `Base` stays open
+  until that query is answered.
 ```agda
-  Roles₃ : let open LeiosState s in
-         ∙ slot < voteDeadline s
-         ∙ needsUpkeep VT-Role
-         ──────────────────────────────────────────────────
-         s -⟦ (ϵ ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s VT-Role
+  Cert₁ : let open LeiosState s in
+        ∙ needsUpkeep Base
+        ∙ CertCheck ∈ˡ Upkeep
+        ∙ certRequest s ≡ just eb
+        ∙ PendingQuery ≡ just (hash currentRB)
+        ∙ Maybe.All (λ c → getEBHash c ≡ hash currentRB) c
+        ───────────────────────────────────────────────────────────────────
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s c) ⟧⇀
+          record (addUpkeep s Base) { PendingQuery = nothing }
+
+  Cert₂ : let open LeiosState s in
+        ∙ needsUpkeep Base
+        ∙ CertCheck ∈ˡ Upkeep
+        ∙ certRequest s ≡ nothing
+        ∙ PendingQuery ≡ just r
+        ───────────────────────────────────────────────────────────────────
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s nothing) ⟧⇀
+          record (addUpkeep s Base) { PendingQuery = nothing }
+
+  Cert₃ : let open LeiosState s in
+        ∙ needsUpkeep Base
+        ∙ CertCheck ∈ˡ Upkeep
+        ∙ certRequest s ≡ just eb
+        ∙ PendingQuery ≡ just r
+        ∙ hash currentRB ≢ r
+        ───────────────────────────────────────────────────────────────────
+        s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ (L⊗ ϵ) ⊗R ↑ₒ QUERY (hash currentRB) ⟧⇀
+          record s { PendingQuery = just (hash currentRB) }
+```
+#### Roles
+
+An EB goes to the network; a vote goes to the voting functionality.
+```agda
+  EB-Role : let open LeiosState s in
+            ∙ CanProposeEB s π eb
+            ∙ needsUpkeep EB-Role
+            ──────────────────────────────────────────────────
+            s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ ((ϵ ⊗R) ⊗R) ⊗R ↑ₒ FFD-IN (Send (ebHeader eb) nothing) ⟧⇀
+              rememberProposal (addUpkeep s EB-Role) eb
+
+  No-EB-Role : let open LeiosState s in
+               ∙ ¬ (∃₂ λ π eb → CanProposeEB s π eb)
+               ∙ needsUpkeep EB-Role
+               ──────────────────────────────────────────────────
+               s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s EB-Role
+
+  VT-Role : ∀ {ebHash slot'} → let open LeiosState s in
+          ∙ CanVote s eb ebHash slot'
+          ∙ needsUpkeep VT-Role
+          ──────────────────────────────────────────────────
+          s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / just $ (L⊗ ϵ) ⊗R ↑ₒ CAST (vote sk-VT (hash currentRB)) ⟧⇀
+            rememberVote (addUpkeep s VT-Role) eb
+
+  No-VT-Role : let open LeiosState s in
+               ∙ ¬ (∃[ eb ] ∃[ ebHash ] ∃[ slot' ] CanVote s eb ebHash slot')
+               ∙ needsUpkeep VT-Role
+               ──────────────────────────────────────────────────
+               s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s VT-Role
+```
+Abstaining from voting is also permitted while the current EB's voting
+window is still open, even when `VT-Role` could fire.  Together with
+`No-VT-Role` this yields bounded liveness: at the deadline slot
+`VT-Defer` no longer applies (the window closes), and `No-VT-Role` does
+not apply while a vote can still be cast, so a node that can vote must
+vote by then.
+```agda
+  VT-Defer : let open LeiosState s in
+           ∙ slot < voteDeadline s
+           ∙ needsUpkeep VT-Role
+           ──────────────────────────────────────────────────
+           s -⟦ ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ SLOT / nothing ⟧⇀ addUpkeep s VT-Role
 ```
 <!--
 ```agda
-LinearLeios : Machine (FFD ⊗₀ BaseIO) (IO ⊗₀ Adv)
+LinearLeios : Machine ((FFD ⊗₀ BaseIO) ⊗₀ VotingC) (IO ⊗₀ Adv)
 LinearLeios .Machine.State = LeiosState
 LinearLeios .Machine.stepRel = _-⟦_/_⟧⇀_
 
@@ -276,13 +358,18 @@ instance
   Dec-isValidityChecked : ∀ {n eb} → isValidityChecked n eb ⁇
   Dec-isValidityChecked {n} {eb} = ⁇ isValidityChecked? n eb
 
-unquoteDecl EB-Role-premises = genPremises EB-Role-premises (quote _↝_.EB-Role)
-unquoteDecl VT-Role-premises = genPremises VT-Role-premises (quote _↝_.VT-Role)
+unquoteDecl EB-Role-premises  = genPremises EB-Role-premises  (quote _-⟦_/_⟧⇀_.EB-Role)
+unquoteDecl VT-Role-premises  = genPremises VT-Role-premises  (quote _-⟦_/_⟧⇀_.VT-Role)
+unquoteDecl VT-Defer-premises = genPremises VT-Defer-premises (quote VT-Defer)
 
-unquoteDecl Slot₁-premises = genPremises Slot₁-premises (quote Slot₁)
-unquoteDecl Slot₂-premises = genPremises Slot₂-premises (quote Slot₂)
+unquoteDecl Slot-premises = genPremises Slot-premises (quote _-⟦_/_⟧⇀_.Slot)
+unquoteDecl Chain-premises = genPremises Chain-premises (quote _-⟦_/_⟧⇀_.Chain)
+unquoteDecl Mempool-premises = genPremises Mempool-premises (quote Mempool)
 unquoteDecl Base₁-premises = genPremises Base₁-premises (quote Base₁)
 unquoteDecl Base₂-premises = genPremises Base₂-premises (quote Base₂)
+unquoteDecl Cert₁-premises = genPremises Cert₁-premises (quote Cert₁)
+unquoteDecl Cert₂-premises = genPremises Cert₂-premises (quote Cert₂)
+unquoteDecl Cert₃-premises = genPremises Cert₃-premises (quote Cert₃)
 
 just≢nothing : ∀ {ℓ} {A : Type ℓ} {x} → (Maybe A ∋ just x) ≡ nothing → ⊥
 just≢nothing = λ ()
@@ -311,59 +398,46 @@ subst' {s} {ebHash = ebHash} {eb = eb} eq₁₁ eq₁₂ eq₂₁ eq₂₂
   with find (λ (_ , eb') → hash eb' ≟ ebHash) (LeiosState.EBs' s) | eq₁₂ | eq₂₂
 ... | _ | refl | refl = refl
 
-Base≢EB-Role : SlotUpkeep.Base ≢ SlotUpkeep.EB-Role
-Base≢EB-Role = λ ()
-
-Base≢VT-Role : SlotUpkeep.Base ≢ SlotUpkeep.VT-Role
-Base≢VT-Role = λ ()
-
 π-unique : ∀ {s π} → canProduceEB (LeiosState.slot s) sk-EB (stake s) π → π ≡ (proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s)))
 π-unique (_ , refl) = refl
 
 instance
 
-  Dec-↝ : ∀ {s u} → (∃[ s'×i ] (s ↝ s'×i × (u ∷ LeiosState.Upkeep s) ≡ LeiosState.Upkeep (proj₁ s'×i))) ⁇
-  Dec-↝ {s} {EB-Role} .dec
+  Dec-CanProposeEB : ∀ {s} → (∃₂ λ π eb → CanProposeEB s π eb) ⁇
+  Dec-CanProposeEB {s} .dec
     with toProposeEB s (proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))) in eq₁
   ... | nothing = no λ where
-    (_ , EB-Role {π = π} (p , a , _) , b) →
-      case (π ≟ (proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s)))) of λ
-        { (yes q) → nothing≢just (trans (sym eq₁) (subst (λ x → toProposeEB s x ≡ just _) q p)) ;
-          (no ¬q) → contradiction (π-unique {s} {π} a) ¬q
-        }
+    (_ , _ , p , q) → nothing≢just (trans (sym eq₁) (subst (λ x → toProposeEB s x ≡ just _) (π-unique {s} q) p))
   ... | just eb
     with ¿ canProduceEB (LeiosState.slot s) sk-EB (stake s) _ ¿
-       | ¿ LeiosState.needsUpkeep s SlotUpkeep.EB-Role ¿
-  ... | yes q | yes u = yes (_ , EB-Role (eq₁ , q , u) , refl)
-  ... | yes _ | no ¬u = no λ where
-    (_ , EB-Role (_ , _ , u) , _) → ¬u u
-  ... | no ¬q | _ = no λ where
-    (_ , EB-Role {π = π} (a , q , _) , b) →
-      case (π ≟ (proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s)))) of λ
-        { (yes r) → ¬q (subst (λ x → canProduceEB (LeiosState.slot s) sk-EB (stake s) x) r q) ;
-          (no ¬r) → contradiction (π-unique {s} {π} q) ¬r
-        }
-  Dec-↝ {s} {VT-Role} .dec
-    with getCurrentEBHash s in eq₂
-  ... | nothing = no λ where (_ , VT-Role (p , _) , _) → nothing≢just (trans (sym eq₂) p)
-  ... | just ebHash
-    with find (λ (_ , eb') → hash eb' ≟ ebHash) (LeiosState.EBs' s) in eq₃
-  ... | nothing = no λ where
-    (_ , VT-Role (x , y , _) , _) →
-      let ji = just-injective (trans (sym x) eq₂)
-      in just≢nothing $ trans (sym y) (subst (not-found s) (sym ji) eq₃)
-  ... | just (slot' , eb)
-    with ¿ VT-Role-premises {s} {eb} {ebHash} {slot'} .proj₁ ¿
-  ... | yes p = yes ((rememberVote (addUpkeep s VT-Role) eb , Send (vtHeader [ vote sk-VT (hash (LeiosState.currentRB s)) ]) nothing) ,
-                      VT-Role p , refl)
-  ... | no ¬p = no λ where (_ , VT-Role (x , y , p) , _) → ¬p $ subst
-                             (λ where (eb , ebHash , slot) → VT-Role-premises {s} {eb} {ebHash} {slot} .proj₁)
-                             (subst' {s} x y eq₂ eq₃) (x , y , p)
-  Dec-↝ {s} {Base} .dec = no λ where
-    (_ , EB-Role _ , x) → Base≢EB-Role (∷-injectiveˡ (trans x refl))
-    (_ , VT-Role _ , x) → Base≢VT-Role (∷-injectiveˡ (trans x refl))
+  ... | yes q = yes (_ , eb , eq₁ , q)
+  ... | no ¬q = no λ where
+    (_ , _ , _ , q) → ¬q (subst (canProduceEB (LeiosState.slot s) sk-EB (stake s)) (π-unique {s} q) q)
 
-unquoteDecl Roles₂-premises = genPremises Roles₂-premises (quote Roles₂)
-unquoteDecl Roles₃-premises = genPremises Roles₃-premises (quote Roles₃)
+  Dec-CanVote : ∀ {s} → (∃[ eb ] ∃[ ebHash ] ∃[ slot' ] CanVote s eb ebHash slot') ⁇
+  Dec-CanVote {s} .dec = byTip (getCurrentEBHash s) refl
+    where
+      Goal : Type
+      Goal = ∃[ eb ] ∃[ ebHash ] ∃[ slot' ] CanVote s eb ebHash slot'
+
+      byEB : ∀ {ebHash} → getCurrentEBHash s ≡ just ebHash
+           → ∀ m → find (λ (_ , eb') → hash eb' ≟ ebHash) (LeiosState.EBs' s) ≡ m → Dec Goal
+      byEB eq₂ nothing eq₃ = no λ where
+        (_ , _ , _ , x , y , _) →
+          let ji = just-injective (trans (sym x) eq₂)
+          in just≢nothing $ trans (sym y) (subst (not-found s) (sym ji) eq₃)
+      byEB {ebHash} eq₂ (just (slot' , eb)) eq₃ = case ¿ CanVote s eb ebHash slot' ¿ of λ where
+        (yes p) → yes (eb , ebHash , slot' , p)
+        (no ¬p) → no λ where
+          (_ , _ , _ , p@(x , y , _)) → ¬p $ subst
+            (λ where (eb , ebHash , slot) → CanVote s eb ebHash slot)
+            (subst' {s} x y eq₂ eq₃) p
+
+      byTip : ∀ m → getCurrentEBHash s ≡ m → Dec Goal
+      byTip nothing  eq₂ = no λ where (_ , _ , _ , p , _) → nothing≢just (trans (sym eq₂) p)
+      byTip (just _) eq₂ = byEB eq₂ _ refl
+
+unquoteDecl No-EB-Role-premises = genPremises No-EB-Role-premises (quote No-EB-Role)
+unquoteDecl No-VT-Role-premises = genPremises No-VT-Role-premises (quote No-VT-Role)
 ```
 -->

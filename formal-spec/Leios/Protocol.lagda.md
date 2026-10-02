@@ -1,11 +1,12 @@
 ## Leios.Protocol
 
-This module defines the core Leios protocol state machine, including:
-- Input/output message types
-- Protocol state representation and operations
-- Block and transaction validation
-- State transition logic for processing headers and block bodies
-  The protocol integrates header/body diffusion with the underlying base protocol.
+This module defines the following building blocks shared by the Leios
+variants:
+
+- the protocol state `LeiosState` and its operations,
+- header and body validation,
+- the state update on receiving headers and bodies (`_↑_`), and
+- the channel types (`Types`), including the voting interface.
 <!--
 ```agda
 {-# OPTIONS --safe #-}
@@ -20,14 +21,14 @@ open import Leios.SpecStructure
 
 open import CategoricalCrypto hiding (_∘_; id)
 
-open import Network.BasicBroadcast using (NetworkT; RcvMessage; SndMessage; Activate)
+open import Network.BasicBroadcast using (NetworkT)
 
 module Leios.Protocol
   (⋯           : SpecStructure) (open SpecStructure ⋯)
   (SlotUpkeep  : Type         )
   (StageUpkeep : Type         ) where
 
-open BaseAbstract B' using (Cert; V-chkCerts; VTy; initSlot)
+open BaseAbstract B' using (VTy; initSlot)
 open GenFFD
 ```
 High level structure.  `LinearLeios` stands on the header and body diffusion
@@ -75,16 +76,16 @@ assumption than the protocol gives them.
         {- EBs': EBs together with the slot in which we received them -}
         EBs'         : List (ℕ × EndorserBlock)
         VotedEBs     : List Hash
-        Vs           : List (List Vote)
         slot         : ℕ
         Upkeep       : List SlotUpkeep
         {- proposedEB: the EB this party diffused in the current slot, if any -}
         proposedEB   : Maybe Hash
         Upkeep-Stage : ℙ StageUpkeep
-        votingState  : VotingState
+        {- PendingQuery: the certificate query awaiting an answer, if any -}
+        PendingQuery : Maybe EBRef
         PubKeys      : List PubKey
 
-  -- ideally we'd require a non-empty list, but this also works for now
+  -- An empty chain has a dummy tip that announces no EB.
   currentRB : RankingBlock
   currentRB = maybe (λ x → x) (record { txsOrEbCert = inj₁ [] ; announcedEB = nothing })
                 (L.last RBs)
@@ -112,20 +113,17 @@ assumption than the protocol gives them.
   hasUpkeep : SlotUpkeep → Type
   hasUpkeep = _∈ˡ Upkeep
 
+  needs : ∀ {u l} → Upkeep ≡ l → u ∉ˡ l → needsUpkeep u
+  needs {u} eq n = subst (u ∉ˡ_) (sym eq) n
+
+  has : ∀ {u l} → Upkeep ≡ l → u ∈ˡ l → hasUpkeep u
+  has {u} eq h = subst (u ∈ˡ_) (sym eq) h
+
   needsUpkeep-Stage : StageUpkeep → Set
   needsUpkeep-Stage = _∉ Upkeep-Stage
 
   Dec-needsUpkeep-Stage : ∀ {u : StageUpkeep} → ⦃ DecEq StageUpkeep ⦄ → needsUpkeep-Stage u ⁇
   Dec-needsUpkeep-Stage {u} .dec = ¬? (u ∈? Upkeep-Stage)
-
-  -- Produces a Vote certified block
-  ebsWithCert : List (EndorserBlock × EBCert)
-  ebsWithCert = mapMaybe getCert EBs
-    where
-      getCert : EndorserBlock → Maybe (EndorserBlock × EBCert)
-      getCert eb = case ¿ isVoteCertified votingState eb ¿ of λ where
-        (yes p) → just (eb , getEBCert p)
-        (no ¬p) → nothing
 
 addUpkeep : LeiosState → SlotUpkeep → LeiosState
 addUpkeep s u = let open LeiosState s in record s { Upkeep = u ∷ Upkeep }
@@ -142,12 +140,11 @@ initLeiosState V SD pks = record
   ; ToPropose    = []
   ; EBs'         = []
   ; VotedEBs     = []
-  ; Vs           = []
   ; slot         = initSlot V
   ; Upkeep       = []
   ; proposedEB   = nothing
   ; Upkeep-Stage = ∅
-  ; votingState  = initVotingState
+  ; PendingQuery = nothing
   ; PubKeys      = pks
   }
 
@@ -220,12 +217,9 @@ module _ (s : LeiosState)  where
     isValid? (inj₂ b) = bodyValid? b
 
 module _ (s : LeiosState) (open LeiosState s) where
-
-  {- Update the LeiosState upon receiving a message (a header or body) -}
   upd : Header ⊎ Body → LeiosState
   upd (inj₁ (ebHeader eb)) = record s { EBs' = (slot , eb) ∷ EBs' }
-  upd (inj₁ (vtHeader vs)) = record s { Vs = vs ∷ Vs }
-  upd (inj₂ _)             = s
+  upd _                    = s
 
 module _ {s s'} (open LeiosState s') where
 
@@ -260,7 +254,6 @@ module Types (params : Params) (let open Params params) where
     FetchLdgI : IOT In
     FetchLdgO : List Tx → IOT Out
 
-  -- mempool
   IO : Channel
   IO = simpleChannel IOT ᵀ
 

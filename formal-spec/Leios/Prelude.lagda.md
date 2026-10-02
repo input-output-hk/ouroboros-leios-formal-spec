@@ -23,6 +23,7 @@ open T public using (These; this; that)
 module N where
   open import Data.Nat public
   open import Data.Nat.Properties public
+  open import Data.Nat.ListAction public
 open N public using (ℕ; zero; suc)
 
 module F where
@@ -33,7 +34,7 @@ open F public using (Fin; toℕ; #_; 0F) renaming (zero to fzero; suc to fsuc)
 
 module L where
   open import Data.List public
-open L public using (List; []; _∷_; _++_; catMaybes; head; length; sum; and; or; any)
+open L public using (List; []; _∷_; _++_; catMaybes; head; length; and; or; any)
 
 module Any where
   open import Data.List.Relation.Unary.Any public

@@ -11,9 +11,6 @@ open import Leios.VRF
 import Leios.Base
 import Leios.Blocks
 import Leios.KeyRegistration
-import Leios.Voting
-
-open import Data.Fin
 ```
 -->
 ```agda
@@ -58,22 +55,12 @@ record SpecStructure : Type₂ where
   module K   = KeyRegistrationAbstract.Functionality KF
   module FFD = FFDAbstract.Functionality FFD'
 
-  open Leios.Voting public
-```
-```agda
-  field va : VotingAbstract EndorserBlock
-  open VotingAbstract va public
-```
-```agda
-  field getEBCert         : ∀ {s eb} → isVoteCertified s eb → EBCert
-        -- Whether validation of the given EB has completed by the given slot.
-        -- Replaces the former `validityCheckTime : EndorserBlock → ℕ` oracle:
-        -- validation latency is a property of the node and its environment,
-        -- not of the EB alone, so the spec only assumes an observable
-        -- completion predicate (monotone in the slot in intended
-        -- instantiations). Eventually to be provided by an asynchronous
-        -- validation functionality (Valid/Invalid/InProgress with bounded
-        -- InProgress).
-        isValidityChecked  : ℕ → EndorserBlock → Type
+  -- Whether validation of the given EB has completed by the given slot.
+  -- Validation latency is a property of the node and its environment, not
+  -- of the EB alone, so the spec only assumes an observable completion
+  -- predicate (monotone in the slot in intended instantiations).
+  -- Eventually to be provided by an asynchronous validation functionality
+  -- (Valid/Invalid/InProgress with bounded InProgress).
+  field isValidityChecked  : ℕ → EndorserBlock → Type
         isValidityChecked? : ∀ n eb → Dec (isValidityChecked n eb)
 ```

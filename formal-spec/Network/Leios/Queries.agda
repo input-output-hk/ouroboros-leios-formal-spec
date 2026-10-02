@@ -34,9 +34,16 @@ module Network.Leios.Queries
     → HashCorrectB rb eb₁ → HashCorrectB rb eb₂ → eb₁ ≡ eb₂)
   (ebOf : RankingBlock → Maybe EndorserBlock)
   (ebOf-correct : ∀ rb → HashCorrectB rb (ebOf rb))
+  (forEB     : Vote → EBRef)
+  (mkCert    : EBRef → EBCert)
+  (mkCert-hash : ∀ r → getEBHash (mkCert r) ≡ r)
+  (threshold : ℕ)
+  (voter     : Vote → Fin numberOfParties)
+  (Valid     : Vote → Type) ⦃ Valid? : Valid ⁇¹ ⦄
     where
 
 open import Network.Leios ⋯ params k HashCorrectB HashCorrect-irrel hash-unique ebOf ebOf-correct
+  forEB mkCert mkCert-hash threshold voter Valid ⦃ Valid? ⦄
 open import Leios.Linear ⋯ params
 open import Leios.NetworkShim ⋯ params
 open Types params hiding (Network)
@@ -50,47 +57,59 @@ private module BC = IsConstrained B.isConstrained
 
 private
   -- The layers between the base functionality's IO channel and `spec`'s:
-  -- `spec = ⊗-assoc⃖ ∘ Y`, `Y = Inner ∘ NetTranslate`.
+  -- `spec = spec-rewire ∘ Y`, `Y = (Inner ⊗₁ id) ∘ (NetTranslate ⊗₁ id)`,
+  -- the identities passing voting by.
   Inner : Machine (Network ⊗₀ BaseNetwork) (Network ⊗₀ (BaseIO ⊗₀ BaseAdv))
   Inner = CC.id ⊗₁ B.m
 
-  Y : Machine DD.M (Network ⊗₀ (BaseIO ⊗₀ BaseAdv))
-  Y = Inner CC.∘ NetTranslate
+  L : Machine ((Network ⊗₀ BaseNetwork) ⊗₀ VotingC) ((Network ⊗₀ (BaseIO ⊗₀ BaseAdv)) ⊗₀ VotingC)
+  L = Inner ⊗₁ CC.id
+
+  NT : Machine (DD.M ⊗₀ VotingC) ((Network ⊗₀ BaseNetwork) ⊗₀ VotingC)
+  NT = NetTranslate ⊗₁ CC.id
+
+  Y : Machine (DD.M ⊗₀ VotingC) ((Network ⊗₀ (BaseIO ⊗₀ BaseAdv)) ⊗₀ VotingC)
+  Y = L CC.∘ NT
 
   module TI = Tensor′ (CC.id {Network}) B.m
-  module KI = Compose Inner NetTranslate
-  module KS = Compose (⊗-assoc⃖ {Network} {BaseIO} {BaseAdv}) Y
+  module TL = Tensor′ Inner (CC.id {VotingC})
+  module KI = Compose L NT
+  module KS = Compose spec-rewire Y
 
   -- A base request `x`, and an answer `y`, at each layer.
   q₁ : BaseIOF Out → Channel.outType (BaseIO ⊗₀ BaseAdv)
   q₁ x = ϵ ⊗R ↑ₒ x
   q₂ : BaseIOF Out → Channel.outType (Network ⊗₀ (BaseIO ⊗₀ BaseAdv))
   q₂ x = L⊗ ϵ ↑ₒ q₁ x
-  q₃ : BaseIOF Out → Channel.outType ((Network ⊗₀ BaseIO) ⊗₀ BaseAdv)
-  q₃ x = (L⊗ ϵ) ⊗R ↑ₒ x
+  q₂' : BaseIOF Out → Channel.outType ((Network ⊗₀ (BaseIO ⊗₀ BaseAdv)) ⊗₀ VotingC)
+  q₂' x = ϵ ⊗R ↑ₒ q₂ x
+  q₃ : BaseIOF Out → Channel.outType (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ BaseAdv)
+  q₃ x = ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ x
 
   a₁ : BaseIOF In → Channel.inType (BaseIO ⊗₀ BaseAdv)
   a₁ y = ϵ ⊗R ↑ᵢ y
   a₂ : BaseIOF In → Channel.inType (Network ⊗₀ (BaseIO ⊗₀ BaseAdv))
   a₂ y = L⊗ ϵ ↑ᵢ a₁ y
-  a₃ : BaseIOF In → Channel.inType ((Network ⊗₀ BaseIO) ⊗₀ BaseAdv)
-  a₃ y = (L⊗ ϵ) ⊗R ↑ᵢ y
+  a₂' : BaseIOF In → Channel.inType ((Network ⊗₀ (BaseIO ⊗₀ BaseAdv)) ⊗₀ VotingC)
+  a₂' y = ϵ ⊗R ↑ᵢ a₂ y
+  a₃ : BaseIOF In → Channel.inType (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ BaseAdv)
+  a₃ y = ((L⊗ ϵ) ⊗R) ⊗R ↑ᵢ y
 
-  -- How the reassociation routes them.
+  -- How the rewiring routes them.
   opaque
     unfolding _⊗₀_
 
-    assocₒ-IO : ∀ x → app (⊗-assoc⃖ₒ {Network} {BaseIO} {BaseAdv}) (q₃ x) ≡ q₂ x
+    assocₒ-IO : ∀ x → app spec-rewireₒ (q₃ x) ≡ q₂' x
     assocₒ-IO x = refl
 
-    assocᵢ-IO : ∀ y → app (⊗-assoc⃖ᵢ {Network} {BaseIO} {BaseAdv}) (a₂ y) ≡ a₃ y
+    assocᵢ-IO : ∀ y → app spec-rewireᵢ (a₂' y) ≡ a₃ y
     assocᵢ-IO y = refl
 
 -- The queries of `spec`: the base layer's, on `spec`'s codomain.
-queryIₛ : BlockChainInfo RankingBlock → Channel.inType (DD.M ⊗ᵀ ((Network ⊗₀ BaseIO) ⊗₀ BaseAdv))
+queryIₛ : BlockChainInfo RankingBlock → Channel.inType ((DD.M ⊗₀ VotingC) ⊗ᵀ (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ BaseAdv))
 queryIₛ q = L⊗ ϵ ᵗ¹ ↑ₒ q₃ (B.qI q)
 
-queryOₛ : ∀ {q} → bciQueryType {Block = RankingBlock} q → Channel.outType (DD.M ⊗ᵀ ((Network ⊗₀ BaseIO) ⊗₀ BaseAdv))
+queryOₛ : ∀ {q} → bciQueryType {Block = RankingBlock} q → Channel.outType ((DD.M ⊗₀ VotingC) ⊗ᵀ (((Network ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ BaseAdv))
 queryOₛ r = L⊗ ϵ ᵗ¹ ↑ᵢ a₃ (B.qO r)
 
 private
@@ -108,7 +127,7 @@ private
 
 spec-completeness : ∀ {q} {s : Machine.State spec}
   → ∃ λ response' → ∃ λ s' → Machine.stepRel spec s (queryIₛ q) (just response') s'
-spec-completeness {q} {(sNT , (tt , sB)) , tt}
+spec-completeness {q} {((sNT , tt) , ((tt , sB) , tt)) , tt}
   with BC.completeness {q} {sB}
 ... | resp' , sB' , stB with BC.correctness stB
 ... | r , eq = _ , _ , fromStep stS
@@ -122,15 +141,18 @@ spec-completeness {q} {(sNT , (tt , sB)) , tt}
     stI : Step Inner (tt , sB) (L⊗ ϵ ᵗ¹ ↑ₒ q₂ x) (just (L⊗ ϵ ᵗ¹ ↑ᵢ a₂ y)) (tt , sB')
     stI = step-subst (nest-ᵗ¹ₒ (L⊗ ϵ) (q₁ x)) (cong just (nest-ᵗ¹ᵢ (L⊗ ϵ) (a₁ y))) (TI.⊗₁-cod₂-cod stB₁)
 
-    stY : Step Y (sNT , (tt , sB)) (L⊗ ϵ ᵗ¹ ↑ₒ q₂ x) (just (L⊗ ϵ ᵗ¹ ↑ᵢ a₂ y)) (sNT , (tt , sB'))
-    stY = KI.∘-cod-cod stI
+    stL : Step L ((tt , sB) , tt) (L⊗ ϵ ᵗ¹ ↑ₒ q₂' x) (just (L⊗ ϵ ᵗ¹ ↑ᵢ a₂' y)) ((tt , sB') , tt)
+    stL = step-subst (nest-ᵗ¹ₒ (ϵ ⊗R) (q₂ x)) (cong just (nest-ᵗ¹ᵢ (ϵ ⊗R) (a₂ y))) (TL.⊗₁-cod₁-cod stI)
 
-    stS : Step spec ((sNT , (tt , sB)) , tt) (queryIₛ q) (just (queryOₛ r)) ((sNT , (tt , sB')) , tt)
-    stS = KS.∘-cod-mid (fwd-cod ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ (q₃ x))
+    stY : Step Y ((sNT , tt) , ((tt , sB) , tt)) (L⊗ ϵ ᵗ¹ ↑ₒ q₂' x) (just (L⊗ ϵ ᵗ¹ ↑ᵢ a₂' y)) ((sNT , tt) , ((tt , sB') , tt))
+    stY = KI.∘-cod-cod stL
+
+    stS : Step spec (((sNT , tt) , ((tt , sB) , tt)) , tt) (queryIₛ q) (just (queryOₛ r)) (((sNT , tt) , ((tt , sB') , tt)) , tt)
+    stS = KS.∘-cod-mid (fwd-cod spec-rewireᵢ spec-rewireₒ (q₃ x))
             (KS.mid₂-subst (sym (assocₒ-IO x)) refl
               (KS.mid₂-mid stY
                 (KS.mid₁-subst refl (cong just (cong (L⊗ ϵ ᵗ¹ ↑ᵢ_) (assocᵢ-IO y)))
-                  (KS.mid₁-cod (fwd-dom ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ (a₂ y))))))
+                  (KS.mid₁-cod (fwd-dom spec-rewireᵢ spec-rewireₒ (a₂' y))))))
 
 ------------------------------------------------------------------------
 -- Correctness and purity: every step of `spec` on a query is the chain
@@ -159,20 +181,34 @@ private
     r , trans oeq (cong just (trans (cong (L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ_) (outᶜ-inj (just-injective eq))) (nest-ᵗ¹ᵢ (L⊗ ϵ) (a₁ (B.qO r)))))
       , trans (cong (sI ,_) pure) (sym seq)
 
-  Y-inv : ∀ {q s o s'}
-    → Step Y s (L⊗ ϵ ᵗ¹ ↑ₒ q₂ (B.qI q)) o s'
-    → ∃ λ r → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ a₂ (B.qO {q} r))) × (s ≡ s')
-  Y-inv {q} {sNT , sI} st with KI.∘-cod-view st
-  ... | inj₁ (sI' , seq , oeq , stI) with Inner-inv {q} stI
+  L-inv : ∀ {q s o s'}
+    → Step L s (L⊗ ϵ ᵗ¹ ↑ₒ q₂' (B.qI q)) o s'
+    → ∃ λ r → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ a₂' (B.qO {q} r))) × (s ≡ s')
+  L-inv {q} {sI , sV} st
+    with TL.⊗₁-cod₁-view (step-subst (sym (nest-ᵗ¹ₒ (ϵ ⊗R) (q₂ (B.qI q)))) refl st)
+  ... | sI' , seq , inj₁ (oeq , stI) with Inner-inv {q} stI
   ...   | _ , eq , _ = case eq of λ ()
-  Y-inv {q} {sNT , sI} st | inj₂ (inj₁ (sI' , c' , seq , oeq , stI)) with Inner-inv {q} stI
+  L-inv {q} {sI , sV} st | sI' , seq , inj₂ (inj₁ (a' , oeq , stI)) with Inner-inv {q} stI
+  ...   | _ , eq , _ = outᵈ≢outᶜ (just-injective eq)
+  L-inv {q} {sI , sV} st | sI' , seq , inj₂ (inj₂ (b' , oeq , stI)) with Inner-inv {q} stI
+  ...   | r , eq , pure =
+    r , trans oeq (cong just (trans (cong (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ_) (outᶜ-inj (just-injective eq))) (nest-ᵗ¹ᵢ (ϵ ⊗R) (a₂ (B.qO r)))))
+      , trans (cong (_, sV) pure) (sym seq)
+
+  Y-inv : ∀ {q s o s'}
+    → Step Y s (L⊗ ϵ ᵗ¹ ↑ₒ q₂' (B.qI q)) o s'
+    → ∃ λ r → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ a₂' (B.qO {q} r))) × (s ≡ s')
+  Y-inv {q} {sNT , sL} st with KI.∘-cod-view st
+  ... | inj₁ (sL' , seq , oeq , stL) with L-inv {q} stL
+  ...   | _ , eq , _ = case eq of λ ()
+  Y-inv {q} {sNT , sL} st | inj₂ (inj₁ (sL' , c' , seq , oeq , stL)) with L-inv {q} stL
   ...   | r , eq , pure = r , trans oeq (cong (λ z → just (L⊗ ϵ ᵗ¹ ↑ᵢ z)) (outᶜ-inj (just-injective eq))) , trans (cong (sNT ,_) pure) (sym seq)
-  Y-inv {q} {sNT , sI} st | inj₂ (inj₂ (sI' , b , stI , _)) with Inner-inv {q} stI
+  Y-inv {q} {sNT , sL} st | inj₂ (inj₂ (sL' , b , stL , _)) with L-inv {q} stL
   ...   | _ , eq , _ = outᵈ≢outᶜ (just-injective eq)
 
-  -- After `⊗-assoc⃖` has relayed the query inwards.
+  -- After `spec-rewire` has relayed the query inwards.
   after-fwd : ∀ {q sY sR o s'}
-    → KS.Mid₂ (sY , sR) (q₂ (B.qI q)) o s'
+    → KS.Mid₂ (sY , sR) (q₂' (B.qI q)) o s'
     → ∃ λ r → (o ≡ just (queryOₛ {q} r)) × ((sY , sR) ≡ s')
   after-fwd {q} k with KS.mid₂-view k
   ... | inj₁ (sY' , seq , oeq , stY) with Y-inv {q} stY
@@ -181,25 +217,25 @@ private
   ...   | _ , eq , _ = outᵈ≢outᶜ (just-injective eq)
   after-fwd {q} k | inj₂ (inj₂ (sY' , b' , stY , k₁)) with Y-inv {q} stY
   ...   | r , eq , pure with KS.mid₁-view (KS.mid₁-subst (outᶜ-inj (just-injective eq)) refl k₁)
-  ...     | inj₁ (_ , _ , _ , st₃) = case fwd-dom-inv ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ st₃ of λ ()
+  ...     | inj₁ (_ , _ , _ , st₃) = case fwd-dom-inv spec-rewireᵢ spec-rewireₒ st₃ of λ ()
   ...     | inj₂ (inj₁ (sR' , c' , seq' , oeq , st₃)) =
     r , trans oeq (cong (λ z → just (L⊗ ϵ ᵗ¹ ↑ᵢ z))
-                    (trans (outᶜ-inj (just-injective (fwd-dom-inv ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ st₃)))
+                    (trans (outᶜ-inj (just-injective (fwd-dom-inv spec-rewireᵢ spec-rewireₒ st₃)))
                            (assocᵢ-IO (B.qO r))))
       , trans (cong (_, sR') pure) (sym seq')
   ...     | inj₂ (inj₂ (_ , _ , st₃ , _)) =
-    outᵈ≢outᶜ (just-injective (fwd-dom-inv ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ st₃))
+    outᵈ≢outᶜ (just-injective (fwd-dom-inv spec-rewireᵢ spec-rewireₒ st₃))
 
 spec-query-inv : ∀ {q s o s'}
   → Step spec s (queryIₛ q) o s'
   → ∃ λ r → (o ≡ just (queryOₛ {q} r)) × (s ≡ s')
 spec-query-inv {q} {sY , sR} st with KS.∘-cod-view st
-... | inj₁ (_ , _ , _ , st₁) = case fwd-cod-inv ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ st₁ of λ ()
+... | inj₁ (_ , _ , _ , st₁) = case fwd-cod-inv spec-rewireᵢ spec-rewireₒ st₁ of λ ()
 ... | inj₂ (inj₁ (_ , c' , _ , _ , st₁)) =
-  outᵈ≢outᶜ (sym (just-injective (fwd-cod-inv ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ st₁)))
+  outᵈ≢outᶜ (sym (just-injective (fwd-cod-inv spec-rewireᵢ spec-rewireₒ st₁)))
 ... | inj₂ (inj₂ (sR' , b , st₁ , k)) =
   after-fwd {q} (KS.mid₂-subst
-    (trans (outᵈ-inj (just-injective (fwd-cod-inv ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ st₁))) (assocₒ-IO (B.qI q)))
+    (trans (outᵈ-inj (just-injective (fwd-cod-inv spec-rewireᵢ spec-rewireₒ st₁))) (assocₒ-IO (B.qI q)))
     refl k)
 
 ------------------------------------------------------------------------
@@ -257,14 +293,15 @@ mapBase∘mapExt Slot  n        = refl
 private
   -- The layers of `Leios1`, outermost first: `Leios1 = ∘ᴷ-fwd ∘ X`,
   -- `X = (ext-spec ⊗₁ id) ∘ spec`, `ext-spec = regroup-ext ∘ R3`,
-  -- `R3 = node-layer ∘ R2`, `R2 = mux-shuffle ∘ mux-layer`.
-  X : Machine DD.M ((ExtIO ⊗₀ Adv) ⊗₀ BaseAdv)
+  -- `R3 = node-layer ∘ R2`, `R2 = mux-shuffle ∘ mux-layer`,
+  -- `mux-layer = (Shim ⊗₁ Mux) ⊗₁ id`.
+  X : Machine (DD.M ⊗₀ VotingC) ((ExtIO ⊗₀ Adv) ⊗₀ BaseAdv)
   X = (ext-spec ⊗₁ CC.id) CC.∘ spec
 
-  R2 : Machine (Network ⊗₀ BaseIO) ((FFD ⊗₀ BaseIO) ⊗₀ QIO)
+  R2 : Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) (((FFD ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ QIO)
   R2 = mux-shuffle CC.∘ mux-layer
 
-  R3 : Machine (Network ⊗₀ BaseIO) ((IO ⊗₀ Adv) ⊗₀ QIO)
+  R3 : Machine ((Network ⊗₀ BaseIO) ⊗₀ VotingC) ((IO ⊗₀ Adv) ⊗₀ QIO)
   R3 = node-layer CC.∘ R2
 
   module KL = Compose (∘ᴷ-fwd {C = ExtIO} {E₁ = BaseAdv} {E₂ = Adv}) X
@@ -274,12 +311,13 @@ private
   module K3 = Compose node-layer R2
   module K2 = Compose mux-shuffle mux-layer
   module TN = Tensor′ LinearLeios (CC.id {QIO})
+  module TQV = Tensor′ (Shim ⊗₁ Mux) (CC.id {VotingC})
   module TQ = Tensor′ Shim Mux
 
   -- The state of the extension layer, given the shim's, the multiplexer's
   -- stack and the node's.
   E : ShimState → Mux.State → LeiosState → Machine.State ext-spec
-  E sSh rs sLL = ((((sSh , rs) , tt) , (sLL , tt)) , tt)
+  E sSh rs sLL = (((((sSh , rs) , tt) , tt) , (sLL , tt)) , tt)
 
   -- A request `z` on the query port, at each layer on its way down to the
   -- base spec's IO channel (`d₁`); an answer `w` on its way back up.
@@ -293,18 +331,26 @@ private
   e₁ z = ϵ ⊗R ↑ₒ e₂ z
   e₅ : QryT Out → Channel.outType ((IO ⊗₀ Adv) ⊗₀ QIO)
   e₅ z = L⊗ ϵ ↑ₒ z
-  e₆ : QryT Out → Channel.outType ((FFD ⊗₀ BaseIO) ⊗₀ QIO)
+  e₆ : QryT Out → Channel.outType (((FFD ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ QIO)
   e₆ z = L⊗ ϵ ↑ₒ z
-  e₇ : QryT Out → Channel.outType (FFD ⊗₀ (BaseIO ⊗₀ QIO))
-  e₇ z = L⊗ ϵ ↑ₒ (L⊗ ϵ ↑ₒ z)
-  d₁ : BaseIOF Out → Channel.outType (Network ⊗₀ BaseIO)
-  d₁ x = L⊗ ϵ ↑ₒ x
+  e₈ : QryT Out → Channel.outType (FFD ⊗₀ (BaseIO ⊗₀ QIO))
+  e₈ z = L⊗ ϵ ↑ₒ (L⊗ ϵ ↑ₒ z)
+  e₇ : QryT Out → Channel.outType ((FFD ⊗₀ (BaseIO ⊗₀ QIO)) ⊗₀ VotingC)
+  e₇ z = ϵ ⊗R ↑ₒ e₈ z
+  d₀ : BaseIOF Out → Channel.outType (Network ⊗₀ BaseIO)
+  d₀ x = L⊗ ϵ ↑ₒ x
+  d₁ : BaseIOF Out → Channel.outType ((Network ⊗₀ BaseIO) ⊗₀ VotingC)
+  d₁ x = ϵ ⊗R ↑ₒ d₀ x
 
-  d₂ : BaseIOF In → Channel.inType (Network ⊗₀ BaseIO)
-  d₂ y = L⊗ ϵ ↑ᵢ y
-  f₁ : QryT In → Channel.inType (FFD ⊗₀ (BaseIO ⊗₀ QIO))
-  f₁ w = L⊗ ϵ ↑ᵢ (L⊗ ϵ ↑ᵢ w)
-  f₂ : QryT In → Channel.inType ((FFD ⊗₀ BaseIO) ⊗₀ QIO)
+  d₀' : BaseIOF In → Channel.inType (Network ⊗₀ BaseIO)
+  d₀' y = L⊗ ϵ ↑ᵢ y
+  d₂ : BaseIOF In → Channel.inType ((Network ⊗₀ BaseIO) ⊗₀ VotingC)
+  d₂ y = ϵ ⊗R ↑ᵢ d₀' y
+  f₈ : QryT In → Channel.inType (FFD ⊗₀ (BaseIO ⊗₀ QIO))
+  f₈ w = L⊗ ϵ ↑ᵢ (L⊗ ϵ ↑ᵢ w)
+  f₁ : QryT In → Channel.inType ((FFD ⊗₀ (BaseIO ⊗₀ QIO)) ⊗₀ VotingC)
+  f₁ w = ϵ ⊗R ↑ᵢ f₈ w
+  f₂ : QryT In → Channel.inType (((FFD ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ QIO)
   f₂ w = L⊗ ϵ ↑ᵢ w
   f₃ : QryT In → Channel.inType ((IO ⊗₀ Adv) ⊗₀ QIO)
   f₃ w = L⊗ ϵ ↑ᵢ w
@@ -331,17 +377,25 @@ private
     regroup-extᵢ-QIO : ∀ w → app regroup-extᵢ (f₃ w) ≡ f₄ w
     regroup-extᵢ-QIO w = refl
 
-    mux-shuffleₒ-QIO : ∀ z → app (⊗-assoc⃖ₒ {FFD} {BaseIO} {QIO}) (e₆ z) ≡ e₇ z
+    mux-shuffleₒ-QIO : ∀ z → app mux-shuffleₒ (e₆ z) ≡ e₇ z
     mux-shuffleₒ-QIO z = refl
 
-    mux-shuffleᵢ-QIO : ∀ w → app (⊗-assoc⃖ᵢ {FFD} {BaseIO} {QIO}) (f₁ w) ≡ f₂ w
+    mux-shuffleᵢ-QIO : ∀ w → app mux-shuffleᵢ (f₁ w) ≡ f₂ w
     mux-shuffleᵢ-QIO w = refl
 
+    -- The base spec's IO messages, as the extension layer's domain and as
+    -- `spec`'s codomain.
+    d₁-q₃ : ∀ x → ϵ ⊗R ↑ₒ d₁ x ≡ q₃ x
+    d₁-q₃ x = refl
+
+    d₂-a₃ : ∀ y → ϵ ⊗R ↑ᵢ d₂ y ≡ a₃ y
+    d₂-a₃ y = refl
+
 -- The queries of the deployed node.
-queryIₗ : BlockChainInfo LeiosBlock → Channel.inType (DD.M ⊗ᵀ (ExtIO ⊗₀ (BaseAdv ⊗₀ Adv)))
+queryIₗ : BlockChainInfo LeiosBlock → Channel.inType ((DD.M ⊗₀ VotingC) ⊗ᵀ (ExtIO ⊗₀ (BaseAdv ⊗₀ Adv)))
 queryIₗ q = L⊗ ϵ ᵗ¹ ↑ₒ e₀ (ask (B.qI (baseQ q)))
 
-queryOₗ : ∀ {q} → bciQueryType {Block = LeiosBlock} q → Channel.outType (DD.M ⊗ᵀ (ExtIO ⊗₀ (BaseAdv ⊗₀ Adv)))
+queryOₗ : ∀ {q} → bciQueryType {Block = LeiosBlock} q → Channel.outType ((DD.M ⊗₀ VotingC) ⊗ᵀ (ExtIO ⊗₀ (BaseAdv ⊗₀ Adv)))
 queryOₗ {q} r = L⊗ ϵ ᵗ¹ ↑ᵢ f₀ (ans (B.qO (mapBase q r)))
 
 private
@@ -365,17 +419,20 @@ private
       mx : Step Mux rs (L⊗ ϵ ᵗ¹ ↑ₒ (L⊗ ϵ ↑ₒ z)) (just (ϵ ⊗R ↑ₒ x)) (Mux.query ∷ rs)
       mx = step-subst (nest-ᵗ¹ₒ (L⊗ ϵ) z) refl (toStep (Mux.Ask {rs = rs} {x = x}))
 
-      ml : Step mux-layer (sSh , rs) (L⊗ ϵ ᵗ¹ ↑ₒ e₇ z) (just (ϵ ⊗R ↑ₒ d₁ x)) (sSh , Mux.query ∷ rs)
-      ml = step-subst (nest-ᵗ¹ₒ (L⊗ ϵ) (L⊗ ϵ ↑ₒ z)) (cong just (nest-⊗Rₒ (L⊗ ϵ) x)) (TQ.⊗₁-cod₂-dom mx)
+      ml₀ : Step (Shim ⊗₁ Mux) (sSh , rs) (L⊗ ϵ ᵗ¹ ↑ₒ e₈ z) (just (ϵ ⊗R ↑ₒ d₀ x)) (sSh , Mux.query ∷ rs)
+      ml₀ = step-subst (nest-ᵗ¹ₒ (L⊗ ϵ) (L⊗ ϵ ↑ₒ z)) (cong just (nest-⊗Rₒ (L⊗ ϵ) x)) (TQ.⊗₁-cod₂-dom mx)
 
-      r2 : Step R2 ((sSh , rs) , tt) (L⊗ ϵ ᵗ¹ ↑ₒ e₆ z) (just (ϵ ⊗R ↑ₒ d₁ x)) ((sSh , Mux.query ∷ rs) , tt)
-      r2 = K2.∘-cod-mid (fwd-cod ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ (e₆ z))
+      ml : Step mux-layer ((sSh , rs) , tt) (L⊗ ϵ ᵗ¹ ↑ₒ e₇ z) (just (ϵ ⊗R ↑ₒ d₁ x)) ((sSh , Mux.query ∷ rs) , tt)
+      ml = step-subst (nest-ᵗ¹ₒ (ϵ ⊗R) (e₈ z)) (cong just (nest-⊗Rₒ (ϵ ⊗R) (d₀ x))) (TQV.⊗₁-cod₁-dom ml₀)
+
+      r2 : Step R2 (((sSh , rs) , tt) , tt) (L⊗ ϵ ᵗ¹ ↑ₒ e₆ z) (just (ϵ ⊗R ↑ₒ d₁ x)) (((sSh , Mux.query ∷ rs) , tt) , tt)
+      r2 = K2.∘-cod-mid (fwd-cod mux-shuffleᵢ mux-shuffleₒ (e₆ z))
              (K2.mid₂-subst (sym (mux-shuffleₒ-QIO z)) refl (K2.mid₂-dom ml))
 
       nl : Step node-layer (sLL , tt) (L⊗ ϵ ᵗ¹ ↑ₒ e₅ z) (just (ϵ ⊗R ↑ₒ e₆ z)) (sLL , tt)
       nl = step-subst (nest-ᵗ¹ₒ (L⊗ ϵ) z) (cong just (nest-⊗Rₒ (L⊗ ϵ) z)) (TN.⊗₁-cod₂-dom (id-cod z))
 
-      r3 : Step R3 (((sSh , rs) , tt) , (sLL , tt)) (L⊗ ϵ ᵗ¹ ↑ₒ e₅ z) (just (ϵ ⊗R ↑ₒ d₁ x)) (((sSh , Mux.query ∷ rs) , tt) , (sLL , tt))
+      r3 : Step R3 ((((sSh , rs) , tt) , tt) , (sLL , tt)) (L⊗ ϵ ᵗ¹ ↑ₒ e₅ z) (just (ϵ ⊗R ↑ₒ d₁ x)) ((((sSh , Mux.query ∷ rs) , tt) , tt) , (sLL , tt))
       r3 = K3.∘-cod-mid nl (K3.mid₂-dom r2)
 
   -- … and relays the answer arriving on its domain back up to the port,
@@ -392,18 +449,21 @@ private
       mx : Step Mux (Mux.query ∷ rs) (ϵ ⊗R ↑ᵢ y) (just (L⊗ ϵ ᵗ¹ ↑ᵢ (L⊗ ϵ ↑ᵢ w))) rs
       mx = step-subst refl (cong just (nest-ᵗ¹ᵢ (L⊗ ϵ) w)) (toStep (Mux.Tell {rs = rs} {y = y}))
 
-      ml : Step mux-layer (sSh , Mux.query ∷ rs) (ϵ ⊗R ↑ᵢ d₂ y) (just (L⊗ ϵ ᵗ¹ ↑ᵢ f₁ w)) (sSh , rs)
-      ml = step-subst (nest-⊗Rᵢ (L⊗ ϵ) y) (cong just (nest-ᵗ¹ᵢ (L⊗ ϵ) (L⊗ ϵ ↑ᵢ w))) (TQ.⊗₁-dom₂-cod mx)
+      ml₀ : Step (Shim ⊗₁ Mux) (sSh , Mux.query ∷ rs) (ϵ ⊗R ↑ᵢ d₀' y) (just (L⊗ ϵ ᵗ¹ ↑ᵢ f₈ w)) (sSh , rs)
+      ml₀ = step-subst (nest-⊗Rᵢ (L⊗ ϵ) y) (cong just (nest-ᵗ¹ᵢ (L⊗ ϵ) (L⊗ ϵ ↑ᵢ w))) (TQ.⊗₁-dom₂-cod mx)
 
-      r2 : Step R2 ((sSh , Mux.query ∷ rs) , tt) (ϵ ⊗R ↑ᵢ d₂ y) (just (L⊗ ϵ ᵗ¹ ↑ᵢ f₂ w)) ((sSh , rs) , tt)
+      ml : Step mux-layer ((sSh , Mux.query ∷ rs) , tt) (ϵ ⊗R ↑ᵢ d₂ y) (just (L⊗ ϵ ᵗ¹ ↑ᵢ f₁ w)) ((sSh , rs) , tt)
+      ml = step-subst (nest-⊗Rᵢ (ϵ ⊗R) (d₀' y)) (cong just (nest-ᵗ¹ᵢ (ϵ ⊗R) (f₈ w))) (TQV.⊗₁-dom₁-cod ml₀)
+
+      r2 : Step R2 (((sSh , Mux.query ∷ rs) , tt) , tt) (ϵ ⊗R ↑ᵢ d₂ y) (just (L⊗ ϵ ᵗ¹ ↑ᵢ f₂ w)) (((sSh , rs) , tt) , tt)
       r2 = K2.∘-dom-mid ml
              (K2.mid₁-subst refl (cong just (cong (L⊗ ϵ ᵗ¹ ↑ᵢ_) (mux-shuffleᵢ-QIO w)))
-               (K2.mid₁-cod (fwd-dom ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ (f₁ w))))
+               (K2.mid₁-cod (fwd-dom mux-shuffleᵢ mux-shuffleₒ (f₁ w))))
 
       nl : Step node-layer (sLL , tt) (ϵ ⊗R ↑ᵢ f₂ w) (just (L⊗ ϵ ᵗ¹ ↑ᵢ f₃ w)) (sLL , tt)
       nl = step-subst (nest-⊗Rᵢ (L⊗ ϵ) w) (cong just (nest-ᵗ¹ᵢ (L⊗ ϵ) w)) (TN.⊗₁-dom₂-cod (id-dom w))
 
-      r3 : Step R3 (((sSh , Mux.query ∷ rs) , tt) , (sLL , tt)) (ϵ ⊗R ↑ᵢ d₂ y) (just (L⊗ ϵ ᵗ¹ ↑ᵢ f₃ w)) (((sSh , rs) , tt) , (sLL , tt))
+      r3 : Step R3 ((((sSh , Mux.query ∷ rs) , tt) , tt) , (sLL , tt)) (ϵ ⊗R ↑ᵢ d₂ y) (just (L⊗ ϵ ᵗ¹ ↑ᵢ f₃ w)) ((((sSh , rs) , tt) , tt) , (sLL , tt))
       r3 = K3.∘-dom-mid r2 (K3.mid₁-cod nl)
 
 ------------------------------------------------------------------------
@@ -411,7 +471,7 @@ private
 
 Leios1-completeness : ∀ {q} {s : Machine.State Leios1}
   → ∃ λ response' → ∃ λ s' → Machine.stepRel Leios1 s (queryIₗ q) (just response') s'
-Leios1-completeness {q} {(sS , (((((sSh , rs) , tt) , (sLL , tt)) , tt) , tt)) , tt}
+Leios1-completeness {q} {(sS , ((((((sSh , rs) , tt) , tt) , (sLL , tt)) , tt) , tt)) , tt}
   with spec-answers (baseQ q) sS
 ... | r , stS = _ , _ , fromStep stL
   where
@@ -424,13 +484,13 @@ Leios1-completeness {q} {(sS , (((((sSh , rs) , tt) , (sLL , tt)) , tt) , tt)) ,
     te-req = step-subst (nest-ᵗ¹ₒ (ϵ ⊗R) (e₂ z)) (cong just (nest-⊗Rₒ (ϵ ⊗R) (d₁ x))) (TE.⊗₁-cod₁-dom (ext-request x))
 
     te-ans : Step (ext-spec ⊗₁ CC.id) (E sSh (Mux.query ∷ rs) sLL , tt) (ϵ ⊗R ↑ᵢ a₃ y) (just (L⊗ ϵ ᵗ¹ ↑ᵢ f₅ w)) (E sSh rs sLL , tt)
-    te-ans = step-subst (trans (nest-⊗Rᵢ (ϵ ⊗R) (d₂ y)) (cong (ϵ ⊗R ↑ᵢ_) (sym (nest-⊗Rᵢ (L⊗ ϵ) y))))
+    te-ans = step-subst (trans (nest-⊗Rᵢ (ϵ ⊗R) (d₂ y)) (cong (ϵ ⊗R ↑ᵢ_) (d₂-a₃ y)))
                         (cong just (nest-ᵗ¹ᵢ (ϵ ⊗R) (f₄ w)))
                         (TE.⊗₁-dom₁-cod (ext-answer y))
 
     stX : Step X (sS , (E sSh rs sLL , tt)) (L⊗ ϵ ᵗ¹ ↑ₒ e₁ z) (just (L⊗ ϵ ᵗ¹ ↑ᵢ f₅ w)) (sS , (E sSh rs sLL , tt))
     stX = KE.∘-cod-mid te-req
-            (KE.mid₂-subst (nest-⊗Rₒ (L⊗ ϵ) x) refl
+            (KE.mid₂-subst (d₁-q₃ x) refl
               (KE.mid₂-mid stS (KE.mid₁-cod te-ans)))
 
     stL : Step Leios1 ((sS , (E sSh rs sLL , tt)) , tt) (queryIₗ q) (just (queryOₗ (mapExt q r))) ((sS , (E sSh rs sLL , tt)) , tt)
@@ -499,10 +559,10 @@ private
   -- a `with` re-normalises the goal, and goals here mention the whole
   -- deployed node, whose normal form is enormous.
 
-  mux-layer-req-inv : ∀ {sSh rs o s'} x
-    → Step mux-layer (sSh , rs) (L⊗ ϵ ᵗ¹ ↑ₒ e₇ (ask x)) o s'
-    → (o ≡ just (ϵ ⊗R ↑ₒ d₁ x)) × (s' ≡ (sSh , Mux.query ∷ rs))
-  mux-layer-req-inv {sSh} x st =
+  ml₀-req-inv : ∀ {sSh rs o s'} x
+    → Step (Shim ⊗₁ Mux) (sSh , rs) (L⊗ ϵ ᵗ¹ ↑ₒ e₈ (ask x)) o s'
+    → (o ≡ just (ϵ ⊗R ↑ₒ d₀ x)) × (s' ≡ (sSh , Mux.query ∷ rs))
+  ml₀-req-inv {sSh} x st =
     case TQ.⊗₁-cod₂-view (step-subst (sym (nest-ᵗ¹ₒ (L⊗ ϵ) (L⊗ ϵ ↑ₒ ask x))) refl st) of λ where
       (rs' , seq , inj₁ (oeq , stM)) →
         case Mux-ask-inv (step-subst (sym (nest-ᵗ¹ₒ (L⊗ ϵ) (ask x))) refl stM) of λ where (eq , _) → case eq of λ ()
@@ -513,15 +573,27 @@ private
       (rs' , seq , inj₂ (inj₂ (_ , _ , stM))) →
         outᵈ≢outᶜ (sym (just-injective (proj₁ (Mux-ask-inv (step-subst (sym (nest-ᵗ¹ₒ (L⊗ ϵ) (ask x))) refl stM)))))
 
+  mux-layer-req-inv : ∀ {sSh rs o s'} {sV : ⊤} x
+    → Step mux-layer ((sSh , rs) , sV) (L⊗ ϵ ᵗ¹ ↑ₒ e₇ (ask x)) o s'
+    → (o ≡ just (ϵ ⊗R ↑ₒ d₁ x)) × (s' ≡ ((sSh , Mux.query ∷ rs) , sV))
+  mux-layer-req-inv x st =
+    case TQV.⊗₁-cod₁-view (step-subst (sym (nest-ᵗ¹ₒ (ϵ ⊗R) (e₈ (ask x)))) refl st) of λ where
+      (s₀' , seq , inj₁ (oeq , st₀)) → case proj₁ (ml₀-req-inv x st₀) of λ ()
+      (s₀' , seq , inj₂ (inj₁ (a' , oeq , st₀))) →
+        case ml₀-req-inv x st₀ of λ where
+          (eq , seq') → trans oeq (cong just (trans (cong ((ϵ ⊗R) ⊗R ↑ₒ_) (outᵈ-inj (just-injective eq))) (nest-⊗Rₒ (ϵ ⊗R) (d₀ x))))
+                      , trans seq (cong (_, _) seq')
+      (s₀' , seq , inj₂ (inj₂ (_ , _ , st₀))) → outᵈ≢outᶜ (sym (just-injective (proj₁ (ml₀-req-inv x st₀))))
+
   R2-req-inv : ∀ {sSh rs o s'} x
-    → Step R2 ((sSh , rs) , tt) (L⊗ ϵ ᵗ¹ ↑ₒ e₆ (ask x)) o s'
-    → (o ≡ just (ϵ ⊗R ↑ₒ d₁ x)) × (s' ≡ ((sSh , Mux.query ∷ rs) , tt))
+    → Step R2 (((sSh , rs) , tt) , tt) (L⊗ ϵ ᵗ¹ ↑ₒ e₆ (ask x)) o s'
+    → (o ≡ just (ϵ ⊗R ↑ₒ d₁ x)) × (s' ≡ (((sSh , Mux.query ∷ rs) , tt) , tt))
   R2-req-inv x st =
     case K2.∘-cod-view st of λ where
-      (inj₁ (_ , _ , _ , st₁)) → case fwd-cod-inv ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ st₁ of λ ()
-      (inj₂ (inj₁ (_ , _ , _ , _ , st₁))) → outᵈ≢outᶜ (sym (just-injective (fwd-cod-inv ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ st₁)))
+      (inj₁ (_ , _ , _ , st₁)) → case fwd-cod-inv mux-shuffleᵢ mux-shuffleₒ st₁ of λ ()
+      (inj₂ (inj₁ (_ , _ , _ , _ , st₁))) → outᵈ≢outᶜ (sym (just-injective (fwd-cod-inv mux-shuffleᵢ mux-shuffleₒ st₁)))
       (inj₂ (inj₂ (_ , b , st₁ , k))) →
-        case K2.mid₂-view (K2.mid₂-subst (trans (outᵈ-inj (just-injective (fwd-cod-inv ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ st₁))) (mux-shuffleₒ-QIO (ask x))) refl k) of λ where
+        case K2.mid₂-view (K2.mid₂-subst (trans (outᵈ-inj (just-injective (fwd-cod-inv mux-shuffleᵢ mux-shuffleₒ st₁))) (mux-shuffleₒ-QIO (ask x))) refl k) of λ where
           (inj₁ (_ , _ , _ , stM)) → case proj₁ (mux-layer-req-inv x stM) of λ ()
           (inj₂ (inj₁ (sM' , a' , seq , oeq , stM))) →
             case mux-layer-req-inv x stM of λ where
@@ -539,8 +611,8 @@ private
       (_ , seq , inj₂ (inj₂ (_ , _ , stId))) → outᵈ≢outᶜ (sym (just-injective (id-cod-inv stId)))
 
   R3-req-inv : ∀ {sSh rs sLL o s'} x
-    → Step R3 (((sSh , rs) , tt) , (sLL , tt)) (L⊗ ϵ ᵗ¹ ↑ₒ e₅ (ask x)) o s'
-    → (o ≡ just (ϵ ⊗R ↑ₒ d₁ x)) × (s' ≡ (((sSh , Mux.query ∷ rs) , tt) , (sLL , tt)))
+    → Step R3 ((((sSh , rs) , tt) , tt) , (sLL , tt)) (L⊗ ϵ ᵗ¹ ↑ₒ e₅ (ask x)) o s'
+    → (o ≡ just (ϵ ⊗R ↑ₒ d₁ x)) × (s' ≡ ((((sSh , Mux.query ∷ rs) , tt) , tt) , (sLL , tt)))
   R3-req-inv x st =
     case K3.∘-cod-view st of λ where
       (inj₁ (_ , _ , _ , stN)) → case proj₁ (node-layer-req-inv (ask x) stN) of λ ()
@@ -572,10 +644,10 @@ private
 
   -- Answer half, innermost first.
 
-  mux-layer-ans-inv : ∀ {sSh rs o s'} y
-    → Step mux-layer (sSh , Mux.query ∷ rs) (ϵ ⊗R ↑ᵢ d₂ y) o s'
-    → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ f₁ (ans y))) × (s' ≡ (sSh , rs))
-  mux-layer-ans-inv {sSh} y st =
+  ml₀-ans-inv : ∀ {sSh rs o s'} y
+    → Step (Shim ⊗₁ Mux) (sSh , Mux.query ∷ rs) (ϵ ⊗R ↑ᵢ d₀' y) o s'
+    → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ f₈ (ans y))) × (s' ≡ (sSh , rs))
+  ml₀-ans-inv {sSh} y st =
     case TQ.⊗₁-dom₂-view (step-subst (sym (nest-⊗Rᵢ (L⊗ ϵ) y)) refl st) of λ where
       (rs' , seq , inj₁ (oeq , stM)) → case proj₁ (Mux-tell-inv stM) of λ ()
       (rs' , seq , inj₂ (inj₁ (_ , _ , stM))) → outᵈ≢outᶜ (just-injective (proj₁ (Mux-tell-inv stM)))
@@ -586,9 +658,21 @@ private
                                         (nest-ᵗ¹ᵢ (L⊗ ϵ) (L⊗ ϵ ↑ᵢ ans y))))
               , trans seq (cong (sSh ,_) seq')
 
+  mux-layer-ans-inv : ∀ {sSh rs o s'} {sV : ⊤} y
+    → Step mux-layer ((sSh , Mux.query ∷ rs) , sV) (ϵ ⊗R ↑ᵢ d₂ y) o s'
+    → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ f₁ (ans y))) × (s' ≡ ((sSh , rs) , sV))
+  mux-layer-ans-inv y st =
+    case TQV.⊗₁-dom₁-view (step-subst (sym (nest-⊗Rᵢ (ϵ ⊗R) (d₀' y))) refl st) of λ where
+      (s₀' , seq , inj₁ (oeq , st₀)) → case proj₁ (ml₀-ans-inv y st₀) of λ ()
+      (s₀' , seq , inj₂ (inj₁ (_ , _ , st₀))) → outᵈ≢outᶜ (just-injective (proj₁ (ml₀-ans-inv y st₀)))
+      (s₀' , seq , inj₂ (inj₂ (b' , oeq , st₀))) →
+        case ml₀-ans-inv y st₀ of λ where
+          (eq , seq') → trans oeq (cong just (trans (cong (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ_) (outᶜ-inj (just-injective eq))) (nest-ᵗ¹ᵢ (ϵ ⊗R) (f₈ (ans y)))))
+                      , trans seq (cong (_, _) seq')
+
   R2-ans-inv : ∀ {sSh rs o s'} y
-    → Step R2 ((sSh , Mux.query ∷ rs) , tt) (ϵ ⊗R ↑ᵢ d₂ y) o s'
-    → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ f₂ (ans y))) × (s' ≡ ((sSh , rs) , tt))
+    → Step R2 (((sSh , Mux.query ∷ rs) , tt) , tt) (ϵ ⊗R ↑ᵢ d₂ y) o s'
+    → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ f₂ (ans y))) × (s' ≡ (((sSh , rs) , tt) , tt))
   R2-ans-inv y st =
     case K2.∘-dom-view st of λ where
       (inj₁ (_ , _ , _ , stM)) → case proj₁ (mux-layer-ans-inv y stM) of λ ()
@@ -597,11 +681,11 @@ private
         case mux-layer-ans-inv y stM of λ where
           (eqM , seqM) →
             case K2.mid₁-view (K2.mid₁-subst (outᶜ-inj (just-injective eqM)) refl k) of λ where
-              (inj₁ (_ , _ , _ , st₁)) → case fwd-dom-inv ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ st₁ of λ ()
+              (inj₁ (_ , _ , _ , st₁)) → case fwd-dom-inv mux-shuffleᵢ mux-shuffleₒ st₁ of λ ()
               (inj₂ (inj₁ (_ , c' , seq , oeq , st₁))) →
-                trans oeq (cong (λ v → just (L⊗ ϵ ᵗ¹ ↑ᵢ v)) (trans (outᶜ-inj (just-injective (fwd-dom-inv ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ st₁))) (mux-shuffleᵢ-QIO (ans y))))
+                trans oeq (cong (λ v → just (L⊗ ϵ ᵗ¹ ↑ᵢ v)) (trans (outᶜ-inj (just-injective (fwd-dom-inv mux-shuffleᵢ mux-shuffleₒ st₁))) (mux-shuffleᵢ-QIO (ans y))))
                   , trans seq (cong (_, tt) seqM)
-              (inj₂ (inj₂ (_ , _ , st₁ , _))) → outᵈ≢outᶜ (just-injective (fwd-dom-inv ⊗-assoc⃖ᵢ ⊗-assoc⃖ₒ st₁))
+              (inj₂ (inj₂ (_ , _ , st₁ , _))) → outᵈ≢outᶜ (just-injective (fwd-dom-inv mux-shuffleᵢ mux-shuffleₒ st₁))
 
   node-layer-ans-inv : ∀ {sLL o s'} w
     → Step node-layer (sLL , tt) (ϵ ⊗R ↑ᵢ f₂ w) o s'
@@ -614,8 +698,8 @@ private
         trans oeq (cong just (trans (cong (L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ_) (outᶜ-inj (just-injective (id-dom-inv stId)))) (nest-ᵗ¹ᵢ (L⊗ ϵ) w))) , seq
 
   R3-ans-inv : ∀ {sSh rs sLL o s'} y
-    → Step R3 (((sSh , Mux.query ∷ rs) , tt) , (sLL , tt)) (ϵ ⊗R ↑ᵢ d₂ y) o s'
-    → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ f₃ (ans y))) × (s' ≡ (((sSh , rs) , tt) , (sLL , tt)))
+    → Step R3 ((((sSh , Mux.query ∷ rs) , tt) , tt) , (sLL , tt)) (ϵ ⊗R ↑ᵢ d₂ y) o s'
+    → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ f₃ (ans y))) × (s' ≡ ((((sSh , rs) , tt) , tt) , (sLL , tt)))
   R3-ans-inv y st =
     case K3.∘-dom-view st of λ where
       (inj₁ (_ , _ , _ , stR)) → case proj₁ (R2-ans-inv y stR) of λ ()
@@ -665,7 +749,7 @@ private
     → Step (ext-spec ⊗₁ CC.id) (E sSh (Mux.query ∷ rs) sLL , sI) (ϵ ⊗R ↑ᵢ a₃ y) o s'
     → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ f₅ (ans y))) × (s' ≡ (E sSh rs sLL , sI))
   TE-ans-inv y st =
-    case TE.⊗₁-dom₁-view (step-subst (trans (cong (ϵ ⊗R ↑ᵢ_) (nest-⊗Rᵢ (L⊗ ϵ) y)) (sym (nest-⊗Rᵢ (ϵ ⊗R) (d₂ y)))) refl st) of λ where
+    case TE.⊗₁-dom₁-view (step-subst (trans (cong (ϵ ⊗R ↑ᵢ_) (sym (d₂-a₃ y))) (sym (nest-⊗Rᵢ (ϵ ⊗R) (d₂ y)))) refl st) of λ where
       (sE' , seq , inj₁ (oeq , stE)) → case proj₁ (ext-ans-inv y stE) of λ ()
       (sE' , seq , inj₂ (inj₁ (_ , _ , stE))) → outᵈ≢outᶜ (just-injective (proj₁ (ext-ans-inv y stE)))
       (sE' , seq , inj₂ (inj₂ (b' , oeq , stE))) →
@@ -685,7 +769,7 @@ private
       (inj₂ (inj₂ (sT' , b , stT , k))) →
         case TE-req-inv _ stT of λ where
           (eqT , seqT) →
-            case KE.mid₂-view (KE.mid₂-subst (trans (outᵈ-inj (just-injective eqT)) (sym (nest-⊗Rₒ (L⊗ ϵ) _))) refl
+            case KE.mid₂-view (KE.mid₂-subst (trans (outᵈ-inj (just-injective eqT)) (d₁-q₃ _)) refl
                                 (subst (λ z → KE.Mid₂ (_ , z) b _ _) seqT k)) of λ where
               (inj₁ (_ , _ , _ , stS)) → case proj₁ (proj₂ (spec-query-inv stS)) of λ ()
               (inj₂ (inj₁ (_ , _ , _ , _ , stS))) → outᵈ≢outᶜ (just-injective (proj₁ (proj₂ (spec-query-inv stS))))
@@ -703,7 +787,7 @@ private
 Leios1-query-inv : ∀ {q s o s'}
   → Step Leios1 s (queryIₗ q) o s'
   → ∃ λ r → (o ≡ just (queryOₗ {q} r)) × (s ≡ s')
-Leios1-query-inv {q} {(sS , (((((sSh , rs) , tt) , (sLL , tt)) , tt) , sI)) , sF} st =
+Leios1-query-inv {q} {(sS , ((((((sSh , rs) , tt) , tt) , (sLL , tt)) , tt) , sI)) , sF} st =
   case KL.∘-cod-view st of λ where
     (inj₁ (_ , _ , _ , st₁)) → case fwd-cod-inv ∘ᴷ-fwdᵢ ∘ᴷ-fwdₒ st₁ of λ ()
     (inj₂ (inj₁ (_ , _ , _ , _ , st₁))) → outᵈ≢outᶜ (sym (just-injective (fwd-cod-inv ∘ᴷ-fwdᵢ ∘ᴷ-fwdₒ st₁)))

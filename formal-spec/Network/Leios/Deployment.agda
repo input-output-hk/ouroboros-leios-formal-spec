@@ -5,6 +5,7 @@ open import Leios.SpecStructure
 open import Leios.Config
 
 open import CategoricalCrypto hiding (id; _∘_)
+import CategoricalCrypto as CC
 open import CategoricalCrypto.Machine.Iso using (≅ᴹ-refl)
 
 open import Blockchain.Safety
@@ -28,18 +29,27 @@ module Network.Leios.Deployment
     → HashCorrectB rb eb₁ → HashCorrectB rb eb₂ → eb₁ ≡ eb₂)
   (ebOf : RankingBlock → Maybe EndorserBlock)
   (ebOf-correct : ∀ rb → HashCorrectB rb (ebOf rb))
+  (forEB     : Vote → EBRef)
+  (mkCert    : EBRef → EBCert)
+  (mkCert-hash : ∀ r → getEBHash (mkCert r) ≡ r)
+  (threshold : ℕ)
+  (voter     : Vote → Fin numberOfParties)
+  (Valid     : Vote → Type) ⦃ Valid? : Valid ⁇¹ ⦄
     where
 
 open import Network.Leios         ⋯ params k HashCorrectB HashCorrect-irrel hash-unique ebOf ebOf-correct
+  forEB mkCert mkCert-hash threshold voter Valid ⦃ Valid? ⦄
 open import Network.Leios.Queries ⋯ params k HashCorrectB HashCorrect-irrel hash-unique ebOf ebOf-correct
+  forEB mkCert mkCert-hash threshold voter Valid ⦃ Valid? ⦄
 open import Leios.Linear ⋯ params
 open Types params hiding (Network)
 open BaseAbstract B' using (BaseAdv)
 
 import Network.DelayedDiffuse numberOfParties Message k as DD
+import Leios.Voting.Certifier numberOfParties Vote EBRef EBCert forEB mkCert threshold as Certifier
 
 module _ (IOF AdvF : Participant → Channel)
-  (nodesF : (p : Participant) → Machine DD.M (IOF p ⊗₀ AdvF p)) honest-Nodes
+  (nodesF : (p : Participant) → Machine (DD.M ⊗₀ VotingC) (IOF p ⊗₀ AdvF p)) honest-Nodes
   (honest-Node : {p : Participant} → p ∈ honest-Nodes → nodesF p ≡ᴹ Leios1)
   (honest-IOF  : {p : Participant} → p ∈ honest-Nodes → IOF p ≡ ExtIO)
   (honest-AdvF : {p : Participant} → p ∈ honest-Nodes → AdvF p ≡ BaseAdv ⊗₀ Adv)
@@ -73,7 +83,8 @@ module _ (IOF AdvF : Participant → Channel)
     ; honest-nodes-≡-spec = honest-Node
     ; honest-IOF          = honest-IOF
     ; honest-AdvF         = honest-AdvF
-    ; network             = DD.Network
+    ; network             = liftᴷ {E = I} (shuffle numberOfParties DD.M VotingC)
+                              ∘ᴷ (DD.Network ⊗ᴷ Certifier.Functionality) CC.∘ idᴷ
     }
 
   module S = Deployment safetyS
