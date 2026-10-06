@@ -125,18 +125,17 @@ private
 ------------------------------------------------------------------------
 -- Completeness: the base layer's answer travels back out.
 
-spec-completeness : ∀ {q} {s : Machine.State spec}
-  → ∃ λ response' → ∃ λ s' → Machine.stepRel spec s (queryIₛ q) (just response') s'
-spec-completeness {q} {((sNT , tt) , ((tt , sB) , tt)) , tt}
-  with BC.completeness {q} {sB}
-... | resp' , sB' , stB with BC.correctness stB
-... | r , eq = _ , _ , fromStep stS
-  where
+  -- The chain of steps, from the base layer's.
+  spec-step : ∀ {q sNT sB sB' r}
+    → Machine.stepRel B.m sB (B.queryI q) (just (B.queryO {q} r)) sB'
+    → Step spec (((sNT , tt) , ((tt , sB) , tt)) , tt) (queryIₛ q) (just (queryOₛ r)) (((sNT , tt) , ((tt , sB') , tt)) , tt)
+  spec-step {q} {sNT} {sB} {sB'} {r} stB = stS
+   where
     x = B.qI q
     y = B.qO {q} r
 
     stB₁ : Step B.m sB (L⊗ ϵ ᵗ¹ ↑ₒ q₁ x) (just (L⊗ ϵ ᵗ¹ ↑ᵢ a₁ y)) sB'
-    stB₁ = B-step (subst (λ o → Machine.stepRel B.m sB (B.queryI q) o sB') eq stB)
+    stB₁ = B-step stB
 
     stI : Step Inner (tt , sB) (L⊗ ϵ ᵗ¹ ↑ₒ q₂ x) (just (L⊗ ϵ ᵗ¹ ↑ᵢ a₂ y)) (tt , sB')
     stI = step-subst (nest-ᵗ¹ₒ (L⊗ ϵ) (q₁ x)) (cong just (nest-ᵗ¹ᵢ (L⊗ ϵ) (a₁ y))) (TI.⊗₁-cod₂-cod stB₁)
@@ -154,6 +153,13 @@ spec-completeness {q} {((sNT , tt) , ((tt , sB) , tt)) , tt}
                 (KS.mid₁-subst refl (cong just (cong (L⊗ ϵ ᵗ¹ ↑ᵢ_) (assocᵢ-IO y)))
                   (KS.mid₁-cod (fwd-dom spec-rewireᵢ spec-rewireₒ (a₂' y))))))
 
+spec-completeness : ∀ {q} {s : Machine.State spec}
+  → ∃ λ response' → ∃ λ s' → Machine.stepRel spec s (queryIₛ q) (just response') s'
+spec-completeness {q} {((sNT , tt) , ((tt , sB) , tt)) , tt} =
+  let resp' , sB' , stB = BC.completeness {q} {sB}
+      r , eq = BC.correctness stB
+  in _ , _ , fromStep (spec-step (subst (λ o → Machine.stepRel B.m sB (B.queryI q) o sB') eq stB))
+
 ------------------------------------------------------------------------
 -- Correctness and purity: every step of `spec` on a query is the chain
 -- above, so its answer is the base layer's and its state is unchanged.
@@ -163,80 +169,81 @@ private
   B-inv : ∀ {q sB o sB'}
     → Step B.m sB (L⊗ ϵ ᵗ¹ ↑ₒ q₁ (B.qI q)) o sB'
     → ∃ λ r → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ a₁ (B.qO {q} r))) × (sB ≡ sB')
-  B-inv {q} st with BC.correctness stB | B.isPure q stB
-    where stB = fromStep (step-subst (sym (trans (B.queryI-IO q) (nest-ᵗ¹ₒ (ϵ ⊗R) (B.qI q)))) refl st)
-  ... | r , eq | pure = r , trans eq (cong just (trans (B.queryO-IO r) (nest-ᵗ¹ᵢ (ϵ ⊗R) (B.qO r)))) , pure
+  B-inv {q} st =
+    let stB = fromStep (step-subst (sym (trans (B.queryI-IO q) (nest-ᵗ¹ₒ (ϵ ⊗R) (B.qI q)))) refl st)
+        r , eq = BC.correctness stB
+    in r , trans eq (cong just (trans (B.queryO-IO r) (nest-ᵗ¹ᵢ (ϵ ⊗R) (B.qO r)))) , B.isPure q stB
 
   Inner-inv : ∀ {q s o s'}
     → Step Inner s (L⊗ ϵ ᵗ¹ ↑ₒ q₂ (B.qI q)) o s'
     → ∃ λ r → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ a₂ (B.qO {q} r))) × (s ≡ s')
-  Inner-inv {q} {sI , sB} st
-    with TI.⊗₁-cod₂-view (step-subst (sym (nest-ᵗ¹ₒ (L⊗ ϵ) (q₁ (B.qI q)))) refl st)
-  ... | sB' , seq , inj₁ (oeq , stB) with B-inv {q} stB
-  ...   | _ , eq , _ = case eq of λ ()
-  Inner-inv {q} {sI , sB} st | sB' , seq , inj₂ (inj₁ (c' , oeq , stB)) with B-inv {q} stB
-  ...   | _ , eq , _ = outᵈ≢outᶜ (just-injective eq)
-  Inner-inv {q} {sI , sB} st | sB' , seq , inj₂ (inj₂ (d' , oeq , stB)) with B-inv {q} stB
-  ...   | r , eq , pure =
-    r , trans oeq (cong just (trans (cong (L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ_) (outᶜ-inj (just-injective eq))) (nest-ᵗ¹ᵢ (L⊗ ϵ) (a₁ (B.qO r)))))
-      , trans (cong (sI ,_) pure) (sym seq)
+  Inner-inv {q} {sI , sB} st =
+    case TI.⊗₁-cod₂-view (step-subst (sym (nest-ᵗ¹ₒ (L⊗ ϵ) (q₁ (B.qI q)))) refl st) of λ where
+      (sB' , seq , inj₁ (oeq , stB)) → case proj₁ (proj₂ (B-inv {q} stB)) of λ ()
+      (sB' , seq , inj₂ (inj₁ (c' , oeq , stB))) → outᵈ≢outᶜ (just-injective (proj₁ (proj₂ (B-inv {q} stB))))
+      (sB' , seq , inj₂ (inj₂ (d' , oeq , stB))) →
+        case B-inv {q} stB of λ where
+          (r , eq , pure) →
+            r , trans oeq (cong just (trans (cong (L⊗ (L⊗ ϵ) ᵗ¹ ↑ᵢ_) (outᶜ-inj (just-injective eq))) (nest-ᵗ¹ᵢ (L⊗ ϵ) (a₁ (B.qO r)))))
+              , trans (cong (sI ,_) pure) (sym seq)
 
   L-inv : ∀ {q s o s'}
     → Step L s (L⊗ ϵ ᵗ¹ ↑ₒ q₂' (B.qI q)) o s'
     → ∃ λ r → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ a₂' (B.qO {q} r))) × (s ≡ s')
-  L-inv {q} {sI , sV} st
-    with TL.⊗₁-cod₁-view (step-subst (sym (nest-ᵗ¹ₒ (ϵ ⊗R) (q₂ (B.qI q)))) refl st)
-  ... | sI' , seq , inj₁ (oeq , stI) with Inner-inv {q} stI
-  ...   | _ , eq , _ = case eq of λ ()
-  L-inv {q} {sI , sV} st | sI' , seq , inj₂ (inj₁ (a' , oeq , stI)) with Inner-inv {q} stI
-  ...   | _ , eq , _ = outᵈ≢outᶜ (just-injective eq)
-  L-inv {q} {sI , sV} st | sI' , seq , inj₂ (inj₂ (b' , oeq , stI)) with Inner-inv {q} stI
-  ...   | r , eq , pure =
-    r , trans oeq (cong just (trans (cong (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ_) (outᶜ-inj (just-injective eq))) (nest-ᵗ¹ᵢ (ϵ ⊗R) (a₂ (B.qO r)))))
-      , trans (cong (_, sV) pure) (sym seq)
+  L-inv {q} {sI , sV} st =
+    case TL.⊗₁-cod₁-view (step-subst (sym (nest-ᵗ¹ₒ (ϵ ⊗R) (q₂ (B.qI q)))) refl st) of λ where
+      (sI' , seq , inj₁ (oeq , stI)) → case proj₁ (proj₂ (Inner-inv {q} stI)) of λ ()
+      (sI' , seq , inj₂ (inj₁ (a' , oeq , stI))) → outᵈ≢outᶜ (just-injective (proj₁ (proj₂ (Inner-inv {q} stI))))
+      (sI' , seq , inj₂ (inj₂ (b' , oeq , stI))) →
+        case Inner-inv {q} stI of λ where
+          (r , eq , pure) →
+            r , trans oeq (cong just (trans (cong (L⊗ (ϵ ⊗R) ᵗ¹ ↑ᵢ_) (outᶜ-inj (just-injective eq))) (nest-ᵗ¹ᵢ (ϵ ⊗R) (a₂ (B.qO r)))))
+              , trans (cong (_, sV) pure) (sym seq)
 
   Y-inv : ∀ {q s o s'}
     → Step Y s (L⊗ ϵ ᵗ¹ ↑ₒ q₂' (B.qI q)) o s'
     → ∃ λ r → (o ≡ just (L⊗ ϵ ᵗ¹ ↑ᵢ a₂' (B.qO {q} r))) × (s ≡ s')
-  Y-inv {q} {sNT , sL} st with KI.∘-cod-view st
-  ... | inj₁ (sL' , seq , oeq , stL) with L-inv {q} stL
-  ...   | _ , eq , _ = case eq of λ ()
-  Y-inv {q} {sNT , sL} st | inj₂ (inj₁ (sL' , c' , seq , oeq , stL)) with L-inv {q} stL
-  ...   | r , eq , pure = r , trans oeq (cong (λ z → just (L⊗ ϵ ᵗ¹ ↑ᵢ z)) (outᶜ-inj (just-injective eq))) , trans (cong (sNT ,_) pure) (sym seq)
-  Y-inv {q} {sNT , sL} st | inj₂ (inj₂ (sL' , b , stL , _)) with L-inv {q} stL
-  ...   | _ , eq , _ = outᵈ≢outᶜ (just-injective eq)
+  Y-inv {q} {sNT , sL} st =
+    case KI.∘-cod-view st of λ where
+      (inj₁ (sL' , seq , oeq , stL)) → case proj₁ (proj₂ (L-inv {q} stL)) of λ ()
+      (inj₂ (inj₁ (sL' , c' , seq , oeq , stL))) →
+        case L-inv {q} stL of λ where
+          (r , eq , pure) → r , trans oeq (cong (λ z → just (L⊗ ϵ ᵗ¹ ↑ᵢ z)) (outᶜ-inj (just-injective eq))) , trans (cong (sNT ,_) pure) (sym seq)
+      (inj₂ (inj₂ (sL' , b , stL , _))) → outᵈ≢outᶜ (just-injective (proj₁ (proj₂ (L-inv {q} stL))))
 
   -- After `spec-rewire` has relayed the query inwards.
   after-fwd : ∀ {q sY sR o s'}
     → KS.Mid₂ (sY , sR) (q₂' (B.qI q)) o s'
     → ∃ λ r → (o ≡ just (queryOₛ {q} r)) × ((sY , sR) ≡ s')
-  after-fwd {q} k with KS.mid₂-view k
-  ... | inj₁ (sY' , seq , oeq , stY) with Y-inv {q} stY
-  ...   | _ , eq , _ = case eq of λ ()
-  after-fwd {q} k | inj₂ (inj₁ (sY' , a' , seq , oeq , stY)) with Y-inv {q} stY
-  ...   | _ , eq , _ = outᵈ≢outᶜ (just-injective eq)
-  after-fwd {q} k | inj₂ (inj₂ (sY' , b' , stY , k₁)) with Y-inv {q} stY
-  ...   | r , eq , pure with KS.mid₁-view (KS.mid₁-subst (outᶜ-inj (just-injective eq)) refl k₁)
-  ...     | inj₁ (_ , _ , _ , st₃) = case fwd-dom-inv spec-rewireᵢ spec-rewireₒ st₃ of λ ()
-  ...     | inj₂ (inj₁ (sR' , c' , seq' , oeq , st₃)) =
-    r , trans oeq (cong (λ z → just (L⊗ ϵ ᵗ¹ ↑ᵢ z))
-                    (trans (outᶜ-inj (just-injective (fwd-dom-inv spec-rewireᵢ spec-rewireₒ st₃)))
-                           (assocᵢ-IO (B.qO r))))
-      , trans (cong (_, sR') pure) (sym seq')
-  ...     | inj₂ (inj₂ (_ , _ , st₃ , _)) =
-    outᵈ≢outᶜ (just-injective (fwd-dom-inv spec-rewireᵢ spec-rewireₒ st₃))
+  after-fwd {q} k =
+    case KS.mid₂-view k of λ where
+      (inj₁ (sY' , seq , oeq , stY)) → case proj₁ (proj₂ (Y-inv {q} stY)) of λ ()
+      (inj₂ (inj₁ (sY' , a' , seq , oeq , stY))) → outᵈ≢outᶜ (just-injective (proj₁ (proj₂ (Y-inv {q} stY))))
+      (inj₂ (inj₂ (sY' , b' , stY , k₁))) →
+        case Y-inv {q} stY of λ where
+          (r , eq , pure) →
+            case KS.mid₁-view (KS.mid₁-subst (outᶜ-inj (just-injective eq)) refl k₁) of λ where
+              (inj₁ (_ , _ , _ , st₃)) → case fwd-dom-inv spec-rewireᵢ spec-rewireₒ st₃ of λ ()
+              (inj₂ (inj₁ (sR' , c' , seq' , oeq , st₃))) →
+                r , trans oeq (cong (λ z → just (L⊗ ϵ ᵗ¹ ↑ᵢ z))
+                                (trans (outᶜ-inj (just-injective (fwd-dom-inv spec-rewireᵢ spec-rewireₒ st₃)))
+                                       (assocᵢ-IO (B.qO r))))
+                  , trans (cong (_, sR') pure) (sym seq')
+              (inj₂ (inj₂ (_ , _ , st₃ , _))) →
+                outᵈ≢outᶜ (just-injective (fwd-dom-inv spec-rewireᵢ spec-rewireₒ st₃))
 
 spec-query-inv : ∀ {q s o s'}
   → Step spec s (queryIₛ q) o s'
   → ∃ λ r → (o ≡ just (queryOₛ {q} r)) × (s ≡ s')
-spec-query-inv {q} {sY , sR} st with KS.∘-cod-view st
-... | inj₁ (_ , _ , _ , st₁) = case fwd-cod-inv spec-rewireᵢ spec-rewireₒ st₁ of λ ()
-... | inj₂ (inj₁ (_ , c' , _ , _ , st₁)) =
-  outᵈ≢outᶜ (sym (just-injective (fwd-cod-inv spec-rewireᵢ spec-rewireₒ st₁)))
-... | inj₂ (inj₂ (sR' , b , st₁ , k)) =
-  after-fwd {q} (KS.mid₂-subst
-    (trans (outᵈ-inj (just-injective (fwd-cod-inv spec-rewireᵢ spec-rewireₒ st₁))) (assocₒ-IO (B.qI q)))
-    refl k)
+spec-query-inv {q} {sY , sR} st =
+  case KS.∘-cod-view st of λ where
+    (inj₁ (_ , _ , _ , st₁)) → case fwd-cod-inv spec-rewireᵢ spec-rewireₒ st₁ of λ ()
+    (inj₂ (inj₁ (_ , c' , _ , _ , st₁))) →
+      outᵈ≢outᶜ (sym (just-injective (fwd-cod-inv spec-rewireᵢ spec-rewireₒ st₁)))
+    (inj₂ (inj₂ (sR' , b , st₁ , k))) →
+      after-fwd {q} (KS.mid₂-subst
+        (trans (outᵈ-inj (just-injective (fwd-cod-inv spec-rewireᵢ spec-rewireₒ st₁))) (assocₒ-IO (B.qI q)))
+        refl k)
 
 ------------------------------------------------------------------------
 -- The interface.
@@ -401,10 +408,11 @@ queryOₗ {q} r = L⊗ ϵ ᵗ¹ ↑ᵢ f₀ (ans (B.qO (mapBase q r)))
 private
   -- The base spec answers a query from any state, and stays put.
   spec-answers : ∀ q sS → ∃ λ r → Step spec sS (queryIₛ q) (just (queryOₛ r)) sS
-  spec-answers q sS with spec-completeness {q} {sS}
-  ... | resp' , sS' , st with spec-query-inv {q} (toStep {M = spec} {o = just resp'} st)
-  ...   | r , eq , seq =
-    r , step-subst refl eq (subst (λ z → Step spec sS (queryIₛ q) (just resp') z) (sym seq) (toStep {M = spec} {o = just resp'} st))
+  spec-answers q sS =
+    let resp' , sS' , st = spec-completeness {q} {sS}
+        stS = toStep {M = spec} {o = just resp'} st
+        r , eq , seq = spec-query-inv {q} stS
+    in r , step-subst refl eq (subst (λ z → Step spec sS (queryIₛ q) (just resp') z) (sym seq) stS)
 
   -- The extension layer relays a query on its port down to its domain, the
   -- base spec's IO channel, pushing `query` on the multiplexer's stack …
@@ -469,12 +477,13 @@ private
 ------------------------------------------------------------------------
 -- Completeness for the deployed node.
 
-Leios1-completeness : ∀ {q} {s : Machine.State Leios1}
-  → ∃ λ response' → ∃ λ s' → Machine.stepRel Leios1 s (queryIₗ q) (just response') s'
-Leios1-completeness {q} {(sS , ((((((sSh , rs) , tt) , tt) , (sLL , tt)) , tt) , tt)) , tt}
-  with spec-answers (baseQ q) sS
-... | r , stS = _ , _ , fromStep stL
-  where
+private
+  -- The chain of steps, from the base spec's.
+  Leios1-step : ∀ {q sS sSh rs sLL} r
+    → Step spec sS (queryIₛ (baseQ q)) (just (queryOₛ r)) sS
+    → Step Leios1 ((sS , (E sSh rs sLL , tt)) , tt) (queryIₗ q) (just (queryOₗ (mapExt q r))) ((sS , (E sSh rs sLL , tt)) , tt)
+  Leios1-step {q} {sS} {sSh} {rs} {sLL} r stS = stL
+   where
     x = B.qI (baseQ q)
     y = B.qO r
     z = ask x
@@ -500,6 +509,12 @@ Leios1-completeness {q} {(sS , ((((((sSh , rs) , tt) , tt) , (sLL , tt)) , tt) ,
                 (KL.mid₂-mid stX
                   (KL.mid₁-subst refl (cong just (cong (L⊗ ϵ ᵗ¹ ↑ᵢ_) (∘ᴷ-fwdᵢ-QIO w)))
                     (KL.mid₁-cod (fwd-dom ∘ᴷ-fwdᵢ ∘ᴷ-fwdₒ (f₅ w)))))))
+
+Leios1-completeness : ∀ {q} {s : Machine.State Leios1}
+  → ∃ λ response' → ∃ λ s' → Machine.stepRel Leios1 s (queryIₗ q) (just response') s'
+Leios1-completeness {q} {(sS , ((((((sSh , rs) , tt) , tt) , (sLL , tt)) , tt) , tt)) , tt} =
+  let r , stS = spec-answers (baseQ q) sS
+  in _ , _ , fromStep (Leios1-step {q} r stS)
 
 ------------------------------------------------------------------------
 -- Correctness and purity for the deployed node: every step on a query is
