@@ -1,0 +1,10 @@
+/result
+/_minted/
+*.aux
+*.log
+*.nav
+*.out
+*.snm
+*.toc
+*.vrb
+/linear-rules.pdf
