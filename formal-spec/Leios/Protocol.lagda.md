@@ -269,12 +269,4 @@ module Types (params : Params) (let open Params params) where
 
   FFD : Channel
   FFD = simpleChannel FFDT ᵀ
-
-  data BaseT : Mode → Type where
-    FTCH-LDG : BaseT In
-    SUBMIT   : RankingBlock → BaseT In
-    BASE-LDG : List RankingBlock → BaseT Out
-
-  BaseC : Channel
-  BaseC = simpleChannel BaseT ᵀ
 ```
