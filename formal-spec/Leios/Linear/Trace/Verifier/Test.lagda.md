@@ -207,7 +207,7 @@ for `EB₁`.
                  ∷ (No-EB-Role-Action 109 , inj₁ SLOT)
                  ∷ (Base₂-Action      109 , inj₁ SLOT)
                  ∷ (Cert₁-Action      109 , inj₂ (inj₂ (inj₂ (CERT nothing))))
-                 ∷ (Chain-Action      109 , inj₂ (inj₁ (BASE-LDG [ RB₂ ])))
+                 ∷ (Chain-Action      109 , inj₂ (inj₁ (BASE-LDG (RB₀ ∷ RB₁ ∷ RB₂ ∷ []))))
                  ∷ []
 ```
 #### Verify the test-trace
@@ -227,17 +227,54 @@ for `EB₁`.
     test₂ = refl
 ```
 ### The certificate fires
-Once the base chain delivers `RB₂`, whose payload is the certificate `crt₁`,
-the ledger resolves it to `EB₁`'s transactions; the certificate is never
-stored in the node state and exists only inside RBs.
+Once the base chain delivers the chain containing `RB₂`, whose payload is
+the certificate `crt₁`, the ledger follows its reference to `RB₁` and that
+block's announcement to `EB₁`'s transactions.  The ledger also includes
+`RB₀`'s transaction; the certificate exists only inside RBs.
 ```agda
     final : LeiosState
     final = case verifyTrace (L.reverse test-trace) s₁₀₀ of λ where
       (Ok vt) → getNewState vt
       (Err _) → s₁₀₀
 
-    test₃ : LeiosState.Ledger final ≡ 1 ∷ 2 ∷ 3 ∷ []
+    test₃ : LeiosState.Ledger final ≡ 0 ∷ 1 ∷ 2 ∷ 3 ∷ []
     test₃ = refl
+```
+### Certificate references are RB hashes, not EB hashes
+The default hash of an empty announcing RB happens to equal its EB hash.
+Give the announcing RB a transaction so these hashes differ: resolving the
+certificate must first find the RB, then follow its announcement to the EB.
+```agda
+    RB₁-distinct RB₂-distinct : RankingBlock
+    RB₁-distinct = record { txsOrEbCert = inj₁ [ 9 ] ; announcedEB = just (hash EB₁) }
+    RB₂-distinct = record { txsOrEbCert = inj₂ (hash ⦃ hrb ⦄ RB₁-distinct) ; announcedEB = nothing }
+
+    certificate-state : LeiosState
+    certificate-state = record s₀
+      { EBs' = (101 , EB₁) ∷ []
+      ; RBs = RB₁-distinct ∷ RB₂-distinct ∷ []
+      }
+
+    distinct-certificate-reference : hash ⦃ hrb ⦄ RB₁-distinct ≢ hash EB₁
+    distinct-certificate-reference ()
+
+    resolve-announcing-RB : LeiosState.lookupTxsC certificate-state (hash ⦃ hrb ⦄ RB₁-distinct)
+      ≡ 1 ∷ 2 ∷ 3 ∷ []
+    resolve-announcing-RB = refl
+
+    ledger-with-distinct-reference : LeiosState.Ledger certificate-state ≡ 9 ∷ 1 ∷ 2 ∷ 3 ∷ []
+    ledger-with-distinct-reference = refl
+
+    unknown-certificate-reference : LeiosState.lookupTxsC certificate-state (hash EB₁) ≡ []
+    unknown-certificate-reference = refl
+
+    non-announcing-certificate-reference :
+      LeiosState.lookupTxsC (record certificate-state { RBs = [ RB₀ ] }) (hash ⦃ hrb ⦄ RB₀) ≡ []
+    non-announcing-certificate-reference = refl
+
+    missing-certified-EB :
+      LeiosState.lookupTxsC (record certificate-state { EBs' = [] }) (hash ⦃ hrb ⦄ RB₁-distinct) ≡ []
+    missing-certified-EB = refl
 ```
 ### The tip changes while a certificate query is outstanding
 The tip can move between a certificate query and its answer (`Chain` has no

@@ -303,7 +303,7 @@ follows:
         ∙ hasUpkeep CertCheck
         ∙ certRequest s ≡ just eb
         ∙ PendingQuery ≡ just (hash currentRB)
-        ∙ Maybe.All (λ c → getEBHash c ≡ hash currentRB) c
+        ∙ Maybe.All (λ cert → getCertRef cert ≡ hash currentRB) c
         ───────────────────────────────────────────────────────────────────
         s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s c) ⟧⇀
           record (addUpkeep s Base) { PendingQuery = nothing }
