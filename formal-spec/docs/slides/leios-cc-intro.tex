@@ -137,10 +137,11 @@
   \begin{itemize}
     \item Ouroboros Praos: in every slot, each stake pool privately checks
           whether it may produce a block
-    \item A block must diffuse before the next one is likely to be
-          produced, so throughput is bounded by the block size that
-          diffuses in time, not by bandwidth or CPU.
-    \item Linear Leios (CIP-0164) lifts that bound:
+    \item Praos carries transactions in chain blocks.  Larger blocks take
+          longer to propagate and validate; at a fixed block-production
+          rate, this increases the risk of forks and constrains throughput.
+    \item Linear Leios (CIP-0164) separates chain growth from bulk
+          transaction diffusion:
       \begin{itemize}
         \item \textcolor{rb}{ranking blocks} (RBs) keep the Praos chain and
               its security argument, and each announces at most one EB;
@@ -205,14 +206,14 @@
 \end{frame}
 
 % ===========================================================================
-\section{Categorical Crypto refresher}
+\section{Channels and Machines}
 % ===========================================================================
 
 \begin{frame}{Categorical Crypto}
   \begin{itemize}
     \item A compositional framework for interactive systems and their
           security proofs, including universal composability (UC), built on
-          category theory and mechanised in Agda (\agda{--safe}).
+          category theory and mechanised in Agda.
     \item In the concrete model, typed \alert{channels} are the objects and
           interactive \alert{machines} are the morphisms; machines compose
           sequentially and in parallel.
@@ -222,8 +223,9 @@
           adversary reduction and a composition theorem, under its stated
           assumptions on composition and observational equivalence.
     \item Leios uses machine composition to build the specification and
-          transfer safety and liveness; UC emulation is the separate goal for
-          replacing ideal voting with real voting.
+          derive its safety and liveness guarantees from those of the base
+          chain. UC emulation is the goal for replacing ideal voting with 
+          real voting.
   \end{itemize}
 \end{frame}
 
@@ -299,8 +301,9 @@ record Machine (A B : Channel) : Type₁ where
   \begin{itemize}
     \item A machine from \agda{A} to \agda{B}: a relation that consumes one
           message and emits at most one.
-    \item Relational, so nondeterminism is free: the spec says what an
-          honest node \emph{may} do.
+    \item For the same state and input, several outputs or successor states
+          may be permitted.  The relation specifies the allowed choices,
+          without selecting one.
     \item Linear Leios is exactly such a relation:
           \agda{LinearLeios .stepRel = \_-⟦\_/\_⟧⇀\_}.
   \end{itemize}
@@ -343,7 +346,7 @@ record Machine (A B : Channel) : Type₁ where
       \end{tikzpicture}
 
       \vspace{1mm}
-      \small Messages on \agda{B} bounce internally (\agda{TraceRel}) until
+      \small Messages on \agda{B} bounce internally until
       one leaves on \agda{A} or \agda{C}.
     \end{column}
   \end{columns}
@@ -565,49 +568,6 @@ data _-⟦_/_⟧⇀_ : machine-type LeiosState (((FFD ⊗₀ BaseIO) ⊗₀ Voti
 %   \end{itemize}
 % \end{frame}
 
-% A witness ordering of node-interface messages, not a mandatory schedule.
-% The tip's voting window has closed, so the third tick declines voting.
-\begin{frame}{A slot as a sequence of interface messages}
-  \centering
-  \begin{tikzpicture}[x=1mm,y=1mm, scale=0.85, transform shape,
-      actor/.style={draw, rounded corners=2pt, fill=blue!6,
-        minimum height=9mm, text width=21mm, align=center, font=\scriptsize},
-      lifeline/.style={gray, dashed},
-      incoming/.style={rb, thick, -{Latex[length=1.5mm]}},
-      outgoing/.style={eb, thick, -{Latex[length=1.5mm]}},
-      message/.style={font=\scriptsize\ttfamily, above, inner sep=0.5mm}]
-    \node[actor] (env) at (0,0) {Environment\\\agda{IO}};
-    \node[actor] (ffd) at (27,0) {Diffusion / shim\\\agda{FFD}};
-    \node[actor, fill=blue!15] (node) at (54,0) {\agda{LinearLeios}};
-    \node[actor] (base) at (81,0) {Base service\\\agda{BaseIO}};
-    \node[actor] (voting) at (108,0) {Voting service\\\agda{VotingC}};
-    \node[actor, fill=gray!8, draw=gray, text=gray] (adv) at (135,0)
-      {Adversary\\\agda{Adv = I}};
-    \foreach \actor in {env,ffd,node,base,voting,adv}
-      \draw[lifeline] (\actor.south) -- ++(0,-47mm);
-
-    \draw[incoming] (0,-9) -- node[message]{Mempool: SubmitTxs txs} (54,-9);
-    \draw[incoming] (27,-13) -- node[message]{Slot: FFD-OUT msgs} (54,-13);
-    \draw[outgoing] (54,-17) -- node[message]{Slot: FTCH-LDG} (81,-17);
-    \draw[incoming] (81,-21) -- node[message]{Chain: BASE-LDG rbs} (54,-21);
-
-    \draw[incoming] (27,-25) -- node[message]{EB-Role: SLOT} (54,-25);
-    \draw[outgoing] (54,-29) -- node[message]{EB-Role: FFD-IN (Send h nothing)} (27,-29);
-    \draw[incoming] (27,-33) -- node[message]{Base₂: SLOT} (54,-33);
-    \draw[outgoing] (54,-37) -- node[message]{Base₂: QUERY (hash currentRB)} (108,-37);
-    \draw[incoming] (108,-41) -- node[message]{Cert₁: CERT c} (54,-41);
-    \draw[outgoing] (54,-45) -- node[message]{Cert₁: SUBMIT (mkRB s c)} (81,-45);
-    \draw[incoming] (27,-49) -- node[message]{No-VT-Role: SLOT} (54,-49);
-    \node[font=\tiny, anchor=west, fill=white, inner sep=0.5mm]
-      at (56,-49) {no output};
-
-  \end{tikzpicture}
-  \par\small
-  \textcolor{rb}{Input to the node}; \textcolor{eb}{output from the node}.
-  Example: EB production is enabled and the current tip calls for a
-  certificate.  \agda{Adv = I} carries no messages.
-\end{frame}
-
 % One slide per rule of _-⟦_/_⟧⇀_, copied verbatim from
 % Leios/Linear.lagda.md.
 
@@ -719,10 +679,10 @@ Base₂   : let open LeiosState s in
 \begin{minted}{agda}
 Cert₁ : let open LeiosState s in
       ∙ needsUpkeep Base
-      ∙ CertCheck ∈ˡ Upkeep
+      ∙ hasUpkeep CertCheck
       ∙ certRequest s ≡ just eb
       ∙ PendingQuery ≡ just (hash currentRB)
-      ∙ Maybe.All (λ c → getEBHash c ≡ hash currentRB) c
+      ∙ Maybe.All (λ cert → getCertRef cert ≡ hash currentRB) c
       ───────────────────────────────────────────────────────────────────
       s -⟦ (L⊗ ϵ) ⊗R ↑ᵢ CERT c / just $ ((L⊗ ϵ) ⊗R) ⊗R ↑ₒ SUBMIT (mkRB s c) ⟧⇀
         record (addUpkeep s Base) { PendingQuery = nothing }
@@ -739,7 +699,7 @@ Cert₁ : let open LeiosState s in
 \begin{minted}{agda}
 Cert₂ : let open LeiosState s in
       ∙ needsUpkeep Base
-      ∙ CertCheck ∈ˡ Upkeep
+      ∙ hasUpkeep CertCheck
       ∙ certRequest s ≡ nothing
       ∙ PendingQuery ≡ just r
       ───────────────────────────────────────────────────────────────────
@@ -758,7 +718,7 @@ Cert₂ : let open LeiosState s in
 \begin{minted}{agda}
 Cert₃ : let open LeiosState s in
       ∙ needsUpkeep Base
-      ∙ CertCheck ∈ˡ Upkeep
+      ∙ hasUpkeep CertCheck
       ∙ certRequest s ≡ just eb
       ∙ PendingQuery ≡ just r
       ∙ hash currentRB ≢ r
@@ -903,216 +863,7 @@ VT-Defer : let open LeiosState s in
 \end{frame}
 
 % ===========================================================================
-\section{Trace verifier}
-% ===========================================================================
-
-% Leios/Linear/Trace/Verifier.lagda.md: Action, TestInput, TestTrace.
-\begin{frame}[fragile]{From a recorded trace to specification steps}
-\begin{minted}{agda}
-TestInput = FFDT Out ⊎ BaseIOF In ⊎ IOT In ⊎ VotingT In
-TestTrace = List (Action × TestInput)
-\end{minted}
-  \begin{itemize}
-    \item Each entry names the expected rule and its slot, paired with the
-          input consumed: for example, \agda{Base₂-Action 108} with
-          \agda{SLOT}, or \agda{Cert₁-Action 108} with \agda{CERT (just c)}.
-    \item Role actions also carry witnesses: \agda{EB-Role-Action} names
-          the proposed EB; \agda{VT-Role-Action} names the EB and its recorded
-          receipt slot.
-    \item Given an initial \agda{LeiosState}, replay the actions against
-          the \emph{same transition relation} that defines \agda{LinearLeios}.
-          Outputs and successor states are reconstructed, not supplied by
-          the trace.
-    \item The internal list is newest first; the sample tests reverse
-          chronological event lists before calling \agda{verifyTrace}.
-    \item This is node-level conformance checking.  The external trace
-          verifier uses this Agda checker for simulator and live-node traces.
-  \end{itemize}
-\end{frame}
-
-% Leios/Linear/Trace/Verifier.lagda.md: ValidStep, ValidTrace, verifyStep.
-\begin{frame}[fragile]{Verification returns a proof, not just a Boolean}
-\begin{minted}{agda}
-verifyStep : (a : Action) → (i : TestInput) → (s : LeiosState)
-  → Result (Err-verifyStep a i s) (ValidStep (a , i) s)
-
-verifyTrace : (σs : TestTrace) → (s : LeiosState)
-  → Result (Err-verifyTrace σs s) (ValidTrace σs s)
-\end{minted}
-  \begin{enumerate}\small
-    \item Check that the action's slot matches the current state and that
-          the input constructor matches the rule.
-    \item Decide the rule's premises, using decision procedures derived
-          from the specification by \agda{genPremises}.
-    \item On success, construct the actual transition and carry its
-          successor state into the next check; on failure, return a
-          structured error with the failed obligation.
-  \end{enumerate}
-  \begin{itemize}\small
-    \item \agda{ValidTrace} contains a derivation of the execution and a
-          proof that its actions and inputs match the recorded trace.
-          \agda{getNewState} extracts its final state.
-    \item Acceptance therefore witnesses a valid specification execution;
-          it does not establish safety or liveness of every execution.
-  \end{itemize}
-\end{frame}
-
-% Leios/Linear/Trace/Verifier/Test.lagda.md: test-trace and verifyTrace.
-\begin{frame}{Trace verifier setup: the Agda test module}
-  \centering
-  \verifierdiagram
-    {Scripted transaction selection\\\agda{SubmitTxs txs}}
-    {Scripted deliveries and duties\\\agda{FFD-OUT msgs}\\\agda{SLOT}}
-    {Scripted RB-chain updates\\\agda{BASE-LDG rbs}}
-    {Scripted certificate answers\\\agda{CERT c}}
-    {yes}
-  \begin{itemize}\footnotesize
-    \item \agda{TestTrace} supplies action/input pairs;
-          \agda{toRcvType} injects each input into the selected node port.
-          The tests replay them from \agda{s₁₀₀} or \agda{s₂₀₀} using
-          \agda{d-SpecStructure} and fixed protocol parameters.
-    \item These are scripted inputs, not running diffusion, base or voting
-          machines.  Outputs and states are reconstructed by the checker;
-          assertions inspect acceptance, errors and the final ledger.
-  \end{itemize}
-\end{frame}
-
-% Leios/Linear/Trace/Verifier/Test.lagda.md: test₁--test₁₀.
-\begin{frame}{Trace tests: certificates, changed tips and refusals}
-  \begin{itemize}\small
-    \item \textbf{Accepted sample}: slots 100--109 cover EB reception,
-          voting, EB production, certificate queries and RB-chain updates.
-          The final ledger resolves the certificate to EB₁'s transactions.
-    \item \textbf{Accepted changed-tip trace}: query for RB₃; receive RB₄
-          as the new tip; \agda{Cert₃} re-queries; the chain becomes empty;
-          \agda{Cert₂} discards the answer and submits without a certificate.
-  \end{itemize}
-  \centering\small
-  \begin{tabular}{@{}ll@{}}
-    \toprule
-    Rejected scenario & Reported error \\
-    \midrule
-    Submit directly when a certificate is called for & \agda{Err-Base₁-premises} \\
-    Positive answer names the wrong reference & \agda{Err-Cert₁-premises} \\
-    Certificate answer with no outstanding query & \agda{Err-Cert₁-premises} \\
-    Re-query although the tip has not changed & \agda{Err-Cert₃-premises} \\
-    Issue the base query twice in one slot & \agda{Err-Base₂-premises} \\
-    Pair a certificate action with \agda{SLOT} & \agda{Err-InputMismatch} \\
-    \bottomrule
-  \end{tabular}
-  \begin{itemize}\small
-    \item These examples are checked in Agda: successful verdicts, final
-          ledger contents and rejection messages are asserted in the tests.
-  \end{itemize}
-\end{frame}
-
-% ouroboros-leios/leios-trace-verifier: LinearLeiosChain.hs,
-% LinearLeiosVerifierChain.agda and hs-src/app/linear-chain/Main.hs.
-\begin{frame}{Running the checker against a live node}
-  \centering
-  \begin{tikzpicture}[node distance=4mm, every node/.style={font=\small}]
-    \node[machine, minimum width=29mm] (log) {Node JSON log};
-    \node[machine, minimum width=29mm, right=of log] (events) {Parsed events};
-    \node[machine, minimum width=29mm, right=of events] (actions) {Spec actions};
-    \node[machine, minimum width=29mm, right=of actions] (check) {Agda checker};
-    \draw[-{Latex}, thick] (log) -- (events);
-    \draw[-{Latex}, thick] (events) -- (actions);
-    \draw[-{Latex}, thick] (actions) -- (check);
-  \end{tikzpicture}
-  \begin{itemize}
-    \item The \agda{ouroboros-leios} project builds the Agda verifier into
-          Haskell executables.  The live-node entry point is
-          \agda{linear-leios-trace-verifier-chain}.
-    \item Two inputs: the node's tracing log streams through \textbf{stdin};
-          \textbf{cardano-api queries over the node socket} supply stake,
-          the pool's leadership schedule and RB capacity.
-    \item Parsed events describe leadership checks, EB forging/acquisition,
-          votes, announcements, chain extensions and mempool readings.
-          The adapter translates them into specification actions and inputs.
-    \item Epoch segments carry a tail of the previous epoch, so voting
-          obligations crossing the boundary remain visible.
-    \item The file-based \agda{linear-leios-trace-verifier} instead reads
-          simulator traces with topology and configuration files.
-  \end{itemize}
-\end{frame}
-
-% ouroboros-leios: ChainEvents.hs, LinearLeiosVerifierChain.agda and
-% linear-chain/Main.hs.  The live adapter currently uses an older spec pin.
-\begin{frame}{Trace verifier setup: following the live node}
-  \centering
-  \verifierdiagram
-    {Reconstructed proposal txs\\from forge / mempool events}
-    {Acquired EBs; slot boundaries\\reconstructed \agda{FFD-OUT}\\and upkeep \agda{SLOT} inputs}
-    {Reconstructed chain view\\from announcements / extensions}
-    {Not exercised by the\\current live adapter}
-    {no}
-  \begin{itemize}\footnotesize
-    \item Log events become action/input pairs.  Socket queries parameterise
-          replay with stake, leadership eligibility and RB capacity.
-    \item Replay observes the live node; reconstructed inputs and outputs are not sent to it.
-    \item The current live adapter uses an older spec pin;
-          \agda{VotingC} certificate interactions are not checked.
-  \end{itemize}
-\end{frame}
-
-% Launch syntax from the chain executable's option parser; paths and ids
-% are supplied as shell variables for the running node.
-\begin{frame}[fragile]{Starting the live-node trace verifier}
-  From the \agda{ouroboros-leios} repository:
-\begin{minted}[fontsize=\scriptsize]{bash}
-nix build '.#trace-parser:exe:linear-leios-trace-verifier-chain'
-
-tail -n +1 -F "$NODE_LOG" | \
-  nix run '.#trace-parser:exe:linear-leios-trace-verifier-chain' -- \
-    --socket-path "$NODE_SOCKET" \
-    --testnet-magic "$NETWORK_MAGIC" \
-    --shelley-genesis "$SHELLEY_GENESIS" \
-    --stake-pool-id "$POOL_ID" \
-    --vrf-signing-key-file "$VRF_SKEY"
-\end{minted}
-  \begin{itemize}\small
-    \item Set the variables to the node's JSON tracing log, socket, network
-          magic, Shelley genesis, pool id and VRF signing-key file.
-          \texttt{tail -F} reads the existing log and follows new output.
-    \item The pool id selects the system under test; the genesis and VRF key
-          are used to query its leadership schedule.  No topology or Leios
-          configuration file is required by this executable.
-    \item The current driver fixes \agda{Lhdr = 1}, \agda{Lvote = 4} and
-          \agda{Ldiff = 7}.  It starts at the first logged leadership-check
-          slot, skipping the preceding sync/replay backlog.
-  \end{itemize}
-\end{frame}
-
-% Live reporting and checkpoint policy in linear-chain/Main.hs and
-% LinearLeiosChain.hs; these are more detailed than the README's summary.
-\begin{frame}[fragile]{Reading the live verifier's output}
-\begin{minted}{text}
-ok @ <events> events, <actions> actions
-VIOLATION after <events> events: <status>
-\end{minted}
-  \begin{itemize}\small
-    \item \textbf{Checkpoints}: every 20 slots, at epoch boundaries and at
-          end of input, re-check the accumulated segment.  A violation
-          reports the failing action and details, then exits unsuccessfully.
-    \item Only completed slots are adjudicated; the final slot still in
-          progress is left unverified when the stream ends.
-    \item \textbf{Eligibility source}: the report says whether it used the
-          queried leadership schedule or the node's own leadership log.
-          A schedule for another epoch, or a segment spanning epochs, causes
-          fallback to the log.
-    \item \textbf{Coverage notes}: missing slot ticks restart verification;
-          obligations across those gaps are not checked.  Missing or
-          inconclusive mempool readings can prevent enforcement of EB
-          production; votes beyond the first in a slot are reported as unchecked.
-    \item Interpret \texttt{ok} together with these notes: it certifies
-          the translated, checked portion of the log, rather than every
-          internal operation of the live node.
-  \end{itemize}
-\end{frame}
-
-
-% ===========================================================================
-\section{Voting Functionality}
+\section{Voting services}
 % ===========================================================================
 
 % Network/DelayedDiffuse.agda: DDiffuseΔ and its five transitions.
@@ -1249,6 +1000,8 @@ VIOLATION after <events> events: <status>
 % Network/Leios.agda; the diagrams follow the ASCII drawings in its comments.
 % Leios/Voting/{Channel.agda,Certifier.lagda.md,Voter.lagda.md}
 \begin{frame}[fragile]{The voting interface}
+  \begin{columns}[c]
+    \begin{column}{0.55\textwidth}
 \begin{minted}{agda}
 data VotingT : Mode → Type where
   CAST  : Vote → VotingT Out
@@ -1258,7 +1011,33 @@ data VotingT : Mode → Type where
 VotingC : Channel
 VotingC = simpleChannel VotingT
 \end{minted}
-  \begin{itemize}
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \centering
+      \begin{tikzpicture}[x=1mm,y=1mm,
+          every node/.style={font=\scriptsize, align=center},
+          received/.style={rb, thick, -{Latex[length=2mm]}},
+          emitted/.style={eb, thick, -{Latex[length=2mm]}},
+          label/.style={font=\scriptsize\ttfamily, inner sep=1mm}]
+        \node[machine, minimum width=18mm, minimum height=24mm] (node) at (0,0)
+          {\agda{LinearLeios}};
+        \node[machine, minimum width=20mm, minimum height=24mm,
+            fill=vt!8, draw=vt] (service) at (37,0)
+          {Voting service\\\agda{Certifier}\\or \agda{Voter}};
+        \node[font=\footnotesize\ttfamily] at (18.5,16) {VotingC};
+        \coordinate (cast) at ([yshift=7mm]node.east);
+        \coordinate (query) at (node.east);
+        \coordinate (reply) at ([yshift=-7mm]node.east);
+        \coordinate (cast-s) at ([yshift=7mm]service.west);
+        \coordinate (query-s) at (service.west);
+        \coordinate (reply-s) at ([yshift=-7mm]service.west);
+        \draw[emitted] (cast) -- node[label,above]{CAST v} (cast-s);
+        \draw[emitted] (query) -- node[label,above]{QUERY r} (query-s);
+        \draw[received] (reply-s) -- node[label,below]{CERT c} (reply);
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+  \begin{itemize}\small
     \item A node casts votes (\agda{CAST}, not answered) and queries for a
           certificate on the RB announcing the current EB (\agda{QUERY}).
     \item A query is answered from the vote log: \agda{CERT (just c)} if
@@ -1269,6 +1048,212 @@ VotingC = simpleChannel VotingT
           \agda{Certifier} and a \alert{local} \agda{Voter}.
   \end{itemize}
 \end{frame}
+
+% Leios/Voting/Ideal.lagda.md: the abstract voting model.
+% \begin{frame}[fragile]{The ideal voting model: validation before an honest cast}
+% \begin{minted}[fontsize=\scriptsize]{agda}
+% Vote = Party × Subject
+% record IdealState : Type where
+%   constructor ⟨_⟩
+%   field voteLog : List Vote
+% 
+% data Step : IdealState → IdealState → Type where
+%   Cast : ∀ {st p x} → (honest p → Validated p x)
+%        → Step st ⟨ (p , x) ∷ voteLog st ⟩
+% 
+% WF : IdealState → Type
+% WF st = ∀ {p x} → Voted p x st → honest p → Validated p x
+% \end{minted}
+%   \begin{itemize}\footnotesize
+%     \item An abstract vote identifies a party and a subject.  Honest
+%           parties may cast only with validation evidence; dishonest parties
+%           may vote on anything.
+%     \item \agda{WF} holds for the empty log and is preserved by \agda{Cast}:
+%           every logged honest vote is backed by validation.
+%     \item \agda{Certified st x} selects logged votes for \agda{x} from
+%           at least \agda{threshold} distinct parties.  A smaller corrupt
+%           set leaves an honest validator in every quorum.
+%     \item This is a state/step model used in correctness proofs;
+%           channel-based machines such as the \agda{Certifier} instantiate it.
+%   \end{itemize}
+% \end{frame}
+
+% Leios/Voting/Real.lagda.md: concrete votes and Refines.α.
+% \begin{frame}[fragile]{The real voting model: concrete votes and valid quorums}
+% \begin{minted}[fontsize=\scriptsize]{agda}
+% RealState = List Vote
+% data Step : RealState → RealState → Type where
+%   Recv : ∀ {rs} (v : Vote) → Step rs (v ∷ rs)
+% 
+% vote⇒ideal : Vote → Party × EBRef
+% vote⇒ideal v = voter v , forEB v
+% 
+% α : RealState → I.IdealState
+% α rs = I.⟨ L.map vote⇒ideal (filter Valid rs) ⟩
+% 
+% realCert⇒idealCert : ∀ {rs eb}
+%   → RealCertified rs eb → I.Certified (α rs) eb
+% \end{minted}
+%   \begin{itemize}\footnotesize
+%     \item \agda{Recv} records any concrete vote, including invalid ones.
+%           Votes themselves carry no honesty or validation evidence.
+%     \item \agda{RealCertified rs eb} selects logged, \agda{Valid} votes for
+%           one reference, with at least \agda{threshold} distinct claimed
+%           voters.  Invalid votes may be logged but cannot count in a quorum.
+%     \item \agda{α} maps real quorums to ideal quorums; \agda{WF} additionally
+%           requires the honest-vote validation premise.
+%     \item The local \agda{Voter} uses this model for its log and quorum
+%           check.  This certificate refinement is not full UC emulation.
+%   \end{itemize}
+% \end{frame}
+
+\begin{frame}[fragile]{Global voting: the \agda{Certifier}}
+  \centering
+  \begin{tikzpicture}[x=1mm,y=1mm, scale=0.9, transform shape,
+      every node/.style={font=\scriptsize, align=center},
+      cast/.style={eb, thick, -{Latex[length=1.5mm]}},
+      answer/.style={rb, thick, -{Latex[length=1.5mm]}},
+      label/.style={font=\scriptsize\ttfamily, inner sep=0.5mm}]
+    \node[machine, minimum width=20mm] (p0) at (0,0)
+      {Party \agda{p = 0}\\\agda{VotingC[0]}};
+    \node[machine, minimum width=20mm] (p1) at (0,-14)
+      {Party \agda{p = 1}, \ldots\\\agda{VotingC[1]}};
+    \node[machine, minimum width=36mm, minimum height=22mm,
+        draw=vt, fill=vt!8] (cert) at (65,-7)
+      {Shared \agda{Certifier}\\\agda{log : List (Party × Vote)}};
+    \node[machine, minimum width=22mm, draw=adv, fill=adv!6] (adversary) at (120,-7)
+      {Adversary\\\agda{Adv}};
+    \foreach \p in {p0,p1} {
+      \coordinate (\p-port) at (cert.west |- \p.center);
+      \draw[cast] ([yshift=2.5mm]\p.east) --
+        node[label,above]{CAST v / QUERY r} ([yshift=2.5mm]\p-port);
+      \draw[answer] ([yshift=-2.5mm]\p-port) --
+        node[label,below]{CERT c} ([yshift=-2.5mm]\p.east);
+    }
+    \draw[adv,thick,-{Latex[length=1.5mm]}]
+      ([yshift=3mm]adversary.west) -- node[label,above]{Read}
+      ([yshift=3mm]cert.east);
+    \draw[adv,thick,-{Latex[length=1.5mm]}]
+      ([yshift=-3mm]cert.east) -- node[label,below]{ReadRes log}
+      ([yshift=-3mm]adversary.west);
+  \end{tikzpicture}\par
+  {\scriptsize\agda{Functionality : Machine I ((n ⨂ⁿ VotingC) ⊗₀ Adv)}}\par
+  \begin{center}
+  \footnotesize
+  \begin{tabular}{@{}ll@{}}
+    \toprule
+    Rule & Effect \\
+    \midrule
+    \agda{Cast-step} & record \agda{(p , v)}; no reply \\
+    \agda{Query-step} & return \agda{CERT (just (mkCert r))} when \agda{Certified log r} \\
+    \agda{QueryNo-step} & return \agda{CERT nothing} otherwise \\
+    \agda{Read-step} & reveal the public log; state unchanged \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+\end{frame}
+
+% Leios/Voting/Certifier.lagda.md: reuses Leios.Voting.Ideal.cert-correct.
+\begin{frame}[fragile]{Global certifier correctness: an honest voter exists}
+  \begin{itemize}\small
+    \item \textbf{Honest participation}: if fewer than \agda{threshold}
+          parties are corrupt, every certificate is backed by at least one
+          honest party's vote.
+  \end{itemize}
+\begin{minted}[fontsize=\scriptsize]{agda}
+module _ (corrupt : List Party) {lg : List (Party × Vote)} where
+  cert-correct : ∀ {eb}
+    → length corrupt N.< threshold
+    → Certified lg eb
+    → ∃[ p ] (p ∉ˡ corrupt × HasVoteFor lg p eb)
+\end{minted}
+  \begin{itemize}\small
+    \item \textbf{Identity comes from the port}: a cast through party
+          \agda{p}'s port is recorded as \agda{(p , v)}.  The adversary
+          cannot cast on behalf of an honest party.
+    \item \textbf{Proof by counting}: a quorum contains at least
+          \agda{threshold} distinct voters, so they cannot all be corrupt.
+          The proof reuses the ideal voting model, interpreting
+          \agda{Validated} as ``has a recorded vote''.
+    \item \textbf{Connection to validation}: the theorem establishes an
+          honest vote for the certified reference.  Showing that the
+          corresponding EB was validated requires the honest node's voting rule.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Local voting: the \agda{Voter}}
+  \centering
+  \begin{tikzpicture}[x=1mm,y=1mm, scale=0.9, transform shape,
+      every node/.style={font=\scriptsize, align=center},
+      incoming/.style={rb, thick, -{Latex[length=1.5mm]}},
+      outgoing/.style={eb, thick, -{Latex[length=1.5mm]}},
+      label/.style={font=\scriptsize\ttfamily, inner sep=0.5mm}]
+    \node[machine, minimum width=22mm, minimum height=18mm] (node) at (0,0)
+      {\agda{LinearLeios}};
+    \node[machine, minimum width=26mm, minimum height=18mm,
+        draw=vt, fill=vt!8] (voter) at (57,0)
+      {Local \agda{Voter}\\\agda{log : List Vote}\\\agda{pending : List Vote}};
+    \node[machine, minimum width=26mm, minimum height=18mm] (adapter) at (114,0)
+      {\agda{NetTranslateV}\\to diffusion};
+    \node[font=\scriptsize\ttfamily] at (28.5,12) {VotingC};
+    \node[font=\scriptsize\ttfamily] at (85.5,12) {VoteNet};
+    \draw[outgoing] ([yshift=6mm]node.east) -- node[label,above]{CAST v}
+      ([yshift=6mm]voter.west);
+    \draw[outgoing] (node.east) -- node[label,above]{QUERY r} (voter.west);
+    \draw[incoming] ([yshift=-6mm]voter.west) -- node[label,below]{CERT c}
+      ([yshift=-6mm]node.east);
+    \draw[incoming] ([yshift=5mm]adapter.west) -- node[label,above]{Deliver vs}
+      ([yshift=5mm]voter.east);
+    \draw[outgoing] ([yshift=-5mm]voter.east) -- node[label,below]{Diffuse pending}
+      ([yshift=-5mm]adapter.west);
+  \end{tikzpicture}\par
+  {\scriptsize\agda{Voter : Machine VoteNet VotingC}}\par
+  \begin{center}
+  \footnotesize
+  \begin{tabular}{@{}ll@{}}
+    \toprule
+    Rule & Effect \\
+    \midrule
+    \agda{Cast-step} & log and buffer \agda{v}; no reply \\
+    \agda{Deliver-step} & log \agda{vs}; diffuse pending casts and clear \agda{pending} \\
+    \agda{Query-step} & return a certificate when \agda{RealCertified log r} \\
+    \agda{QueryNo-step} & return \agda{CERT nothing} otherwise \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+\end{frame}
+
+% Leios/Voting/Real.lagda.md: Refines.real-cert-correct;
+% Leios/Voting/Voter.lagda.md: Correctness.answered-cert-correct.
+%\begin{frame}[fragile]{Local certifier correctness: an honest validator exists}
+%  \begin{itemize}\footnotesize
+%    \item \textbf{Honest validation}: under the validation and corruption
+%          premises, every positive \agda{Voter} reply is backed by an honest
+%          party that validated the certified subject.
+%  \end{itemize}
+%\begin{minted}[fontsize=\scriptsize]{agda}
+%answered-cert-correct : ∀ {s i o s' eb}
+%  → (stp : WithState s receive i return o newState s')
+%  → AnswersCert stp ≡ just eb
+%  → (∀ {v} → v ∈ˡ log s' → Valid v
+%      → honest (voter v) → Validated (voter v) (forEB v))
+%  → (corrupt : List Party)
+%  → (∀ {v} → v ∈ˡ log s' → Valid v
+%      → ¬ honest (voter v) → voter v ∈ˡ corrupt)
+%  → length corrupt N.< threshold
+%  → ∃[ p ] (honest p × Validated p eb)
+%\end{minted}
+%  \begin{itemize}\footnotesize
+%    \item \textbf{Trust in vote attribution}: valid votes attributed to honest
+%          parties must be backed by validation.  The corrupt set must cover
+%          all dishonest valid voters and contain fewer than \agda{threshold} parties.
+%    \item \textbf{From reply to quorum}: \agda{AnswersCert stp ≡ just eb}
+%          identifies a positive certificate reply.  \agda{cert-answered-certified}
+%          extracts a \agda{RealCertified} witness from the transition.
+%    \item \textbf{Proof by counting}: \agda{real-cert-correct} finds an honest
+%          validator via the ideal model.  UC emulation is a separate obligation.
+%  \end{itemize}
+%\end{frame}
 
 \begin{frame}[fragile]{One node over the global certifier: \texttt{Leios1}}
   \begin{columns}[c]
@@ -1357,82 +1342,23 @@ Leios1ʳ = ext-spec ∘ᴷ specʳ
   \end{columns}
 \end{frame}
 
-
-\begin{frame}[fragile]{Global voting: the \agda{Certifier}}
-\begin{minted}{agda}
-Functionality : Machine I ((n ⨂ⁿ VotingC) ⊗₀ Adv)
-record CertifierState : Type where
-  field log : List (Party × Vote)
-\end{minted}
-  \centering\small
-  \begin{tabular}{@{}lll@{}}
-    \toprule
-    Rule & Input / output & Effect \\
-    \midrule
-    \agda{Cast-step} & \agda{CAST v} on party \agda{p}'s port / --- & log \agda{(p , v)} \\
-    \agda{Query-step} & \agda{QUERY r} / \agda{CERT (just (mkCert r))} & if \agda{Certified log r} \\
-    \agda{QueryNo-step} & \agda{QUERY r} / \agda{CERT nothing} & otherwise \\
-    \agda{Read-step} & \agda{Read} / \agda{ReadRes log} (adversary) & votes are public \\
-    \bottomrule
-  \end{tabular}
-  \begin{itemize}
-    \item One shared functionality with one \agda{VotingC} port per party.
-          A vote's caster is the port it arrives on: identity comes from the
-          wiring, so the adversary can only vote through the parties it
-          controls.
-    \item \agda{Certified log r}: \agda{threshold} votes for reference \agda{r}
-          from distinct parties.  \agda{cert-correct}: with fewer than
-          \agda{threshold} corrupt parties, every certificate has an honest
-          voter behind it.
-  \end{itemize}
-\end{frame}
-
-\begin{frame}[fragile]{Local voting: the \agda{Voter}}
-\begin{minted}[fontsize=\scriptsize]{agda}
-Voter : Machine VoteNet VotingC   -- VoteNet: Diffuse / Deliver (List Vote)
-record VoterState : Type where
-  field log     : List Vote
-        pending : List Vote
-\end{minted}
-  \centering\small
-  \begin{tabular}{@{}lll@{}}
-    \toprule
-    Rule & Input / output & Effect \\
-    \midrule
-    \agda{Cast-step} & \agda{CAST v} / --- & log and buffer \agda{v} \\
-    \agda{Deliver-step} & \agda{Deliver vs} / \agda{Diffuse pending} & log \agda{vs}, empty the buffer \\
-    \agda{Query-step} & \agda{QUERY r} / \agda{CERT (just (mkCert r))} & if \agda{RealCertified log r} \\
-    \agda{QueryNo-step} & \agda{QUERY r} / \agda{CERT nothing} & otherwise \\
-    \bottomrule
-  \end{tabular}
-  \begin{itemize}\footnotesize
-    \item One per node; buffered casts are sent on the next network delivery.
-    \item The network authenticates nothing, so \agda{RealCertified}
-          counts only \agda{Valid} votes, under the voter each vote
-          \emph{claims}, distinct and at least \agda{threshold} of them.
-    \item \agda{answered-cert-correct}: under the corruption bound and the
-          honest-vote validation premise, a positive answer has an honest
-          validating voter behind it.
-  \end{itemize}
-\end{frame}
-
-\begin{frame}[fragile]{A deployment}
-\begin{minted}{agda}
-network = liftᴷ (shuffle numberOfParties DD.M VotingC)
-            ∘ᴷ (DD.Network ⊗ᴷ Certifier.Functionality) ∘ idᴷ
-\end{minted}
-  \begin{itemize}
-    \item $n$ parties; honest ones run \agda{Leios1}, the others arbitrary
-          machines with the same channels.
-    \item Shared functionalities: a delayed-diffusion network
-          (delay \agda{k}) and a \agda{Certifier} for votes.
-    \item \agda{shuffle} regroups $n$ network ports and $n$ voting ports into
-          one \agda{DD.M ⊗₀ VotingC} port per party.
-    \item This is the ideal deployment.  The real deployment uses
-          \agda{Leios1ʳ} and local voters over diffusion alone; replacing
-          ideal voting with real voting requires the UC emulation proof.
-  \end{itemize}
-\end{frame}
+% \begin{frame}[fragile]{A deployment}
+% \begin{minted}{agda}
+% network = liftᴷ (shuffle numberOfParties DD.M VotingC)
+%             ∘ᴷ (DD.Network ⊗ᴷ Certifier.Functionality) ∘ idᴷ
+% \end{minted}
+%   \begin{itemize}
+%     \item $n$ parties; honest ones run \agda{Leios1}, the others arbitrary
+%           machines with the same channels.
+%     \item Shared functionalities: a delayed-diffusion network
+%           (delay \agda{k}) and a \agda{Certifier} for votes.
+%     \item \agda{shuffle} regroups $n$ network ports and $n$ voting ports into
+%           one \agda{DD.M ⊗₀ VotingC} port per party.
+%     \item This is the ideal deployment.  The real deployment uses
+%           \agda{Leios1ʳ} and local voters over diffusion alone; replacing
+%           ideal voting with real voting requires the UC emulation proof.
+%   \end{itemize}
+% \end{frame}
 
 \begin{frame}{A deployment: shared network and voting}
   \centering
@@ -1475,250 +1401,460 @@ network = liftᴷ (shuffle numberOfParties DD.M VotingC)
   The environment closes the exposed IO and adversary interfaces.
 \end{frame}
 
-% Leios/Voting/{Ideal,Real,Voter}.lagda.md.
-\begin{frame}[fragile]{Certificate correctness: an honest validator exists}
-\begin{minted}[fontsize=\scriptsize]{agda}
-cert-correct : ∀ {st x}
-  → WF st
-  → (corrupt : List Party)
-  → (∀ {p} → Voted p x st → ¬ honest p → p ∈ˡ corrupt)
-  → length corrupt N.< threshold
-  → Certified st x
-  → ∃[ p ] (honest p × Validated p x)
-\end{minted}
-  \begin{itemize}\small
-    \item \textbf{Invariant}: \agda{WF} says every logged vote by an honest
-          party is backed by validation.  It holds for the empty log and is
-          preserved by \agda{Cast}.
-    \item \textbf{Counting argument}: a certificate contains at least
-          \agda{threshold} distinct voters.  They cannot all belong to the
-          smaller corrupt set, so one is honest; \agda{WF} gives validation.
-    \item \textbf{Real voting}: filter the local log to \agda{Valid} votes
-          and map each to its voter and reference.  A real quorum becomes an
-          ideal quorum; \agda{real-cert-correct} transfers the result, and
-          \agda{answered-cert-correct} applies it to a positive voter reply.
-    \item The real result assumes that valid votes attributed to honest
-          parties imply validation.  This certificate theorem is proved;
-          full real-to-ideal UC emulation remains a separate goal.
+
+\begin{frame}{A deployment: shared network and local voting}
+  \centering
+  \begin{tikzpicture}[x=1mm,y=1mm, scale=0.9, transform shape,
+      every node/.style={font=\scriptsize, align=center}]
+    \node[machine, minimum width=32mm, minimum height=26mm] (p0) at (0,-4) {};
+    \node[anchor=north] at (p0.north) {Honest party 0\\\agda{Leios1ʳ}};
+    \node[machine, minimum width=24mm, minimum height=6mm, draw=vt, fill=vt!8]
+      at (0,-10) {Local \agda{Voter}};
+    \node[machine, minimum width=32mm, minimum height=26mm] (p1) at (45,-4) {};
+    \node[anchor=north] at (p1.north) {Honest party 1\\\agda{Leios1ʳ}};
+    \node[machine, minimum width=24mm, minimum height=6mm, draw=vt, fill=vt!8]
+      at (45,-10) {Local \agda{Voter}};
+    \node[machine, minimum width=32mm, minimum height=26mm,
+        draw=adv, fill=adv!6] (pc) at (90,-4)
+      {Corrupt party\\arbitrary machine};
+    \foreach \p in {p0,p1,pc} {
+      \draw[chan] ([xshift=-5mm]\p.north) -- ++(0,7mm)
+        node[above,lbl]{IO};
+      \draw[advchan] ([xshift=5mm]\p.north) -- ++(0,7mm)
+        node[above,lbl]{Adv};
+    }
+    \node[machine, minimum width=112mm, minimum height=10mm] (dd) at (45,-29)
+      {\agda{DD.Network}\\shared delayed diffusion, delay \agda{k}};
+    \foreach \p in {p0,p1,pc} {
+      \draw[chan] (\p.south) -- (\p.south |- dd.north)
+        node[midway,right,lbl]{DD.M};
+    }
+    \draw[advchan] (dd.south) -- ++(0,-6mm)
+      node[below,lbl]{DD.Env ⊗ DD.Adv};
+  \end{tikzpicture}
+  \par\footnotesize
+  Each honest node has its own vote log; \agda{VotingC} and \agda{VoteNet}
+  remain internal.  \agda{NetTranslateV} carries votes, EBs and base traffic
+  over \agda{DD.M}.  Only delayed diffusion is shared.
+\end{frame}
+
+% Real/ideal comparison in the style of Andre Knispel's uc-slides.pdf,
+% slide 5.  Voting UC emulation is a goal; the branch proof remains partial.
+\begin{frame}{The idea: local voting emulates the global service}
+  {\small For every adversary \textcolor{adv}{$A$}, find a simulator
+  \textcolor{adv}{$S$} such that no environment $Z$ distinguishes the worlds.}
+  \par\vspace{1mm}
+  \centering
+  \begin{tikzpicture}[x=1mm,y=1mm, scale=0.88, transform shape,
+      every node/.style={font=\small, align=center}]
+    \node[machine, minimum width=68mm, minimum height=9mm] (zr) at (28,0)
+      {Environment $Z$};
+    \node[machine, minimum width=68mm, minimum height=9mm] (zi) at (108,0)
+      {Environment $Z$};
+    \node[machine, text width=32mm, minimum height=18mm] (real) at (8,-20)
+      {Real world\\{\scriptsize local voters\\+ diffusion}};
+    \node[machine, minimum width=24mm, minimum height=18mm,
+        draw=adv, fill=adv!6] (a) at (48,-20)
+      {$A$\\{\scriptsize adversary}};
+    \node[machine, text width=32mm, minimum height=18mm,
+        draw=vt, fill=vt!8] (ideal) at (88,-20)
+      {Ideal world\\{\scriptsize global certifier\\+ diffusion}};
+    \node[machine, minimum width=24mm, minimum height=18mm,
+        draw=adv, fill=adv!6] (sim) at (128,-20)
+      {$S$\\{\scriptsize simulator}};
+    \draw[chan] (real.north) -- (real.north |- zr.south);
+    \draw[advchan] (a.north) -- (a.north |- zr.south);
+    \draw[advchan] (real.east) -- (a.west);
+    \draw[chan] (ideal.north) -- (ideal.north |- zi.south);
+    \draw[advchan] (sim.north) -- (sim.north |- zi.south);
+    \draw[advchan] (ideal.east) -- (sim.west);
+    \node[font=\Large] at (66,-18) {$\approx$};
+  \end{tikzpicture}
+  \par\agda{realWorld ≤UC idealWorld}
+  \begin{itemize}\footnotesize
+    \item \textbf{Assumptions}: vote attribution and reference binding;
+          synchrony, so votes arrive before certificate queries.
+    \item \textbf{Benefit}: UC composition lets us replace the ideal service
+          while preserving guarantees that environments can test.
+    \item \textbf{Status}: a simulator and partial simulation proofs exist
+          on a branch; emulation remains a goal.
   \end{itemize}
 \end{frame}
 
-\begin{frame}{UC emulation}
-  \begin{itemize}
-    \item Environments are tests: machines into a fixed output channel
-          \agda{ℰ-Out}, possibly with an ancilla wire.
-    \item \agda{f ≈ℰ g}: every test yields equivalent composites, i.e.\ no
-          environment distinguishes \agda{f} from \agda{g}.
-    \item \agda{π ≤UC φ}: for every adversary against the real protocol
-          \agda{π} there is a simulator against the ideal functionality
-          \agda{φ} such that the two worlds are \agda{≈ℰ}.
-    \item The abstract layer proves, once, the following:
-      \begin{itemize}
-        \item \agda{≤UC} is a preorder;
-        \item the dummy adversary is complete;
-        \item \alert{composition}: if \agda{π ≤UC φ} then
-              \agda{ρ ∘ π ≤UC ρ ∘ φ}.
-      \end{itemize}
-    \item Practical consequence: reason about Leios against an
-          \emph{ideal} voting functionality, then replace it.
-  \end{itemize}
-\end{frame}
-
-% Branch yveshauser/vr-relbisim (2ddab09, unpushed): Network/Leios.agda and
-% Network/Leios/VotingBisim.agda.  It needs categorical-crypto extensions
-% (pointed machines, bisimulation up to context) that are not upstream yet.
-\begin{frame}[fragile]{UC for the voting functionalities (on a branch)}
-\begin{minted}[fontsize=\scriptsize]{agda}
-idealWorld = ⨂ᴷ (λ _ → Leios1)  ∘ᴷ ideal-network   -- diffusion ⊗ one global Certifier
-realWorld  = ⨂ᴷ (λ _ → Leios1ʳ) ∘ᴷ DD.Network      -- each node counts votes with a Voter
-
-Voting-UC = ∀ st → Attributable st → VotesBind st → HashesBind
-  → suc (suc (suc k)) ≤ Ldiff → realWorldᴾ st ≤UC idealWorldᴾ st
-\end{minted}
-  \begin{itemize}\small
-    \item Premises: every vote is valid and attributed to its caster
-          (unforgeability, key registration); votes and hashes bind; and
-          \alert{synchrony}, a vote reaches every node before anyone queries
-          for it.  Synchrony is necessary: without it the adversary can
-          withhold a vote, so that a local voter and the certifier answer a
-          query differently.
-    \item Proof: both worlds start at a shared genesis (pointed machines,
-          rooted bisimulation \agda{≈ᴿ}); one simulator against the dummy
-          adversary suffices, and it keeps a shadow of the real network.
-          Both worlds factor into a shared context over a core, related by a
-          bisimulation up to context.
-    \item Status: the core simulation is proved; two parameters remain,
-          inverting the simulated core's steps (\agda{sim-inv}) and the
-          context invariants (\agda{ContextHyps}).
-  \end{itemize}
-\end{frame}
+%% ===========================================================================
+%\section{Safety and Liveness}
+%% ===========================================================================
+%
+%\begin{frame}[fragile]{Safety: common prefix}
+%\begin{minted}{agda}
+%safeState : {A : Channel} → ℕ → (E : Environment A) → Machine.State (protocol E) → Type
+%safeState k E S =
+%  {p p' : Fin n} (honest-p : p ∈ honest-nodes) (honest-p' : p' ∈ honest-nodes)
+%  → prune k (getChain E S honest-p) ≼ getChain E S honest-p'
+%
+%safety : ℕ → Type₁
+%safety k = ∀ {A} (E : Environment A) → Invariant (protocol E) (safeState k E)
+%
+%Invariant : (P : State → Type) → Type
+%Invariant P = (s₁ s₂ : State) → Trace s₁ s₂ → P s₁ → P s₂
+%\end{minted}
+%  \begin{itemize}
+%    \item Cutting the last \agda{k} blocks off one honest chain leaves a
+%          prefix of any other.
+%    \item \agda{protocol E = E ∘ (nodes ∘ᴷ network)}: the deployment,
+%          closed off by an environment that also plays the adversary.
+%    \item An invariant over every environment: traces preserve safe states.
+%    \item \agda{getChain} reads a chain through the node's
+%          \agda{IsBlockchain} queries.
+%  \end{itemize}
+%\end{frame}
+%
+%\begin{frame}[fragile]{Liveness: chain growth and chain quality}
+%\begin{minted}{agda}
+%hcgState : {A : Channel} → ℚ → (E : Environment A) → Machine.State (protocol E) → Type
+%hcgState τ E S₀ =
+%    {p : Fin n} (hp : p ∈ honest-nodes) {pref suff : List Block} {b : Block}
+%  → getChain E S₀ hp ≡ pref ++ (b ∷ suff)
+%  → isHonestBlock b
+%  → τ ℚ.* ℕ→ℚ (getSlot E S₀ hp ∸ slotOf b) ℚ.≤ ℕ→ℚ (length suff)
+%
+%∃cqState : {A : Channel} → ℕ → (E : Environment A) → Machine.State (protocol E) → Type
+%∃cqState T E S₀ =
+%    {p : Fin n} (hp : p ∈ honest-nodes)
+%  → Any.Any isHonestBlock (recent T (getSlot E S₀ hp) (getChain E S₀ hp))
+%\end{minted}
+%  \begin{itemize}
+%    \item \textbf{Honest chain growth}: at least
+%          $\tau \cdot (\mathit{slot} - \mathit{slot}_b)$ blocks follow an
+%          honest block \agda{b}.
+%    \item \textbf{Existential chain quality}: among the blocks of the last
+%          \agda{T} slots of an honest chain, at least one is honest.
+%    \item \agda{hcg τ} and \agda{∃cq T} are invariants over every
+%          environment, like \agda{safety k}.
+%  \end{itemize}
+%\end{frame}
+%
+%% Leios/Linear/Progress.agda: enough-traces, built from tick and upkeep.
+%\begin{frame}[fragile]{Progress: traces reach every future slot}
+%\begin{minted}{agda}
+%enough-traces : ∀ s n → allDone s
+%  → ∃[ s' ] slot s + n ≡ slot s' × Trace LinearLeios s s'
+%\end{minted}
+%  \begin{itemize}\small
+%    \item Safety and liveness are invariants along deployment traces.
+%          This progress result supplies bare-node witness traces;
+%          \agda{allDone} means all four per-slot duties are settled.
+%    \item \textbf{One tick}: \agda{Slot}, then \agda{Chain}, advance the
+%          slot and reset upkeep.  Settle EB production, base/certificate
+%          duties, then voting, restoring \agda{allDone} in the same slot.
+%    \item \textbf{No blocked duty}: produce or vote when eligible;
+%          otherwise use \agda{No-EB-Role} or \agda{No-VT-Role}.
+%          If the tip calls for a certificate, answer the node's query with
+%          \agda{CERT nothing} via \agda{Cert₁}.
+%    \item \textbf{Induct on \agda{n}}: the empty trace for zero;
+%          concatenate one tick with the remaining ticks using
+%          \agda{Trace-trans}.  Choose empty message and RB lists.
+%    \item \alert{Scope}: existential progress of the bare node, with
+%          inputs chosen by the trace; not chain growth or progress of the
+%          composed deployment, nor a premise of the transfer theorems.
+%  \end{itemize}
+%\end{frame}
+%
+%\begin{frame}[fragile]{Safety and liveness transfer}
+%  \begin{itemize}
+%    \item \textbf{Safety transfer}: assuming the chain lemma, Leios
+%          inherits common prefix from the base chain.
+%  \end{itemize}
+%\begin{minted}{agda}
+%leiosSafety : (∀ {A} (E : S.Environment A) → TrM.ChainLemma-ty E)
+%            → Deployment.safety Tr.base k → S.safety k
+%\end{minted}
+%  \begin{itemize}
+%    \item \textbf{Liveness transfer}: honest chain growth and chain quality
+%          (\agda{leiosHCG}, \agda{leios∃CQ}), from chain and slot lemmas.
+%    \item The key step is \agda{is-extension}: the Leios node \emph{is}
+%          the base node with an extra layer on top, up to \agda{≅ᴹ}.
+%  \end{itemize}
+%\end{frame}
+%
+%\begin{frame}[fragile]{When are two machines the same?}
+%\begin{minted}{agda}
+%record _≅ᴹ_ (M M' : Machine A B) : Type where
+%  field to      : S → S'
+%	from    : S' → S
+%        from∘to : ∀ s  → from (to s) ≡ s
+%	to∘from : ∀ s' → to (from s') ≡ s'
+%        step-to   : R  s₁  i o s₂  → R' (to s₁)    i o (to s₂)
+%        step-from : R' s₁' i o s₂' → R  (from s₁') i o (from s₂')
+%\end{minted}
+%  \begin{itemize}
+%    \item \agda{≅ᴹ}: a state bijection that preserves and reflects steps.
+%    \item Up to \agda{≅ᴹ}, machines with \agda{∘}, \agda{⊗₁}, \agda{I} form
+%          a \alert{symmetric monoidal category}, all laws proved.
+%    \item Strong, and sometimes too strong: a bisimulation \agda{\_≈ᴮ\_}
+%          is available where state spaces differ.
+%  \end{itemize}
+%\end{frame}
+%
+%% Blockchain/Safety/Transfer.agda; Blockchain/Liveness/Transfer.agda reuses
+%% the same transProtocol.
+%\begin{frame}[fragile]{The category at work: transferring safety and liveness}
+%  \begin{itemize}
+%    \item Channels are the objects, machines the morphisms; with \agda{∘},
+%          \agda{⊗₁} and \agda{I} they form a symmetric monoidal category up
+%          to \agda{≅ᴹ}.  The Kleisli operators \agda{∘ᴷ}, \agda{⊗ᴷ}
+%          additionally carry the adversary channels along.
+%    \item The transfer proofs rewrite the closed Leios system, for any
+%          environment \agda{E}, into the \emph{base} system under a new
+%          environment:
+%  \end{itemize}
+%\begin{minted}{agda}
+%transProtocol : Ext.protocol E ≅ᴹ Base.protocol transEnv
+%transEnv      = E ∘ transId ∘ ⨂ᴷ extPart ⊗₁ id
+%\end{minted}
+%  \begin{itemize}
+%    \item Each honest Leios node is its Leios layer on top of a base node
+%          (\agda{is-extension}); the n-ary laws \agda{⨂-reshape-env} and
+%          \agda{⨂-absorb-env}, derived from the monoidal ones, then move all
+%          the layers into the environment.
+%    \item \agda{≅ᴹ} maps states and traces
+%          (\agda{Trace-map transProtocol}).  Base safety and liveness hold
+%          for \emph{every} environment, so also for \agda{transEnv}; with
+%          the chain lemma (base chain $=$ Leios chain mapped to RBs), and
+%          for liveness the slot lemma, they carry over to Leios.
+%  \end{itemize}
+%\end{frame}
+%
+%% ===========================================================================
+%\section{Trace verifier}
+%% ===========================================================================
+%
+%% Leios/Linear/Trace/Verifier.lagda.md: Action, TestInput, TestTrace.
+%\begin{frame}[fragile]{From a recorded trace to specification steps}
+%\begin{minted}{agda}
+%TestInput = FFDT Out ⊎ BaseIOF In ⊎ IOT In ⊎ VotingT In
+%TestTrace = List (Action × TestInput)
+%\end{minted}
+%  \begin{itemize}
+%    \item Each entry names the expected rule and its slot, paired with the
+%          input consumed: for example, \agda{Base₂-Action 108} with
+%          \agda{SLOT}, or \agda{Cert₁-Action 108} with \agda{CERT (just c)}.
+%    \item Role actions also carry witnesses: \agda{EB-Role-Action} names
+%          the proposed EB; \agda{VT-Role-Action} names the EB and its recorded
+%          receipt slot.
+%    \item Given an initial \agda{LeiosState}, replay the actions against
+%          the \emph{same transition relation} that defines \agda{LinearLeios}.
+%          Outputs and successor states are reconstructed, not supplied by
+%          the trace.
+%    \item The internal list is newest first; the sample tests reverse
+%          chronological event lists before calling \agda{verifyTrace}.
+%    \item This is node-level conformance checking.  The external trace
+%          verifier uses this Agda checker for simulator and live-node traces.
+%  \end{itemize}
+%\end{frame}
+%
+%% Leios/Linear/Trace/Verifier.lagda.md: ValidStep, ValidTrace, verifyStep.
+%\begin{frame}[fragile]{Verification returns a proof, not just a Boolean}
+%\begin{minted}{agda}
+%verifyStep : (a : Action) → (i : TestInput) → (s : LeiosState)
+%  → Result (Err-verifyStep a i s) (ValidStep (a , i) s)
+%
+%verifyTrace : (σs : TestTrace) → (s : LeiosState)
+%  → Result (Err-verifyTrace σs s) (ValidTrace σs s)
+%\end{minted}
+%  \begin{enumerate}\small
+%    \item Check that the action's slot matches the current state and that
+%          the input constructor matches the rule.
+%    \item Decide the rule's premises, using decision procedures derived
+%          from the specification by \agda{genPremises}.
+%    \item On success, construct the actual transition and carry its
+%          successor state into the next check; on failure, return a
+%          structured error with the failed obligation.
+%  \end{enumerate}
+%  \begin{itemize}\small
+%    \item \agda{ValidTrace} contains a derivation of the execution and a
+%          proof that its actions and inputs match the recorded trace.
+%          \agda{getNewState} extracts its final state.
+%    \item Acceptance therefore witnesses a valid specification execution;
+%          it does not establish safety or liveness of every execution.
+%  \end{itemize}
+%\end{frame}
+%
+%% Leios/Linear/Trace/Verifier/Test.lagda.md: test-trace and verifyTrace.
+%\begin{frame}{Trace verifier setup: the Agda test module}
+%  \centering
+%  \verifierdiagram
+%    {Scripted transaction selection\\\agda{SubmitTxs txs}}
+%    {Scripted deliveries and duties\\\agda{FFD-OUT msgs}\\\agda{SLOT}}
+%    {Scripted RB-chain updates\\\agda{BASE-LDG rbs}}
+%    {Scripted certificate answers\\\agda{CERT c}}
+%    {yes}
+%  \begin{itemize}\footnotesize
+%    \item \agda{TestTrace} supplies action/input pairs;
+%          \agda{toRcvType} injects each input into the selected node port.
+%          The tests replay them from \agda{s₁₀₀} or \agda{s₂₀₀} using
+%          \agda{d-SpecStructure} and fixed protocol parameters.
+%    \item These are scripted inputs, not running diffusion, base or voting
+%          machines.  Outputs and states are reconstructed by the checker;
+%          assertions inspect acceptance, errors and the final ledger.
+%  \end{itemize}
+%\end{frame}
+%
+%% Leios/Linear/Trace/Verifier/Test.lagda.md: test₁--test₁₀.
+%\begin{frame}{Trace tests: certificates, changed tips and refusals}
+%  \begin{itemize}\small
+%    \item \textbf{Accepted sample}: slots 100--109 cover EB reception,
+%          voting, EB production, certificate queries and RB-chain updates.
+%          The final ledger resolves the certificate to EB₁'s transactions.
+%    \item \textbf{Accepted changed-tip trace}: query for RB₃; receive RB₄
+%          as the new tip; \agda{Cert₃} re-queries; the chain becomes empty;
+%          \agda{Cert₂} discards the answer and submits without a certificate.
+%  \end{itemize}
+%  \centering\small
+%  \begin{tabular}{@{}ll@{}}
+%    \toprule
+%    Rejected scenario & Reported error \\
+%    \midrule
+%    Submit directly when a certificate is called for & \agda{Err-Base₁-premises} \\
+%    Positive answer names the wrong reference & \agda{Err-Cert₁-premises} \\
+%    Certificate answer with no outstanding query & \agda{Err-Cert₁-premises} \\
+%    Re-query although the tip has not changed & \agda{Err-Cert₃-premises} \\
+%    Issue the base query twice in one slot & \agda{Err-Base₂-premises} \\
+%    Pair a certificate action with \agda{SLOT} & \agda{Err-InputMismatch} \\
+%    \bottomrule
+%  \end{tabular}
+%  \begin{itemize}\small
+%    \item These examples are checked in Agda: successful verdicts, final
+%          ledger contents and rejection messages are asserted in the tests.
+%  \end{itemize}
+%\end{frame}
+%
+%% ouroboros-leios/leios-trace-verifier: LinearLeiosChain.hs,
+%% LinearLeiosVerifierChain.agda and hs-src/app/linear-chain/Main.hs.
+%\begin{frame}{Running the checker against a live node}
+%  \centering
+%  \begin{tikzpicture}[node distance=4mm, every node/.style={font=\small}]
+%    \node[machine, minimum width=29mm] (log) {Node JSON log};
+%    \node[machine, minimum width=29mm, right=of log] (events) {Parsed events};
+%    \node[machine, minimum width=29mm, right=of events] (actions) {Spec actions};
+%    \node[machine, minimum width=29mm, right=of actions] (check) {Agda checker};
+%    \draw[-{Latex}, thick] (log) -- (events);
+%    \draw[-{Latex}, thick] (events) -- (actions);
+%    \draw[-{Latex}, thick] (actions) -- (check);
+%  \end{tikzpicture}
+%  \begin{itemize}
+%    \item The \agda{ouroboros-leios} project builds the Agda verifier into
+%          Haskell executables.  The live-node entry point is
+%          \agda{linear-leios-trace-verifier-chain}.
+%    \item Two inputs: the node's tracing log streams through \textbf{stdin};
+%          \textbf{cardano-api queries over the node socket} supply stake,
+%          the pool's leadership schedule and RB capacity.
+%    \item Parsed events describe leadership checks, EB forging/acquisition,
+%          votes, announcements, chain extensions and mempool readings.
+%          The adapter translates them into specification actions and inputs.
+%    \item Epoch segments carry a tail of the previous epoch, so voting
+%          obligations crossing the boundary remain visible.
+%    \item The file-based \agda{linear-leios-trace-verifier} instead reads
+%          simulator traces with topology and configuration files.
+%  \end{itemize}
+%\end{frame}
+%
+%% ouroboros-leios: ChainEvents.hs, LinearLeiosVerifierChain.agda and
+%% linear-chain/Main.hs.  The live adapter currently uses an older spec pin.
+%\begin{frame}{Trace verifier setup: following the live node}
+%  \centering
+%  \verifierdiagram
+%    {Reconstructed proposal txs\\from forge / mempool events}
+%    {Acquired EBs; slot boundaries\\reconstructed \agda{FFD-OUT}\\and upkeep \agda{SLOT} inputs}
+%    {Reconstructed chain view\\from announcements / extensions}
+%    {Not exercised by the\\current live adapter}
+%    {no}
+%  \begin{itemize}\footnotesize
+%    \item Log events become action/input pairs.  Socket queries parameterise
+%          replay with stake, leadership eligibility and RB capacity.
+%    \item Replay observes the live node; reconstructed inputs and outputs are not sent to it.
+%    \item The current live adapter uses an older spec pin;
+%          \agda{VotingC} certificate interactions are not checked.
+%  \end{itemize}
+%\end{frame}
+%
+%% Launch syntax from the chain executable's option parser; paths and ids
+%% are supplied as shell variables for the running node.
+%\begin{frame}[fragile]{Starting the live-node trace verifier}
+%  From the \agda{ouroboros-leios} repository:
+%\begin{minted}[fontsize=\scriptsize]{bash}
+%nix build '.#trace-parser:exe:linear-leios-trace-verifier-chain'
+%
+%tail -n +1 -F "$NODE_LOG" | \
+%  nix run '.#trace-parser:exe:linear-leios-trace-verifier-chain' -- \
+%    --socket-path "$NODE_SOCKET" \
+%    --testnet-magic "$NETWORK_MAGIC" \
+%    --shelley-genesis "$SHELLEY_GENESIS" \
+%    --stake-pool-id "$POOL_ID" \
+%    --vrf-signing-key-file "$VRF_SKEY"
+%\end{minted}
+%  \begin{itemize}\small
+%    \item Set the variables to the node's JSON tracing log, socket, network
+%          magic, Shelley genesis, pool id and VRF signing-key file.
+%          \texttt{tail -F} reads the existing log and follows new output.
+%    \item The pool id selects the system under test; the genesis and VRF key
+%          are used to query its leadership schedule.  No topology or Leios
+%          configuration file is required by this executable.
+%    \item The current driver fixes \agda{Lhdr = 1}, \agda{Lvote = 4} and
+%          \agda{Ldiff = 7}.  It starts at the first logged leadership-check
+%          slot, skipping the preceding sync/replay backlog.
+%  \end{itemize}
+%\end{frame}
+%
+%% Live reporting and checkpoint policy in linear-chain/Main.hs and
+%% LinearLeiosChain.hs; these are more detailed than the README's summary.
+%\begin{frame}[fragile]{Reading the live verifier's output}
+%\begin{minted}{text}
+%ok @ <events> events, <actions> actions
+%VIOLATION after <events> events: <status>
+%\end{minted}
+%  \begin{itemize}\small
+%    \item \textbf{Checkpoints}: every 20 slots, at epoch boundaries and at
+%          end of input, re-check the accumulated segment.  A violation
+%          reports the failing action and details, then exits unsuccessfully.
+%    \item Only completed slots are adjudicated; the final slot still in
+%          progress is left unverified when the stream ends.
+%    \item \textbf{Eligibility source}: the report says whether it used the
+%          queried leadership schedule or the node's own leadership log.
+%          A schedule for another epoch, or a segment spanning epochs, causes
+%          fallback to the log.
+%    \item \textbf{Coverage notes}: missing slot ticks restart verification;
+%          obligations across those gaps are not checked.  Missing or
+%          inconclusive mempool readings can prevent enforcement of EB
+%          production; votes beyond the first in a slot are reported as unchecked.
+%    \item Interpret \texttt{ok} together with these notes: it certifies
+%          the translated, checked portion of the log, rather than every
+%          internal operation of the live node.
+%  \end{itemize}
+%\end{frame}
 
 % ===========================================================================
-\section{Safety and Liveness}
+\section{Summary}
 % ===========================================================================
 
-\begin{frame}[fragile]{Safety: common prefix}
-\begin{minted}{agda}
-safeState : {A : Channel} → ℕ → (E : Environment A) → Machine.State (protocol E) → Type
-safeState k E S =
-  {p p' : Fin n} (honest-p : p ∈ honest-nodes) (honest-p' : p' ∈ honest-nodes)
-  → prune k (getChain E S honest-p) ≼ getChain E S honest-p'
-
-safety : ℕ → Type₁
-safety k = ∀ {A} (E : Environment A) → Invariant (protocol E) (safeState k E)
-
-Invariant : (P : State → Type) → Type
-Invariant P = (s₁ s₂ : State) → Trace s₁ s₂ → P s₁ → P s₂
-\end{minted}
-  \begin{itemize}
-    \item Cutting the last \agda{k} blocks off one honest chain leaves a
-          prefix of any other.
-    \item \agda{protocol E = E ∘ (nodes ∘ᴷ network)}: the deployment,
-          closed off by an environment that also plays the adversary.
-    \item An invariant over every environment: traces preserve safe states.
-    \item \agda{getChain} reads a chain through the node's
-          \agda{IsBlockchain} queries.
-  \end{itemize}
-\end{frame}
-
-\begin{frame}[fragile]{Liveness: chain growth and chain quality}
-\begin{minted}{agda}
-hcgState : {A : Channel} → ℚ → (E : Environment A) → Machine.State (protocol E) → Type
-hcgState τ E S₀ =
-    {p : Fin n} (hp : p ∈ honest-nodes) {pref suff : List Block} {b : Block}
-  → getChain E S₀ hp ≡ pref ++ (b ∷ suff)
-  → isHonestBlock b
-  → τ ℚ.* ℕ→ℚ (getSlot E S₀ hp ∸ slotOf b) ℚ.≤ ℕ→ℚ (length suff)
-
-∃cqState : {A : Channel} → ℕ → (E : Environment A) → Machine.State (protocol E) → Type
-∃cqState T E S₀ =
-    {p : Fin n} (hp : p ∈ honest-nodes)
-  → Any.Any isHonestBlock (recent T (getSlot E S₀ hp) (getChain E S₀ hp))
-\end{minted}
-  \begin{itemize}
-    \item \textbf{Honest chain growth}: at least
-          $\tau \cdot (\mathit{slot} - \mathit{slot}_b)$ blocks follow an
-          honest block \agda{b}.
-    \item \textbf{Existential chain quality}: among the blocks of the last
-          \agda{T} slots of an honest chain, at least one is honest.
-    \item \agda{hcg τ} and \agda{∃cq T} are invariants over every
-          environment, like \agda{safety k}.
-  \end{itemize}
-\end{frame}
-
-% Leios/Linear/Progress.agda: enough-traces, built from tick and upkeep.
-\begin{frame}[fragile]{Progress: traces reach every future slot}
-\begin{minted}{agda}
-enough-traces : ∀ s n → allDone s
-  → ∃[ s' ] slot s + n ≡ slot s' × Trace LinearLeios s s'
-\end{minted}
-  \begin{itemize}\small
-    \item Safety and liveness are invariants along deployment traces.
-          This progress result supplies bare-node witness traces;
-          \agda{allDone} means all four per-slot duties are settled.
-    \item \textbf{One tick}: \agda{Slot}, then \agda{Chain}, advance the
-          slot and reset upkeep.  Settle EB production, base/certificate
-          duties, then voting, restoring \agda{allDone} in the same slot.
-    \item \textbf{No blocked duty}: produce or vote when eligible;
-          otherwise use \agda{No-EB-Role} or \agda{No-VT-Role}.
-          If the tip calls for a certificate, answer the node's query with
-          \agda{CERT nothing} via \agda{Cert₁}.
-    \item \textbf{Induct on \agda{n}}: the empty trace for zero;
-          concatenate one tick with the remaining ticks using
-          \agda{Trace-trans}.  Choose empty message and RB lists.
-    \item \alert{Scope}: existential progress of the bare node, with
-          inputs chosen by the trace; not chain growth or progress of the
-          composed deployment, nor a premise of the transfer theorems.
-  \end{itemize}
-\end{frame}
-
-\begin{frame}[fragile]{Safety and liveness transfer}
-  \begin{itemize}
-    \item \textbf{Safety transfer}: assuming the chain lemma, Leios
-          inherits common prefix from the base chain.
-  \end{itemize}
-\begin{minted}{agda}
-leiosSafety : (∀ {A} (E : S.Environment A) → TrM.ChainLemma-ty E)
-            → Deployment.safety Tr.base k → S.safety k
-\end{minted}
-  \begin{itemize}
-    \item \textbf{Liveness transfer}: honest chain growth and chain quality
-          (\agda{leiosHCG}, \agda{leios∃CQ}), from chain and slot lemmas.
-    \item The key step is \agda{is-extension}: the Leios node \emph{is}
-          the base node with an extra layer on top, up to \agda{≅ᴹ}.
-  \end{itemize}
-\end{frame}
-
-\begin{frame}[fragile]{When are two machines the same?}
-\begin{minted}{agda}
-record _≅ᴹ_ (M M' : Machine A B) : Type where
-  field to      : S → S'
-	from    : S' → S
-        from∘to : ∀ s  → from (to s) ≡ s
-	to∘from : ∀ s' → to (from s') ≡ s'
-        step-to   : R  s₁  i o s₂  → R' (to s₁)    i o (to s₂)
-        step-from : R' s₁' i o s₂' → R  (from s₁') i o (from s₂')
-\end{minted}
-  \begin{itemize}
-    \item \agda{≅ᴹ}: a state bijection that preserves and reflects steps.
-    \item Up to \agda{≅ᴹ}, machines with \agda{∘}, \agda{⊗₁}, \agda{I} form
-          a \alert{symmetric monoidal category}, all laws proved.
-    \item Strong, and sometimes too strong: a bisimulation \agda{\_≈ᴮ\_}
-          is available where state spaces differ.
-  \end{itemize}
-\end{frame}
-
-% Blockchain/Safety/Transfer.agda; Blockchain/Liveness/Transfer.agda reuses
-% the same transProtocol.
-\begin{frame}[fragile]{The category at work: transferring safety and liveness}
-  \begin{itemize}
-    \item Channels are the objects, machines the morphisms; with \agda{∘},
-          \agda{⊗₁} and \agda{I} they form a symmetric monoidal category up
-          to \agda{≅ᴹ}.  The Kleisli operators \agda{∘ᴷ}, \agda{⊗ᴷ}
-          additionally carry the adversary channels along.
-    \item The transfer proofs rewrite the closed Leios system, for any
-          environment \agda{E}, into the \emph{base} system under a new
-          environment:
-  \end{itemize}
-\begin{minted}{agda}
-transProtocol : Ext.protocol E ≅ᴹ Base.protocol transEnv
-transEnv      = E ∘ transId ∘ ⨂ᴷ extPart ⊗₁ id
-\end{minted}
-  \begin{itemize}
-    \item Each honest Leios node is its Leios layer on top of a base node
-          (\agda{is-extension}); the n-ary laws \agda{⨂-reshape-env} and
-          \agda{⨂-absorb-env}, derived from the monoidal ones, then move all
-          the layers into the environment.
-    \item \agda{≅ᴹ} maps states and traces
-          (\agda{Trace-map transProtocol}).  Base safety and liveness hold
-          for \emph{every} environment, so also for \agda{transEnv}; with
-          the chain lemma (base chain $=$ Leios chain mapped to RBs), and
-          for liveness the slot lemma, they carry over to Leios.
-  \end{itemize}
-\end{frame}
-
-% ===========================================================================
-\section{Status and open questions}
-% ===========================================================================
-
-\begin{frame}{Status and open questions}
-  \begin{itemize}
-    \item Discharge the chain and slot lemmas for all environments,
-          leaving base-chain security as the transfer premise.
-    \item Bare-node progress is proved (\agda{enough-traces}); progress of
-          the composed deployment remains open.
-    \item Real voting \agda{≤UC} ideal voting:
-      \begin{itemize}
-        \item needs synchrony between diffusion delay \agda{k} and
-              $L_\mathrm{diff}$;
-        \item rooted bisimulation is available; the remaining simulation
-              plumbing and context invariants must be discharged.
-      \end{itemize}
-    \item Instantiating the base chain with the Praos specification.
-    \item Conformance: the executable trace verifier checks simulator and
-          live-node traces; the live adapter still needs the current spec pin.
-  \end{itemize}
-\end{frame}
+%\begin{frame}{Status and open questions}
+%  \begin{itemize}
+%%    \item Discharge the chain and slot lemmas for all environments,
+%%          leaving base-chain security as the transfer premise.
+%%    \item Bare-node progress is proved (\agda{enough-traces}); progress of
+%%          the composed deployment remains open.
+%    \item Real voting \agda{≤UC} ideal voting:
+%      \begin{itemize}
+%        \item needs synchrony between diffusion delay \agda{k} and
+%              $L_\mathrm{diff}$;
+%        \item rooted bisimulation is available; the remaining simulation
+%              plumbing and context invariants must be discharged.
+%      \end{itemize}
+%    \item Instantiating the base chain with the Praos specification.
+%%    \item Conformance: the executable trace verifier checks simulator and
+%%          live-node traces; the live adapter still needs the current spec pin.
+%  \end{itemize}
+%\end{frame}
 
 \begin{frame}{Summary}
   \begin{itemize}
@@ -1729,8 +1865,8 @@ transEnv      = E ∘ transId ∘ ⨂ᴷ extPart ⊗₁ id
           with adversary interfaces, and an abstract UC theory.
     \item The node, the network and voting are separate machines, wired by
           \agda{∘}, \agda{⊗₁}, \agda{∘ᴷ}, \agda{⊗ᴷ}.
-    \item Safety and liveness \emph{transfer} from the base chain under
-          chain/slot lemmas; certificate correctness is proved separately.
+%    \item Safety and liveness \emph{transfer} from the base chain under
+%          chain/slot lemmas; certificate correctness is proved separately.
   \end{itemize}
   \vfill
   \centering\small
@@ -1767,8 +1903,56 @@ modeType In  = inType
   \end{itemize}
 \end{frame}
 
+% CategoricalCrypto/Channel/Core.agda: the tensor and its exported injections.
+\begin{frame}[fragile]{Channel bundles: an opaque tensor product}
+\begin{minted}{agda}
+opaque
+  _⊗₀_ : Channel → Channel → Channel
+  A ⊗₀ B = (inType A ⊎ inType B) ⇿ (outType A ⊎ outType B)
+\end{minted}
+  \begin{itemize}
+    \item \agda{A ⊗₀ B} bundles two interfaces.  Each message belongs to
+          either \agda{A} or \agda{B}; internally, sum constructors tag the
+          chosen component in each direction.
+    \item \agda{opaque} prevents ordinary client code from automatically
+          reducing the tensor to those sums.  A nested value such as
+          \agda{inj₁ (inj₂ m)} therefore does not directly inhabit
+          \agda{inType ((A ⊗₀ B) ⊗₀ C)} without unfolding.
+    \item The library exports typed injections and projections.  The
+          selection DSL builds paths from these operations, locating a
+          component and tracking its direction without exposing the sum
+          representation.
+    \item Explicit \agda{opaque unfolding \_⊗₀\_} blocks can reveal the
+          representation for proofs; message routing normally uses selectors.
+  \end{itemize}
+\end{frame}
+
 % CategoricalCrypto/Channel/Selection.agda, with the implicit binders
 % (∀ {m m' A B C} →) left out.
+\begin{frame}[fragile]{Why keep the channel tensor opaque?}
+\begin{minted}{agda}
+-- Channel structure:
+(A ⊗₀ B) ⊗₀ C
+
+-- Its input type after unfolding:
+(inType A ⊎ inType B) ⊎ inType C
+\end{minted}
+  \begin{itemize}
+    \item Unrestricted reduction exposes nested sums, injections and case
+          analysis throughout machine-layer proof goals.  Channel expressions
+          and named routing operations preserve the wiring structure.
+    \item \agda{opaque} provides an abstraction boundary: ordinary code
+          keeps the tensor symbolic; proofs needing its representation
+          explicitly unfold it.
+    \item This is a proof-engineering choice, not a mathematical requirement
+          or a security mechanism.  A transparent tensor would describe the
+          same interfaces.
+    \item The selection DSL conveniently composes typed routing operations;
+          it is not the only option.  Exported injections can also be used
+          directly, while representation-level proofs need unfolding.
+  \end{itemize}
+\end{frame}
+
 \begin{frame}[fragile]{The selection DSL}
 Messages into a bundle are addressed with a selection DSL.
 \begin{minted}[fontsize=\scriptsize]{agda}
@@ -2025,6 +2209,74 @@ I .Channel.outType = ⊥
        \textcolor{eb}{\agda{CAST : Vote}}\\
        \textcolor{eb}{\agda{QUERY : EBRef}}};
   \end{tikzpicture}
+\end{frame}
+
+% A witness ordering of node-interface messages, not a mandatory schedule.
+% The tip's voting window has closed, so the third tick declines voting.
+\begin{frame}{A slot as a sequence of interface messages}
+  \centering
+  \begin{tikzpicture}[x=1mm,y=1mm, scale=0.85, transform shape,
+      actor/.style={draw, rounded corners=2pt, fill=blue!6,
+        minimum height=9mm, text width=21mm, align=center, font=\scriptsize},
+      lifeline/.style={gray, dashed},
+      incoming/.style={rb, thick, -{Latex[length=1.5mm]}},
+      outgoing/.style={eb, thick, -{Latex[length=1.5mm]}},
+      message/.style={font=\scriptsize\ttfamily, above, inner sep=0.5mm}]
+    \node[actor] (ffd) at (0,0) {Diffusion / shim\\\agda{FFD}};
+    \node[actor] (base) at (27,0) {Base service\\\agda{BaseIO}};
+    \node[actor] (voting) at (54,0) {Voting service\\\agda{VotingC}};
+    \node[actor, fill=blue!15] (node) at (81,0) {\agda{LinearLeios}};
+    \node[actor] (env) at (108,0) {Environment\\\agda{IO}};
+    \node[actor, fill=gray!8, draw=gray, text=gray] (adv) at (135,0)
+      {Adversary\\\agda{Adv = I}};
+    \foreach \actor in {ffd,base,voting,node,env,adv}
+      \draw[lifeline] (\actor.south) -- ++(0,-47mm);
+
+    \draw[incoming] (env.center |- 0,-9) -- node[message]{Mempool: SubmitTxs txs} (node.center |- 0,-9);
+    \draw[incoming] (ffd.center |- 0,-13) -- node[message]{Slot: FFD-OUT msgs} (node.center |- 0,-13);
+    \draw[outgoing] (node.center |- 0,-17) -- node[message]{Slot: FTCH-LDG} (base.center |- 0,-17);
+    \draw[incoming] (base.center |- 0,-21) -- node[message]{Chain: BASE-LDG rbs} (node.center |- 0,-21);
+
+    \draw[incoming] (ffd.center |- 0,-25) -- node[message]{EB-Role: SLOT} (node.center |- 0,-25);
+    \draw[outgoing] (node.center |- 0,-29) -- node[message]{EB-Role: FFD-IN (Send h nothing)} (ffd.center |- 0,-29);
+    \draw[incoming] (ffd.center |- 0,-33) -- node[message]{Base₂: SLOT} (node.center |- 0,-33);
+    \draw[outgoing] (node.center |- 0,-37) -- node[message]{Base₂: QUERY (hash currentRB)} (voting.center |- 0,-37);
+    \draw[incoming] (voting.center |- 0,-41) -- node[message]{Cert₁: CERT c} (node.center |- 0,-41);
+    \draw[outgoing] (node.center |- 0,-45) -- node[message]{Cert₁: SUBMIT (mkRB s c)} (base.center |- 0,-45);
+    \draw[incoming] (ffd.center |- 0,-49) -- node[message]{No-VT-Role: SLOT} (node.center |- 0,-49);
+    \node[font=\tiny, anchor=west, fill=white, inner sep=0.5mm]
+      at (83,-49) {no output};
+
+  \end{tikzpicture}
+  \par\small
+  \textcolor{rb}{Input to the node}; \textcolor{eb}{output from the node}.
+  Example: EB production is enabled and the current tip calls for a
+  certificate.  \agda{Adv = I} carries no messages.
+\end{frame}
+
+
+% Leios/Linear.lagda.md: certRequest-announcedEB.
+\begin{frame}[fragile]{Certificate requests: binding the queried RB to its EB}
+\begin{minted}{agda}
+certRequest-announcedEB : ∀ {s eb} → certRequest s ≡ just eb
+  → RankingBlock.announcedEB (LeiosState.currentRB s)
+      ≡ just (hash eb)
+\end{minted}
+  \begin{itemize}
+    \item \agda{certRequest} searches known EBs for one announced by the
+          current RB tip and old enough for its votes to have diffused.
+          The lemma exposes the announcement condition of that lookup.
+    \item \agda{Base₂} queries \agda{hash currentRB}, not \agda{hash eb}:
+          votes sign the announcing RB's hash.  The lemma connects this
+          queried RB to the EB returned by \agda{certRequest}.
+    \item \textbf{Proof}: recurse over the EB list.  The empty case cannot
+          return \agda{just eb}; a matching head supplies the announcement
+          equality, and \agda{just}-injectivity identifies it with \agda{eb}.
+          A nonmatching head reduces to the tail.
+    \item The lemma proves reference binding, not certificate availability.
+          \agda{Cert₁} separately checks that the answer still names the
+          current tip and that a positive certificate matches that reference.
+  \end{itemize}
 \end{frame}
 
 \end{document}
