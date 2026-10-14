@@ -275,7 +275,7 @@ follows:
 ```agda
   Cert₁ : let open LeiosState s in
         ∙ needsUpkeep Base
-        ∙ CertCheck ∈ˡ Upkeep
+        ∙ hasUpkeep CertCheck
         ∙ certRequest s ≡ just eb
         ∙ PendingQuery ≡ just (hash currentRB)
         ∙ Maybe.All (λ c → getEBHash c ≡ hash currentRB) c
@@ -285,7 +285,7 @@ follows:
 
   Cert₂ : let open LeiosState s in
         ∙ needsUpkeep Base
-        ∙ CertCheck ∈ˡ Upkeep
+        ∙ hasUpkeep CertCheck
         ∙ certRequest s ≡ nothing
         ∙ PendingQuery ≡ just r
         ───────────────────────────────────────────────────────────────────
@@ -294,7 +294,7 @@ follows:
 
   Cert₃ : let open LeiosState s in
         ∙ needsUpkeep Base
-        ∙ CertCheck ∈ˡ Upkeep
+        ∙ hasUpkeep CertCheck
         ∙ certRequest s ≡ just eb
         ∙ PendingQuery ≡ just r
         ∙ hash currentRB ≢ r
