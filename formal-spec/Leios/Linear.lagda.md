@@ -100,6 +100,29 @@ certRequest s = let open LeiosState s in
   find (λ eb → ¿ just (hash eb) ≡ getCurrentEBHash s
              × slotNumber eb + 3 * Lhdr + Lvote + Ldiff ≤ slot ¿) EBs
 
+-- A successful request selects the EB announced by the current RB tip.
+certRequest-announcedEB : ∀ {s eb} → certRequest s ≡ just eb
+  → RankingBlock.announcedEB (LeiosState.currentRB s) ≡ just (hash eb)
+certRequest-announcedEB {s} {eb} eq = go matches (LeiosState.EBs s) eq
+  where
+    Matches : EndorserBlock → Type
+    Matches eb' = just (hash eb') ≡ getCurrentEBHash s
+      × slotNumber eb' + 3 * Lhdr + Lvote + Ldiff ≤ LeiosState.slot s
+
+    matches : (eb' : EndorserBlock) → Dec (Matches eb')
+    matches eb' = ¿ just (hash eb') ≡ getCurrentEBHash s
+                   × slotNumber eb' + 3 * Lhdr + Lvote + Ldiff ≤ LeiosState.slot s ¿
+
+    -- Keep the decision procedure abstract so `find` reduces with the case split.
+    go : (check : (e : EndorserBlock) → Dec (Matches e))
+      → (ebs : List EndorserBlock) → find check ebs ≡ just eb
+      → RankingBlock.announcedEB (LeiosState.currentRB s) ≡ just (hash eb)
+    go check [] ()
+    go check (eb' ∷ ebs) eq with check eb'
+    ... | yes (announced , _) =
+      trans (sym announced) (cong (λ e → just (hash e)) (just-injective eq))
+    ... | no _ = go check ebs eq
+
 mkRB : LeiosState → Maybe EBCert → RankingBlock
 mkRB s mc = let open LeiosState s in record
   { announcedEB = proposedEB
@@ -112,6 +135,8 @@ be answered from the votes as cast.  `certRequest` still selects the EB, but
 only to decide *whether* a certificate is called for; the reference asked
 for is `hash currentRB`.  A positive answer must certify that reference
 (`Maybe.All`, in `Cert₁`); a negative answer trivially matches any request.
+`certRequest-announcedEB` makes the binding explicit: a successful request
+selects the EB announced by the ranking block whose hash is queried.
 ```agda
 rememberVote : LeiosState → EndorserBlock → LeiosState
 rememberVote s@(record { VotedEBs = vebs }) eb = record s { VotedEBs = hash eb ∷ vebs }
