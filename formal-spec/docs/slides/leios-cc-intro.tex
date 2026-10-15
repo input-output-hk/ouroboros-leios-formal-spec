@@ -130,14 +130,14 @@
 \end{frame}
 
 % ===========================================================================
-\section{Protocol recap}
+\section{Protocol}
 % ===========================================================================
 
 \begin{frame}{Why Linear Leios?}
   \begin{itemize}
     \item Ouroboros Praos: in every slot, each stake pool privately checks
           whether it may produce a block
-    \item Praos carries transactions in chain blocks.  Larger blocks take
+    \item Transactions are carried in blocks. Larger blocks take
           longer to propagate and validate; at a fixed block-production
           rate, this increases the risk of forks and constrains throughput.
     \item Linear Leios (CIP-0164) separates chain growth from bulk
@@ -217,8 +217,8 @@
     \item In the concrete model, typed \alert{channels} are the objects and
           interactive \alert{machines} are the morphisms; machines compose
           sequentially and in parallel.
-    \item Protocols, functionalities, adversaries and environments are
-          modelled as machines, with distinct roles in the security argument.
+%    \item Protocols, functionalities, adversaries and environments are
+%          modelled as machines, with distinct roles in the security argument.
     \item The abstract UC layer proves reflexivity, transitivity, the dummy
           adversary reduction and a composition theorem, under its stated
           assumptions on composition and observational equivalence.
@@ -301,9 +301,7 @@ record Machine (A B : Channel) : Type₁ where
   \begin{itemize}
     \item A machine from \agda{A} to \agda{B}: a relation that consumes one
           message and emits at most one.
-    \item For the same state and input, several outputs or successor states
-          may be permitted.  The relation specifies the allowed choices,
-          without selecting one.
+    \item The relation specifies the allowed choices, without selecting one.
     \item Linear Leios is exactly such a relation:
           \agda{LinearLeios .stepRel = \_-⟦\_/\_⟧⇀\_}.
   \end{itemize}
