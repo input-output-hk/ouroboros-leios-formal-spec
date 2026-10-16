@@ -32,7 +32,8 @@ record LeiosAbstract : Type₁ where
 ```agda
         vote      : PrivKey → Hash → Vote
         sign      : PrivKey → Hash → Sig
-        getEBHash : EBCert → Hash
+        -- The certified reference: the hash of the RB announcing the EB.
+        getCertRef : EBCert → Hash
         -- split a mempool into transactions for the RB & EB
         splitTxs  : List Tx → List Tx × List Tx
 ```

@@ -26,7 +26,7 @@ module Network.Leios
   (mkCert    : EBRef → EBCert)
   -- a certificate names the reference it was made for, so that a positive
   -- answer to a query can match the query
-  (mkCert-hash : ∀ r → getEBHash (mkCert r) ≡ r)
+  (mkCert-hash : ∀ r → getCertRef (mkCert r) ≡ r)
   (threshold : ℕ)
   (voter     : Vote → Fin numberOfParties)
   (Valid     : Vote → Type) ⦃ _ : Valid ⁇¹ ⦄
@@ -209,7 +209,7 @@ Leios1ʳ = ext-spec ∘ᴷ specʳ
 
 -- A positive answer from the certifier or the voter, `CERT (just (mkCert r))`
 -- to `QUERY r`, satisfies `Cert₁`'s premise on the answer.
-mkCert-matches : ∀ r → Maybe.All (λ c → getEBHash c ≡ r) (just (mkCert r))
+mkCert-matches : ∀ r → Maybe.All (λ c → getCertRef c ≡ r) (just (mkCert r))
 mkCert-matches r = Maybe.just (mkCert-hash r)
 
 -- the optional EB is the one determined by the RB, _not_ the one announced by it

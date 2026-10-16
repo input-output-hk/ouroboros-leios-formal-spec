@@ -1,0 +1,71 @@
+digraph linear {
+  rankdir=LR; nodesep=0.45; ranksep=0.9; newrank=true;
+  bgcolor=white;
+  label=<<b>Linear Leios: the rules of <i>_-⟦_/_⟧⇀_</i> over one slot</b><br/><font point-size="10">edge label: <b>rule</b> [premise]  /  input ⇒ output</font>>;
+  labelloc=t; fontname="DejaVu Sans"; fontsize=14;
+  node [shape=box, style="rounded,filled", fillcolor="#f4f6fa", color="#3b4a6b",
+        fontname="DejaVu Sans", fontsize=12, margin="0.2,0.1"];
+  edge [fontname="DejaVu Sans", fontsize=10, color="#3b4a6b", arrowsize=0.8];
+
+  start [shape=point, width=0.15, label="", style=filled, fillcolor="#3b4a6b"];
+  fork [shape=box, style=filled, fillcolor="#3b4a6b", width=0.08, height=3.2, fixedsize=true, label=""];
+  join [shape=box, style=filled, fillcolor="#3b4a6b", width=0.08, height=3.2, fixedsize=true, label=""];
+
+  start -> fork;
+
+  subgraph cluster_slot {
+    label=<<b>Upkeep of the current slot</b>  <font point-size="10">(three regions, interleaved freely)</font>>;
+    style="rounded,dashed"; color="#8a94a8"; fontname="DejaVu Sans"; fontsize=12;
+
+    subgraph cluster_eb {
+      label=<<b>EB-Role</b>>; style="rounded"; color="#c7cddb";
+      ebOpen [label=<EB-Role unsettled>];
+      ebDone [label=<EB-Role settled<br/><font point-size="10">proposedEB set if produced</font>>];
+      ebOpen -> ebDone [label=<<b>EB-Role</b> [CanProposeEB s π eb]<br/>SLOT ⇒ FFD-IN (Send ebHeader)>];
+      ebOpen -> ebDone [label=<<b>No-EB-Role</b> [¬ ∃ π eb. CanProposeEB s π eb]<br/>SLOT ⇒ nothing>, color="#8a94a8", fontcolor="#5a6478"];
+    }
+
+    subgraph cluster_vt {
+      label=<<b>VT-Role</b>>; style="rounded"; color="#c7cddb";
+      vtOpen [label=<VT-Role unsettled>];
+      vtDone [label=<VT-Role settled>];
+      vtOpen -> vtDone [label=<<b>VT-Role</b> [CanVote s eb ebHash slot′]<br/>SLOT ⇒ CAST v>];
+      vtOpen -> vtDone [label=<<b>No-VT-Role</b> [¬ ∃ eb ebHash slot′. CanVote …]<br/>SLOT ⇒ nothing>, color="#8a94a8", fontcolor="#5a6478"];
+      vtOpen -> vtDone [label=<<b>VT-Defer</b> [slot &lt; voteDeadline]<br/>SLOT ⇒ nothing>, color="#8a94a8", fontcolor="#5a6478"];
+    }
+
+    subgraph cluster_cert {
+      label=<<b>CertCheck and Base</b>>; labelloc=b; style="rounded"; color="#c7cddb";
+      Open      [label=<<b>Open</b><br/><font point-size="10">CertCheck, Base unsettled</font>>];
+      Awaiting  [label=<<b>Awaiting answer</b><br/><font point-size="10">CertCheck settled<br/>PendingQuery = just r</font>>];
+      Submitted [label=<<b>RB submitted</b><br/><font point-size="10">CertCheck, Base settled</font>>];
+      Open -> Submitted [label=<<b>Base₁</b> [EB-Role settled, certRequest ≡ nothing]<br/>SLOT ⇒ SUBMIT (mkRB s nothing)>];
+      Open -> Awaiting  [label=<<b>Base₂</b> [EB-Role settled, certRequest ≡ just eb]<br/>SLOT ⇒ QUERY (hash currentRB)>];
+      Awaiting -> Awaiting [label=<<b>Cert₃</b> [r ≢ hash currentRB]<br/>CERT c ⇒ QUERY (hash currentRB)>, color="#b5651d", fontcolor="#8a4a12"];
+      Awaiting -> Submitted [label=<<b>Cert₁</b> [r ≡ hash currentRB, c certifies it]<br/>CERT c ⇒ SUBMIT (mkRB s c)>];
+      Awaiting -> Submitted [label=<<b>Cert₂</b> [certRequest ≡ nothing]<br/>CERT c ⇒ SUBMIT (mkRB s nothing)>, color="#b5651d", fontcolor="#8a4a12"];
+    }
+  }
+
+  fork -> ebOpen; fork -> vtOpen; fork -> Open;
+  ebDone -> join [arrowhead=none]; vtDone -> join [arrowhead=none]; Submitted -> join [arrowhead=none];
+
+  // cross-region premise
+  ebDone -> Open [style=dotted, constraint=false, arrowhead=vee,
+                  label=<<i>enables Base₁, Base₂</i>>];
+
+  slot1 [shape=plain, label=<<b>Slot</b>  [allDone]<br/>FFD-OUT msgs ⇒ FTCH-LDG<br/><font point-size="9">slot := suc slot<br/>Upkeep := []<br/>proposedEB := nothing</font>>];
+  join -> slot1 [arrowhead=none];
+  slot1 -> fork [constraint=false, label=<next slot>];
+
+  // rules enabled in every state
+  anyrules [shape=plain, label=<
+    <table border="1" cellborder="0" cellspacing="0" cellpadding="5" color="#8a94a8" style="rounded" bgcolor="#f4f6fa">
+      <tr><td colspan="3" align="left"><b>Enabled in every state</b>  <font point-size="10">(self-loops, no upkeep change)</font></td></tr>
+      <tr><td align="left"><b>Mempool</b></td><td align="left">SubmitTxs txs ⇒ nothing</td><td align="left">ToPropose := txs</td></tr>
+      <tr><td align="left"><b>Chain</b></td><td align="left">BASE-LDG rbs ⇒ nothing</td><td align="left">RBs := rbs  <font color="#8a4a12">(tip may change: why Cert₂, Cert₃)</font></td></tr>
+      <tr><td align="left"><b>Fetch</b></td><td align="left">FetchLdgI ⇒ FetchLdgO Ledger</td><td align="left">state unchanged</td></tr>
+    </table>>];
+  { rank=same; slot1; anyrules; }
+  anyrules -> slot1 [style=invis];
+}

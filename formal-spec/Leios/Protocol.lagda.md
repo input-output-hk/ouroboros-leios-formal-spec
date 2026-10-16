@@ -92,13 +92,20 @@ record LeiosState : Type where
   lookupTxs : EndorserBlock → List Tx
   lookupTxs eb = let open EndorserBlockOSig eb in txs
 
+  -- Certificates name the announcing RB, whose announcement names the EB.
   lookupTxsC : Hash → List Tx
-  lookupTxsC c = maybe lookupTxs [] $ lookupEB c
+  lookupTxsC rbRef =
+    case find (λ rb → hash rb ≟ rbRef) RBs of λ where
+      nothing → []
+      (just rb) →
+        case RankingBlock.announcedEB rb of λ where
+          nothing      → []
+          (just ebRef) → maybe lookupTxs [] (lookupEB ebRef)
 
   Ledger : List Tx
   Ledger = flip L.concatMap RBs λ rb → case RankingBlock.txsOrEbCert rb of λ where
     (inj₁ txs) → txs
-    (inj₂ ebCert) → lookupTxsC (getEBHash ebCert)
+    (inj₂ ebCert) → lookupTxsC (getCertRef ebCert)
 
   hasRB : RankingBlock → Type
   hasRB = _∈ RBs
@@ -269,12 +276,4 @@ module Types (params : Params) (let open Params params) where
 
   FFD : Channel
   FFD = simpleChannel FFDT ᵀ
-
-  data BaseT : Mode → Type where
-    FTCH-LDG : BaseT In
-    SUBMIT   : RankingBlock → BaseT In
-    BASE-LDG : List RankingBlock → BaseT Out
-
-  BaseC : Channel
-  BaseC = simpleChannel BaseT ᵀ
 ```
