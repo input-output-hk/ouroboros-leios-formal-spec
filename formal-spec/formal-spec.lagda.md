@@ -77,6 +77,7 @@ Category-theoretic approach to cryptography
 ```agda
 open import CategoricalCrypto
 import CategoricalCrypto.Ext
+import CategoricalCrypto.Step
 ```
 ### Blockchain abstractions
 ```agda
@@ -91,6 +92,8 @@ The Leios deployment over the diffusion network, and the transfer of safety
 and liveness from the base chain
 ```agda
 open import Network.Leios
+import Network.Leios.Queries
+import Network.Leios.Deployment
 ```
 ### Verification and Testing
 Trace verification for protocol properties
