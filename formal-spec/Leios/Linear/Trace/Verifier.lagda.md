@@ -7,9 +7,9 @@ open import Leios.Prelude hiding (id; _>>=_; return; _⊗_)
 open import Leios.Config
 open import Leios.SpecStructure
 
-open import Prelude.Result
-open import CategoricalCrypto hiding (id; _∘_; eval)
+open import CategoricalCrypto hiding (id; _∘_; eval; Trace)
 open import CategoricalCrypto.Channel.Selection
+import CategoricalCrypto.Machine.Trace as T
 
 open import Data.Maybe.Properties
 ```
@@ -42,7 +42,8 @@ data Action : Type where
   No-EB-Role-Action : ℕ → Action
   No-VT-Role-Action : ℕ → Action
 ```
-A `TestTrace` pairs each action with the input its step consumes.
+A `TestTrace` pairs each action with the input its step consumes, oldest
+first.
 ```agda
 TestInput = FFDT Out ⊎ BaseIOF In ⊎ IOT In ⊎ VotingT In
 
@@ -51,8 +52,6 @@ TestTrace = List (Action × TestInput)
 ```agda
 private variable
   s s′ : LeiosState
-  σ    : Action
-  σs   : TestTrace
   eb   : EndorserBlock
   i    : TestInput
 ```
@@ -89,57 +88,24 @@ getSlot (Mempool-Action x)     = x
 getSlot (Base₁-Action x)       = x
 getSlot (Base₂-Action x)       = x
 ```
-`_—→_` runs backwards, from the later state to the earlier one.
 ```agda
-data _—→_ : LeiosState → LeiosState → Type where
-
-  ActionStep : ∀ {s i o s′} →
-    ∙ s -⟦ i / o ⟧⇀ s′
-      ───────────────────
-      s′ —→ s
-
-open import Prelude.Closures _—→_
-```
-```agda
-toRcvType : TestInput → Channel.inType (((FFD ⊗₀ BaseIO) ⊗₀ VotingC) ⊗₀ ((IO ⊗₀ Adv) ᵀ))
+toRcvType : TestInput → T.Input LinearLeios
 toRcvType (inj₁ i) = ((ϵ ⊗R) ⊗R) ⊗R ↑ᵢ i
 toRcvType (inj₂ (inj₁ i)) = ((L⊗ ϵ) ⊗R) ⊗R ↑ᵢ i
 toRcvType (inj₂ (inj₂ (inj₁ i))) = L⊗ (ϵ ᵗ¹ ⊗R) ᵗ¹ ↑ᵢ i
 toRcvType (inj₂ (inj₂ (inj₂ i))) = (L⊗ ϵ) ⊗R ↑ᵢ i
 ```
+The verifier is an instance of the generic trace verifier
+`CategoricalCrypto.Machine.Trace` for `LinearLeios`: the hint naming a step's
+rule is its `Action`, and traces name inputs as `TestInput`s, mapped into the
+machine's input by `toRcvType`.  A `StepWith a s i` is a step from `s` on input
+`i` whose rule is `a`.
 ```agda
-infix 0 _≈_ _≈¹_
-
-data _≈¹_ : Action × TestInput → s′ —→ s → Type where
-
-  FromAction :
-    ∀ i {s′ o}
-      → (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
-      → (getAction σ , i) ≈¹ ActionStep σ
-
-data ValidStep (es : Action × TestInput) (s : LeiosState) : Type where
-  Valid : (tr : s′ —→ s) → es ≈¹ tr → ValidStep es s
-```
-```agda
-data _≈_ : TestTrace → s′ —↠ s → Type where
-
-  FromAction :
-    ∀ i {σs s′ s₀ o} {tr : s —↠ s₀}
-      → σs ≈ tr
-      → (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
-      → (getAction σ , i) ∷ σs ≈ s′ —→⟨ ActionStep σ ⟩ tr
-
-  Done : [] ≈ s ∎
-
-data ValidTrace (es : TestTrace) (s : LeiosState) : Type where
-  Valid : (tr : s′ —↠ s) → es ≈ tr → ValidTrace es s
+StepWith : Action → LeiosState → TestInput → Type
+StepWith a s i = Σ[ x ∈ T.Step LinearLeios s (toRcvType i) ] getAction (T.derivation x) ≡ a
 ```
 ### Error handling
-```agda
-getNewState : ∀ {es s} → ValidTrace es s → LeiosState
-getNewState (Valid {s′ = s} _ _) = s
-```
-`Err-InputMismatch` carries the real refutation `¬ ValidStep (σ , i) s`.  Deriving it requires
+`Err-InputMismatch` carries the real refutation `¬ StepWith σ s i`.  Deriving it requires
 inverting the transition's input index `toRcvType i`, whose channel selections are `opaque` in
 categorical-crypto; the lemmas below therefore sit in an `opaque unfolding _⊗₀_` block, where
 the selections reduce to constructor form and Agda can dismiss the impossible transition
@@ -209,39 +175,52 @@ opaque
   input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₂ _)     = refl
   input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₃ _)     = refl
 
-  input-mismatch : ∀ {a i s} → inputC i ≢ expectedInput a → ¬ ValidStep (a , i) s
-  input-mismatch neq (Valid _ (FromAction i σ)) = neq (input-sound i σ)
+  input-mismatch : ∀ {a i s} → inputC i ≢ expectedInput a → ¬ StepWith a s i
+  input-mismatch {i = i} neq (T.step _ _ σ , refl) = neq (input-sound i σ)
 
-  Fetch-step : ∀ {s} → ValidStep (Fetch-Action (LeiosState.slot s) , inj₂ (inj₂ (inj₁ FetchLdgI))) s
-  Fetch-step = Valid _ (FromAction (inj₂ (inj₂ (inj₁ FetchLdgI))) Fetch)
+  Fetch-step : ∀ {s} → StepWith (Fetch-Action (LeiosState.slot s)) s (inj₂ (inj₂ (inj₁ FetchLdgI)))
+  Fetch-step = T.step _ _ Fetch , refl
+```
+Each error names the action, and where it matters the input, that it
+rejects, so that it refutes every step the trace entry could stand for
+(see `refute-rule` below).  An EB-Role error is stated for the verifier's
+VRF proof `π₀ s`, the only one `canProduceEB` admits (`π-unique`), and a
+VT-Role error for the hash of the voted EB, the only hash `CanVote` admits.
+```agda
+π₀ : LeiosState → VrfPf
+π₀ s = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))
 
-data Err-verifyStep (σ : Action) (i : TestInput) (s : LeiosState) : Type where
-  Err-Slot : getSlot σ ≢ LeiosState.slot s → Err-verifyStep σ i s
-  Err-EB-Role-premises : ∀ {π} → ¬ (EB-Role-premises {s = s} {π = π} {eb = eb} .proj₁) → Err-verifyStep σ i s
-  Err-No-EB-Role-premises : ¬ (No-EB-Role-premises {s = s} .proj₁) → Err-verifyStep σ i s
-  Err-VT-Role-premises : ∀ {ebHash slot'}
-    → ¬ (VT-Role-premises {s = s} {eb = eb} {ebHash = ebHash} {slot' = slot'} .proj₁) → Err-verifyStep σ i s
-  Err-No-VT-Role-premises : ¬ (No-VT-Role-premises {s = s} .proj₁) → ¬ (VT-Defer-premises {s = s} .proj₁)
-    → Err-verifyStep σ i s
-  Err-AllDone : ¬ (allDone s) → Err-verifyStep σ i s
-  Err-Cert₁-premises : ∀ {c} → (∀ {eb} → ¬ (Cert₁-premises {s = s} {eb = eb} {c = c} .proj₁)) → Err-verifyStep σ i s
-  Err-Cert₂-premises : (∀ {r} → ¬ (Cert₂-premises {s = s} {r = r} .proj₁)) → Err-verifyStep σ i s
-  Err-Cert₃-premises : (∀ {eb r} → ¬ (Cert₃-premises {s = s} {eb = eb} {r = r} .proj₁)) → Err-verifyStep σ i s
-  Err-Base₁-premises : ¬ (Base₁-premises {s = s} .proj₁) → Err-verifyStep σ i s
-  Err-Base₂-premises : (∀ {eb} → ¬ (Base₂-premises {s = s} {eb = eb} .proj₁)) → Err-verifyStep σ i s
-  Err-InputMismatch : ¬ ValidStep (σ , i) s → Err-verifyStep σ i s
-data Err-verifyTrace : TestTrace → LeiosState → Type where
-  Err-StepOk : Err-verifyTrace σs s → Err-verifyTrace ((σ , i) ∷ σs) s
-  Err-Step   : Err-verifyStep σ i s′ → Err-verifyTrace ((σ , i) ∷ σs) s
+data Err-verifyStep : Action → TestInput → LeiosState → Type where
+  Err-Slot : ∀ {σ i s} → getSlot σ ≢ LeiosState.slot s → Err-verifyStep σ i s
+  Err-EB-Role-premises : ∀ {n eb i s} → ¬ (EB-Role-premises {s = s} {π = π₀ s} {eb = eb} .proj₁)
+    → Err-verifyStep (EB-Role-Action n eb) i s
+  Err-No-EB-Role-premises : ∀ {n i s} → ¬ (No-EB-Role-premises {s = s} .proj₁)
+    → Err-verifyStep (No-EB-Role-Action n) i s
+  Err-VT-Role-premises : ∀ {n eb slot' i s}
+    → ¬ (VT-Role-premises {s = s} {eb = eb} {ebHash = hash eb} {slot' = slot'} .proj₁)
+    → Err-verifyStep (VT-Role-Action n eb slot') i s
+  Err-No-VT-Role-premises : ∀ {n i s} → ¬ (No-VT-Role-premises {s = s} .proj₁) → ¬ (VT-Defer-premises {s = s} .proj₁)
+    → Err-verifyStep (No-VT-Role-Action n) i s
+  Err-AllDone : ∀ {n i s} → ¬ (allDone s) → Err-verifyStep (Slot-Action n) i s
+  Err-Cert₁-premises : ∀ {n c s} → (∀ {eb} → ¬ (Cert₁-premises {s = s} {eb = eb} {c = c} .proj₁))
+    → Err-verifyStep (Cert₁-Action n) (inj₂ (inj₂ (inj₂ (CERT c)))) s
+  Err-Cert₂-premises : ∀ {n i s} → (∀ {r} → ¬ (Cert₂-premises {s = s} {r = r} .proj₁))
+    → Err-verifyStep (Cert₂-Action n) i s
+  Err-Cert₃-premises : ∀ {n i s} → (∀ {eb r} → ¬ (Cert₃-premises {s = s} {eb = eb} {r = r} .proj₁))
+    → Err-verifyStep (Cert₃-Action n) i s
+  Err-Base₁-premises : ∀ {n i s} → ¬ (Base₁-premises {s = s} .proj₁) → Err-verifyStep (Base₁-Action n) i s
+  Err-Base₂-premises : ∀ {n i s} → (∀ {eb} → ¬ (Base₂-premises {s = s} {eb = eb} .proj₁))
+    → Err-verifyStep (Base₂-Action n) i s
+  Err-InputMismatch : ∀ {σ i s} → ¬ StepWith σ s i → Err-verifyStep σ i s
 ```
 ```agda
 Ok' : ∀ {s i o s′} → (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
-    → Result (Err-verifyStep (getAction σ) i s) (ValidStep (getAction σ , i) s)
-Ok' a = Ok (Valid _ (FromAction _ a))
+    → Err-verifyStep (getAction σ) i s ⊎ StepWith (getAction σ) s i
+Ok' σ = inj₂ (T.step _ _ σ , refl)
 
 Mismatch : ∀ {a i s} → inputC i ≢ expectedInput a
-         → Result (Err-verifyStep a i s) (ValidStep (a , i) s)
-Mismatch neq = Err (Err-InputMismatch (input-mismatch neq))
+         → Err-verifyStep a i s ⊎ StepWith a s i
+Mismatch neq = inj₁ (Err-InputMismatch (input-mismatch neq))
 inj₂≢SLOT : ∀ y → inputC (inj₂ y) ≢ cSLOT
 inj₂≢SLOT (inj₁ (BASE-LDG _))         ()
 inj₂≢SLOT (inj₁ (STAKE _))            ()
@@ -302,18 +281,18 @@ inj₂inj₁≢CERT (SLOT _)     ()
 verifyStep' : (a : Action) →
   (i : TestInput) →
   (s : LeiosState) → getSlot a ≡ LeiosState.slot s →
-  Result (Err-verifyStep a i s) (ValidStep (a , i) s)
+  Err-verifyStep a i s ⊎ StepWith a s i
 verifyStep' (EB-Role-Action _ _) (inj₁ SLOT) s refl
-  with ¿ EB-Role-premises {s = s} {π = proj₂ $ eval sk-EB (genEBInput (LeiosState.slot s))} .proj₁ ¿
+  with ¿ EB-Role-premises {s = s} {π = π₀ s} .proj₁ ¿
 ... | yes p = Ok' (EB-Role p)
-... | no ¬p = Err (Err-EB-Role-premises ¬p)
+... | no ¬p = inj₁ (Err-EB-Role-premises ¬p)
 verifyStep' (EB-Role-Action _ _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (EB-Role-Action _ _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (EB-Role-Action _ _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (VT-Role-Action _ eb slot') (inj₁ SLOT) s refl
   with ¿ VT-Role-premises {s = s} {eb = eb} {ebHash = hash eb} {slot' = slot'} .proj₁ ¿
 ... | yes p = Ok' (VT-Role {ebHash = hash eb} {slot' = slot'} p)
-... | no ¬p = Err (Err-VT-Role-premises ¬p)
+... | no ¬p = inj₁ (Err-VT-Role-premises ¬p)
 verifyStep' (VT-Role-Action _ _ _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (VT-Role-Action _ _ _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (VT-Role-Action _ _ _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
@@ -324,11 +303,11 @@ verifyStep' (Cert₁-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mi
 verifyStep' (Cert₁-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _     = Mismatch λ ()
 verifyStep' (Cert₁-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
   with certRequest s in eq
-... | nothing = Err (Err-Cert₁-premises {c = c} λ (_ , _ , creq , _) → just≢nothing (trans (sym creq) eq))
+... | nothing = inj₁ (Err-Cert₁-premises {c = c} λ (_ , _ , creq , _) → just≢nothing (trans (sym creq) eq))
 ... | just eb
   with ¿ Cert₁-premises {s = s} {eb = eb} {c = c} .proj₁ ¿
 ... | yes p = Ok' (Cert₁ p)
-... | no ¬p = Err (Err-Cert₁-premises λ p@(_ , _ , creq , _) →
+... | no ¬p = inj₁ (Err-Cert₁-premises λ p@(_ , _ , creq , _) →
                 ¬p (subst (λ e → Cert₁-premises {s = s} {eb = e} {c = c} .proj₁) (just-injective (trans (sym creq) eq)) p))
 
 verifyStep' (Cert₂-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢CERT x)
@@ -337,11 +316,11 @@ verifyStep' (Cert₂-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mi
 verifyStep' (Cert₂-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _     = Mismatch λ ()
 verifyStep' (Cert₂-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
   with LeiosState.PendingQuery s in peq
-... | nothing = Err (Err-Cert₂-premises λ (_ , _ , _ , pq) → just≢nothing (trans (sym pq) peq))
+... | nothing = inj₁ (Err-Cert₂-premises λ (_ , _ , _ , pq) → just≢nothing (trans (sym pq) peq))
 ... | just r
   with ¿ Cert₂-premises {s = s} {r = r} .proj₁ ¿
 ... | yes p = Ok' (Cert₂ p)
-... | no ¬p = Err (Err-Cert₂-premises λ (upk , chk , creq , _) → ¬p (upk , chk , creq , peq))
+... | no ¬p = inj₁ (Err-Cert₂-premises λ (upk , chk , creq , _) → ¬p (upk , chk , creq , peq))
 
 verifyStep' (Cert₃-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢CERT x)
 verifyStep' (Cert₃-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢CERT y)
@@ -349,19 +328,19 @@ verifyStep' (Cert₃-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mi
 verifyStep' (Cert₃-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ _     = Mismatch λ ()
 verifyStep' (Cert₃-Action _) (inj₂ (inj₂ (inj₂ (CERT c)))) s refl
   with certRequest s in eq | LeiosState.PendingQuery s in peq
-... | nothing | _       = Err (Err-Cert₃-premises λ (_ , _ , creq , _) → just≢nothing (trans (sym creq) eq))
-... | just _  | nothing = Err (Err-Cert₃-premises λ (_ , _ , _ , pq , _) → just≢nothing (trans (sym pq) peq))
+... | nothing | _       = inj₁ (Err-Cert₃-premises λ (_ , _ , creq , _) → just≢nothing (trans (sym creq) eq))
+... | just _  | nothing = inj₁ (Err-Cert₃-premises λ (_ , _ , _ , pq , _) → just≢nothing (trans (sym pq) peq))
 ... | just eb | just r
   with ¿ Cert₃-premises {s = s} {eb = eb} {r = r} .proj₁ ¿
 ... | yes p = Ok' (Cert₃ p)
-... | no ¬p = Err (Err-Cert₃-premises λ p@(_ , _ , creq , pq , _) →
+... | no ¬p = inj₁ (Err-Cert₃-premises λ p@(_ , _ , creq , pq , _) →
                 ¬p (subst₂ (λ e r' → Cert₃-premises {s = s} {eb = e} {r = r'} .proj₁)
                       (just-injective (trans (sym creq) eq)) (just-injective (trans (sym pq) peq)) p))
 
 verifyStep' (Fetch-Action _) (inj₁ x) _ _                           = Mismatch (inj₁≢FetchLdgI x)
 verifyStep' (Fetch-Action _) (inj₂ (inj₁ y)) _ _                    = Mismatch (inj₂inj₁≢FetchLdgI y)
 verifyStep' (Fetch-Action _) (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) _ _ = Mismatch λ ()
-verifyStep' (Fetch-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ refl  = Ok Fetch-step
+verifyStep' (Fetch-Action _) (inj₂ (inj₂ (inj₁ FetchLdgI))) _ refl  = inj₂ Fetch-step
 verifyStep' (Fetch-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _      = Mismatch λ ()
 
 verifyStep' (Slot-Action _) (inj₁ SLOT) _ _ = Mismatch λ ()
@@ -369,7 +348,7 @@ verifyStep' (Slot-Action _) (inj₁ FTCH) _ _ = Mismatch λ ()
 verifyStep' (Slot-Action _) (inj₁ (FFD-OUT msgs)) s refl
   with ¿ Slot-premises {s = s} .proj₁ ¿
 ... | yes p = Ok' (Slot {s = s} {msgs = msgs} p)
-... | no ¬p = Err (Err-AllDone ¬p)
+... | no ¬p = inj₁ (Err-AllDone ¬p)
 verifyStep' (Slot-Action _) (inj₂ y) _ _ = Mismatch (inj₂≢FFD-OUT y)
 verifyStep' (Chain-Action _) (inj₁ x) _ _ = Mismatch (inj₁≢BASE-LDG x)
 verifyStep' (Chain-Action _) (inj₂ (inj₁ (BASE-LDG _))) _ refl         = Ok' Chain
@@ -388,24 +367,24 @@ verifyStep' (Mempool-Action _) (inj₂ (inj₂ (inj₂ (CERT _)))) _ _         =
 verifyStep' (Base₁-Action _) (inj₁ SLOT) s refl
   with ¿ Base₁-premises {s = s} .proj₁ ¿
 ... | yes p = Ok' (Base₁ p)
-... | no ¬p = Err (Err-Base₁-premises ¬p)
+... | no ¬p = inj₁ (Err-Base₁-premises ¬p)
 verifyStep' (Base₁-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (Base₁-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (Base₁-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (Base₂-Action _) (inj₁ SLOT) s refl
   with certRequest s in eq
-... | nothing = Err (Err-Base₂-premises λ { (_ , _ , q) → just≢nothing (trans (sym q) eq) })
+... | nothing = inj₁ (Err-Base₂-premises λ { (_ , _ , q) → just≢nothing (trans (sym q) eq) })
 ... | just eb
   with ¿ Base₂-premises {s = s} {eb = eb} .proj₁ ¿
 ... | yes p = Ok' (Base₂ p)
-... | no ¬p = Err (Err-Base₂-premises λ (p , u , _) → ¬p (p , u , eq))
+... | no ¬p = inj₁ (Err-Base₂-premises λ (p , u , _) → ¬p (p , u , eq))
 verifyStep' (Base₂-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (Base₂-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (Base₂-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 verifyStep' (No-EB-Role-Action _) (inj₁ SLOT) s refl
   with ¿ No-EB-Role-premises {s = s} .proj₁ ¿
 ... | yes p = Ok' (No-EB-Role p)
-... | no ¬p = Err (Err-No-EB-Role-premises ¬p)
+... | no ¬p = inj₁ (Err-No-EB-Role-premises ¬p)
 verifyStep' (No-EB-Role-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (No-EB-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (No-EB-Role-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
@@ -413,28 +392,110 @@ verifyStep' (No-VT-Role-Action _) (inj₁ SLOT) s refl
   with ¿ No-VT-Role-premises {s = s} .proj₁ ¿ | ¿ VT-Defer-premises {s = s} .proj₁ ¿
 ... | yes p | _     = Ok' (No-VT-Role p)
 ... | no _  | yes q = Ok' (VT-Defer q)
-... | no ¬p | no ¬q = Err (Err-No-VT-Role-premises ¬p ¬q)
+... | no ¬p | no ¬q = inj₁ (Err-No-VT-Role-premises ¬p ¬q)
 verifyStep' (No-VT-Role-Action _) (inj₁ FTCH) _ _        = Mismatch λ ()
 verifyStep' (No-VT-Role-Action _) (inj₁ (FFD-OUT _)) _ _ = Mismatch λ ()
 verifyStep' (No-VT-Role-Action _) (inj₂ y) _ _           = Mismatch (inj₂≢SLOT y)
 ```
 ```agda
-verifyStep : (a : Action) → (i : TestInput) → (s : LeiosState) → Result (Err-verifyStep a i s) (ValidStep (a , i) s)
+verifyStep : (a : Action) → (i : TestInput) → (s : LeiosState) → Err-verifyStep a i s ⊎ StepWith a s i
 verifyStep a i s = case getSlot a ≟ LeiosState.slot s of λ where
   (yes p) → verifyStep' a i s p
-  (no ¬p) → Err (Err-Slot ¬p)
+  (no ¬p) → inj₁ (Err-Slot ¬p)
 ```
+`verifyStep` is the generic verifier's step checker.  Outputs are not
+checked.
 ```agda
-verifyTrace : ∀ (σs : TestTrace) → (s : LeiosState) → Result (Err-verifyTrace σs s) (ValidTrace σs s)
-verifyTrace [] s = Ok (Valid (s ∎) Done)
-verifyTrace ((a , i) ∷ σs) s = do
-  σs ← mapErr Err-StepOk (verifyTrace σs s)
-  x  ← mapErr Err-Step (verifyStep a i (getNewState σs))
-  return (σs Valid∷ʳ x)
-  where
-    open Monad-Result
-    _Valid∷ʳ_ : ∀ {e es s} → (σs : ValidTrace es s) → ValidStep e (getNewState σs) → ValidTrace (e ∷ es) s
-    Valid tr x Valid∷ʳ Valid (ActionStep as) (FromAction a _) = Valid (_ —→⟨ ActionStep as ⟩ tr) (FromAction a x as)
+checkable : T.Checkable LinearLeios
+checkable = record
+  { Hint      = Action
+  ; hintOf    = getAction ∘ T.derivation
+  ; Msg       = TestInput
+  ; embed     = toRcvType
+  ; Err       = Err-verifyStep
+  ; checkStep = verifyStep
+  }
+
+open T.Verifier LinearLeios checkable (T.ignoreOutputs LinearLeios) public
+  renaming (verifyStep to verifyEntry)
+
+toTrace : TestTrace → Trace
+toTrace = L.map λ (a , i) → ⟨ a , i , tt ⟩
+```
+### Completeness
+The verifier is also complete: every error refutes all steps with the
+entry's action, and an action determines the output and target of its
+step.  The only two rules sharing an action, `No-VT-Role` and `VT-Defer`,
+have the same output and target.  Hence `validTrace? checkable-complete`
+decides `ValidTrace`.
+```agda
+getSlot-getAction : ∀ {s i o s′} (σ : s -⟦ i / o ⟧⇀ s′) → getSlot (getAction σ) ≡ LeiosState.slot s
+getSlot-getAction (Slot _)       = refl
+getSlot-getAction Chain          = refl
+getSlot-getAction Fetch          = refl
+getSlot-getAction Mempool        = refl
+getSlot-getAction (Base₁ _)      = refl
+getSlot-getAction (Base₂ _)      = refl
+getSlot-getAction (Cert₁ _)      = refl
+getSlot-getAction (Cert₂ _)      = refl
+getSlot-getAction (Cert₃ _)      = refl
+getSlot-getAction (EB-Role _)    = refl
+getSlot-getAction (No-EB-Role _) = refl
+getSlot-getAction (VT-Role _)    = refl
+getSlot-getAction (No-VT-Role _) = refl
+getSlot-getAction (VT-Defer _)   = refl
+
+find-sound : ∀ {A : Type} {P : A → Type} (P? : ∀ x → Dec (P x)) xs {x} → find P? xs ≡ just x → P x
+find-sound P? (y ∷ ys) eq with P? y
+... | yes py = subst _ (just-injective eq) py
+... | no _   = find-sound P? ys eq
+
+opaque
+  unfolding _⊗₀_
+
+  refute-rule : ∀ {h m s i o s′} → Err-verifyStep h m s → (σ : s -⟦ i / o ⟧⇀ s′)
+              → i ≡ toRcvType m → getAction σ ≡ h → ⊥
+  refute-rule (Err-Slot ne) σ _ refl = ne (getSlot-getAction σ)
+  refute-rule {s = s} (Err-EB-Role-premises {eb = eb} ¬p) (EB-Role p) _ refl =
+    ¬p (subst (λ π → EB-Role-premises {s = s} {π = π} {eb = eb} .proj₁) (π-unique {s} (p .proj₁ .proj₂)) p)
+  refute-rule (Err-No-EB-Role-premises ¬p) (No-EB-Role p) _ refl = ¬p p
+  refute-rule {s = s} (Err-VT-Role-premises {eb = eb} {slot' = slot'} ¬p) (VT-Role p) _ refl =
+    ¬p (subst (λ h → VT-Role-premises {s = s} {eb = eb} {ebHash = h} {slot' = slot'} .proj₁)
+              (sym (find-sound _ (LeiosState.EBs' s) (p .proj₁ .proj₂ .proj₁))) p)
+  refute-rule (Err-No-VT-Role-premises ¬p _) (No-VT-Role p) _ refl = ¬p p
+  refute-rule (Err-No-VT-Role-premises _ ¬q) (VT-Defer q) _ refl = ¬q q
+  refute-rule (Err-AllDone ¬p) (Slot p) _ refl = ¬p p
+  refute-rule (Err-Cert₁-premises ¬p) (Cert₁ p) refl refl = ¬p p
+  refute-rule (Err-Cert₂-premises ¬p) (Cert₂ p) _ refl = ¬p p
+  refute-rule (Err-Cert₃-premises ¬p) (Cert₃ p) _ refl = ¬p p
+  refute-rule (Err-Base₁-premises ¬p) (Base₁ p) _ refl = ¬p p
+  refute-rule (Err-Base₂-premises ¬p) (Base₂ p) _ refl = ¬p p
+  refute-rule (Err-InputMismatch ¬x) σ refl refl = ¬x (T.step _ _ σ , refl)
+
+  rule-unique : ∀ {s i o₁ o₂ s₁ s₂} (σ₁ : s -⟦ i / o₁ ⟧⇀ s₁) (σ₂ : s -⟦ i / o₂ ⟧⇀ s₂)
+              → getAction σ₂ ≡ getAction σ₁ → (o₁ , s₁) ≡ (o₂ , s₂)
+  rule-unique (Slot _)       (Slot _)       _    = refl
+  rule-unique Chain          Chain          _    = refl
+  rule-unique Fetch          Fetch          _    = refl
+  rule-unique Mempool        Mempool        _    = refl
+  rule-unique (Base₁ _)      (Base₁ _)      _    = refl
+  rule-unique (Base₂ _)      (Base₂ _)      _    = refl
+  rule-unique (Cert₁ _)      (Cert₁ _)      _    = refl
+  rule-unique (Cert₂ _)      (Cert₂ _)      _    = refl
+  rule-unique (Cert₃ _)      (Cert₃ _)      _    = refl
+  rule-unique (EB-Role _)    (EB-Role _)    refl = refl
+  rule-unique (No-EB-Role _) (No-EB-Role _) _    = refl
+  rule-unique (VT-Role _)    (VT-Role _)    refl = refl
+  rule-unique (No-VT-Role _) (No-VT-Role _) _    = refl
+  rule-unique (No-VT-Role _) (VT-Defer _)   _    = refl
+  rule-unique (VT-Defer _)   (No-VT-Role _) _    = refl
+  rule-unique (VT-Defer _)   (VT-Defer _)   _    = refl
+
+checkable-complete : T.Complete LinearLeios checkable
+checkable-complete = record
+  { refute = λ where err (T.step _ _ σ , eq) → refute-rule err σ refl eq
+  ; unique = λ where (T.step _ _ σ₁ , refl) (T.step _ _ σ₂ , eq) → rule-unique σ₁ σ₂ eq
+  }
 ```
 #### Error messages
 ```agda
@@ -473,12 +534,12 @@ module _
     iErr-verifyStep {s = s} .errorMsg (Err-No-EB-Role-premises _)         = printf "%u : Err-No-EB-Role-premises: EB role already settled, or an EB can be produced" (LeiosState.slot s)
     iErr-verifyStep {s = s} .errorMsg (Err-No-VT-Role-premises _ _)       = printf "%u : Err-No-VT-Role-premises: VT role already settled, or a vote can be cast and the voting window has closed" (LeiosState.slot s)
     iErr-verifyStep {s = s} .errorMsg {a} (Err-InputMismatch _)           = printf "%u : Err-InputMismatch: input channel does not match action %s" (LeiosState.slot s) (actionName a)
-    iErr-verifyStep {s = s} .errorMsg (Err-VT-Role-premises {eb = eb} {ebHash = ebHash} {slot' = slot'} _)
-      with ¿ getCurrentEBHash s ≡ just ebHash ¿
+    iErr-verifyStep {s = s} .errorMsg (Err-VT-Role-premises {eb = eb} {slot' = slot'} _)
+      with ¿ getCurrentEBHash s ≡ just (hash eb) ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: Current EB hash does not match" (LeiosState.slot s)
     ... | yes p
-      with ¿ find (λ (_ , eb') → hash eb' ≟ ebHash) (LeiosState.EBs' s) ≡ just (slot' , eb) ¿
-    ... | no ¬p = printf "%u : Err-VT-Role-premises: Hashes mismatch, ebHash=%s" (LeiosState.slot s) (show ebHash)
+      with ¿ find (λ (_ , eb') → hash eb' ≟ hash eb) (LeiosState.EBs' s) ≡ just (slot' , eb) ¿
+    ... | no ¬p = printf "%u : Err-VT-Role-premises: Hashes mismatch, ebHash=%s" (LeiosState.slot s) (show (hash eb))
     ... | yes p
       with ¿ hash eb ∉ LeiosState.VotedEBs s ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: Already voted" (LeiosState.slot s)
@@ -514,7 +575,11 @@ module _
     ... | no ¬p = printf "%u : Err-VT-Role-premises: No registered voting key (keyless committee seat)" (LeiosState.slot s)
     ... | yes p = printf "%u : Impossible!" (LeiosState.slot s)
 
-    iErr-verifyTrace : ∀ {s} → IsError (λ t → Err-verifyTrace t s)
-    iErr-verifyTrace .errorMsg (Err-StepOk x) = errorMsg x
-    iErr-verifyTrace .errorMsg (Err-Step x)   = errorMsg x
+    iStepErr : ∀ {m e s} → IsError (λ h → StepErr h m e s)
+    iStepErr .errorMsg (rejected x)            = errorMsg x
+    iStepErr .errorMsg (output-mismatch _ ¬ok) = ⊥-elim (¬ok tt)
+
+    iTraceErr : ∀ {s} → IsError (λ t → TraceErr s t)
+    iTraceErr .errorMsg (here x)      = errorMsg x
+    iTraceErr .errorMsg (there _ _ x) = errorMsg x
 ```
