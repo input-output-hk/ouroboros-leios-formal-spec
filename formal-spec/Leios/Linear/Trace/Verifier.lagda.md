@@ -57,20 +57,20 @@ private variable
 ```
 ```agda
 getAction : ∀ {i o} → s -⟦ i / o ⟧⇀ s′ → Action
-getAction (Slot {s} _)                                       = Slot-Action (LeiosState.slot s)
-getAction (Chain {s})                                        = Chain-Action (LeiosState.slot s)
-getAction (Fetch {s})                                        = Fetch-Action (LeiosState.slot s)
-getAction (Mempool {s})                                      = Mempool-Action (LeiosState.slot s)
-getAction (Base₁ {s} _)                                      = Base₁-Action (LeiosState.slot s)
-getAction (Base₂ {s} _)                                      = Base₂-Action (LeiosState.slot s)
-getAction (Cert₁ {s} _)                                      = Cert₁-Action (LeiosState.slot s)
-getAction (Cert₂ {s} _)                                      = Cert₂-Action (LeiosState.slot s)
-getAction (Cert₃ {s} _)                                      = Cert₃-Action (LeiosState.slot s)
-getAction (EB-Role {s} {eb = eb} _)                          = EB-Role-Action (LeiosState.slot s) eb
-getAction (No-EB-Role {s} _)                                 = No-EB-Role-Action (LeiosState.slot s)
-getAction (VT-Role {s} {eb = eb} {slot' = slot'} _)          = VT-Role-Action (LeiosState.slot s) eb slot'
-getAction (No-VT-Role {s} _)                                 = No-VT-Role-Action (LeiosState.slot s)
-getAction (VT-Defer {s} _)                                   = No-VT-Role-Action (LeiosState.slot s)
+getAction (Slot {s} _)                              = Slot-Action (LeiosState.slot s)
+getAction (Chain {s})                               = Chain-Action (LeiosState.slot s)
+getAction (Fetch {s})                               = Fetch-Action (LeiosState.slot s)
+getAction (Mempool {s})                             = Mempool-Action (LeiosState.slot s)
+getAction (Base₁ {s} _)                             = Base₁-Action (LeiosState.slot s)
+getAction (Base₂ {s} _)                             = Base₂-Action (LeiosState.slot s)
+getAction (Cert₁ {s} _)                             = Cert₁-Action (LeiosState.slot s)
+getAction (Cert₂ {s} _)                             = Cert₂-Action (LeiosState.slot s)
+getAction (Cert₃ {s} _)                             = Cert₃-Action (LeiosState.slot s)
+getAction (EB-Role {s} {eb = eb} _)                 = EB-Role-Action (LeiosState.slot s) eb
+getAction (No-EB-Role {s} _)                        = No-EB-Role-Action (LeiosState.slot s)
+getAction (VT-Role {s} {eb = eb} {slot' = slot'} _) = VT-Role-Action (LeiosState.slot s) eb slot'
+getAction (No-VT-Role {s} _)                        = No-VT-Role-Action (LeiosState.slot s)
+getAction (VT-Defer {s} _)                          = No-VT-Role-Action (LeiosState.slot s)
 ```
 ```agda
 getSlot : Action → ℕ
@@ -156,24 +156,24 @@ opaque
   input-sound : ∀ (i : TestInput) {s s′ o}
                 (σ : s -⟦ toRcvType i / o ⟧⇀ s′)
               → inputC i ≡ expectedInput (getAction σ)
-  input-sound (inj₁ SLOT) (Base₁ _)                       = refl
-  input-sound (inj₁ SLOT) (Base₂ _)                       = refl
-  input-sound (inj₁ SLOT) (EB-Role _)                     = refl
-  input-sound (inj₁ SLOT) (No-EB-Role _)                  = refl
-  input-sound (inj₁ SLOT) (VT-Role _)                     = refl
-  input-sound (inj₁ SLOT) (No-VT-Role _)                  = refl
-  input-sound (inj₁ SLOT) (VT-Defer _)                    = refl
+  input-sound (inj₁ SLOT) (Base₁ _)                      = refl
+  input-sound (inj₁ SLOT) (Base₂ _)                      = refl
+  input-sound (inj₁ SLOT) (EB-Role _)                    = refl
+  input-sound (inj₁ SLOT) (No-EB-Role _)                 = refl
+  input-sound (inj₁ SLOT) (VT-Role _)                    = refl
+  input-sound (inj₁ SLOT) (No-VT-Role _)                 = refl
+  input-sound (inj₁ SLOT) (VT-Defer _)                   = refl
   input-sound (inj₁ FTCH) ()
-  input-sound (inj₁ (FFD-OUT _)) (Slot _)                 = refl
-  input-sound (inj₂ (inj₁ (BASE-LDG _))) Chain            = refl
+  input-sound (inj₁ (FFD-OUT _)) (Slot _)                = refl
+  input-sound (inj₂ (inj₁ (BASE-LDG _))) Chain           = refl
   input-sound (inj₂ (inj₁ (STAKE _))) ()
   input-sound (inj₂ (inj₁ EMPTY)) ()
   input-sound (inj₂ (inj₁ (SLOT _))) ()
-  input-sound (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) Mempool  = refl
-  input-sound (inj₂ (inj₂ (inj₁ FetchLdgI))) Fetch        = refl
-  input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₁ _)     = refl
-  input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₂ _)     = refl
-  input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₃ _)     = refl
+  input-sound (inj₂ (inj₂ (inj₁ (SubmitTxs _)))) Mempool = refl
+  input-sound (inj₂ (inj₂ (inj₁ FetchLdgI))) Fetch       = refl
+  input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₁ _)    = refl
+  input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₂ _)    = refl
+  input-sound (inj₂ (inj₂ (inj₂ (CERT _)))) (Cert₃ _)    = refl
 
   input-mismatch : ∀ {a i s} → inputC i ≢ expectedInput a → ¬ StepWith a s i
   input-mismatch {i = i} neq (T.step _ _ σ , refl) = neq (input-sound i σ)
@@ -404,7 +404,8 @@ verifyStep a i s = case getSlot a ≟ LeiosState.slot s of λ where
   (no ¬p) → inj₁ (Err-Slot ¬p)
 ```
 `verifyStep` is the generic verifier's step checker.  Outputs are not
-checked.
+checked here; the generic `passes?` checks them separately, against an
+`Observation`.
 ```agda
 checkable : T.Checkable LinearLeios
 checkable = record
@@ -416,11 +417,10 @@ checkable = record
   ; checkStep = verifyStep
   }
 
-open T.Verifier LinearLeios checkable (T.ignoreOutputs LinearLeios) public
-  renaming (verifyStep to verifyEntry)
+open T.Verifier LinearLeios checkable public
 
 toTrace : TestTrace → Trace
-toTrace = L.map λ (a , i) → ⟨ a , i , tt ⟩
+toTrace = L.map λ (a , i) → ⟨ a , i ⟩
 ```
 ### Completeness
 The verifier is also complete: every error refutes all steps with the
@@ -575,11 +575,7 @@ module _
     ... | no ¬p = printf "%u : Err-VT-Role-premises: No registered voting key (keyless committee seat)" (LeiosState.slot s)
     ... | yes p = printf "%u : Impossible!" (LeiosState.slot s)
 
-    iStepErr : ∀ {m e s} → IsError (λ h → StepErr h m e s)
-    iStepErr .errorMsg (rejected x)            = errorMsg x
-    iStepErr .errorMsg (output-mismatch _ ¬ok) = ⊥-elim (¬ok tt)
-
     iTraceErr : ∀ {s} → IsError (λ t → TraceErr s t)
-    iTraceErr .errorMsg (here x)      = errorMsg x
-    iTraceErr .errorMsg (there _ _ x) = errorMsg x
+    iTraceErr .errorMsg (here x)    = errorMsg x
+    iTraceErr .errorMsg (there _ x) = errorMsg x
 ```
