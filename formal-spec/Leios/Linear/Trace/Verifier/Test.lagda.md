@@ -99,24 +99,25 @@ the node ignores incoming votes (see `upd`), so it only illustrates diffusion.
     test-trace : TestTrace
     test-trace =
 ```
+The rows of the diagram are as follows: `tip` is the tip of the chain the
+base layer has delivered, `party 1` is what the other party produces,
+`SUT in` is what the SUT receives by diffusion (`FFD-OUT`), and `SUT out`
+is what it casts or submits.  `RB₂` certifies `EB₁` with `crt₁ = hash RB₁`
+and announces `EB₂`; the RBs the SUT submits in slots 107 and 109 do not
+reach the chain.
 <pre>
-slot: 100 101 102 103 104 105 106 107 108 109
+slot      100   101   102   103   104   105   106   107   108   109
+           |     |     |     |     |     |     |     |     |     |
+           |<--- 3·Lhdr ---->|<- Lvote ->|<- Ldiff ->|
+                             voting window           certificate due
 
-            3* Lhdr    Lvote   Ldiff
-          <---------> <-----> <------>
-  ___|___|___|___|___|___|___|___|___|___|___
-
-                     +---+
-                     |VT₀|
-                     +---+
-     +---+             |             +---+
-  <--|RB₁| <-----------+-------------|RB₂|<--
-     |EB₁| <-----------+---+---------|CRT|
-     +---+                 |         +---+
-                           |
-                         +---+
-                         |VT₁|
-                         +---+
+tip       RB₀   RB₁   RB₁   RB₁   RB₁   RB₁   RB₁   RB₁   RB₁   RB₂
+party 1   RB₁                     VT₁
+          EB₁
+SUT in          EB₁                     VT₁
+SUT out                           vote              RB    RB₂   RB
+                                  EB₁               crt₁  crt₁  txs
+                                                          EB₂
 </pre>
 #### Slot 100
 Submitting transactions and receiving `RB₀`.
