@@ -4,7 +4,6 @@
 {-# OPTIONS --safe #-}
 
 open import Prelude.Errors
-open import Prelude.Result
 open import Leios.Prelude hiding (id)
 open import Leios.Config
 open import Leios.SpecStructure
@@ -100,24 +99,25 @@ the node ignores incoming votes (see `upd`), so it only illustrates diffusion.
     test-trace : TestTrace
     test-trace =
 ```
+The rows of the diagram are as follows: `tip` is the tip of the chain the
+base layer has delivered, `party 1` is what the other party produces,
+`SUT in` is what the SUT receives by diffusion (`FFD-OUT`), and `SUT out`
+is what it casts or submits.  `RB₂` certifies `EB₁` with `crt₁ = hash RB₁`
+and announces `EB₂`; the RBs the SUT submits in slots 107 and 109 do not
+reach the chain.
 <pre>
-slot: 100 101 102 103 104 105 106 107 108 109
+slot      100   101   102   103   104   105   106   107   108   109
+           |     |     |     |     |     |     |     |     |     |
+           |<--- 3·Lhdr ---->|<- Lvote ->|<- Ldiff ->|
+                             voting window           certificate due
 
-            3* Lhdr    Lvote   Ldiff
-          <---------> <-----> <------>
-  ___|___|___|___|___|___|___|___|___|___|___
-
-                     +---+
-                     |VT₀|
-                     +---+
-     +---+             |             +---+
-  <--|RB₁| <-----------+-------------|RB₂|<--
-     |EB₁| <-----------+---+---------|CRT|
-     +---+                 |         +---+
-                           |
-                         +---+
-                         |VT₁|
-                         +---+
+tip       RB₀   RB₁   RB₁   RB₁   RB₁   RB₁   RB₁   RB₁   RB₁   RB₂
+party 1   RB₁                     VT₁
+          EB₁
+SUT in          EB₁                     VT₁
+SUT out                           vote              RB    RB₂   RB
+                                  EB₁               crt₁  crt₁  txs
+                                                          EB₂
 </pre>
 #### Slot 100
 Submitting transactions and receiving `RB₀`.
@@ -211,17 +211,23 @@ for `EB₁`.
                  ∷ []
 ```
 #### Verify the test-trace
+`Accepts t s` holds if the verifier accepts the trace `t` from state `s`.
 ```agda
-    test₁ : IsOk (verifyTrace (L.reverse test-trace) s₁₀₀)
+    Accepts : TestTrace → LeiosState → Type
+    Accepts t s = case verifyTrace s (toTrace t) of λ where
+      (inj₁ _) → ⊥
+      (inj₂ _) → ⊤
+
+    test₁ : Accepts test-trace s₁₀₀
     test₁ = _
 ```
 ### Test error handling
 ```agda
     retValue : String
     retValue =
-      case verifyTrace (L.reverse test-trace) s₁₀₀ of λ where
-        (Ok _) → "ok"
-        (Err e) → errorMsg e
+      case verifyTrace s₁₀₀ (toTrace test-trace) of λ where
+        (inj₂ _) → "ok"
+        (inj₁ e) → errorMsg e
 
     test₂ : retValue ≡ "ok"
     test₂ = refl
@@ -233,9 +239,9 @@ block's announcement to `EB₁`'s transactions.  The ledger also includes
 `RB₀`'s transaction; the certificate exists only inside RBs.
 ```agda
     final : LeiosState
-    final = case verifyTrace (L.reverse test-trace) s₁₀₀ of λ where
-      (Ok vt) → getNewState vt
-      (Err _) → s₁₀₀
+    final = case verifyTrace s₁₀₀ (toTrace test-trace) of λ where
+      (inj₂ (s , _)) → s
+      (inj₁ _)       → s₁₀₀
 
     test₃ : LeiosState.Ledger final ≡ 0 ∷ 1 ∷ 2 ∷ 3 ∷ []
     test₃ = refl
@@ -322,7 +328,7 @@ certificate.
 ```
 #### Verify the stale-certificate trace
 ```agda
-    test₄ : IsOk (verifyTrace (L.reverse stale-cert-trace) s₂₀₀)
+    test₄ : Accepts stale-cert-trace s₂₀₀
     test₄ = _
 ```
 ### Rejected traces
@@ -330,9 +336,9 @@ Each of the following traces breaks one premise of the certificate rules,
 and the verifier reports it.
 ```agda
     verdict : TestTrace → LeiosState → String
-    verdict t s = case verifyTrace (L.reverse t) s of λ where
-      (Ok _)  → "ok"
-      (Err e) → errorMsg e
+    verdict t s = case verifyTrace s (toTrace t) of λ where
+      (inj₂ _) → "ok"
+      (inj₁ e) → errorMsg e
 ```
 `Base₁` cannot submit while the tip calls for a certificate.
 ```agda
@@ -380,4 +386,17 @@ A certificate rule only consumes a `CERT` input.
     test₁₀ : verdict ((Cert₁-Action 200 , inj₁ SLOT) ∷ []) s₂₀₀
            ≡ "200 : Err-InputMismatch: input channel does not match action Cert₁-Action"
     test₁₀ = refl
+```
+### Rejection is refutation
+The verifier is complete (`checkable-complete`), so a rejected trace is
+not merely one the verifier fails to follow: no run of `LinearLeios`
+takes the named rules on these inputs.  The trace of `test₆` is an
+example.
+```agda
+    test₁₁ : ¬ (∃[ s′ ] ValidTrace s₂₀₀ (toTrace (
+                     (No-EB-Role-Action 200 , inj₁ SLOT)
+                   ∷ (Base₂-Action      200 , inj₁ SLOT)
+                   ∷ (Cert₁-Action      200 , inj₂ (inj₂ (inj₂ (CERT (just (hash EB₄))))))
+                   ∷ [])) s′)
+    test₁₁ = toWitnessFalse {a? = validTrace? checkable-complete s₂₀₀ _} tt
 ```
