@@ -407,12 +407,10 @@ verifyStep a i s = case getSlot a ≟ LeiosState.slot s of λ where
 checked here; the generic `passes?` checks them separately, against an
 `Observation`.
 ```agda
-checkable : T.Checkable LinearLeios
+checkable : T.Checkable LinearLeios toRcvType
 checkable = record
   { Hint      = Action
   ; hintOf    = getAction ∘ T.derivation
-  ; Msg       = TestInput
-  ; embed     = toRcvType
   ; Err       = Err-verifyStep
   ; checkStep = verifyStep
   }
