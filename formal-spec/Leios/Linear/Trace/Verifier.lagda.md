@@ -566,7 +566,7 @@ module _
       with ¿ LeiosState.needsUpkeep s VT-Role ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: VT-Role already done" (LeiosState.slot s)
     ... | yes p
-      with ¿ inVotingCommittee params (stake s) ¿
+      with ¿ inCommittee (LeiosState.SD s) id ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: Not in the voting committee" (LeiosState.slot s)
     ... | yes p
       with ¿ id ∈ˡ L.map poolID (LeiosState.PubKeys s) ¿

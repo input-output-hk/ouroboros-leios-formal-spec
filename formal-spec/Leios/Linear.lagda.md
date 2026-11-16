@@ -157,8 +157,9 @@ CanProposeEB s π eb = let open LeiosState s in
 A node can vote on the EB announced by the chain tip if it received
 the EB in time, has not voted on it yet, sees no equivocation, has
 validated it, and is inside the voting window, provided that the EB is
-not empty and that the node holds a committee seat with a registered
-key.
+not empty and that the node holds a committee seat, in the committee the
+ledger selects for the stake distribution (`inCommittee`), with a
+registered key.
 ```agda
 CanVote : LeiosState → EndorserBlock → EBRef → ℕ → Type
 CanVote s eb ebHash slot' = let open LeiosState s in
@@ -172,8 +173,8 @@ CanVote s eb ebHash slot' = let open LeiosState s in
   × slot ≤ slotNumber eb + 3 * Lhdr + Lvote
   × isValidityChecked slot eb
   × EndorserBlockOSig.txs eb ≢ []
-  × inVotingCommittee params (stake s)
-  -- Committee membership is by stake; signing also needs a registered key
+  × inCommittee SD id
+  -- Committee membership is the ledger's; signing also needs a registered key
   × id ∈ˡ L.map poolID PubKeys
 
 allDone : LeiosState → Type
@@ -382,6 +383,9 @@ instance
 
   Dec-isValidityChecked : ∀ {n eb} → isValidityChecked n eb ⁇
   Dec-isValidityChecked {n} {eb} = ⁇ isValidityChecked? n eb
+
+  Dec-inCommittee : ∀ {sd p} → inCommittee sd p ⁇
+  Dec-inCommittee {sd} {p} = ⁇ inCommittee? sd p
 
 unquoteDecl EB-Role-premises  = genPremises EB-Role-premises  (quote _-⟦_/_⟧⇀_.EB-Role)
 unquoteDecl VT-Role-premises  = genPremises VT-Role-premises  (quote _-⟦_/_⟧⇀_.VT-Role)

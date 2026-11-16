@@ -32,8 +32,6 @@ with an RB.
       ; Lhdr = 1
       ; Lvote = 2
       ; Ldiff = 2
-      ; σc-num = 99
-      ; σc-den = 100
       }
 
   testParams : TestParams params

@@ -298,4 +298,6 @@ d-SpecStructure = record
       ; KF                        = d-KeyRegistrationFunctionality
       ; isValidityChecked         = λ _ _ → ⊤
       ; isValidityChecked?        = λ _ _ → yes tt
+      ; inCommittee               = λ _ _ → ⊤
+      ; inCommittee?              = λ _ _ → yes tt
       }
