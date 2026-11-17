@@ -407,12 +407,10 @@ verifyStep a i s = case getSlot a ≟ LeiosState.slot s of λ where
 checked here; the generic `passes?` checks them separately, against an
 `Observation`.
 ```agda
-checkable : T.Checkable LinearLeios
+checkable : T.Checkable LinearLeios toRcvType
 checkable = record
   { Hint      = Action
   ; hintOf    = getAction ∘ T.derivation
-  ; Msg       = TestInput
-  ; embed     = toRcvType
   ; Err       = Err-verifyStep
   ; checkStep = verifyStep
   }
@@ -568,7 +566,7 @@ module _
       with ¿ LeiosState.needsUpkeep s VT-Role ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: VT-Role already done" (LeiosState.slot s)
     ... | yes p
-      with ¿ inVotingCommittee params (stake s) ¿
+      with ¿ inCommittee (LeiosState.SD s) id ¿
     ... | no ¬p = printf "%u : Err-VT-Role-premises: Not in the voting committee" (LeiosState.slot s)
     ... | yes p
       with ¿ id ∈ˡ L.map poolID (LeiosState.PubKeys s) ¿

@@ -64,3 +64,15 @@ record SpecStructure : Type₂ where
   field isValidityChecked  : ℕ → EndorserBlock → Type
         isValidityChecked? : ∀ n eb → Dec (isValidityChecked n eb)
 ```
+Voting-committee membership is the ledger's: the Dijkstra-era ledger
+specification (formal-ledger-specifications, `Ledger.Dijkstra.Specification.Leios`)
+selects the committee for an epoch from the stake distribution and the
+registered pools, and is authoritative for it.  The Leios specification only
+assumes that membership of a pool, given the stake distribution in force, is
+decidable.  `inCommittee sd p` holds when pool `p` holds a seat of the
+committee the ledger selects for `sd` that can sign, i.e. one with an
+honoured voting key.
+```agda
+  field inCommittee  : StakeDistr → PoolID → Type
+        inCommittee? : ∀ sd p → Dec (inCommittee sd p)
+```
